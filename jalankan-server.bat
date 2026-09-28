@@ -48,15 +48,21 @@ echo ====================================================================
 echo.
 echo  [A] Akses di PC Server ini:
 echo      • Scanner Operator : http://localhost/retrun.inboud/
-echo      • Admin Monitoring : http://localhost/retrun.inboud/admin.php
+echo      • Admin Portal     : http://localhost/retrun.inboud/admin.php
 echo.
-echo  [B] Akses dari PC / HP Operator Gudang Lain (Satu Wi-Fi / LAN):
+echo  [B] Akses dari PC / HP / Scanner Gudang Lain (Satu Wi-Fi / LAN):
 echo      • Scanner Operator : http://%LOCAL_IP%/retrun.inboud/
-echo      • Admin Monitoring : http://%LOCAL_IP%/retrun.inboud/admin.php
+echo      • Admin Portal     : http://%LOCAL_IP%/retrun.inboud/admin.php
+echo.
+echo  [C] Akun Pengguna Resmi:
+echo      • Superadmin : Daniel      ^| Password : Dh@niel0
+echo      • Admin      : Admin       ^| Password : Password01
+echo      • Operator 1 : PIN 123456  ^| Pass: Password01
+echo      • Operator 2 : PIN 123456  ^| Pass: Password01
 echo.
 echo ====================================================================
 echo.
-echo Tekan tombol apa saja untuk membuka Scanner di browser...
+echo Tekan tombol apa saja untuk membuka sistem di browser...
 pause >nul
 
 start http://localhost/retrun.inboud/
