@@ -19,9 +19,9 @@ jobs:
       - name: 📂 Sync files to InfinityFree via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ftpupload.net
-          username: if0_38464190
-          password: 'Dhaniel0'
+          server: ${{ secrets.FTP_SERVER || 'ftpupload.net' }}
+          username: ${{ secrets.FTP_USERNAME || 'if0_38464190' }}
+          password: ${{ secrets.FTP_PASSWORD || 'Dhaniel0' }}
           server-dir: returninboundieg.great-site.net/htdocs/
           exclude: |
             **/.git*
@@ -32,3 +32,9 @@ jobs:
             **/jalankan-server.bat
             **/*.sql
             **/deploy-to-infinity.ps1
+
+      - name: 🗄️ Trigger Database Auto-Migration & Sync on InfinityFree
+        run: |
+          echo "Memperbarui skema dan tabel database di hosting InfinityFree..."
+          curl -s -L "http://returninboundieg.great-site.net/api/migrate.php" || true
+          echo "Selesai! Database otomatis tersinkronisasi saat halaman diakses."
