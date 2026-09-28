@@ -744,11 +744,318 @@ window.refreshAllData = function() {
     const icon = document.getElementById('refreshIcon');
     if (icon) icon.classList.add('fa-spin');
 
-    Promise.all([loadMetrics(), loadTransactions(), loadProducts(), loadExpeditions()]).then(() => {
+    const promises = [loadMetrics(), loadTransactions(), loadProducts(), loadExpeditions(), loadUsers()];
+    if (document.getElementById('tab-maintenance')) {
+        promises.push(loadMaintenanceStatus());
+    }
+
+    Promise.all(promises).then(() => {
         setTimeout(() => {
             if (icon) icon.classList.remove('fa-spin');
         }, 600);
     });
+};
+
+// -------------------------------------------------------------
+// 5. USER MANAGEMENT (CRUD)
+// -------------------------------------------------------------
+let cachedUsers = [];
+
+async function loadUsers() {
+    try {
+        const res = await fetch('api/users.php');
+        if (res.status === 401) {
+            window.location.href = 'login.php';
+            return;
+        }
+        cachedUsers = await res.json();
+        renderUsersTable(cachedUsers);
+    } catch (err) {
+        console.error("Gagal load users:", err);
+    }
+}
+
+function renderUsersTable(list) {
+    const tbody = document.getElementById('fullUsersTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!list || list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-slate-400">Tidak ada pengguna ditemukan.</td></tr>`;
+        return;
+    }
+
+    list.forEach((u, idx) => {
+        let roleBadge = `<span class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-mono font-bold text-[10px]">OPERATOR</span>`;
+        if (u.role === 'admin') {
+            roleBadge = `<span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded font-mono font-bold text-[10px]">ADMIN</span>`;
+        } else if (u.role === 'superadmin') {
+            roleBadge = `<span class="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded font-mono font-bold text-[10px]"><i class="fa-solid fa-shield-halved text-[9px]"></i> SUPERADMIN</span>`;
+        }
+
+        const statusBadge = (u.status === 'ACTIVE')
+            ? `<span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold text-[10px]">Aktif</span>`
+            : `<span class="bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-bold text-[10px]">Nonaktif</span>`;
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 border-b border-slate-100 transition';
+        tr.innerHTML = `
+            <td class="p-3 text-slate-400 font-mono text-xs text-center">${idx + 1}</td>
+            <td class="p-3 font-mono font-bold text-slate-800">${u.username}</td>
+            <td class="p-3 font-semibold text-slate-800">${u.name}</td>
+            <td class="p-3 text-center">${roleBadge}</td>
+            <td class="p-3 text-center">${statusBadge}</td>
+            <td class="p-3 font-mono text-[11px] text-slate-500">${new Date(u.created_at).toLocaleDateString('id-ID')}</td>
+            <td class="p-3 text-center">
+                <div class="flex items-center justify-center space-x-1.5">
+                    <button onclick="editUser(${u.id})" title="Edit Pengguna" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2 py-1 rounded-lg text-xs font-semibold transition">
+                        <i class="fa-solid fa-pen-to-square"></i> Edit
+                    </button>
+                    <button onclick="deleteUser(${u.id}, '${u.name}')" title="Hapus Pengguna" class="bg-rose-50 hover:bg-rose-100 text-rose-600 px-2 py-1 rounded-lg text-xs font-semibold transition">
+                        <i class="fa-solid fa-trash-can"></i> Hapus
+                    </button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+window.filterUserTable = function() {
+    const q = (document.getElementById('filterUserSearch')?.value || '').toLowerCase().trim();
+    const filtered = cachedUsers.filter(u => 
+        u.username.toLowerCase().includes(q) || 
+        u.name.toLowerCase().includes(q) ||
+        u.role.toLowerCase().includes(q)
+    );
+    renderUsersTable(filtered);
+};
+
+window.openAddUserModal = function() {
+    document.getElementById('userModalTitle').innerText = 'Tambah Pengguna Baru';
+    document.getElementById('userModalSubtitle').innerText = 'Daftarkan akun operator atau admin';
+    document.getElementById('formUser').reset();
+    document.getElementById('userId').value = '';
+    document.getElementById('userPasswordLabel').innerText = 'Password *';
+    document.getElementById('userPassword').required = true;
+    document.getElementById('userPasswordHelp').innerText = 'Wajib diisi saat membuat akun baru.';
+    document.getElementById('userModal').classList.remove('hidden');
+    document.getElementById('userUsername').focus();
+};
+
+window.closeUserModal = function() {
+    document.getElementById('userModal').classList.add('hidden');
+    document.getElementById('formUser').reset();
+};
+
+window.editUser = function(id) {
+    const u = cachedUsers.find(x => x.id == id);
+    if (!u) return;
+
+    document.getElementById('userModalTitle').innerText = 'Edit Pengguna';
+    document.getElementById('userModalSubtitle').innerText = `Perbarui akun ${u.name}`;
+    document.getElementById('userId').value = u.id;
+    document.getElementById('userUsername').value = u.username;
+    document.getElementById('userName').value = u.name;
+    document.getElementById('userRole').value = u.role;
+    document.getElementById('userStatus').value = u.status;
+    document.getElementById('userPasswordLabel').innerText = 'Ganti Password (Opsional)';
+    document.getElementById('userPassword').value = '';
+    document.getElementById('userPassword').required = false;
+    document.getElementById('userPasswordHelp').innerText = 'Kosongkan jika tidak ingin mengubah password saat ini.';
+    document.getElementById('userModal').classList.remove('hidden');
+};
+
+window.submitUser = async function(e) {
+    e.preventDefault();
+    const id = document.getElementById('userId').value;
+    const username = document.getElementById('userUsername').value.trim();
+    const name = document.getElementById('userName').value.trim();
+    const password = document.getElementById('userPassword').value.trim();
+    const role = document.getElementById('userRole').value;
+    const status = document.getElementById('userStatus').value;
+
+    const btn = document.getElementById('btnSaveUser');
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...`;
+
+    try {
+        const payload = { id, username, name, password, role, status };
+        const res = await fetch('api/users.php', {
+            method: id ? 'PUT' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+            closeUserModal();
+            loadUsers();
+            alert(data.message || 'Pengguna berhasil disimpan!');
+        } else {
+            alert('Gagal: ' + (data.error || 'Terjadi kesalahan'));
+        }
+    } catch (err) {
+        alert('Gagal koneksi ke server: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-save"></i> Simpan Pengguna`;
+    }
+};
+
+window.deleteUser = async function(id, name) {
+    if (!confirm(`Yakin ingin menghapus pengguna "${name}"?`)) return;
+
+    try {
+        const res = await fetch(`api/users.php?action=delete&id=${id}`, {
+            method: 'POST'
+        });
+        const data = await res.json();
+        if (data.success) {
+            loadUsers();
+            alert(data.message || 'Pengguna berhasil dihapus.');
+        } else {
+            alert('Gagal: ' + (data.error || 'Tidak dapat menghapus user'));
+        }
+    } catch (err) {
+        alert('Gagal koneksi ke server: ' + err.message);
+    }
+};
+
+// -------------------------------------------------------------
+// 6. MAINTENANCE MODE & SYSTEM TOOLS (SUPERADMIN ONLY)
+// -------------------------------------------------------------
+async function loadMaintenanceStatus() {
+    const maintTab = document.getElementById('tab-maintenance');
+    if (!maintTab) return; // Bukan superadmin
+
+    try {
+        const res = await fetch('api/maintenance.php');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.success) return;
+
+        // Update badge & buttons
+        const isMaint = data.maintenance_mode;
+        const badge = document.getElementById('maintStatusBadge');
+        const icon = document.getElementById('maintStatusIcon');
+        const text = document.getElementById('maintStatusText');
+        const title = document.getElementById('maintModeTitle');
+        const desc = document.getElementById('maintModeDesc');
+        const btnToggle = document.getElementById('btnToggleMaint');
+
+        if (isMaint) {
+            if (badge) badge.className = "bg-rose-100 text-rose-800 text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-sm flex items-center gap-2 border border-rose-200";
+            if (icon) icon.className = "fa-solid fa-circle-exclamation text-rose-600 animate-pulse";
+            if (text) text.innerText = "Mode Pemeliharaan AKTIF";
+            if (title) title.innerText = "Status: Pemeliharaan (Maintenance)";
+            if (desc) desc.innerText = "Operator dan admin biasa diblokir sementara sampai maintenance selesai.";
+            if (btnToggle) {
+                btnToggle.innerText = "Nonaktifkan Maintenance";
+                btnToggle.className = "bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-sm shrink-0";
+            }
+        } else {
+            if (badge) badge.className = "bg-white text-slate-800 text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-sm flex items-center gap-2";
+            if (icon) icon.className = "fa-solid fa-circle-check text-emerald-500";
+            if (text) text.innerText = "Sistem Online Normal";
+            if (title) title.innerText = "Mode Normal (Online)";
+            if (desc) desc.innerText = "Sistem dapat diakses secara normal oleh semua user.";
+            if (btnToggle) {
+                btnToggle.innerText = "Aktifkan Maintenance";
+                btnToggle.className = "bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-sm shrink-0";
+            }
+        }
+
+        // Table counts
+        if (data.tables) {
+            const elProd = document.getElementById('countMasterProducts');
+            const elSess = document.getElementById('countReturnSessions');
+            const elItem = document.getElementById('countReturnItems');
+            const elUser = document.getElementById('countUsers');
+            if (elProd) elProd.innerText = data.tables.master_products || 0;
+            if (elSess) elSess.innerText = data.tables.return_sessions || 0;
+            if (elItem) elItem.innerText = data.tables.return_items || 0;
+            if (elUser) elUser.innerText = data.tables.users || 0;
+        }
+
+    } catch (err) {
+        console.error("Gagal load status maintenance:", err);
+    }
+}
+
+window.toggleMaintenanceMode = async function() {
+    const isActivating = (document.getElementById('maintModeTitle')?.innerText || '').includes('Normal');
+    const msg = isActivating 
+        ? "Yakin ingin MENGAKTIFKAN mode maintenance? Pengguna lain (operator & admin biasa) tidak akan bisa login sampai dinonaktifkan."
+        : "Yakin ingin MENONAKTIFKAN mode maintenance dan kembali ke online normal?";
+    if (!confirm(msg)) return;
+
+    showGlobalLoading("Memperbarui Status Sistem...", "Sedang mengubah status mode pemeliharaan...");
+
+    try {
+        const res = await fetch('api/maintenance.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'toggle_maintenance' })
+        });
+        const data = await res.json();
+        hideGlobalLoading();
+        if (data.success) {
+            await loadMaintenanceStatus();
+            alert(data.message);
+        } else {
+            alert('Gagal: ' + (data.error || 'Terjadi kesalahan'));
+        }
+    } catch (err) {
+        hideGlobalLoading();
+        alert('Gagal koneksi ke server: ' + err.message);
+    }
+};
+
+window.optimizeDatabaseTables = async function() {
+    showGlobalLoading("Mengoptimasi Database...", "Menjalankan perintah SQL OPTIMIZE TABLE untuk defragmentasi indeks...");
+    try {
+        const res = await fetch('api/maintenance.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'optimize_tables' })
+        });
+        const data = await res.json();
+        hideGlobalLoading();
+        if (data.success) {
+            alert(data.message || 'Optimasi tabel berhasil!');
+            loadMaintenanceStatus();
+        } else {
+            alert('Gagal: ' + (data.error || 'Terjadi kesalahan'));
+        }
+    } catch (err) {
+        hideGlobalLoading();
+        alert('Gagal koneksi ke server: ' + err.message);
+    }
+};
+
+window.cleanTestTransactions = async function() {
+    if (!confirm("Hapus semua transaksi uji coba bertanda 'INV-DEMO' atau 'TEST'?")) return;
+    showGlobalLoading("Membersihkan Data...", "Menghapus transaksi retur uji coba...");
+    try {
+        const res = await fetch('api/maintenance.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'clean_test_transactions' })
+        });
+        const data = await res.json();
+        hideGlobalLoading();
+        if (data.success) {
+            alert(data.message);
+            loadMaintenanceStatus();
+            loadTransactions();
+            loadMetrics();
+        } else {
+            alert('Gagal: ' + (data.error || 'Gagal membersihkan data'));
+        }
+    } catch (err) {
+        hideGlobalLoading();
+        alert('Gagal koneksi ke server: ' + err.message);
+    }
 };
 
 // Initial Load

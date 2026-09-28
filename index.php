@@ -1,5 +1,8 @@
 <?php
 require_once __DIR__ . '/config.php';
+$currentUser = getSessionUser();
+checkMaintenanceMode($pdo, $currentUser);
+$user = requireLogin(['operator', 'admin', 'superadmin']);
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -28,13 +31,29 @@ require_once __DIR__ . '/config.php';
                 </div>
             </div>
             
-            <div class="flex items-center space-x-3">
-                <span id="cameraStatusBadge" class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5">
+            <div class="flex items-center space-x-2.5">
+                <span id="cameraStatusBadge" class="hidden sm:flex bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-full font-semibold items-center gap-1.5">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Kamera Siap
                 </span>
-                <a href="admin.php" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl font-semibold transition flex items-center gap-1.5 shadow-sm">
+
+                <?php if (in_array($user['role'], ['admin', 'superadmin'])): ?>
+                <a href="admin.php" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded-xl font-semibold transition flex items-center gap-1.5 shadow-sm">
                     <i class="fa-solid fa-chart-pie"></i>
-                    <span>Admin Panel</span>
+                    <span class="hidden md:inline">Admin Panel</span>
+                </a>
+                <?php endif; ?>
+
+                <!-- User Badge Profile -->
+                <div class="flex items-center gap-1.5 bg-slate-800 border border-slate-700/80 px-2.5 py-1.5 rounded-xl text-xs">
+                    <i class="fa-solid fa-circle-user text-indigo-400 text-sm"></i>
+                    <span class="font-bold text-slate-200"><?= htmlspecialchars($user['name']) ?></span>
+                    <span class="bg-indigo-500/20 text-indigo-300 text-[10px] font-mono uppercase px-1.5 py-0.5 rounded font-bold"><?= $user['role'] ?></span>
+                </div>
+
+                <!-- Tombol Logout -->
+                <a href="logout.php" onclick="return confirm('Apakah Anda yakin ingin logout?')" title="Keluar / Logout" class="bg-rose-600/90 hover:bg-rose-600 text-white px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-sm shadow-rose-900/20">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                    <span class="hidden sm:inline">Logout</span>
                 </a>
             </div>
         </div>

@@ -1,5 +1,8 @@
 <?php
-// config.php - Konfigurasi Database MySQL untuk Laragon
+// config.php - Konfigurasi Database MySQL & Session
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
@@ -108,6 +111,22 @@ try {
             INDEX idx_session (`session_id`),
             CONSTRAINT fk_session_items FOREIGN KEY (`session_id`) REFERENCES `return_sessions`(`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+        CREATE TABLE IF NOT EXISTS `users` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `username` VARCHAR(50) NOT NULL UNIQUE,
+            `password` VARCHAR(255) NOT NULL,
+            `name` VARCHAR(100) NOT NULL,
+            `role` ENUM('superadmin', 'admin', 'operator') NOT NULL DEFAULT 'operator',
+            `status` VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+        CREATE TABLE IF NOT EXISTS `system_settings` (
+            `key_name` VARCHAR(100) PRIMARY KEY,
+            `key_value` TEXT NULL,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     ");
 
     // Auto-patch kolom jika tabel sudah ada sebelumnya
@@ -205,6 +224,28 @@ try {
         }
         // Bersihkan data dummy contoh awal jika ada
         $pdo->exec("DELETE FROM master_products WHERE barcode LIKE '899100%' AND (seller_sku IS NULL OR seller_sku = '')");
+
+        // Seed Default Users jika tabel users masih kosong
+        $chkUserCount = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
+        if ($chkUserCount == 0) {
+            $stmtUser = $pdo->prepare("INSERT INTO users (username, password, name, role, status) VALUES (?, ?, ?, ?, 'ACTIVE')");
+            $defaultUsers = [
+                ['superadmin', password_hash('admin', PASSWORD_DEFAULT), 'Super Administrator', 'superadmin'],
+                ['admin', password_hash('admin', PASSWORD_DEFAULT), 'Admin Gudang', 'admin'],
+                ['operator', password_hash('operator', PASSWORD_DEFAULT), 'Operator Inbound', 'operator']
+            ];
+            foreach ($defaultUsers as $u) {
+                $stmtUser->execute($u);
+            }
+        }
+
+        // Setting maintenance_mode default 0 (OFF)
+        $chkMaint = $pdo->prepare("SELECT key_value FROM system_settings WHERE key_name = 'maintenance_mode'");
+        $chkMaint->execute();
+        if (!$chkMaint->fetch()) {
+            $pdo->prepare("INSERT INTO system_settings (key_name, key_value) VALUES ('maintenance_mode', '0')")->execute();
+        }
+
     } catch (Exception $e) {}
 
 } catch (PDOException $e) {
@@ -223,4 +264,51 @@ function jsonResponse($data, $statusCode = 200) {
     http_response_code($statusCode);
     echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
     exit;
+}
+
+// Auth & Session Helpers
+function getSessionUser() {
+    return $_SESSION['user'] ?? null;
+}
+
+function requireLogin($allowedRoles = []) {
+    $user = getSessionUser();
+    if (!$user) {
+        $isApi = (strpos($_SERVER['REQUEST_URI'] ?? '', '/api/') !== false) || (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false);
+        if ($isApi) {
+            jsonResponse(['error' => 'Sesi berakhir atau belum login. Silakan login kembali.'], 401);
+        } else {
+            header('Location: login.php');
+            exit;
+        }
+    }
+
+    if (!empty($allowedRoles) && !in_array($user['role'], $allowedRoles)) {
+        $isApi = (strpos($_SERVER['REQUEST_URI'] ?? '', '/api/') !== false);
+        if ($isApi) {
+            jsonResponse(['error' => 'Akses ditolak: role Anda (' . $user['role'] . ') tidak memiliki izin.'], 403);
+        } else {
+            $redirect = ($user['role'] === 'operator') ? 'index.php' : 'admin.php';
+            echo "<script>alert('Akses Ditolak: Halaman ini hanya untuk role " . implode('/', $allowedRoles) . "'); window.location.href = '{$redirect}';</script>";
+            exit;
+        }
+    }
+    return $user;
+}
+
+function checkMaintenanceMode($pdo, $user = null) {
+    // Superadmin selalu bisa bypass maintenance mode
+    if ($user && $user['role'] === 'superadmin') {
+        return false;
+    }
+    try {
+        $stmt = $pdo->prepare("SELECT key_value FROM system_settings WHERE key_name = 'maintenance_mode'");
+        $stmt->execute();
+        $row = $stmt->fetch();
+        if ($row && $row['key_value'] == '1') {
+            include __DIR__ . '/maintenance.php';
+            exit;
+        }
+    } catch (Exception $e) {}
+    return false;
 }

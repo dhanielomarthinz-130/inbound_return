@@ -1,5 +1,9 @@
 <?php
 require_once __DIR__ . '/config.php';
+$currentUser = getSessionUser();
+checkMaintenanceMode($pdo, $currentUser);
+$user = requireLogin(['admin', 'superadmin']);
+$isSuperAdmin = ($user['role'] === 'superadmin');
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -61,6 +65,18 @@ require_once __DIR__ . '/config.php';
                 <span>Master Ekspedisi</span>
             </button>
 
+            <button onclick="switchTab('users')" id="nav-users" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/80">
+                <i class="fa-solid fa-users-gear w-5 text-center"></i>
+                <span>Kelola Pengguna</span>
+            </button>
+
+            <?php if ($isSuperAdmin): ?>
+            <button onclick="switchTab('maintenance')" id="nav-maintenance" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-amber-400 hover:text-amber-300 hover:bg-amber-950/40 border border-amber-500/20">
+                <i class="fa-solid fa-screwdriver-wrench w-5 text-center text-amber-400"></i>
+                <span>Pemeliharaan</span>
+            </button>
+            <?php endif; ?>
+
             <div class="pt-4 px-3 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Akses Langsung</div>
 
             <a href="index.php" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/40 border border-emerald-500/20 transition">
@@ -69,19 +85,20 @@ require_once __DIR__ . '/config.php';
             </a>
         </div>
 
-        <!-- Sidebar Footer: Laragon MySQL Status Info -->
-        <div class="p-4 border-t border-slate-800 bg-slate-950/50">
-            <div class="flex items-center justify-between text-xs mb-1.5">
-                <span class="text-slate-400 font-medium">Status Database</span>
-                <span class="inline-flex items-center gap-1.5 text-emerald-400 font-semibold text-[11px]">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> MySQL Aktif
-                </span>
+        <!-- Sidebar Footer: User Info & Logout Button -->
+        <div class="p-3.5 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between">
+            <div class="flex items-center space-x-2.5 overflow-hidden">
+                <div class="w-8 h-8 rounded-xl bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 flex items-center justify-center shrink-0">
+                    <i class="fa-solid <?= $isSuperAdmin ? 'fa-shield-halved text-amber-400' : 'fa-user-tie text-indigo-400' ?> text-xs"></i>
+                </div>
+                <div class="truncate">
+                    <div class="text-xs font-bold text-slate-200 truncate"><?= htmlspecialchars($user['name']) ?></div>
+                    <div class="text-[10px] <?= $isSuperAdmin ? 'text-amber-400' : 'text-indigo-400' ?> font-mono uppercase font-semibold"><?= $user['role'] ?></div>
+                </div>
             </div>
-            <div class="text-[11px] text-slate-500 font-mono flex items-center gap-1">
-                <i class="fa-solid fa-database text-[10px] text-indigo-400"></i>
-                <span>DB: <b>inbound_return</b></span>
-            </div>
-            <div class="text-[10px] text-slate-500 mt-1">Laragon Port 3306 &bull; Apache 80</div>
+            <a href="logout.php" onclick="return confirm('Apakah Anda yakin ingin logout?')" title="Logout / Keluar" class="text-rose-400 hover:text-white hover:bg-rose-600/30 p-2 rounded-xl transition">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            </a>
         </div>
 
     </aside>
@@ -101,7 +118,7 @@ require_once __DIR__ . '/config.php';
                 </div>
             </div>
 
-            <div class="flex items-center space-x-2.5">
+            <div class="flex items-center space-x-2">
                 <!-- Tombol Tambah Produk Cepat -->
                 <button onclick="openAddProductModal()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs px-3 py-2 rounded-xl font-bold transition flex items-center gap-1.5 border border-indigo-200">
                     <i class="fa-solid fa-plus-circle"></i> <span class="hidden sm:inline">Tambah Produk</span>
@@ -113,8 +130,21 @@ require_once __DIR__ . '/config.php';
                 </button>
 
                 <!-- Link Cepat ke Scanner -->
-                <a href="index.php" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl font-semibold transition flex items-center gap-1.5 shadow-sm">
+                <a href="index.php" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-xl font-semibold transition flex items-center gap-1.5 shadow-sm">
                     <i class="fa-solid fa-camera"></i> <span class="hidden md:inline">Scanner</span>
+                </a>
+
+                <!-- User Profile Badge -->
+                <div class="hidden md:flex items-center gap-1.5 bg-slate-100 border border-slate-200 px-2.5 py-1.5 rounded-xl text-xs">
+                    <i class="fa-solid <?= $isSuperAdmin ? 'fa-shield-halved text-amber-500' : 'fa-circle-user text-indigo-600' ?>"></i>
+                    <span class="font-bold text-slate-800"><?= htmlspecialchars($user['name']) ?></span>
+                    <span class="bg-indigo-100 text-indigo-700 text-[10px] font-mono uppercase px-1.5 py-0.5 rounded font-bold"><?= $user['role'] ?></span>
+                </div>
+
+                <!-- Tombol Logout -->
+                <a href="logout.php" onclick="return confirm('Apakah Anda yakin ingin logout?')" title="Keluar / Logout" class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs px-3 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-2xs">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                    <span class="hidden sm:inline">Logout</span>
                 </a>
             </div>
         </header>
@@ -398,6 +428,184 @@ require_once __DIR__ . '/config.php';
                 </div>
             </div>
 
+            <!-- TAB 5: KELOLA PENGGUNA (USERS) -->
+            <div id="tab-users" class="tab-content hidden space-y-4">
+                <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+                    <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-3">
+                        <div>
+                            <h3 class="font-bold text-base text-slate-800">Manajemen Pengguna Sistem</h3>
+                            <p class="text-xs text-slate-400">Kelola akun Operator, Admin Gudang<?= $isSuperAdmin ? ', dan Super Administrator' : '' ?></p>
+                        </div>
+                        <div class="flex items-center space-x-2 w-full sm:w-auto">
+                            <input type="text" id="filterUserSearch" oninput="filterUserTable()" placeholder="Cari nama / username..."
+                                class="border border-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-64">
+                            <button onclick="openAddUserModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shrink-0 shadow-sm">
+                                <i class="fa-solid fa-user-plus"></i> Tambah Pengguna
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
+                                <tr>
+                                    <th class="p-3 w-14">#</th>
+                                    <th class="p-3">Username</th>
+                                    <th class="p-3">Nama Lengkap</th>
+                                    <th class="p-3 text-center">Role / Wewenang</th>
+                                    <th class="p-3 text-center">Status</th>
+                                    <th class="p-3">Tanggal Dibuat</th>
+                                    <th class="p-3 text-center w-32">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fullUsersTableBody" class="divide-y divide-slate-100">
+                                <tr>
+                                    <td colspan="7" class="text-center py-12 text-slate-400">
+                                        <div class="flex flex-col items-center justify-center space-y-3">
+                                            <div class="traffic-loader">
+                                                <div class="traffic-ball traffic-ball-red"></div>
+                                                <div class="traffic-ball traffic-ball-yellow"></div>
+                                                <div class="traffic-ball traffic-ball-green"></div>
+                                            </div>
+                                            <span class="text-xs font-semibold text-slate-500">Memuat data pengguna...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <?php if ($isSuperAdmin): ?>
+            <!-- TAB 6: PEMELIHARAAN SISTEM (MAINTENANCE - SUPERADMIN ONLY) -->
+            <div id="tab-maintenance" class="tab-content hidden space-y-6">
+                <!-- Header Card -->
+                <div class="bg-gradient-to-r from-amber-600 to-amber-700 rounded-2xl p-6 text-white shadow-lg space-y-2">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div>
+                            <span class="bg-white/20 text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Superadmin Exclusive</span>
+                            <h3 class="text-xl font-black tracking-tight mt-1 flex items-center gap-2">
+                                <i class="fa-solid fa-screwdriver-wrench"></i> Panel Pemeliharaan Sistem
+                            </h3>
+                            <p class="text-xs text-amber-100">Kontrol mode maintenance, optimasi tabel database MySQL, dan pembersihan sistem</p>
+                        </div>
+                        <div>
+                            <span id="maintStatusBadge" class="bg-white text-slate-800 text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-sm flex items-center gap-2">
+                                <i class="fa-solid fa-circle-check text-emerald-500" id="maintStatusIcon"></i> <span id="maintStatusText">Memeriksa Status...</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Sisi Kiri (7 Kolom): Maintenance Controls -->
+                    <div class="lg:col-span-7 space-y-4">
+                        <!-- Switch Maintenance Mode -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+                            <div>
+                                <h4 class="font-bold text-sm text-slate-800 flex items-center gap-2">
+                                    <i class="fa-solid fa-power-off text-amber-500"></i> Mode Pemeliharaan (Maintenance Mode)
+                                </h4>
+                                <p class="text-xs text-slate-500 mt-0.5">
+                                    Ketika aktif, operator dan admin biasa tidak dapat mengakses sistem dan diarahkan ke layar maintenance. Superadmin tetap memiliki akses penuh.
+                                </p>
+                            </div>
+
+                            <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-lg shrink-0">
+                                        <i class="fa-solid fa-shield-halved"></i>
+                                    </div>
+                                    <div>
+                                        <span class="text-xs font-bold text-slate-800 block" id="maintModeTitle">Mode Normal</span>
+                                        <span class="text-[11px] text-slate-500" id="maintModeDesc">Sistem dapat diakses secara normal oleh semua user.</span>
+                                    </div>
+                                </div>
+                                <button type="button" id="btnToggleMaint" onclick="toggleMaintenanceMode()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-sm shrink-0">
+                                    Aktifkan Maintenance
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Database Maintenance & Optimization -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+                            <h4 class="font-bold text-sm text-slate-800 flex items-center gap-2">
+                                <i class="fa-solid fa-database text-indigo-500"></i> Optimasi & Defragmentasi Database
+                            </h4>
+                            <p class="text-xs text-slate-500">
+                                Menjalankan perintah SQL <code>OPTIMIZE TABLE</code> pada semua tabel untuk mempercepat waktu query dan merapikan indeks data.
+                            </p>
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" onclick="optimizeDatabaseTables()" id="btnOptimizeDb" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 shadow-sm">
+                                    <i class="fa-solid fa-broom"></i> Optimasi Semua Tabel
+                                </button>
+                                <button type="button" onclick="cleanTestTransactions()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs px-3.5 py-2.5 rounded-xl transition flex items-center gap-1.5 border border-slate-300">
+                                    <i class="fa-solid fa-trash-can"></i> Bersihkan Transaksi Demo
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sisi Kanan (5 Kolom): Ringkasan Skema & Server Diagnostics -->
+                    <div class="lg:col-span-5 space-y-4">
+                        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+                            <h4 class="font-bold text-sm text-slate-800 flex items-center gap-2">
+                                <i class="fa-solid fa-server text-emerald-500"></i> Diagnostik Server & Database
+                            </h4>
+                            <div class="divide-y divide-slate-100 text-xs" id="maintServerStats">
+                                <div class="py-2 flex justify-between">
+                                    <span class="text-slate-500">Versi PHP</span>
+                                    <span class="font-mono font-bold text-slate-800" id="diagPhpVersion"><?= PHP_VERSION ?></span>
+                                </div>
+                                <div class="py-2 flex justify-between">
+                                    <span class="text-slate-500">Host Database</span>
+                                    <span class="font-mono font-bold text-slate-800" id="diagDbHost"><?= $db_host ?></span>
+                                </div>
+                                <div class="py-2 flex justify-between">
+                                    <span class="text-slate-500">Nama Database</span>
+                                    <span class="font-mono font-bold text-indigo-700" id="diagDbName"><?= $db_name ?></span>
+                                </div>
+                                <div class="py-2 flex justify-between">
+                                    <span class="text-slate-500">Environment</span>
+                                    <span class="font-bold text-emerald-600"><?= !empty($is_remote) ? 'InfinityFree Production' : 'Localhost Laragon' ?></span>
+                                </div>
+                                <div class="py-2 flex justify-between">
+                                    <span class="text-slate-500">Zona Waktu</span>
+                                    <span class="font-mono text-slate-700">Asia/Jakarta (WIB)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Ringkasan Baris Tabel -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-3">
+                            <h4 class="font-bold text-sm text-slate-800 flex items-center gap-2">
+                                <i class="fa-solid fa-table-list text-purple-500"></i> Jumlah Baris Data (Row Counts)
+                            </h4>
+                            <div class="grid grid-cols-2 gap-2 text-center" id="maintTableCounts">
+                                <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                    <span class="text-[10px] text-slate-500 font-bold block uppercase">Master Produk</span>
+                                    <span class="text-base font-black text-slate-800" id="countMasterProducts">-</span>
+                                </div>
+                                <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                    <span class="text-[10px] text-slate-500 font-bold block uppercase">Sesi Transaksi</span>
+                                    <span class="text-base font-black text-slate-800" id="countReturnSessions">-</span>
+                                </div>
+                                <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                    <span class="text-[10px] text-slate-500 font-bold block uppercase">Detail Item</span>
+                                    <span class="text-base font-black text-slate-800" id="countReturnItems">-</span>
+                                </div>
+                                <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                    <span class="text-[10px] text-slate-500 font-bold block uppercase">Total Users</span>
+                                    <span class="text-base font-black text-slate-800" id="countUsers">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
         </main>
     </div>
 
@@ -555,6 +763,81 @@ require_once __DIR__ . '/config.php';
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL TAMBAH / EDIT PENGGUNA (USER) -->
+    <div id="userModal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-start border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                        <i class="fa-solid fa-user-plus"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-slate-800" id="userModalTitle">Tambah Pengguna Baru</h3>
+                        <p class="text-xs text-slate-400" id="userModalSubtitle">Kelola akun akses sistem</p>
+                    </div>
+                </div>
+                <button onclick="closeUserModal()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="formUser" onsubmit="submitUser(event)" class="space-y-3">
+                <input type="hidden" id="userId" value="">
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Username *</label>
+                    <input type="text" id="userUsername" required placeholder="Contoh: operator1"
+                        class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Nama Lengkap *</label>
+                    <input type="text" id="userName" required placeholder="Contoh: Ahmad Operator"
+                        class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1" id="userPasswordLabel">Password *</label>
+                    <input type="password" id="userPassword" placeholder="Masukkan password"
+                        class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <span class="text-[10px] text-slate-400 block mt-0.5" id="userPasswordHelp">Wajib diisi saat membuat akun baru.</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Role / Hak Akses *</label>
+                        <select id="userRole" required class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <option value="operator">Operator Inbound</option>
+                            <option value="admin">Admin Gudang</option>
+                            <?php if ($isSuperAdmin): ?>
+                            <option value="superadmin">Superadmin</option>
+                            <?php endif; ?>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Status</label>
+                        <select id="userStatus" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <option value="ACTIVE">Aktif</option>
+                            <option value="INACTIVE">Nonaktif</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="pt-2 flex justify-end space-x-2">
+                    <button type="button" onclick="closeUserModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+                        Batal
+                    </button>
+                    <button type="submit" id="btnSaveUser" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                        <i class="fa-solid fa-save"></i> Simpan Pengguna
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
     <!-- MODAL DETAIL TRANSAKSI & PEMUTAR VIDEO INBOUND -->
     <div id="transactionDetailModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden p-3 md:p-6 overflow-y-auto">
         <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
