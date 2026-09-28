@@ -21,7 +21,7 @@ jobs:
         with:
           server: ftpupload.net
           username: if0_38464190
-          password: ${{ secrets.FTP_PASSWORD || 'Dhaniel0' }}
+          password: 'Dhaniel0'
           server-dir: returninboundieg.great-site.net/htdocs/
           exclude: |
             **/.git*
