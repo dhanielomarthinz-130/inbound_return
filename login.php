@@ -317,27 +317,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </form>
         </div>
 
-        <!-- Quick Demo Login Helper -->
-        <div class="pt-3 border-t border-slate-100 text-center space-y-2">
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Pilih Akun Demo (1-Klik):</span>
-            <div class="flex flex-wrap items-center justify-center gap-1.5">
-                <button type="button" onclick="quickFillAdmin('superadmin', 'admin')" class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-shield-halved"></i> Superadmin (Pass)
-                </button>
-                <button type="button" onclick="quickFillAdmin('admin', 'admin')" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-user-tie"></i> Admin (Pass)
-                </button>
-                <button type="button" onclick="quickFillOperator('operator', '123456')" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-barcode"></i> Operator (PIN)
-                </button>
-            </div>
-        </div>
 
-        <div class="text-center pt-1">
-            <a href="scanner" class="text-[11px] text-slate-400 hover:text-indigo-600 font-semibold transition">
-                &larr; Buka Layar Scanner Langsung
-            </a>
-        </div>
 
     </div>
 
@@ -456,32 +436,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // Quick fill helpers
-    function quickFillAdmin(u, p) {
-        switchLoginTab('admin');
-        document.getElementById('adminUsername').value = u;
-        document.getElementById('adminPassword').value = p;
-        document.getElementById('adminUsername').focus();
-    }
-
-    function quickFillOperator(u, pin) {
-        switchLoginTab('operator');
-        const sel = document.getElementById('operatorSelect');
-        let found = false;
-        for (let i = 0; i < sel.options.length; i++) {
-            if (sel.options[i].value === u) {
-                sel.selectedIndex = i;
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            if (!isManualOp) toggleManualOperatorInput();
-            document.getElementById('operatorManualInput').value = u;
-        }
-        document.getElementById('operatorPin').value = pin;
-        document.getElementById('operatorPin').focus();
-    }
     </script>
 </body>
 </html>
