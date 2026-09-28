@@ -203,25 +203,9 @@ try {
                 $pdo->prepare("INSERT INTO master_expeditions (code, name, prefix_pattern, status) VALUES ('GTL', 'GoTo Logistics (GTL)', 'GTL,TKP,GOTO', 'ACTIVE')")->execute();
             }
         }
+        // Bersihkan data dummy contoh awal jika ada
+        $pdo->exec("DELETE FROM master_products WHERE barcode LIKE '899100%' AND (seller_sku IS NULL OR seller_sku = '')");
     } catch (Exception $e) {}
-
-    // 4. Auto Seed Master Produk Dummy jika masih kosong
-    $checkStmt = $pdo->query("SELECT COUNT(*) AS total FROM master_products");
-    $rowCount = $checkStmt->fetch()['total'];
-
-    if ($rowCount == 0) {
-        $seedStmt = $pdo->prepare("INSERT INTO master_products (barcode, sku, name, category, unit) VALUES (?, ?, ?, ?, ?)");
-        $dummy = [
-            ['8991001', 'SKU-KPS-01', 'Kipas Angin Portable USB', 'Elektronik', 'Pcs'],
-            ['8991002', 'SKU-TWS-02', 'Earphone TWS Bluetooth 5.3', 'Aksesoris', 'Unit'],
-            ['8991003', 'SKU-PB-03', 'Powerbank 10.000mAh Fast Charging', 'Gadget', 'Pcs'],
-            ['8991004', 'SKU-CHG-04', 'Adaptor Charger 20W Type C', 'Aksesoris', 'Pcs'],
-            ['8991005', 'SKU-BLB-05', 'Smart Lampu Bohlam LED 9W', 'Rumah Tangga', 'Pcs']
-        ];
-        foreach ($dummy as $row) {
-            $seedStmt->execute($row);
-        }
-    }
 
 } catch (PDOException $e) {
     if (php_sapi_name() !== 'cli' && basename($_SERVER['PHP_SELF']) !== 'config.php') {

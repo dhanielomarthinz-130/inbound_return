@@ -324,17 +324,18 @@ require_once __DIR__ . '/config.php';
                         <table class="w-full text-left text-xs border-collapse">
                             <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
                                 <tr>
-                                    <th class="p-3">ID</th>
-                                    <th class="p-3">Barcode</th>
+                                    <th class="p-3 w-12 text-center">#</th>
                                     <th class="p-3">Seller SKU</th>
+                                    <th class="p-3">Shop / Toko</th>
+                                    <th class="p-3 text-center">Bin Code (Rak)</th>
+                                    <th class="p-3">Barcode</th>
+                                    <th class="p-3">Barcode BPOM</th>
                                     <th class="p-3">SAP Code</th>
                                     <th class="p-3">Nama Produk</th>
-                                    <th class="p-3">Toko / Brand</th>
-                                    <th class="p-3 text-center">Bin Code (Rak)</th>
                                 </tr>
                             </thead>
                             <tbody id="fullProductsTableBody" class="divide-y divide-slate-100">
-                                <tr><td colspan="7" class="text-center py-8 text-slate-400">Memuat daftar master produk...</td></tr>
+                                <tr><td colspan="8" class="text-center py-8 text-slate-400">Memuat daftar master produk...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -653,6 +654,6 @@ require_once __DIR__ . '/config.php';
         </div>
     </div>
 
-    <script src="assets/js/admin.js"></script>
+    <script src="assets/js/admin.js?v=<?= file_exists(__DIR__ . '/assets/js/admin.js') ? filemtime(__DIR__ . '/assets/js/admin.js') : time() ?>"></script>
 </body>
 </html>

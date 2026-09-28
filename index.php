@@ -377,6 +377,6 @@ require_once __DIR__ . '/config.php';
         </div>
     </div>
 
-    <script src="assets/js/operator.js"></script>
+    <script src="assets/js/operator.js?v=<?= file_exists(__DIR__ . '/assets/js/operator.js') ? filemtime(__DIR__ . '/assets/js/operator.js') : time() ?>"></script>
 </body>
 </html>

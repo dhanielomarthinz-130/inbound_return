@@ -330,26 +330,39 @@ function renderFullProductsTable(products) {
     fullTbody.innerHTML = '';
 
     if (!products || products.length === 0) {
-        fullTbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-slate-400">Tidak ada produk ditemukan.</td></tr>`;
+        fullTbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-400">Tidak ada produk ditemukan.</td></tr>`;
         return;
     }
 
-    products.forEach(p => {
+    products.forEach((p, idx) => {
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-slate-50 border-b border-slate-100 transition';
         const sellerSku = p.seller_sku || p.sku || '-';
-        const sapCode = p.sap_code ? `<span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-mono font-bold text-[11px]">${p.sap_code}</span>` : `<span class="text-slate-400 italic text-[11px]">-</span>`;
         const shop = p.shop || p.category || '-';
-        const binCode = p.bin_code ? `<span class="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded font-mono font-bold text-[11px]">${p.bin_code}</span>` : `<span class="text-slate-400 italic text-[11px]">-</span>`;
+        const binCode = p.bin_code 
+            ? `<span class="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded font-mono font-bold text-[11px]">${p.bin_code}</span>` 
+            : `<span class="text-slate-400 italic text-[11px]">-</span>`;
+        const barcode = p.barcode 
+            ? `<span class="font-mono font-bold text-slate-800">${p.barcode}</span>` 
+            : `<span class="text-slate-400 italic text-[11px]">-</span>`;
+        const barcodeBpom = p.barcode_bpom 
+            ? `<span class="font-mono text-[11px] text-slate-600">${p.barcode_bpom}</span>` 
+            : `<span class="text-slate-400 italic text-[11px]">-</span>`;
+        const sapCode = (p.sap_code && p.sap_code !== '0') 
+            ? `<span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-mono font-bold text-[11px]">${p.sap_code}</span>` 
+            : `<span class="text-slate-400 italic text-[11px]">-</span>`;
 
         tr.innerHTML = `
-            <td class="p-3 text-slate-400 font-mono text-xs">${p.id}</td>
-            <td class="p-3 font-mono font-bold text-slate-800">${p.barcode}</td>
-            <td class="p-3 font-mono text-indigo-600 font-semibold">${sellerSku}</td>
-            <td class="p-3">${sapCode}</td>
-            <td class="p-3 font-bold text-slate-800">${p.name}</td>
-            <td class="p-3 text-slate-600 font-medium">${shop}</td>
+            <td class="p-3 text-slate-400 font-mono text-xs text-center">${idx + 1}</td>
+            <td class="p-3 font-mono font-bold text-indigo-700">${sellerSku}</td>
+            <td class="p-3">
+                <span class="bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-md font-semibold text-[11px]">${shop}</span>
+            </td>
             <td class="p-3 text-center">${binCode}</td>
+            <td class="p-3 font-mono text-slate-700">${barcode}</td>
+            <td class="p-3 font-mono text-slate-500">${barcodeBpom}</td>
+            <td class="p-3">${sapCode}</td>
+            <td class="p-3 font-semibold text-slate-800">${p.name}</td>
         `;
         fullTbody.appendChild(tr);
     });
