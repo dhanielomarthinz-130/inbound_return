@@ -89,8 +89,8 @@ try {
     $sessionId = $pdo->lastInsertId();
 
     $stmtItem = $pdo->prepare("
-        INSERT INTO return_items (session_id, barcode, product_name, sku, batch_no, exp_date, type, qty, `condition`, damage_reason)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO return_items (session_id, barcode, product_name, sku, seller_sku, sap_code, batch_no, exp_date, type, qty, `condition`, damage_reason)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     foreach ($items as $item) {
@@ -105,6 +105,8 @@ try {
             $item['barcode'] ?? '',
             $item['product_name'] ?? '',
             $item['sku'] ?? '',
+            $item['seller_sku'] ?? $item['sku'] ?? '',
+            $item['sap_code'] ?? '',
             $item['batch_no'] ?? '',
             $item['exp_date'] ?? '',
             $type,

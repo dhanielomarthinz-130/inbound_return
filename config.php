@@ -131,6 +131,30 @@ try {
             $pdo->exec("ALTER TABLE return_sessions ADD COLUMN video_path VARCHAR(255) NULL AFTER notes");
         }
 
+        $colsProd = $pdo->query("SHOW COLUMNS FROM master_products")->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('seller_sku', $colsProd)) {
+            $pdo->exec("ALTER TABLE master_products ADD COLUMN seller_sku VARCHAR(150) NULL AFTER sku");
+        }
+        if (!in_array('sap_code', $colsProd)) {
+            $pdo->exec("ALTER TABLE master_products ADD COLUMN sap_code VARCHAR(100) NULL AFTER seller_sku");
+        }
+        if (!in_array('shop', $colsProd)) {
+            $pdo->exec("ALTER TABLE master_products ADD COLUMN shop VARCHAR(100) NULL AFTER sap_code");
+        }
+        if (!in_array('bin_code', $colsProd)) {
+            $pdo->exec("ALTER TABLE master_products ADD COLUMN bin_code VARCHAR(100) NULL AFTER shop");
+        }
+        if (!in_array('barcode_bpom', $colsProd)) {
+            $pdo->exec("ALTER TABLE master_products ADD COLUMN barcode_bpom VARCHAR(150) NULL AFTER bin_code");
+        }
+
+        if (!in_array('seller_sku', $cols)) {
+            $pdo->exec("ALTER TABLE return_items ADD COLUMN seller_sku VARCHAR(150) NULL AFTER sku");
+        }
+        if (!in_array('sap_code', $cols)) {
+            $pdo->exec("ALTER TABLE return_items ADD COLUMN sap_code VARCHAR(100) NULL AFTER seller_sku");
+        }
+
         $colsExp = $pdo->query("SHOW COLUMNS FROM master_expeditions")->fetchAll(PDO::FETCH_COLUMN);
         if (!in_array('prefix_pattern', $colsExp)) {
             $pdo->exec("ALTER TABLE master_expeditions ADD COLUMN prefix_pattern VARCHAR(255) NULL DEFAULT '' AFTER name");

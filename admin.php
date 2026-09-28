@@ -309,10 +309,13 @@ require_once __DIR__ . '/config.php';
                             <h3 class="font-bold text-base text-slate-800">Master Data Produk & Barcode</h3>
                             <p class="text-xs text-slate-400">Daftar produk yang tersimpan di database MySQL Laragon</p>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <input type="text" id="filterProductSearch" onkeyup="filterProductTable()" placeholder="Cari nama/barcode/sku..." class="border border-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <input type="text" id="filterProductSearch" onkeyup="filterProductTable()" placeholder="Cari nama/barcode/sku/sap..." class="border border-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <button id="btnSyncOcs" onclick="syncProductsFromOCS()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-2xs">
+                                <i class="fa-solid fa-arrows-rotate" id="syncOcsIcon"></i> Tarik Data dari OCS IEG
+                            </button>
                             <button onclick="openAddProductModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-sm">
-                                <i class="fa-solid fa-plus-circle"></i> Tambah Produk Baru
+                                <i class="fa-solid fa-plus-circle"></i> Tambah Manual
                             </button>
                         </div>
                     </div>
@@ -323,11 +326,11 @@ require_once __DIR__ . '/config.php';
                                 <tr>
                                     <th class="p-3">ID</th>
                                     <th class="p-3">Barcode</th>
-                                    <th class="p-3">SKU</th>
+                                    <th class="p-3">Seller SKU</th>
+                                    <th class="p-3">SAP Code</th>
                                     <th class="p-3">Nama Produk</th>
-                                    <th class="p-3">Kategori</th>
-                                    <th class="p-3 text-center">Satuan</th>
-                                    <th class="p-3 text-center">Status</th>
+                                    <th class="p-3">Toko / Brand</th>
+                                    <th class="p-3 text-center">Bin Code (Rak)</th>
                                 </tr>
                             </thead>
                             <tbody id="fullProductsTableBody" class="divide-y divide-slate-100">

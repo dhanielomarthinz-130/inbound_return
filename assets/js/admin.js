@@ -336,30 +336,61 @@ function renderFullProductsTable(products) {
 
     products.forEach(p => {
         const tr = document.createElement('tr');
-        tr.className = 'hover:bg-slate-50 border-b border-slate-100';
+        tr.className = 'hover:bg-slate-50 border-b border-slate-100 transition';
+        const sellerSku = p.seller_sku || p.sku || '-';
+        const sapCode = p.sap_code ? `<span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-mono font-bold text-[11px]">${p.sap_code}</span>` : `<span class="text-slate-400 italic text-[11px]">-</span>`;
+        const shop = p.shop || p.category || '-';
+        const binCode = p.bin_code ? `<span class="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded font-mono font-bold text-[11px]">${p.bin_code}</span>` : `<span class="text-slate-400 italic text-[11px]">-</span>`;
+
         tr.innerHTML = `
             <td class="p-3 text-slate-400 font-mono text-xs">${p.id}</td>
-            <td class="p-3 font-mono font-bold text-indigo-700">${p.barcode}</td>
-            <td class="p-3 font-mono text-slate-500">${p.sku}</td>
+            <td class="p-3 font-mono font-bold text-slate-800">${p.barcode}</td>
+            <td class="p-3 font-mono text-indigo-600 font-semibold">${sellerSku}</td>
+            <td class="p-3">${sapCode}</td>
             <td class="p-3 font-bold text-slate-800">${p.name}</td>
-            <td class="p-3 text-slate-600">${p.category}</td>
-            <td class="p-3 text-center text-slate-600">${p.unit || 'Pcs'}</td>
-            <td class="p-3 text-center">
-                <span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold text-[10px]">Aktif</span>
-            </td>
+            <td class="p-3 text-slate-600 font-medium">${shop}</td>
+            <td class="p-3 text-center">${binCode}</td>
         `;
         fullTbody.appendChild(tr);
     });
 }
 
+// Sinkronisasi data dari OCS WMS IEG System
+window.syncProductsFromOCS = async function() {
+    const btn = document.getElementById('btnSyncOcs');
+    const icon = document.getElementById('syncOcsIcon');
+    if (btn) btn.disabled = true;
+    if (icon) icon.classList.add('fa-spin');
+
+    try {
+        const res = await fetch('api/sync_ocs.php');
+        const data = await res.json();
+        if (data.success) {
+            alert(`Berhasil sinkronisasi! ${data.total_synced || 0} produk dari OCS WMS berhasil diperbarui ke database.`);
+            await loadProducts();
+        } else {
+            alert('Sinkronisasi gagal: ' + (data.error || 'Terjadi kesalahan sistem'));
+        }
+    } catch (err) {
+        alert('Gagal menghubungi server sync: ' + err.message);
+    } finally {
+        if (btn) btn.disabled = false;
+        if (icon) icon.classList.remove('fa-spin');
+    }
+};
+
 // Filter produk di tab master
 window.filterProductTable = function() {
-    const q = document.getElementById('filterProductSearch').value.toLowerCase();
+    const q = (document.getElementById('filterProductSearch').value || '').toLowerCase();
     const filtered = cachedProducts.filter(p => 
-        p.name.toLowerCase().includes(q) || 
-        p.barcode.toLowerCase().includes(q) || 
-        p.sku.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q)
+        (p.name && p.name.toLowerCase().includes(q)) || 
+        (p.barcode && p.barcode.toLowerCase().includes(q)) || 
+        (p.sku && p.sku.toLowerCase().includes(q)) ||
+        (p.seller_sku && p.seller_sku.toLowerCase().includes(q)) ||
+        (p.sap_code && p.sap_code.toLowerCase().includes(q)) ||
+        (p.shop && p.shop.toLowerCase().includes(q)) ||
+        (p.bin_code && p.bin_code.toLowerCase().includes(q)) ||
+        (p.category && p.category.toLowerCase().includes(q))
     );
     renderFullProductsTable(filtered);
 };

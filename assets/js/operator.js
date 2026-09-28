@@ -273,11 +273,28 @@ async function lookupProduct(barcode) {
         currentDetectedProduct = product;
         playBeep('success');
 
-        // Tampilkan info produk terdeteksi
+        // Tampilkan info produk terdeteksi (Seller SKU, SAP Code, Rak/Bin)
         const nameEl = document.getElementById('detectedProductName');
         nameEl.innerText = product.name;
         nameEl.className = "font-bold text-emerald-700 ml-1 text-sm";
-        document.getElementById('detectedProductSku').innerText = `(SKU: ${product.sku})`;
+        
+        const sellerSku = product.seller_sku || product.sku || '-';
+        const sapCode = product.sap_code || '-';
+        const binCode = product.bin_code || '';
+        const shop = product.shop || '';
+
+        document.getElementById('detectedProductSku').innerHTML = `
+            <span class="inline-flex flex-wrap items-center gap-1.5 ml-2 mt-1">
+                <span class="bg-indigo-100 text-indigo-800 text-[11px] font-mono font-bold px-2 py-0.5 rounded border border-indigo-200">
+                    <i class="fa-solid fa-tag text-[10px]"></i> Seller SKU: ${sellerSku}
+                </span>
+                <span class="bg-emerald-100 text-emerald-800 text-[11px] font-mono font-bold px-2 py-0.5 rounded border border-emerald-200">
+                    <i class="fa-solid fa-barcode text-[10px]"></i> SAP: ${sapCode}
+                </span>
+                ${binCode ? `<span class="bg-amber-100 text-amber-800 text-[11px] font-mono font-bold px-2 py-0.5 rounded border border-amber-200"><i class="fa-solid fa-cubes-stacked text-[10px]"></i> Rak: ${binCode}</span>` : ''}
+                ${shop ? `<span class="bg-purple-100 text-purple-800 text-[11px] font-bold px-2 py-0.5 rounded border border-purple-200">${shop}</span>` : ''}
+            </span>
+        `;
 
         // Pindahkan kursor otomatis ke NO. BATCH!
         setTimeout(() => {
@@ -328,6 +345,10 @@ function commitAddItem() {
         barcode: currentDetectedProduct.barcode,
         product_name: currentDetectedProduct.name,
         sku: currentDetectedProduct.sku,
+        seller_sku: currentDetectedProduct.seller_sku || currentDetectedProduct.sku || '-',
+        sap_code: currentDetectedProduct.sap_code || '-',
+        shop: currentDetectedProduct.shop || '',
+        bin_code: currentDetectedProduct.bin_code || '',
         batch_no: batchNo || '-',
         exp_date: expDate || '-',
         qty: qty,
@@ -400,7 +421,11 @@ function renderItemsTable() {
             <td class="p-3 font-mono font-bold text-indigo-700">${item.barcode}</td>
             <td class="p-3">
                 <div class="font-bold text-slate-800">${item.product_name}</div>
-                <div class="text-[10px] text-slate-400 font-mono">SKU: ${item.sku}</div>
+                <div class="text-[10px] text-slate-500 flex flex-wrap gap-1.5 mt-0.5">
+                    <span class="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-mono font-bold border border-indigo-200">SKU: ${item.seller_sku || item.sku}</span>
+                    <span class="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-mono font-bold border border-emerald-200">SAP: ${item.sap_code || '-'}</span>
+                    ${item.bin_code ? `<span class="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-mono text-[10px] border border-amber-200">Rak: ${item.bin_code}</span>` : ''}
+                </div>
             </td>
             <td class="p-3 font-mono text-slate-600">${item.batch_no || '-'}</td>
             <td class="p-3 font-mono text-slate-600">${item.exp_date || '-'}</td>

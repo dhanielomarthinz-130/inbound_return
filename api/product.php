@@ -13,8 +13,16 @@ if (empty($barcode)) {
 }
 
 try {
-    $stmt = $pdo->prepare("SELECT * FROM master_products WHERE barcode = ? LIMIT 1");
-    $stmt->execute([$barcode]);
+    $stmt = $pdo->prepare("
+        SELECT * FROM master_products 
+        WHERE barcode = ? 
+           OR barcode_bpom = ? 
+           OR sap_code = ? 
+           OR seller_sku = ? 
+           OR sku = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$barcode, $barcode, $barcode, $barcode, $barcode]);
     $product = $stmt->fetch();
 
     if (!$product) {

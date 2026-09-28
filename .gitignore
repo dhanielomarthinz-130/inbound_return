@@ -8,5 +8,10 @@ Thumbs.db
 # IDE
 .idea/
 .vscode/
+# IDE
 *.sublime-project
 *.sublime-workspace
+
+# User Uploads
+uploads/videos/*.webm
+uploads/videos/*.mp4
