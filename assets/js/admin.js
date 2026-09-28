@@ -3,6 +3,22 @@ let ratioChartInstance = null;
 let currentTab = 'dashboard';
 let cachedProducts = [];
 
+// Global Loading Overlay Controls (Bola-bola Merah, Kuning, Hijau)
+window.showGlobalLoading = function(title = 'Memuat Data...', desc = 'Mohon tunggu sebentar, sistem sedang memproses data.') {
+    const el = document.getElementById('globalLoadingOverlay');
+    if (!el) return;
+    const t = document.getElementById('globalLoadingTitle');
+    const d = document.getElementById('globalLoadingDesc');
+    if (t) t.innerText = title;
+    if (d) d.innerText = desc;
+    el.classList.remove('hidden');
+};
+
+window.hideGlobalLoading = function() {
+    const el = document.getElementById('globalLoadingOverlay');
+    if (el) el.classList.add('hidden');
+};
+
 // Sidebar Mobile Toggle
 const sidebar = document.getElementById('sidebar');
 const backdrop = document.getElementById('sidebarBackdrop');
@@ -296,7 +312,7 @@ window.closeDetailModal = function() {
 // 3. Load Master Produk
 async function loadProducts() {
     try {
-        const res = await fetch('api/products');
+        const res = await fetch('api/products.php');
         cachedProducts = await res.json();
 
         // Render Quick Products Table (di Dashboard)
@@ -308,13 +324,16 @@ async function loadProducts() {
                 tr.className = 'hover:bg-slate-50';
                 tr.innerHTML = `
                     <td class="p-2.5 font-mono font-bold text-indigo-700">${p.barcode}</td>
-                    <td class="p-2.5 font-mono text-slate-500">${p.sku}</td>
+                    <td class="p-2.5 font-mono text-slate-500">${p.seller_sku || p.sku}</td>
                     <td class="p-2.5 font-semibold text-slate-800">${p.name}</td>
-                    <td class="p-2.5 text-slate-500">${p.category}</td>
+                    <td class="p-2.5 text-slate-500">${p.shop || p.category}</td>
                 `;
                 quickTbody.appendChild(tr);
             });
         }
+
+        // Populate dropdown filter toko
+        populateShopDropdown(cachedProducts);
 
         // Render Full Products Table
         renderFullProductsTable(cachedProducts);
@@ -324,13 +343,31 @@ async function loadProducts() {
     }
 }
 
+// Mengisi pilihan Toko / Shop di dropdown filter
+function populateShopDropdown(products) {
+    const select = document.getElementById('filterProductShop');
+    if (!select) return;
+    const currentVal = select.value;
+    const shops = Array.from(new Set(products.map(p => (p.shop || p.category || '').trim()).filter(Boolean))).sort();
+
+    select.innerHTML = '<option value="">Semua Toko / Shop (' + products.length + ')</option>';
+    shops.forEach(s => {
+        const count = products.filter(p => (p.shop || p.category || '').trim() === s).length;
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.innerText = `${s} (${count})`;
+        if (s === currentVal) opt.selected = true;
+        select.appendChild(opt);
+    });
+}
+
 function renderFullProductsTable(products) {
     const fullTbody = document.getElementById('fullProductsTableBody');
     if (!fullTbody) return;
     fullTbody.innerHTML = '';
 
     if (!products || products.length === 0) {
-        fullTbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-400">Tidak ada produk ditemukan.</td></tr>`;
+        fullTbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-400">Tidak ada produk yang cocok dengan pencarian / filter toko.</td></tr>`;
         return;
     }
 
@@ -368,43 +405,64 @@ function renderFullProductsTable(products) {
     });
 }
 
-// Sinkronisasi data dari OCS WMS IEG System
+// Sinkronisasi data dari OCS WMS IEG System dengan Animasi Bola Merah Kuning Hijau
 window.syncProductsFromOCS = async function() {
     const btn = document.getElementById('btnSyncOcs');
     const icon = document.getElementById('syncOcsIcon');
     if (btn) btn.disabled = true;
     if (icon) icon.classList.add('fa-spin');
 
+    // Tampilkan overlay bola-bola animasi
+    showGlobalLoading(
+        'Sinkronisasi Master Produk dari OCS IEG...',
+        'Sedang menghubungkan ke https://ocs.iegsystem.id/ untuk menarik data 700+ Master Produk, Barcode, dan Rak...'
+    );
+
     try {
         const res = await fetch('api/sync_ocs.php');
         const data = await res.json();
         if (data.success) {
-            alert(`Berhasil sinkronisasi! ${data.total_synced || 0} produk dari OCS WMS berhasil diperbarui ke database.`);
             await loadProducts();
+            hideGlobalLoading();
+            alert(`Berhasil sinkronisasi!\nTotal ${data.total_synced || 0} produk dan rak dari OCS WMS berhasil diperbarui ke database.`);
         } else {
+            hideGlobalLoading();
             alert('Sinkronisasi gagal: ' + (data.error || 'Terjadi kesalahan sistem'));
         }
     } catch (err) {
+        hideGlobalLoading();
         alert('Gagal menghubungi server sync: ' + err.message);
     } finally {
+        hideGlobalLoading();
         if (btn) btn.disabled = false;
         if (icon) icon.classList.remove('fa-spin');
     }
 };
 
-// Filter produk di tab master
+// Filter produk berdasarkan Keyword & Pilihan Toko / Shop
 window.filterProductTable = function() {
-    const q = (document.getElementById('filterProductSearch').value || '').toLowerCase();
-    const filtered = cachedProducts.filter(p => 
-        (p.name && p.name.toLowerCase().includes(q)) || 
-        (p.barcode && p.barcode.toLowerCase().includes(q)) || 
-        (p.sku && p.sku.toLowerCase().includes(q)) ||
-        (p.seller_sku && p.seller_sku.toLowerCase().includes(q)) ||
-        (p.sap_code && p.sap_code.toLowerCase().includes(q)) ||
-        (p.shop && p.shop.toLowerCase().includes(q)) ||
-        (p.bin_code && p.bin_code.toLowerCase().includes(q)) ||
-        (p.category && p.category.toLowerCase().includes(q))
-    );
+    const q = (document.getElementById('filterProductSearch')?.value || '').toLowerCase().trim();
+    const selectedShop = (document.getElementById('filterProductShop')?.value || '').toLowerCase().trim();
+
+    const filtered = cachedProducts.filter(p => {
+        const pShop = (p.shop || p.category || '').toLowerCase().trim();
+        const matchShop = !selectedShop || pShop === selectedShop;
+
+        const matchQuery = !q || (
+            (p.name && p.name.toLowerCase().includes(q)) || 
+            (p.barcode && p.barcode.toLowerCase().includes(q)) || 
+            (p.barcode_bpom && p.barcode_bpom.toLowerCase().includes(q)) || 
+            (p.sku && p.sku.toLowerCase().includes(q)) ||
+            (p.seller_sku && p.seller_sku.toLowerCase().includes(q)) ||
+            (p.sap_code && p.sap_code.toLowerCase().includes(q)) ||
+            (p.shop && p.shop.toLowerCase().includes(q)) ||
+            (p.bin_code && p.bin_code.toLowerCase().includes(q)) ||
+            (p.category && p.category.toLowerCase().includes(q))
+        );
+
+        return matchShop && matchQuery;
+    });
+
     renderFullProductsTable(filtered);
 };
 

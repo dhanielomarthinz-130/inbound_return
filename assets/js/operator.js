@@ -6,6 +6,22 @@ let cachedExpeditionsList = [];
 let currentDetectedProduct = null;
 let scannedProductsList = [];
 
+// Global Loading Overlay Controls (Bola-bola Merah, Kuning, Hijau)
+window.showGlobalLoading = function(title = 'Memproses...', desc = 'Mohon tunggu sebentar.') {
+    const el = document.getElementById('globalLoadingOverlay');
+    if (!el) return;
+    const t = document.getElementById('globalLoadingTitle');
+    const d = document.getElementById('globalLoadingDesc');
+    if (t) t.innerText = title;
+    if (d) d.innerText = desc;
+    el.classList.remove('hidden');
+};
+
+window.hideGlobalLoading = function() {
+    const el = document.getElementById('globalLoadingOverlay');
+    if (el) el.classList.add('hidden');
+};
+
 // Audio Synthesizer Beep (Web Audio API)
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 function playBeep(type = 'success') {
@@ -552,6 +568,12 @@ window.submitFinalSession = async function() {
         items: scannedProductsList
     };
 
+    // Tampilkan bola-bola animasi loading saat menyimpan
+    showGlobalLoading(
+        'Menyimpan Transaksi Inbound...',
+        'Sedang merekam data produk retur' + (videoBlob ? ' dan mengunggah video unboxing' : '') + ' ke server...'
+    );
+
     try {
         let res;
         if (videoBlob && videoBlob.size > 0) {
@@ -570,6 +592,7 @@ window.submitFinalSession = async function() {
             });
         }
         const result = await res.json();
+        hideGlobalLoading();
 
         if (result.success) {
             const videoNotice = (videoBlob && videoBlob.size > 0) ? ' Rekaman video unboxing berhasil disimpan.' : '';
@@ -579,8 +602,10 @@ window.submitFinalSession = async function() {
             alert("Gagal: " + (result.error || 'Terjadi kesalahan saat menyimpan'));
         }
     } catch (err) {
+        hideGlobalLoading();
         alert("Gagal koneksi ke server: " + err.message);
     } finally {
+        hideGlobalLoading();
         btn.disabled = false;
         btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Selesaikan Inbound Invoice`;
     }

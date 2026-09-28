@@ -21,3 +21,71 @@
     border-color: #4f46e5;
     background-color: #eef2ff;
 }
+
+/* ========================================================
+   SPINNER BOLA-BOLA MERAH, KUNING, HIJAU (TRAFFIC LOADER)
+   ======================================================== */
+@keyframes trafficBounce {
+    0%, 80%, 100% {
+        transform: scale(0.4) translateY(0);
+        opacity: 0.4;
+    }
+    40% {
+        transform: scale(1.15) translateY(-8px);
+        opacity: 1;
+    }
+}
+
+.traffic-loader {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.traffic-ball {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    animation: trafficBounce 1.2s infinite ease-in-out both;
+    display: inline-block;
+}
+
+.traffic-ball-red {
+    background: radial-gradient(circle at 35% 35%, #fca5a5, #ef4444);
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.55);
+    animation-delay: -0.32s;
+}
+
+.traffic-ball-yellow {
+    background: radial-gradient(circle at 35% 35%, #fef08a, #eab308);
+    box-shadow: 0 0 10px rgba(234, 179, 8, 0.55);
+    animation-delay: -0.16s;
+}
+
+.traffic-ball-green {
+    background: radial-gradient(circle at 35% 35%, #86efac, #10b981);
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.55);
+    animation-delay: 0s;
+}
+
+/* Ukuran Besar untuk Modal / Overlay */
+.traffic-loader-lg {
+    gap: 12px;
+}
+
+.traffic-loader-lg .traffic-ball {
+    width: 22px;
+    height: 22px;
+}
+
+/* Ukuran Kecil untuk Tombol / Inline */
+.traffic-loader-sm {
+    gap: 5px;
+}
+
+.traffic-loader-sm .traffic-ball {
+    width: 8px;
+    height: 8px;
+}
+

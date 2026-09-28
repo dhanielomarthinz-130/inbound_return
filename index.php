@@ -11,8 +11,7 @@ require_once __DIR__ . '/config.php';
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- HTML5-QRCode Scanner Library -->
     <script src="https://unpkg.com/html5-qrcode"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="assets/css/custom.css">
+    <link rel="stylesheet" href="assets/css/custom.css?v=<?= file_exists(__DIR__ . '/assets/css/custom.css') ? filemtime(__DIR__ . '/assets/css/custom.css') : time() ?>">
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800 antialiased flex flex-col justify-between">
 
@@ -373,6 +372,21 @@ require_once __DIR__ . '/config.php';
                 <button onclick="resetInvoiceSession()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm transition">
                     Scan Invoice Selanjutnya &rarr;
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GLOBAL LOADING OVERLAY (BOLA-BOLA MERAH, KUNING, HIJAU) -->
+    <div id="globalLoadingOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4 transition-all">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl flex flex-col items-center text-center space-y-4 border border-slate-100 animate-in fade-in zoom-in duration-200">
+            <div class="traffic-loader traffic-loader-lg py-2">
+                <div class="traffic-ball traffic-ball-red"></div>
+                <div class="traffic-ball traffic-ball-yellow"></div>
+                <div class="traffic-ball traffic-ball-green"></div>
+            </div>
+            <div class="space-y-1">
+                <h4 class="font-bold text-base text-slate-800" id="globalLoadingTitle">Menyimpan Transaksi...</h4>
+                <p class="text-xs text-slate-500 leading-relaxed" id="globalLoadingDesc">Mohon tunggu, sedang memproses data retur ke server.</p>
             </div>
         </div>
     </div>

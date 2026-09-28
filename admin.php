@@ -11,8 +11,7 @@ require_once __DIR__ . '/config.php';
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="assets/css/custom.css">
+    <link rel="stylesheet" href="assets/css/custom.css?v=<?= file_exists(__DIR__ . '/assets/css/custom.css') ? filemtime(__DIR__ . '/assets/css/custom.css') : time() ?>">
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800 flex overflow-x-hidden">
 
@@ -310,7 +309,16 @@ require_once __DIR__ . '/config.php';
                             <p class="text-xs text-slate-400">Daftar produk yang tersimpan di database MySQL Laragon</p>
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
-                            <input type="text" id="filterProductSearch" onkeyup="filterProductTable()" placeholder="Cari nama/barcode/sku/sap..." class="border border-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <!-- Dropdown Filter Toko / Shop -->
+                            <div class="relative">
+                                <select id="filterProductShop" onchange="filterProductTable()" class="bg-slate-50 hover:bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-2xs">
+                                    <option value="">Semua Toko / Shop</option>
+                                </select>
+                            </div>
+                            <!-- Search Input Keyword -->
+                            <div class="relative">
+                                <input type="text" id="filterProductSearch" onkeyup="filterProductTable()" placeholder="Cari nama/barcode/sku/sap/rak..." class="border border-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 w-44 sm:w-60">
+                            </div>
                             <button id="btnSyncOcs" onclick="syncProductsFromOCS()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-2xs">
                                 <i class="fa-solid fa-arrows-rotate" id="syncOcsIcon"></i> Tarik Data dari OCS IEG
                             </button>
@@ -335,7 +343,18 @@ require_once __DIR__ . '/config.php';
                                 </tr>
                             </thead>
                             <tbody id="fullProductsTableBody" class="divide-y divide-slate-100">
-                                <tr><td colspan="8" class="text-center py-8 text-slate-400">Memuat daftar master produk...</td></tr>
+                                <tr>
+                                    <td colspan="8" class="text-center py-12 text-slate-400">
+                                        <div class="flex flex-col items-center justify-center space-y-3">
+                                            <div class="traffic-loader">
+                                                <div class="traffic-ball traffic-ball-red"></div>
+                                                <div class="traffic-ball traffic-ball-yellow"></div>
+                                                <div class="traffic-ball traffic-ball-green"></div>
+                                            </div>
+                                            <span class="text-xs font-semibold text-slate-500">Memuat daftar master produk...</span>
+                                        </div>
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -650,6 +669,21 @@ require_once __DIR__ . '/config.php';
                 <button type="button" onclick="closeDetailModal()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2 rounded-xl text-xs font-semibold transition">
                     Tutup
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GLOBAL LOADING OVERLAY (BOLA-BOLA MERAH, KUNING, HIJAU) -->
+    <div id="globalLoadingOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4 transition-all">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl flex flex-col items-center text-center space-y-4 border border-slate-100 animate-in fade-in zoom-in duration-200">
+            <div class="traffic-loader traffic-loader-lg py-2">
+                <div class="traffic-ball traffic-ball-red"></div>
+                <div class="traffic-ball traffic-ball-yellow"></div>
+                <div class="traffic-ball traffic-ball-green"></div>
+            </div>
+            <div class="space-y-1">
+                <h4 class="font-bold text-base text-slate-800" id="globalLoadingTitle">Memuat Data...</h4>
+                <p class="text-xs text-slate-500 leading-relaxed" id="globalLoadingDesc">Mohon tunggu sebentar, sistem sedang memproses data.</p>
             </div>
         </div>
     </div>
