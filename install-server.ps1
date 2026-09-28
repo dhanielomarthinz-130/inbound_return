@@ -23,10 +23,10 @@ if (Test-Path "C:\laragon\www") {
 # Jika script dijalankan di dalam folder repo yang sudah ada, gunakan folder saat ini
 if (![string]::IsNullOrEmpty($PSScriptRoot) -and (Test-Path "$PSScriptRoot\config.php")) {
     $installDir = $PSScriptRoot
-    Write-Host "[✓] Dijalankan di dalam folder aplikasi: $installDir" -ForegroundColor Green
+    Write-Host "[OK] Dijalankan di dalam folder aplikasi: $installDir" -ForegroundColor Green
 } elseif (Test-Path ".\config.php") {
     $installDir = (Get-Location).Path
-    Write-Host "[✓] Dijalankan di dalam folder aplikasi: $installDir" -ForegroundColor Green
+    Write-Host "[OK] Dijalankan di dalam folder aplikasi: $installDir" -ForegroundColor Green
 } else {
     $installDir = $defaultDir
     Write-Host "[*] Target instalasi server: $installDir" -ForegroundColor Yellow
@@ -62,7 +62,7 @@ if ($gitInstalled) {
     Copy-Item -Path "$tempExtract\inbound_return-main\*" -Destination $installDir -Recurse -Force
     Remove-Item -Force $tempZip -ErrorAction SilentlyContinue
     Remove-Item -Recurse -Force $tempExtract -ErrorAction SilentlyContinue
-    Write-Host "      [✓] Ekstraksi source code berhasil." -ForegroundColor Green
+    Write-Host "      [OK] Ekstraksi source code berhasil." -ForegroundColor Green
 }
 
 # 3. Deteksi PHP Executable
@@ -96,7 +96,7 @@ foreach ($c in $phpCandidates) {
 }
 
 if ($foundPhp) {
-    Write-Host "      [✓] PHP ditemukan: $phpBin" -ForegroundColor Green
+    Write-Host "      [OK] PHP ditemukan: $phpBin" -ForegroundColor Green
 } else {
     Write-Host "      [!] PERINGATAN: PHP tidak ditemukan di PATH, XAMPP, ataupun Laragon." -ForegroundColor Red
     Write-Host "          Silakan install XAMPP atau Laragon terlebih dahulu." -ForegroundColor Yellow
@@ -112,9 +112,9 @@ if ($foundPhp) {
     
     # Cek apakah database berhasil
     if ($migrateResult -match '"success":\s*true') {
-        Write-Host "      [✓] Database 'inbound_return' siap!" -ForegroundColor Green
-        Write-Host "      [✓] Semua tabel & auto-patch kolom berhasil dieksekusi." -ForegroundColor Green
-        Write-Host "      [✓] Akun pengguna resmi berhasil disinkronkan." -ForegroundColor Green
+        Write-Host "      [OK] Database 'inbound_return' siap!" -ForegroundColor Green
+        Write-Host "      [OK] Semua tabel & auto-patch kolom berhasil dieksekusi." -ForegroundColor Green
+        Write-Host "      [OK] Akun pengguna resmi berhasil disinkronkan." -ForegroundColor Green
     } else {
         Write-Host "      [!] Respon migrasi:" -ForegroundColor Yellow
         Write-Host "          $migrateResult" -ForegroundColor DarkGray
@@ -127,20 +127,23 @@ Write-Host ""
 Write-Host "[4/5] Mendeteksi IP Address Jaringan Lokal (LAN/Wi-Fi)..." -ForegroundColor Cyan
 $serverIp = "127.0.0.1"
 try {
-    $ips = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | 
+    $ips = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop | 
            Where-Object { $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*" }
     if ($ips) {
         $serverIp = $ips[0].IPAddress
     }
 } catch {
     # Fallback ipconfig
-    $ipMatches = (ipconfig) -match "(IPv4 Address|Alamat IPv4)[^:]*:\s*([0-9\.]+)"
-    if ($matches -and $matches[2]) {
-        $serverIp = $matches[2].Trim()
+    $ipLines = ipconfig
+    foreach ($line in $ipLines) {
+        if ($line -match '(IPv4 Address|Alamat IPv4)[^:]*:\s*([0-9\.]+)') {
+            $serverIp = $matches[2].Trim()
+            break
+        }
     }
 }
 
-Write-Host "      [✓] IP Server Lokal: $serverIp" -ForegroundColor Green
+Write-Host "      [OK] IP Server Lokal: $serverIp" -ForegroundColor Green
 
 # 6. Rangkuman Akses & Pilihan Server
 Write-Host ""
@@ -162,8 +165,8 @@ $xamppUrl = "http://localhost/$folderName/"
 $lanUrl   = "http://${serverIp}/$folderName/"
 
 Write-Host "  [A] Jika menggunakan Apache (XAMPP / Laragon sudah START):" -ForegroundColor Cyan
-Write-Host "      • Akses di PC Server ini : $xamppUrl" -ForegroundColor White
-Write-Host "      • Akses dari HP/PC lain  : $lanUrl" -ForegroundColor White
+Write-Host "      - Akses di PC Server ini : $xamppUrl" -ForegroundColor White
+Write-Host "      - Akses dari HP/PC lain  : $lanUrl" -ForegroundColor White
 Write-Host ""
 
 # Pilihan: Jalankan PHP Built-in Server otomatis pada Port 8080
@@ -177,8 +180,8 @@ if ([string]::IsNullOrWhiteSpace($runPhpServer) -or $runPhpServer -match '^[Yy]'
     Write-Host "====================================================================" -ForegroundColor Cyan
     Write-Host "   SERVER LOCAL SEDANG BERJALAN DI PORT $port                       " -ForegroundColor Green
     Write-Host "====================================================================" -ForegroundColor Cyan
-    Write-Host "   • PC Server ini        : $localServerUrl" -ForegroundColor Yellow
-    Write-Host "   • Barcode Scanner / HP : $lanServerUrl" -ForegroundColor Yellow
+    Write-Host "   - PC Server ini        : $localServerUrl" -ForegroundColor Yellow
+    Write-Host "   - Barcode Scanner / HP : $lanServerUrl" -ForegroundColor Yellow
     Write-Host "====================================================================" -ForegroundColor Cyan
     Write-Host "   Tekan Ctrl + C untuk menghentikan server." -ForegroundColor DarkGray
     Write-Host ""
