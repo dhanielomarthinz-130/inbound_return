@@ -127,7 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Masuk Sistem - Inbound Return Hub</title>
+    <title>Masuk Sistem - Inbound Return IEG</title>
     <!-- Favicon Huruf D Warna Hijau -->
     <link rel="icon" type="image/svg+xml" href="assets/image/favicon.svg">
     <link rel="icon" type="image/png" href="assets/image/favicon.png">
@@ -156,7 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="inline-flex items-center justify-center w-16 h-16 p-2 rounded-2xl bg-white border border-slate-200 shadow-md mb-1">
                 <img src="assets/image/logo-IEG.png" alt="Logo IEG" class="w-full h-full object-contain">
             </div>
-            <h2 class="text-2xl font-black text-slate-900 tracking-tight">Inbound Return Hub</h2>
+            <h2 class="text-2xl font-black text-slate-900 tracking-tight">Inbound Return IEG</h2>
             <p class="text-xs text-slate-400 font-medium">Sistem Verifikasi & Unboxing Pengembalian Barang</p>
         </div>
 

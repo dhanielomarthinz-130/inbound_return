@@ -22,7 +22,7 @@
                 <img src="assets/image/logo-IEG.png" alt="Logo IEG" class="w-full h-full object-contain">
             </div>
             <div class="text-left">
-                <h2 class="font-bold text-white text-base leading-tight">Inbound Return Hub</h2>
+                <h2 class="font-bold text-white text-base leading-tight">Inbound Return IEG</h2>
                 <p class="text-[10px] text-slate-400">PT. Indo Express Global</p>
             </div>
         </div>
