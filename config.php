@@ -118,6 +118,7 @@ try {
             `password` VARCHAR(255) NOT NULL,
             `name` VARCHAR(100) NOT NULL,
             `role` ENUM('superadmin', 'admin', 'operator') NOT NULL DEFAULT 'operator',
+            `pin` VARCHAR(20) NULL DEFAULT '123456',
             `status` VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -188,6 +189,12 @@ try {
         if (!in_array('prefix_pattern', $colsExp)) {
             $pdo->exec("ALTER TABLE master_expeditions ADD COLUMN prefix_pattern VARCHAR(255) NULL DEFAULT '' AFTER name");
         }
+
+        // Auto-patch kolom pin pada tabel users
+        $colsUsers = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('pin', $colsUsers)) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN pin VARCHAR(20) NULL DEFAULT '123456' AFTER role");
+        }
     } catch (Exception $e) {}
 
     // Auto Seed & Update Master Ekspedisi dengan Prefix Deteksi
@@ -251,20 +258,55 @@ try {
             }
         }
 
+        // PASTIKAN USER WAJIB SELALU TERSEDIA & TERUPDATE (Daniel, Admin, Operator 1, Operator 2)
+        $requiredUsers = [
+            [
+                'username' => 'Daniel',
+                'password' => 'Dh@niel0',
+                'name'     => 'Daniel',
+                'role'     => 'superadmin',
+                'pin'      => '123456'
+            ],
+            [
+                'username' => 'Admin',
+                'password' => 'Password01',
+                'name'     => 'Admin',
+                'role'     => 'admin',
+                'pin'      => '123456'
+            ],
+            [
+                'username' => 'Operator 1',
+                'password' => 'Password01',
+                'name'     => 'Operator 1',
+                'role'     => 'operator',
+                'pin'      => '123456'
+            ],
+            [
+                'username' => 'Operator 2',
+                'password' => 'Password01',
+                'name'     => 'Operator 2',
+                'role'     => 'operator',
+                'pin'      => '123456'
+            ]
+        ];
 
-        // Seed Default Users jika tabel users masih kosong
-        $chkUserCount = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
-        if ($chkUserCount == 0) {
-            $stmtUser = $pdo->prepare("INSERT INTO users (username, password, name, role, status) VALUES (?, ?, ?, ?, 'ACTIVE')");
-            $defaultUsers = [
-                ['superadmin', password_hash('admin', PASSWORD_DEFAULT), 'Super Administrator', 'superadmin'],
-                ['admin', password_hash('admin', PASSWORD_DEFAULT), 'Admin Gudang', 'admin'],
-                ['operator', password_hash('operator', PASSWORD_DEFAULT), 'Operator Inbound', 'operator']
-            ];
-            foreach ($defaultUsers as $u) {
-                $stmtUser->execute($u);
+        foreach ($requiredUsers as $reqUser) {
+            $chkU = $pdo->prepare("SELECT id FROM users WHERE username = ?");
+            $chkU->execute([$reqUser['username']]);
+            $existing = $chkU->fetch();
+
+            $hashedPass = password_hash($reqUser['password'], PASSWORD_DEFAULT);
+            if ($existing) {
+                $pdo->prepare("UPDATE users SET username = ?, password = ?, name = ?, role = ?, pin = ?, status = 'ACTIVE' WHERE id = ?")
+                    ->execute([$reqUser['username'], $hashedPass, $reqUser['name'], $reqUser['role'], $reqUser['pin'], $existing['id']]);
+            } else {
+                $pdo->prepare("INSERT INTO users (username, password, name, role, pin, status) VALUES (?, ?, ?, ?, ?, 'ACTIVE')")
+                    ->execute([$reqUser['username'], $hashedPass, $reqUser['name'], $reqUser['role'], $reqUser['pin']]);
             }
         }
+
+        // Hapus akun dummy default lama agar database bersih dan hanya ada user resmi
+        $pdo->exec("DELETE FROM users WHERE username IN ('superadmin', 'operator')");
 
         // Setting maintenance_mode default 0 (OFF)
         $chkMaint = $pdo->prepare("SELECT key_value FROM system_settings WHERE key_name = 'maintenance_mode'");

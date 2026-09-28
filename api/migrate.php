@@ -35,6 +35,9 @@ try {
         }
     }
 
+    // 4. Daftar user di database
+    $userList = $pdo->query("SELECT id, username, name, role, pin, status FROM users ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
+
     echo json_encode([
         'success' => true,
         'message' => 'Database skema dan tabel berhasil dimigrasi & diperbarui!',
@@ -43,6 +46,7 @@ try {
         'tables_found' => $tables,
         'total_products' => (int)$prodCount,
         'ocs_synced_now' => (int)$syncedFromOcs,
+        'users_in_db' => $userList,
         'timestamp' => date('Y-m-d H:i:s')
     ], JSON_PRETTY_PRINT);
 

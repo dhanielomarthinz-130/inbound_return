@@ -45,8 +45,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Silakan masukkan PIN Operator (6 Digit)!';
         } else {
             try {
-                $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ? LIMIT 1");
-                $stmt->execute([$username]);
+                $cleanUser = str_replace([' ', '_', '-'], '', strtolower($username));
+                $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ? OR REPLACE(REPLACE(LOWER(username), ' ', ''), '_', '') = ? OR LOWER(name) = ? LIMIT 1");
+                $stmt->execute([$username, $cleanUser, strtolower($username)]);
                 $user = $stmt->fetch();
 
                 if (!$user) {
