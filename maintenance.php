@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem Sedang Dalam Pemeliharaan - Return Inbound</title>
+    <!-- Favicon Huruf D Warna Hijau -->
+    <link rel="icon" type="image/svg+xml" href="assets/image/favicon.svg">
+    <link rel="icon" type="image/png" href="assets/image/favicon.png">
+    <link rel="shortcut icon" href="favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/custom.css">
@@ -12,10 +16,20 @@
 
     <div class="max-w-lg w-full bg-slate-800/90 rounded-3xl p-8 md:p-10 border border-slate-700/80 shadow-2xl text-center space-y-6">
         
-        <!-- Animated Maintenance Icon -->
-        <div class="relative w-24 h-24 mx-auto flex items-center justify-center">
+        <!-- Logo IEG & Animated Maintenance Icon -->
+        <div class="flex items-center justify-center space-x-3 mb-2">
+            <div class="w-12 h-12 rounded-2xl bg-white p-1.5 flex items-center justify-center shadow-md">
+                <img src="assets/image/logo-IEG.png" alt="Logo IEG" class="w-full h-full object-contain">
+            </div>
+            <div class="text-left">
+                <h2 class="font-bold text-white text-base leading-tight">Inbound Return Hub</h2>
+                <p class="text-[10px] text-slate-400">PT. Indo Express Global</p>
+            </div>
+        </div>
+
+        <div class="relative w-20 h-20 mx-auto flex items-center justify-center">
             <div class="absolute inset-0 rounded-3xl bg-amber-500/10 animate-ping"></div>
-            <div class="w-20 h-20 rounded-3xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-white text-3xl shadow-xl shadow-amber-500/30">
+            <div class="w-16 h-16 rounded-3xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-white text-2xl shadow-xl shadow-amber-500/30">
                 <i class="fa-solid fa-screwdriver-wrench animate-bounce"></i>
             </div>
         </div>
@@ -41,7 +55,7 @@
         </div>
 
         <div class="pt-4 border-t border-slate-700 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a href="login.php" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-sm">
+            <a href="login" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-sm">
                 <i class="fa-solid fa-shield-halved"></i>
                 <span>Masuk sebagai Superadmin</span>
             </a>

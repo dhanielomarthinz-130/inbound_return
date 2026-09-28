@@ -10,11 +10,20 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Inbound Return (Laragon)</title>
+    <title>Admin Dashboard - Inbound Return</title>
+    <!-- Favicon Huruf D Warna Hijau -->
+    <link rel="icon" type="image/svg+xml" href="assets/image/favicon.svg">
+    <link rel="icon" type="image/png" href="assets/image/favicon.png">
+    <link rel="shortcut icon" href="favicon.ico">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome 6 CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Flatpickr Date Picker (Premium Airbnb theme) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://npmcdn.com/flatpickr/dist/themes/airbnb.css">
     <link rel="stylesheet" href="assets/css/custom.css?v=<?= file_exists(__DIR__ . '/assets/css/custom.css') ? filemtime(__DIR__ . '/assets/css/custom.css') : time() ?>">
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800 flex overflow-x-hidden">
@@ -28,12 +37,11 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
         <!-- Sidebar Brand -->
         <div class="p-5 border-b border-slate-800 flex items-center justify-between">
             <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white shadow-md shadow-indigo-500/30">
-                    <i class="fa-solid fa-boxes-packing text-lg"></i>
+                <div class="w-10 h-10 rounded-xl bg-white p-1.5 flex items-center justify-center shadow-md shrink-0">
+                    <img src="assets/image/logo-IEG.png" alt="Logo IEG" class="w-full h-full object-contain">
                 </div>
                 <div>
                     <h1 class="font-bold text-white text-base leading-tight tracking-tight">Return Inbound</h1>
-                    <p class="text-[11px] text-indigo-400 font-medium">Warehouse Admin Hub</p>
                 </div>
             </div>
             <button id="btnCloseSidebar" class="lg:hidden text-slate-400 hover:text-white p-1">
@@ -51,8 +59,8 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
             </button>
 
             <button onclick="switchTab('transactions')" id="nav-transactions" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/80">
-                <i class="fa-solid fa-receipt w-5 text-center"></i>
-                <span>Riwayat Inbound</span>
+                <i class="fa-solid fa-box-open w-5 text-center"></i>
+                <span>Inbound Unboxing</span>
             </button>
 
             <button onclick="switchTab('products')" id="nav-products" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/80">
@@ -63,6 +71,11 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
             <button onclick="switchTab('expeditions')" id="nav-expeditions" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/80">
                 <i class="fa-solid fa-truck-fast w-5 text-center"></i>
                 <span>Master Ekspedisi</span>
+            </button>
+
+            <button onclick="switchTab('conditions')" id="nav-conditions" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/80">
+                <i class="fa-solid fa-tags w-5 text-center"></i>
+                <span>Master Kondisi</span>
             </button>
 
             <button onclick="switchTab('users')" id="nav-users" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/80">
@@ -79,7 +92,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
 
             <div class="pt-4 px-3 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Akses Langsung</div>
 
-            <a href="index.php" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/40 border border-emerald-500/20 transition">
+            <a href="scanner" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/40 border border-emerald-500/20 transition">
                 <i class="fa-solid fa-barcode w-5 text-center"></i>
                 <span>Buka Scanner Operator</span>
             </a>
@@ -96,7 +109,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                     <div class="text-[10px] <?= $isSuperAdmin ? 'text-amber-400' : 'text-indigo-400' ?> font-mono uppercase font-semibold"><?= $user['role'] ?></div>
                 </div>
             </div>
-            <a href="logout.php" onclick="return confirm('Apakah Anda yakin ingin logout?')" title="Logout / Keluar" class="text-rose-400 hover:text-white hover:bg-rose-600/30 p-2 rounded-xl transition">
+            <a href="logout" onclick="return confirm('Apakah Anda yakin ingin logout?')" title="Logout / Keluar" class="text-rose-400 hover:text-white hover:bg-rose-600/30 p-2 rounded-xl transition">
                 <i class="fa-solid fa-arrow-right-from-bracket"></i>
             </a>
         </div>
@@ -114,216 +127,291 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 </button>
                 <div>
                     <h2 class="font-bold text-lg md:text-xl text-slate-800" id="currentViewTitle">Dashboard Monitoring Retur</h2>
-                    <p class="text-xs text-slate-400 hidden sm:block">Pemantauan data penerimaan barang retur secara realtime</p>
                 </div>
-            </div>
-
-            <div class="flex items-center space-x-2">
-                <!-- Tombol Tambah Produk Cepat -->
-                <button onclick="openAddProductModal()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs px-3 py-2 rounded-xl font-bold transition flex items-center gap-1.5 border border-indigo-200">
-                    <i class="fa-solid fa-plus-circle"></i> <span class="hidden sm:inline">Tambah Produk</span>
-                </button>
-
-                <!-- Tombol Refresh Data -->
-                <button onclick="refreshAllData()" title="Segarkan Data" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-2 rounded-xl font-semibold transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-arrows-rotate" id="refreshIcon"></i> <span class="hidden sm:inline">Refresh</span>
-                </button>
-
-                <!-- Link Cepat ke Scanner -->
-                <a href="index.php" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-xl font-semibold transition flex items-center gap-1.5 shadow-sm">
-                    <i class="fa-solid fa-camera"></i> <span class="hidden md:inline">Scanner</span>
-                </a>
-
-                <!-- User Profile Badge -->
-                <div class="hidden md:flex items-center gap-1.5 bg-slate-100 border border-slate-200 px-2.5 py-1.5 rounded-xl text-xs">
-                    <i class="fa-solid <?= $isSuperAdmin ? 'fa-shield-halved text-amber-500' : 'fa-circle-user text-indigo-600' ?>"></i>
-                    <span class="font-bold text-slate-800"><?= htmlspecialchars($user['name']) ?></span>
-                    <span class="bg-indigo-100 text-indigo-700 text-[10px] font-mono uppercase px-1.5 py-0.5 rounded font-bold"><?= $user['role'] ?></span>
-                </div>
-
-                <!-- Tombol Logout -->
-                <a href="logout.php" onclick="return confirm('Apakah Anda yakin ingin logout?')" title="Keluar / Logout" class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs px-3 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-2xs">
-                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
-                    <span class="hidden sm:inline">Logout</span>
-                </a>
             </div>
         </header>
 
-        <!-- Body Container -->
-        <main class="p-4 md:p-8 space-y-6 flex-1">
+        <!-- Body Container (Jarak ke topbar konsisten dan rapi di semua halaman) -->
+        <main class="w-full px-4 md:px-8 py-6 flex-1">
 
             <!-- TAB 1: DASHBOARD OVERVIEW -->
-            <div id="tab-dashboard" class="tab-content space-y-6">
-                <!-- KPI Summary Cards -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200">
-                        <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase">
-                            <span>Total Invoice Hari Ini</span>
-                            <span class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                                <i class="fa-solid fa-file-invoice text-sm"></i>
-                            </span>
+            <div id="tab-dashboard" class="tab-content space-y-5">
+
+                <!-- Filter Bar -->
+                <div class="bg-white p-4 rounded-2xl shadow-xs border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-indigo-600/10 flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-chart-line text-indigo-600"></i>
                         </div>
-                        <div class="text-3xl font-black text-slate-800 mt-2" id="kpiTotalInvoice">0</div>
-                        <div class="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-                            <span class="text-indigo-600 font-bold">&bull;</span> Sesi transaksi retur
+                        <div>
+                            <h3 class="font-bold text-sm text-slate-800">Dashboard Monitoring Retur</h3>
+                            <span id="dashboardDateBadge" class="bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-200">Hari Ini</span>
                         </div>
                     </div>
-
-                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200">
-                        <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase">
-                            <span>Total Unit Fisik</span>
-                            <span class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                                <i class="fa-solid fa-box-open text-sm"></i>
+                    <div class="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+                        <div class="relative flex items-center">
+                            <span class="absolute left-3 text-indigo-600 pointer-events-none text-xs z-10">
+                                <i class="fa-regular fa-calendar-days"></i>
                             </span>
+                            <input type="text" id="dashboardFilterDate" placeholder="Pilih Tanggal / Rentang..." readonly
+                                class="bg-slate-50 hover:bg-white border border-slate-300 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs transition w-full sm:w-64 cursor-pointer">
+                            <button type="button" id="btnClearDashboardDate" onclick="clearDashboardDateFilter()" title="Hapus filter tanggal" class="absolute right-2.5 text-slate-400 hover:text-rose-500 transition text-xs hidden z-10">
+                                <i class="fa-solid fa-circle-xmark"></i>
+                            </button>
                         </div>
-                        <div class="text-3xl font-black text-slate-800 mt-2" id="kpiTotalItems">0</div>
-                        <div class="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-                            <span class="text-blue-600 font-bold">&bull;</span> Total seluruh pcs masuk
+                        <button onclick="applyDashboardDateFilter()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-sm shadow-indigo-600/30 shrink-0">
+                            <i class="fa-solid fa-filter text-[11px]"></i> Terapkan
+                        </button>
+                        <button onclick="exportDashboardExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 shrink-0">
+                            <i class="fa-solid fa-file-excel text-xs"></i> Export Excel
+                        </button>
+                    </div>
+                </div>
+
+                <!-- KPI Cards Row -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Total Invoice -->
+                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 relative overflow-hidden group hover:shadow-md transition">
+                        <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-indigo-50 opacity-60 group-hover:opacity-100 transition"></div>
+                        <div class="relative">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Invoice</span>
+                                <span class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                    <i class="fa-solid fa-file-invoice text-xs"></i>
+                                </span>
+                            </div>
+                            <div class="text-3xl font-black text-slate-800" id="kpiTotalInvoice">—</div>
+                            <div class="text-[10px] text-slate-400 mt-1">Sesi retur tercatat</div>
                         </div>
                     </div>
-
-                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200">
-                        <div class="flex items-center justify-between text-emerald-600 text-xs font-semibold uppercase">
-                            <span>Kondisi Good</span>
-                            <span class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                                <i class="fa-solid fa-circle-check text-sm"></i>
-                            </span>
-                        </div>
-                        <div class="text-3xl font-black text-emerald-600 mt-2" id="kpiTotalGood">0</div>
-                        <div class="text-[11px] text-emerald-500 mt-1 flex items-center gap-1">
-                            <span class="text-emerald-600 font-bold">&bull;</span> Layak restock / jual
+                    <!-- Total Unit -->
+                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 relative overflow-hidden group hover:shadow-md transition">
+                        <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-blue-50 opacity-60 group-hover:opacity-100 transition"></div>
+                        <div class="relative">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Qty</span>
+                                <span class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                                    <i class="fa-solid fa-boxes-stacked text-xs"></i>
+                                </span>
+                            </div>
+                            <div class="text-3xl font-black text-slate-800" id="kpiTotalItems">—</div>
+                            <div class="text-[10px] text-slate-400 mt-1">Total unit fisik masuk</div>
                         </div>
                     </div>
-
-                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200">
-                        <div class="flex items-center justify-between text-rose-600 text-xs font-semibold uppercase">
-                            <span>Kondisi Rusak</span>
-                            <span class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-                                <i class="fa-solid fa-triangle-exclamation text-sm"></i>
-                            </span>
+                    <!-- Kondisi Baik -->
+                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-emerald-100 relative overflow-hidden group hover:shadow-md transition">
+                        <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-emerald-50 opacity-60 group-hover:opacity-100 transition"></div>
+                        <div class="relative">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Kondisi Baik</span>
+                                <span class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                    <i class="fa-solid fa-circle-check text-xs"></i>
+                                </span>
+                            </div>
+                            <div class="text-3xl font-black text-emerald-600" id="kpiTotalGood">—</div>
+                            <div class="text-[10px] text-emerald-500 mt-1">Layak restock / jual</div>
                         </div>
-                        <div class="text-3xl font-black text-rose-600 mt-2" id="kpiTotalDamaged">0</div>
-                        <div class="text-[11px] text-rose-500 mt-1 flex items-center gap-1">
-                            <span class="text-rose-600 font-bold">&bull;</span> Cacat / retur vendor
+                    </div>
+                    <!-- Kondisi Rusak -->
+                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-rose-100 relative overflow-hidden group hover:shadow-md transition">
+                        <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-rose-50 opacity-60 group-hover:opacity-100 transition"></div>
+                        <div class="relative">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-bold text-rose-600 uppercase tracking-wider">Kondisi Rusak</span>
+                                <span class="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+                                    <i class="fa-solid fa-triangle-exclamation text-xs"></i>
+                                </span>
+                            </div>
+                            <div class="text-3xl font-black text-rose-600" id="kpiTotalDamaged">—</div>
+                            <div class="text-[10px] text-rose-500 mt-1">Cacat / retur vendor</div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Middle Section: Chart Rasio & Master Produk Preview -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <!-- Chart Rasio Good vs Rusak -->
-                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 lg:col-span-1 flex flex-col items-center">
-                        <h3 class="font-bold text-sm text-slate-700 w-full mb-3 flex items-center justify-between">
-                            <span>Rasio Kualitas Hari Ini</span>
-                            <i class="fa-solid fa-chart-pie text-indigo-500"></i>
-                        </h3>
-                        <div class="relative w-full h-56 flex justify-center items-center">
+                <!-- Middle Row: Charts -->
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
+                    <!-- Donut Rasio -->
+                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 lg:col-span-1 flex flex-col">
+                        <h4 class="font-bold text-sm text-slate-700 mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-pie text-indigo-500 text-xs"></i> Rasio Kondisi
+                        </h4>
+                        <div class="flex-1 relative min-h-[180px]">
                             <canvas id="ratioChart"></canvas>
                         </div>
                     </div>
-
-                    <!-- Ringkasan Master Produk Cepat -->
-                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 lg:col-span-2 flex flex-col justify-between">
-                        <div>
-                            <div class="flex items-center justify-between mb-3">
-                                <div>
-                                    <h3 class="font-bold text-sm text-slate-800">Master Data Produk Terdaftar</h3>
-                                    <p class="text-xs text-slate-400">Barcode yang siap dipindai oleh stasiun operator</p>
-                                </div>
-                                <button onclick="switchTab('products')" class="text-xs text-indigo-600 hover:text-indigo-800 font-bold">
-                                    Lihat Semua &rarr;
-                                </button>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full text-xs text-left">
-                                    <thead class="bg-slate-50 text-slate-600 uppercase font-semibold">
-                                        <tr>
-                                            <th class="p-2.5">Barcode</th>
-                                            <th class="p-2.5">SKU</th>
-                                            <th class="p-2.5">Nama Produk</th>
-                                            <th class="p-2.5">Kategori</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="quickProductsTableBody" class="divide-y divide-slate-100">
-                                        <tr><td colspan="4" class="p-4 text-center text-slate-400">Memuat data produk...</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                    <!-- Trend 7 hari -->
+                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 lg:col-span-4 flex flex-col">
+                        <h4 class="font-bold text-sm text-slate-700 mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-area text-indigo-500 text-xs"></i> Trend Volume Retur 7 Hari Terakhir
+                        </h4>
+                        <div class="flex-1 relative min-h-[170px]">
+                            <canvas id="trendChart"></canvas>
                         </div>
                     </div>
                 </div>
 
-                <!-- 5 Transaksi Terakhir Preview -->
-                <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
-                    <div class="p-4 border-b border-slate-200 flex justify-between items-center">
-                        <div>
-                            <h3 class="font-bold text-sm text-slate-800">5 Transaksi Inbound Terbaru</h3>
-                            <p class="text-xs text-slate-400">Ringkasan aktivitas retur invoice terkini</p>
+                <!-- Bottom Row: Expedition Tables -->
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                    <!-- Total Qty per Ekspedisi -->
+                    <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+                        <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                                    <i class="fa-solid fa-truck-fast text-xs"></i>
+                                </span>
+                                <h4 class="font-bold text-sm text-slate-800">Total Qty per Ekspedisi</h4>
+                            </div>
                         </div>
-                        <button onclick="switchTab('transactions')" class="text-xs text-indigo-600 hover:text-indigo-800 font-bold">
-                            Buka Semua Riwayat &rarr;
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-xs text-left">
+                                <thead class="bg-slate-50 text-slate-500 uppercase font-semibold text-[10px]">
+                                    <tr>
+                                        <th class="p-3">#</th>
+                                        <th class="p-3">Ekspedisi</th>
+                                        <th class="p-3 text-center">Total Sesi</th>
+                                        <th class="p-3 text-right">Total Qty</th>
+                                        <th class="p-3">Proporsi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dashExpeditionTableBody" class="divide-y divide-slate-100">
+                                    <tr><td colspan="5" class="p-6 text-center text-slate-400">Memuat data...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Kondisi per Ekspedisi -->
+                    <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+                        <div class="p-4 border-b border-slate-100 flex items-center gap-2">
+                            <span class="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+                                <i class="fa-solid fa-tags text-xs"></i>
+                            </span>
+                            <h4 class="font-bold text-sm text-slate-800">Kondisi per Ekspedisi</h4>
+                        </div>
+                        <div id="dashConditionContainer" class="divide-y divide-slate-100 max-h-[340px] overflow-y-auto">
+                            <div class="p-6 text-center text-slate-400 text-xs">Memuat data...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Transactions Preview -->
+                <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+                    <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                        <h3 class="font-bold text-sm text-slate-800">Transaksi Terbaru</h3>
+                        <button onclick="switchTab('transactions')" class="text-xs text-indigo-600 hover:text-indigo-800 font-bold border border-indigo-200 hover:border-indigo-400 px-3 py-2 rounded-xl transition">
+                            Lihat Semua &rarr;
                         </button>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-xs border-collapse">
-                            <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
+                            <thead class="bg-slate-100 text-slate-600 uppercase font-semibold text-[11px]">
                                 <tr>
-                                    <th class="p-3">Waktu</th>
-                                    <th class="p-3">Invoice</th>
-                                    <th class="p-3">Ekspedisi</th>
-                                    <th class="p-3">Operator</th>
-                                    <th class="p-3 text-center">Total Unit</th>
-                                    <th class="p-3 text-center">Good</th>
-                                    <th class="p-3 text-center">Rusak</th>
-                                    <th class="p-3">Detail Item</th>
-                                    <th class="p-3 text-center">Aksi</th>
+                                    <th class="p-3 whitespace-nowrap">Tanggal & Waktu</th>
+                                    <th class="p-3 whitespace-nowrap">Invoice</th>
+                                    <th class="p-3 whitespace-nowrap">Ekspedisi</th>
+                                    <th class="p-3 whitespace-nowrap">Operator</th>
+                                    <th class="p-3 whitespace-nowrap">Seller SKU</th>
+                                    <th class="p-3 min-w-[200px] max-w-[340px]">Nama Produk</th>
+                                    <th class="p-3 whitespace-nowrap">Batch</th>
+                                    <th class="p-3 whitespace-nowrap">Exp Date</th>
+                                    <th class="p-3 text-center whitespace-nowrap">Qty</th>
+                                    <th class="p-3 text-center whitespace-nowrap">Type (Kondisi)</th>
+                                    <th class="p-3 text-center whitespace-nowrap">Video</th>
+                                    <th class="p-3 text-center whitespace-nowrap">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody id="previewTransactionsTableBody" class="divide-y divide-slate-100">
-                                <tr><td colspan="9" class="text-center py-6 text-slate-400">Memuat data...</td></tr>
+                                <tr><td colspan="12" class="text-center py-6 text-slate-400">Memuat data...</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
-            <!-- TAB 2: RIWAYAT TRANSAKSI LENGKAP -->
-            <div id="tab-transactions" class="tab-content hidden space-y-4">
+            <!-- TAB 2: INBOUND UNBOXING & RIWAYAT TRANSAKSI LENGKAP -->
+            <div id="tab-transactions" class="tab-content hidden space-y-6">
                 <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
-                    <div class="p-4 border-b border-slate-200 flex flex-col md:flex-row justify-between items-center gap-3">
+                    <div class="p-4 border-b border-slate-200 flex flex-col lg:flex-row justify-between items-center gap-4">
                         <div>
-                            <h3 class="font-bold text-base text-slate-800">Seluruh Riwayat Inbound Return</h3>
-                            <p class="text-xs text-slate-400">Audit trail dan detail seluruh sesi transaksi retur</p>
+                            <div class="flex items-center gap-2">
+                                <h3 class="font-bold text-base text-slate-800">Inbound Unboxing</h3>
+                                <span class="bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-200">Video &amp; Audit Trail</span>
+                            </div>
                         </div>
-                        <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                            <input type="date" id="filterDate" class="border border-slate-300 rounded-xl px-3 py-1.5 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                            <input type="text" id="filterSearch" placeholder="Cari invoice/operator..." class="border border-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                            <button id="btnApplyFilter" class="bg-slate-800 hover:bg-slate-700 text-white text-xs px-3.5 py-2 rounded-xl font-semibold transition flex items-center gap-1">
-                                <i class="fa-solid fa-filter"></i> Filter
+                        <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+                            <!-- Premium Datepicker (Flatpickr) -->
+                            <div class="relative flex items-center">
+                                <span class="absolute left-3 text-indigo-600 pointer-events-none text-xs z-10">
+                                    <i class="fa-regular fa-calendar-days"></i>
+                                </span>
+                                <input type="text" id="filterDate" placeholder="Pilih Tanggal / Rentang..." readonly
+                                    class="bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs transition w-44 sm:w-56 cursor-pointer">
+                                <button type="button" id="btnClearDate" onclick="clearDateFilter()" title="Hapus filter tanggal" class="absolute right-2.5 text-slate-400 hover:text-rose-500 transition text-xs hidden z-10">
+                                    <i class="fa-solid fa-circle-xmark"></i>
+                                </button>
+                            </div>
+
+                            <!-- Filter Ekspedisi -->
+                            <div class="relative">
+                                <select id="filterExpedition" onchange="loadTransactions()" class="bg-slate-50 hover:bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-2xs">
+                                    <option value="">Semua Ekspedisi</option>
+                                </select>
+                            </div>
+
+                            <!-- Filter Type (Kondisi) -->
+                            <div class="relative">
+                                <select id="filterCondition" onchange="loadTransactions()" class="bg-slate-50 hover:bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-2xs">
+                                    <option value="">Semua Kondisi</option>
+                                    <option value="GOOD">GOOD (Layak)</option>
+                                    <option value="RUSAK">RUSAK</option>
+                                </select>
+                            </div>
+
+                            <!-- Filter Operator -->
+                            <div class="relative">
+                                <select id="filterOperator" onchange="loadTransactions()" class="bg-slate-50 hover:bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-2xs">
+                                    <option value="">Semua Operator</option>
+                                </select>
+                            </div>
+
+                            <!-- Search Input -->
+                            <div class="relative flex items-center">
+                                <span class="absolute left-3 text-slate-400 pointer-events-none text-xs">
+                                    <i class="fa-solid fa-magnifying-glass"></i>
+                                </span>
+                                <input type="text" id="filterSearch" placeholder="Cari invoice/sku..." 
+                                    class="border border-slate-300 rounded-xl pl-8 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs w-36 sm:w-44">
+                            </div>
+
+                            <button id="btnApplyFilter" onclick="loadTransactions()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-sm shadow-indigo-600/30">
+                                <i class="fa-solid fa-filter text-[11px]"></i> Filter
                             </button>
-                            <button id="btnExportCsv" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-semibold transition flex items-center gap-1 shadow-xs">
-                                <i class="fa-solid fa-file-excel"></i> Export CSV
+                            <button onclick="exportInboundUnboxingExcel()" title="Download Seluruh Riwayat Inbound Unboxing ke Excel" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/20">
+                                <i class="fa-solid fa-file-excel text-[11px]"></i> Download Excel
                             </button>
                         </div>
                     </div>
 
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-xs border-collapse">
-                            <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
+                            <thead class="bg-slate-100 text-slate-600 uppercase font-semibold text-[11px]">
                                 <tr>
-                                    <th class="p-3">Waktu</th>
-                                    <th class="p-3">Invoice</th>
-                                    <th class="p-3">Ekspedisi</th>
-                                    <th class="p-3">Operator</th>
-                                    <th class="p-3 text-center">Total Unit</th>
-                                    <th class="p-3 text-center">Good</th>
-                                    <th class="p-3 text-center">Rusak</th>
-                                    <th class="p-3">Ringkasan Produk</th>
-                                    <th class="p-3 text-center">Aksi</th>
+                                    <th class="p-3 whitespace-nowrap">Tanggal & Waktu</th>
+                                    <th class="p-3 whitespace-nowrap">Invoice</th>
+                                    <th class="p-3 whitespace-nowrap">Ekspedisi</th>
+                                    <th class="p-3 whitespace-nowrap">Operator</th>
+                                    <th class="p-3 whitespace-nowrap">Seller SKU</th>
+                                    <th class="p-3 min-w-[200px] max-w-[340px]">Nama Produk</th>
+                                    <th class="p-3 whitespace-nowrap">Batch</th>
+                                    <th class="p-3 whitespace-nowrap">Exp Date</th>
+                                    <th class="p-3 text-center whitespace-nowrap">Qty</th>
+                                    <th class="p-3 text-center whitespace-nowrap">Type (Kondisi)</th>
+                                    <th class="p-3 text-center whitespace-nowrap">Video Unboxing</th>
+                                    <th class="p-3 text-center whitespace-nowrap">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody id="transactionsTableBody" class="divide-y divide-slate-100">
-                                <tr><td colspan="9" class="text-center py-8 text-slate-400">Memuat data transaksi...</td></tr>
+                                <tr><td colspan="12" class="text-center py-8 text-slate-400">Memuat data transaksi unboxing...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -331,12 +419,11 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
             </div>
 
             <!-- TAB 3: MASTER PRODUK LENGKAP -->
-            <div id="tab-products" class="tab-content hidden space-y-4">
+            <div id="tab-products" class="tab-content hidden space-y-6">
                 <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
                     <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-3">
                         <div>
                             <h3 class="font-bold text-base text-slate-800">Master Data Produk & Barcode</h3>
-                            <p class="text-xs text-slate-400">Daftar produk yang tersimpan di database MySQL Laragon</p>
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
                             <!-- Dropdown Filter Toko / Shop -->
@@ -347,34 +434,31 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             </div>
                             <!-- Search Input Keyword -->
                             <div class="relative">
-                                <input type="text" id="filterProductSearch" onkeyup="filterProductTable()" placeholder="Cari nama/barcode/sku/sap/rak..." class="border border-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 w-44 sm:w-60">
+                                <input type="text" id="filterProductSearch" onkeyup="filterProductTable()" placeholder="Cari nama/barcode/sku/sap..." class="border border-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 w-44 sm:w-60">
                             </div>
                             <button id="btnSyncOcs" onclick="syncProductsFromOCS()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-2xs">
                                 <i class="fa-solid fa-arrows-rotate" id="syncOcsIcon"></i> Tarik Data dari OCS IEG
                             </button>
-                            <button onclick="openAddProductModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-sm">
-                                <i class="fa-solid fa-plus-circle"></i> Tambah Manual
+                            <button onclick="exportProductsExcel()" title="Download Seluruh Master Produk ke Excel" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/20">
+                                <i class="fa-solid fa-file-excel text-xs"></i> Download Excel
                             </button>
                         </div>
                     </div>
 
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-xs border-collapse">
-                            <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
+                            <thead class="bg-slate-100 text-slate-600 uppercase font-semibold text-[11px]">
                                 <tr>
-                                    <th class="p-3 w-12 text-center">#</th>
-                                    <th class="p-3">Seller SKU</th>
-                                    <th class="p-3">Shop / Toko</th>
-                                    <th class="p-3 text-center">Bin Code (Rak)</th>
-                                    <th class="p-3">Barcode</th>
-                                    <th class="p-3">Barcode BPOM</th>
-                                    <th class="p-3">SAP Code</th>
-                                    <th class="p-3">Nama Produk</th>
+                                    <th class="p-3 w-12 text-center whitespace-nowrap">#</th>
+                                    <th class="p-3 whitespace-nowrap">Shop / Toko</th>
+                                    <th class="p-3 whitespace-nowrap">Barcode / Seller SKU / SAP Code</th>
+                                    <th class="p-3" style="min-width:160px;max-width:260px;width:260px">Nama Produk</th>
+                                    <th class="p-3 whitespace-nowrap">Barcode BPOM</th>
                                 </tr>
                             </thead>
                             <tbody id="fullProductsTableBody" class="divide-y divide-slate-100">
                                 <tr>
-                                    <td colspan="8" class="text-center py-12 text-slate-400">
+                                    <td colspan="5" class="text-center py-12 text-slate-400">
                                         <div class="flex flex-col items-center justify-center space-y-3">
                                             <div class="traffic-loader">
                                                 <div class="traffic-ball traffic-ball-red"></div>
@@ -392,16 +476,18 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
             </div>
 
             <!-- TAB 4: MASTER EKSPEDISI / KURIR -->
-            <div id="tab-expeditions" class="tab-content hidden space-y-4">
+            <div id="tab-expeditions" class="tab-content hidden space-y-6">
                 <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
                     <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-3">
                         <div>
                             <h3 class="font-bold text-base text-slate-800">Master Data Ekspedisi & Kurir</h3>
-                            <p class="text-xs text-slate-400">Kelola daftar armada ekspedisi penerima barang retur (Tambah, Edit, Hapus)</p>
                         </div>
-                        <div class="flex items-center space-x-2 w-full sm:w-auto">
+                        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                             <input type="text" id="filterExpeditionSearch" oninput="filterExpeditionTable()" placeholder="Cari nama / kode ekspedisi..."
-                                class="border border-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-64">
+                                class="border border-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-56">
+                            <button onclick="exportExpeditionsExcel()" title="Download Seluruh Data Ekspedisi ke Excel" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shrink-0 shadow-sm shadow-emerald-600/20">
+                                <i class="fa-solid fa-file-excel text-xs"></i> Download Excel
+                            </button>
                             <button onclick="openAddExpeditionModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shrink-0 shadow-sm">
                                 <i class="fa-solid fa-plus-circle"></i> Tambah Ekspedisi
                             </button>
@@ -428,13 +514,49 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 </div>
             </div>
 
-            <!-- TAB 5: KELOLA PENGGUNA (USERS) -->
-            <div id="tab-users" class="tab-content hidden space-y-4">
+            <!-- TAB 5: MASTER KONDISI / TYPE -->
+            <div id="tab-conditions" class="tab-content hidden space-y-6">
+                <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+                    <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-3">
+                        <div>
+                            <h3 class="font-bold text-base text-slate-800">Master Data Type / Kondisi Produk</h3>
+                            <p class="text-xs text-slate-400 mt-0.5">Kelola daftar kondisi yang tersedia saat scanning retur</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                            <input type="text" id="filterConditionSearch" oninput="filterConditionTable()" placeholder="Cari kode / nama kondisi..."
+                                class="border border-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-56">
+                            <button onclick="openAddConditionModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shrink-0 shadow-sm">
+                                <i class="fa-solid fa-plus-circle"></i> Tambah Kondisi
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead class="bg-slate-100 text-slate-600 uppercase font-semibold text-[11px]">
+                                <tr>
+                                    <th class="p-3 w-12 text-center">#</th>
+                                    <th class="p-3">Kode</th>
+                                    <th class="p-3">Nama Kondisi</th>
+                                    <th class="p-3">Deskripsi</th>
+                                    <th class="p-3 text-center">Warna Badge</th>
+                                    <th class="p-3 text-center w-32">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fullConditionsTableBody" class="divide-y divide-slate-100">
+                                <tr><td colspan="6" class="text-center py-8 text-slate-400">Memuat data kondisi...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 6: KELOLA PENGGUNA (USERS) -->
+            <div id="tab-users" class="tab-content hidden space-y-6">
                 <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
                     <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-3">
                         <div>
                             <h3 class="font-bold text-base text-slate-800">Manajemen Pengguna Sistem</h3>
-                            <p class="text-xs text-slate-400">Kelola akun Operator, Admin Gudang<?= $isSuperAdmin ? ', dan Super Administrator' : '' ?></p>
                         </div>
                         <div class="flex items-center space-x-2 w-full sm:w-auto">
                             <input type="text" id="filterUserSearch" oninput="filterUserTable()" placeholder="Cari nama / username..."
@@ -453,6 +575,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                     <th class="p-3">Username</th>
                                     <th class="p-3">Nama Lengkap</th>
                                     <th class="p-3 text-center">Role / Wewenang</th>
+                                    <th class="p-3 text-center">PIN</th>
                                     <th class="p-3 text-center">Status</th>
                                     <th class="p-3">Tanggal Dibuat</th>
                                     <th class="p-3 text-center w-32">Aksi</th>
@@ -488,7 +611,6 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             <h3 class="text-xl font-black tracking-tight mt-1 flex items-center gap-2">
                                 <i class="fa-solid fa-screwdriver-wrench"></i> Panel Pemeliharaan Sistem
                             </h3>
-                            <p class="text-xs text-amber-100">Kontrol mode maintenance, optimasi tabel database MySQL, dan pembersihan sistem</p>
                         </div>
                         <div>
                             <span id="maintStatusBadge" class="bg-white text-slate-800 text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-sm flex items-center gap-2">
@@ -568,7 +690,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 </div>
                                 <div class="py-2 flex justify-between">
                                     <span class="text-slate-500">Environment</span>
-                                    <span class="font-bold text-emerald-600"><?= !empty($is_remote) ? 'InfinityFree Production' : 'Localhost Laragon' ?></span>
+                                    <span class="font-bold text-emerald-600"><?= !empty($is_remote) ? 'InfinityFree Production' : 'Local Server (Active)' ?></span>
                                 </div>
                                 <div class="py-2 flex justify-between">
                                     <span class="text-slate-500">Zona Waktu</span>
@@ -609,37 +731,6 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
         </main>
     </div>
 
-    <!-- MODAL DETAIL ITEM PER SESI -->
-    <div id="detailModal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center hidden p-4">
-        <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4">
-            <div class="flex justify-between items-start border-b border-slate-100 pb-3">
-                <div>
-                    <h3 class="text-lg font-bold text-slate-800" id="modalInvoiceTitle">Detail Invoice</h3>
-                    <p class="text-xs text-slate-400" id="modalInvoiceSubtitle">Rincian item barang yang diretur</p>
-                </div>
-                <button id="btnCloseModal" class="text-slate-400 hover:text-slate-600 text-lg">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-
-            <div class="overflow-x-auto max-h-[350px]">
-                <table class="w-full text-xs text-left border-collapse">
-                    <thead class="bg-slate-50 text-slate-600 uppercase font-semibold sticky top-0">
-                        <tr>
-                            <th class="p-2.5">Barcode</th>
-                            <th class="p-2.5">Nama Produk</th>
-                            <th class="p-2.5">Batch</th>
-                            <th class="p-2.5">Exp Date</th>
-                            <th class="p-2.5 text-center">Qty</th>
-                            <th class="p-2.5 text-center">Type</th>
-                        </tr>
-                    </thead>
-                    <tbody id="modalItemsBody" class="divide-y divide-slate-100"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
     <!-- MODAL TAMBAH PRODUK BARU -->
     <div id="addProductModal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center hidden p-4">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
@@ -650,7 +741,6 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                     </div>
                     <div>
                         <h3 class="text-base font-bold text-slate-800">Tambah Produk Baru</h3>
-                        <p class="text-xs text-slate-400">Daftarkan barcode ke database MySQL</p>
                     </div>
                 </div>
                 <button onclick="closeAddProductModal()" class="text-slate-400 hover:text-slate-600">
@@ -716,7 +806,6 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                     </div>
                     <div>
                         <h3 class="text-base font-bold text-slate-800" id="expeditionModalTitle">Tambah Ekspedisi Baru</h3>
-                        <p class="text-xs text-slate-400" id="expeditionModalSubtitle">Simpan data armada/kurir ke database MySQL</p>
                     </div>
                 </div>
                 <button onclick="closeExpeditionModal()" class="text-slate-400 hover:text-slate-600">
@@ -776,7 +865,6 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                     </div>
                     <div>
                         <h3 class="text-base font-bold text-slate-800" id="userModalTitle">Tambah Pengguna Baru</h3>
-                        <p class="text-xs text-slate-400" id="userModalSubtitle">Kelola akun akses sistem</p>
                     </div>
                 </div>
                 <button onclick="closeUserModal()" class="text-slate-400 hover:text-slate-600">
@@ -799,11 +887,20 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                         class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                 </div>
 
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1" id="userPasswordLabel">Password *</label>
-                    <input type="password" id="userPassword" placeholder="Masukkan password"
-                        class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                    <span class="text-[10px] text-slate-400 block mt-0.5" id="userPasswordHelp">Wajib diisi saat membuat akun baru.</span>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1" id="userPasswordLabel">Password *</label>
+                        <input type="password" id="userPassword" placeholder="Masukkan password"
+                            class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <span class="text-[10px] text-slate-400 block mt-0.5" id="userPasswordHelp">Untuk login Admin.</span>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">PIN Operator (6 Digit)</label>
+                        <input type="text" id="userPin" maxlength="10" placeholder="Contoh: 123456"
+                            class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <span class="text-[10px] text-slate-400 block mt-0.5">Untuk login Tab Operator.</span>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
@@ -887,6 +984,18 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                     Kamera tidak aktif atau izin kamera belum diberikan saat sesi transaksi ini diselesaikan.
                                 </span>
                             </div>
+
+                            <!-- Watermark Overlay (Invoice, Ekspedisi, Tanggal & Jam) -->
+                            <div id="modalVideoWatermark" class="absolute bottom-2 left-2 right-2 bg-slate-950/85 backdrop-blur-xs text-white text-[11px] px-3 py-1.5 rounded-xl flex items-center justify-between border border-white/10 pointer-events-none transition shadow-lg">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-indigo-300 font-mono" id="watermarkInvoice">INV: -</span>
+                                    <span class="text-slate-400">&bull;</span>
+                                    <span class="text-sky-300 font-semibold" id="watermarkExpedition">KURIR: -</span>
+                                </div>
+                                <div class="font-mono text-slate-200 text-[10px] flex items-center gap-1.5" id="watermarkTime">
+                                    <i class="fa-regular fa-clock text-indigo-400"></i> -
+                                </div>
+                            </div>
                         </div>
 
                         <div class="flex justify-between items-center text-[11px] text-slate-500 pt-1">
@@ -956,6 +1065,70 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
         </div>
     </div>
 
+    <!-- MODAL: TAMBAH / EDIT KONDISI -->
+    <div id="modalCondition" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 animate-in fade-in zoom-in duration-200">
+            <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-xl bg-indigo-600/10 flex items-center justify-center">
+                        <i class="fa-solid fa-tag text-indigo-600 text-sm"></i>
+                    </div>
+                    <h3 id="conditionModalTitle" class="font-bold text-slate-800 text-sm">Tambah Kondisi Baru</h3>
+                </div>
+                <button onclick="closeConditionModal()" class="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg hover:bg-slate-100">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-4">
+                <input type="hidden" id="conditionId" value="">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Kode <span class="text-red-500">*</span></label>
+                        <input type="text" id="conditionCode" placeholder="cth: GOOD, DAMAGED" maxlength="50"
+                            class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono uppercase">
+                        <p class="text-[10px] text-slate-400 mt-1">Huruf kapital, tanpa spasi</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Warna Badge <span class="text-red-500">*</span></label>
+                        <select id="conditionColor" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="emerald">🟢 Hijau (Emerald)</option>
+                            <option value="red">🔴 Merah (Red)</option>
+                            <option value="amber">🟡 Kuning (Amber)</option>
+                            <option value="orange">🟠 Oranye (Orange)</option>
+                            <option value="purple">🟣 Ungu (Purple)</option>
+                            <option value="blue">🔵 Biru (Blue)</option>
+                            <option value="slate">⚫ Abu-abu (Slate)</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Kondisi <span class="text-red-500">*</span></label>
+                    <input type="text" id="conditionName" placeholder="cth: Baik / Good"
+                        class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Deskripsi</label>
+                    <textarea id="conditionDesc" rows="2" placeholder="Penjelasan singkat tentang kondisi ini..."
+                        class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Urutan Tampil</label>
+                    <input type="number" id="conditionSort" value="0" min="0" max="999"
+                        class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 w-28">
+                    <p class="text-[10px] text-slate-400 mt-1">Angka kecil ditampilkan lebih dahulu</p>
+                </div>
+            </div>
+            <div class="p-4 border-t border-slate-100 flex justify-end gap-2">
+                <button onclick="closeConditionModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition">
+                    Batal
+                </button>
+                <button onclick="saveCondition()" id="btnSaveCondition" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-5 py-2 rounded-xl font-bold transition flex items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-floppy-disk"></i> Simpan Kondisi
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- GLOBAL LOADING OVERLAY (BOLA-BOLA MERAH, KUNING, HIJAU) -->
     <div id="globalLoadingOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4 transition-all">
         <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl flex flex-col items-center text-center space-y-4 border border-slate-100 animate-in fade-in zoom-in duration-200">
@@ -971,6 +1144,11 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
         </div>
     </div>
 
-    <script src="assets/js/admin.js?v=<?= file_exists(__DIR__ . '/assets/js/admin.js') ? filemtime(__DIR__ . '/assets/js/admin.js') : time() ?>"></script>
+    <!-- SheetJS (Official Native XLSX Generator - 100% Bebas Corrupt) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Flatpickr JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/id.js"></script>
+    <script src="assets/js/admin.js?v=<?= file_exists(__DIR__ . '/assets/js/admin.js') ? filemtime(__DIR__ . '/assets/css/custom.css') : time() ?>"></script>
 </body>
 </html>

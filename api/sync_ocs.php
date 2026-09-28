@@ -50,7 +50,7 @@ try {
         throw new Exception("Token otentikasi tidak ditemukan dalam respons login OCS.");
     }
 
-    // 2. AMBIL DATA SKU RACK DARI OCS
+    // 2. AMBIL DATA SKU RACK DARI OCS (Barcode, Rak/Bin, SAP, Shop)
     $ch2 = curl_init("{$ocsBaseUrl}/MasterData/GetSkuRack");
     curl_setopt_array($ch2, [
         CURLOPT_RETURNTRANSFER => true,
@@ -78,6 +78,44 @@ try {
         throw new Exception("Data SKU yang diterima bukan array yang valid.");
     }
 
+    // 2b. AMBIL DATA STOCKS VIEW V2 (Sku Name Lengkap berdasarkan Sku / Seller SKU)
+    // Sumber: https://ocs.iegsystem.id/stocks/view-v2 -> /odata/DTO_WmsItemStockLite
+    $stockNameMap = [];
+    try {
+        $chStock = curl_init("{$ocsBaseUrl}/odata/DTO_WmsItemStockLite");
+        curl_setopt_array($chStock, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPGET        => true,
+            CURLOPT_HTTPHEADER     => [
+                "Authorization: Bearer {$token}",
+                'Accept: application/json'
+            ],
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_TIMEOUT        => 60
+        ]);
+        $stockResponse = curl_exec($chStock);
+        $stockHttpCode = curl_getinfo($chStock, CURLINFO_HTTP_CODE);
+        curl_close($chStock);
+
+        if ($stockHttpCode === 200 && $stockResponse) {
+            $stockJson = json_decode($stockResponse, true);
+            $stockItems = $stockJson['value'] ?? [];
+            if (is_array($stockItems)) {
+                foreach ($stockItems as $stk) {
+                    $sSku = strtoupper(trim($stk['Sku'] ?? ''));
+                    $sName = trim($stk['Name'] ?? '');
+                    if (!empty($sSku) && !empty($sName)) {
+                        $stockNameMap[$sSku] = $sName;
+                    }
+                }
+            }
+        }
+    } catch (Exception $eStock) {
+        // Fallback jika stocks view lambat/gagal, tetap lanjutkan dengan SKU Rack
+        error_log("Peringatan: Gagal memuat DTO_WmsItemStockLite: " . $eStock->getMessage());
+    }
+
     // 3. SIMPAN KE DATABASE MYSQL (master_products)
     $pdo->beginTransaction();
 
@@ -99,6 +137,7 @@ try {
 
     $synced = 0;
     $skipped = 0;
+    $namesMatched = 0;
 
     foreach ($skuList as $item) {
         $sellerSku   = trim($item['SellerSku'] ?? '');
@@ -117,10 +156,24 @@ try {
             continue;
         }
 
-        // Nama produk: format dari Seller SKU & Shop
-        $productName = $sellerSku;
-        if (!empty($shop) && $shop !== 'IEG' && stripos($productName, $shop) === false) {
-            $productName = "[{$shop}] " . $sellerSku;
+        // Tentukan Nama Produk:
+        // Prioritas UTAMA: Ambil Sku Name dari https://ocs.iegsystem.id/stocks/view-v2 berdasarkan Seller SKU!
+        $sellerSkuUpper = strtoupper($sellerSku);
+        $sapCodeUpper   = strtoupper($sapCode);
+        $productName    = '';
+
+        if (!empty($sellerSkuUpper) && isset($stockNameMap[$sellerSkuUpper])) {
+            $productName = $stockNameMap[$sellerSkuUpper];
+            $namesMatched++;
+        } elseif (!empty($sapCodeUpper) && isset($stockNameMap[$sapCodeUpper])) {
+            $productName = $stockNameMap[$sapCodeUpper];
+            $namesMatched++;
+        } else {
+            // Fallback jika tidak terdaftar di Stocks View
+            $productName = $sellerSku;
+            if (!empty($shop) && $shop !== 'IEG' && stripos($productName, $shop) === false) {
+                $productName = "[{$shop}] " . $sellerSku;
+            }
         }
 
         $stmt->execute([
@@ -141,11 +194,12 @@ try {
     $pdo->commit();
 
     jsonResponse([
-        'success'      => true,
-        'total_synced' => $synced,
-        'skipped'      => $skipped,
-        'total_source' => count($skuList),
-        'message'      => "Berhasil menyinkronkan {$synced} produk dari OCS IEG System!"
+        'success'        => true,
+        'total_synced'   => $synced,
+        'names_matched'  => $namesMatched,
+        'skipped'        => $skipped,
+        'total_source'   => count($skuList),
+        'message'        => "Berhasil menyinkronkan {$synced} produk dari OCS IEG System ({$namesMatched} nama produk diambil dari Stocks View V2)!"
     ]);
 
 } catch (Exception $e) {

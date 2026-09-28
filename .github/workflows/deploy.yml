@@ -19,9 +19,9 @@ jobs:
       - name: 📂 Sync files to InfinityFree via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ secrets.FTP_SERVER || 'ftpupload.net' }}
-          username: ${{ secrets.FTP_USERNAME || 'if0_38464190' }}
-          password: ${{ secrets.FTP_PASSWORD || 'Dhaniel0' }}
+          server: ftpupload.net
+          username: if0_38464190
+          password: Dhaniel0
           server-dir: returninboundieg.great-site.net/htdocs/
           exclude: |
             **/.git*

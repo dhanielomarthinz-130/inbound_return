@@ -1,12 +1,17 @@
 Options -MultiViews
 RewriteEngine On
 
-# Allow direct access to existing files and directories
-RewriteCond %{REQUEST_FILENAME} -f [OR]
-RewriteCond %{REQUEST_FILENAME} -d
+# 1. Redirect eksternal dari *.php ke Clean URL (hanya untuk non-API)
+RewriteCond %{THE_REQUEST} ^[A-Z]{3,}\s+([^?\s]+)\.php(\?[^\s]*)?\s [NC]
+RewriteCond %{THE_REQUEST} !/api/ [NC]
+RewriteRule ^ %1%2 [R=301,L]
+
+# 2. Izinkan akses langsung ke file aset statis (CSS, JS, gambar, video, fonts) dan direktori
+RewriteCond %{REQUEST_FILENAME} -d [OR]
+RewriteCond %{REQUEST_URI} \.(css|js|png|jpg|jpeg|gif|svg|webp|ico|webm|mp4|woff|woff2|ttf|eot)$ [NC]
 RewriteRule ^ - [L]
 
-# API Rewrites
+# 4. API Rewrites
 RewriteRule ^api/invoice/(.+)$ api/invoice.php?invoice_number=$1 [QSA,L]
 RewriteRule ^api/product/(.+)$ api/product.php?barcode=$1 [QSA,L]
 RewriteRule ^api/returns/?$ api/returns.php [QSA,L]
@@ -16,6 +21,13 @@ RewriteRule ^api/admin/session/([^/]+)/items/?$ api/admin/session_items.php?sess
 RewriteRule ^api/products/?$ api/products.php [QSA,L]
 RewriteRule ^api/expeditions/?$ api/expeditions.php [QSA,L]
 
-# Route index / admin
-RewriteRule ^admin/?$ admin.php [L]
-RewriteRule ^scanner/?$ index.php [L]
+# 5. Route Clean URLs ke PHP scripts
+RewriteRule ^admin/?$ admin.php [QSA,L]
+RewriteRule ^scanner/?$ index.php [QSA,L]
+RewriteRule ^login/?$ login.php [QSA,L]
+RewriteRule ^logout/?$ logout.php [QSA,L]
+
+# 6. Fallback jika ada file PHP lain yang diakses tanpa ekstensi
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}.php -f
+RewriteRule ^(.*)$ $1.php [QSA,L]

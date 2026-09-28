@@ -100,6 +100,11 @@ try {
         $cond = ($type === 'GOOD') ? 'GOOD' : 'RUSAK';
         $reason = ($cond === 'RUSAK') ? ($item['damage_reason'] ?? $type) : '';
 
+        $expDate = trim($item['exp_date'] ?? '');
+        if (!empty($expDate) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $expDate, $m)) {
+            $expDate = "{$m[3]}-{$m[2]}-{$m[1]}";
+        }
+
         $stmtItem->execute([
             $sessionId,
             $item['barcode'] ?? '',
@@ -108,7 +113,7 @@ try {
             $item['seller_sku'] ?? $item['sku'] ?? '',
             $item['sap_code'] ?? '',
             $item['batch_no'] ?? '',
-            $item['exp_date'] ?? '',
+            $expDate,
             $type,
             $qty,
             $cond,

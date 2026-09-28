@@ -18,6 +18,13 @@ try {
     $stmt->execute([(int)$sessionId]);
     $items = $stmt->fetchAll();
 
+    foreach ($items as &$it) {
+        if (!empty($it['exp_date']) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', trim($it['exp_date']), $m)) {
+            $it['exp_date'] = "{$m[3]}-{$m[2]}-{$m[1]}";
+        }
+    }
+    unset($it);
+
     jsonResponse($items);
 } catch (Exception $e) {
     jsonResponse(['error' => $e->getMessage()], 500);

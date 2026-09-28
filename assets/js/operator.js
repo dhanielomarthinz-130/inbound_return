@@ -351,6 +351,21 @@ window.handleAddItem = function(e) {
     commitAddItem();
 };
 
+function formatExpDate(val) {
+    if (!val || val === '-' || val.trim() === '') return '-';
+    const clean = val.trim();
+    if (/^\d{2}-\d{2}-\d{4}$/.test(clean)) return clean;
+    const parts = clean.split(/[-/]/);
+    if (parts.length === 3) {
+        if (parts[0].length === 4) {
+            return `${parts[2].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[0]}`;
+        } else if (parts[2].length === 4) {
+            return `${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[2]}`;
+        }
+    }
+    return clean;
+}
+
 function commitAddItem() {
     const batchNo = inputBatch.value.trim();
     const expDate = inputExpDate.value.trim();
@@ -366,7 +381,7 @@ function commitAddItem() {
         shop: currentDetectedProduct.shop || '',
         bin_code: currentDetectedProduct.bin_code || '',
         batch_no: batchNo || '-',
-        exp_date: expDate || '-',
+        exp_date: formatExpDate(expDate),
         qty: qty,
         type: type,
         condition: (type === 'GOOD') ? 'GOOD' : 'RUSAK'
@@ -443,8 +458,8 @@ function renderItemsTable() {
                     ${item.bin_code ? `<span class="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-mono text-[10px] border border-amber-200">Rak: ${item.bin_code}</span>` : ''}
                 </div>
             </td>
-            <td class="p-3 font-mono text-slate-600">${item.batch_no || '-'}</td>
-            <td class="p-3 font-mono text-slate-600">${item.exp_date || '-'}</td>
+            <td class="p-3 font-mono text-slate-600 whitespace-nowrap">${item.batch_no || '-'}</td>
+            <td class="p-3 font-mono text-slate-600 whitespace-nowrap font-medium">${formatExpDate(item.exp_date)}</td>
             <td class="p-3 text-center font-bold text-slate-900 text-sm font-mono">${item.qty}</td>
             <td class="p-3 text-center">${badge}</td>
             <td class="p-3 text-center">
@@ -473,6 +488,10 @@ let mediaRecorder = null;
 let recordedChunks = [];
 let recordingTimerInterval = null;
 let recordingSeconds = 0;
+let watermarkCanvas = null;
+let watermarkCtx = null;
+let watermarkAnimId = null;
+let isVideoRecordingActive = false;
 
 function startVideoRecording() {
     if (!mediaStream) {
@@ -489,7 +508,92 @@ function startVideoRecording() {
             }
         }
         const options = mime ? { mimeType: mime } : undefined;
-        mediaRecorder = new MediaRecorder(mediaStream, options);
+
+        // Inisialisasi Canvas Watermark (Membakar Watermark ke Dalam Video)
+        const liveVideo = document.getElementById('liveVideoFeed');
+        const vW = (liveVideo && liveVideo.videoWidth) ? liveVideo.videoWidth : 1280;
+        const vH = (liveVideo && liveVideo.videoHeight) ? liveVideo.videoHeight : 720;
+
+        if (!watermarkCanvas) {
+            watermarkCanvas = document.createElement('canvas');
+        }
+        watermarkCanvas.width = vW;
+        watermarkCanvas.height = vH;
+        watermarkCtx = watermarkCanvas.getContext('2d');
+
+        isVideoRecordingActive = true;
+
+        function renderWatermarkLoop() {
+            if (!isVideoRecordingActive) return;
+
+            // 1. Render frame kamera terkini
+            if (liveVideo && liveVideo.readyState >= 2) {
+                watermarkCtx.drawImage(liveVideo, 0, 0, vW, vH);
+            }
+
+            // 2. Render Banner Watermark di bagian bawah video
+            const barH = Math.max(38, Math.round(vH * 0.08));
+            const yTop = vH - barH;
+
+            // Background banner gelap elegan
+            watermarkCtx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+            watermarkCtx.fillRect(0, yTop, vW, barH);
+
+            // Garis aksen atas (Indigo)
+            watermarkCtx.fillStyle = '#6366f1';
+            watermarkCtx.fillRect(0, yTop, vW, 3);
+
+            // Waktu & Tanggal Realtime
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+            const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
+
+            const inv = activeInvoice || '-';
+            const exp = activeExpedition || 'Reguler';
+
+            const fontSize = Math.max(12, Math.round(barH * 0.38));
+            watermarkCtx.font = `bold ${fontSize}px "Segoe UI", Roboto, sans-serif`;
+            watermarkCtx.textBaseline = 'middle';
+            const centerY = yTop + (barH / 2) + 1;
+
+            // Teks Kiri: INVOICE & EKSPEDISI
+            watermarkCtx.fillStyle = '#ffffff';
+            watermarkCtx.fillText(`INV: ${inv}`, 16, centerY);
+            const invW = watermarkCtx.measureText(`INV: ${inv}`).width;
+
+            watermarkCtx.fillStyle = '#64748b';
+            watermarkCtx.fillText(' • ', 16 + invW + 3, centerY);
+            const dotW = watermarkCtx.measureText(' • ').width;
+
+            watermarkCtx.fillStyle = '#38bdf8';
+            watermarkCtx.fillText(`KURIR: ${exp}`, 16 + invW + 3 + dotW + 3, centerY);
+
+            // Teks Kanan: TANGGAL & JAM
+            const rightText = `${dateStr}  ${timeStr}`;
+            const rightW = watermarkCtx.measureText(rightText).width;
+            watermarkCtx.fillStyle = '#f8fafc';
+            watermarkCtx.fillText(rightText, vW - rightW - 16, centerY);
+
+            watermarkAnimId = requestAnimationFrame(renderWatermarkLoop);
+        }
+
+        renderWatermarkLoop();
+
+        // Rekam dari canvas stream (dengan watermark), fallback ke mediaStream jika tidak didukung
+        let streamToRecord = mediaStream;
+        try {
+            if (watermarkCanvas.captureStream) {
+                streamToRecord = watermarkCanvas.captureStream(25);
+                if (mediaStream.getAudioTracks && mediaStream.getAudioTracks().length > 0) {
+                    streamToRecord.addTrack(mediaStream.getAudioTracks()[0]);
+                }
+            }
+        } catch (csErr) {
+            console.warn("captureStream error, fallback ke mediaStream:", csErr);
+            streamToRecord = mediaStream;
+        }
+
+        mediaRecorder = new MediaRecorder(streamToRecord, options);
         mediaRecorder.ondataavailable = (e) => {
             if (e.data && e.data.size > 0) {
                 recordedChunks.push(e.data);
@@ -508,7 +612,7 @@ function startVideoRecording() {
             const timeEl = document.getElementById('cameraRecTime');
             if (timeEl) timeEl.innerText = `${mins}:${secs}`;
         }, 1000);
-        console.log("Perekaman video unboxing dimulai...");
+        console.log("Perekaman video unboxing dengan watermark dimulai...");
     } catch (e) {
         console.warn("Gagal start recording video:", e);
     }
@@ -516,6 +620,12 @@ function startVideoRecording() {
 
 function stopVideoRecording() {
     return new Promise((resolve) => {
+        isVideoRecordingActive = false;
+        if (watermarkAnimId) {
+            cancelAnimationFrame(watermarkAnimId);
+            watermarkAnimId = null;
+        }
+
         if (recordingTimerInterval) {
             clearInterval(recordingTimerInterval);
             recordingTimerInterval = null;

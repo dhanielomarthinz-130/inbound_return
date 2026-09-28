@@ -39,7 +39,7 @@ if ($method === 'GET') {
             'server_software' => $_SERVER['SERVER_SOFTWARE'] ?? 'PHP CLI',
             'mysql_host' => $db_host ?? '127.0.0.1',
             'database_name' => $db_name ?? 'inbound_return',
-            'environment' => !empty($is_remote) ? 'InfinityFree Hosting (Production)' : 'Localhost Laragon',
+            'environment' => !empty($is_remote) ? 'InfinityFree Hosting (Production)' : 'Local Server (Active)',
             'timezone' => date_default_timezone_get(),
             'server_time' => date('Y-m-d H:i:s'),
             'upload_max_filesize' => ini_get('upload_max_filesize'),

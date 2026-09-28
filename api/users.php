@@ -13,10 +13,10 @@ if ($method === 'GET') {
     try {
         if ($currentUser['role'] === 'superadmin') {
             // Superadmin dapat melihat SEMUA user
-            $stmt = $pdo->query("SELECT id, username, name, role, status, created_at FROM users ORDER BY id ASC");
+            $stmt = $pdo->query("SELECT id, username, name, role, pin, status, created_at FROM users ORDER BY id ASC");
         } else {
             // ADMIN dan OPERATOR TIDAK BISA MELIHAT user ber-role superadmin!
-            $stmt = $pdo->prepare("SELECT id, username, name, role, status, created_at FROM users WHERE role != 'superadmin' ORDER BY id ASC");
+            $stmt = $pdo->prepare("SELECT id, username, name, role, pin, status, created_at FROM users WHERE role != 'superadmin' ORDER BY id ASC");
             $stmt->execute();
         }
         $users = $stmt->fetchAll();
@@ -38,6 +38,8 @@ if ($method === 'POST') {
     $name     = trim($input['name'] ?? '');
     $role     = trim($input['role'] ?? 'operator');
     $status   = trim($input['status'] ?? 'ACTIVE');
+    $pin      = trim($input['pin'] ?? '123456');
+    if (empty($pin)) $pin = '123456';
 
     if (empty($username) || empty($password) || empty($name)) {
         jsonResponse(['error' => 'Username, Password, dan Nama Lengkap wajib diisi!'], 400);
@@ -61,8 +63,8 @@ if ($method === 'POST') {
         }
 
         $hashedPass = password_hash($password, PASSWORD_DEFAULT);
-        $stmt = $pdo->prepare("INSERT INTO users (username, password, name, role, status) VALUES (?, ?, ?, ?, ?)");
-        $stmt->execute([$username, $hashedPass, $name, $role, $status]);
+        $stmt = $pdo->prepare("INSERT INTO users (username, password, name, role, status, pin) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$username, $hashedPass, $name, $role, $status, $pin]);
 
         jsonResponse([
             'success' => true,
@@ -87,6 +89,7 @@ if ($method === 'PUT') {
     $name     = trim($input['name'] ?? '');
     $role     = trim($input['role'] ?? 'operator');
     $status   = trim($input['status'] ?? 'ACTIVE');
+    $pin      = isset($input['pin']) ? trim($input['pin']) : null;
 
     if ($id <= 0 || empty($username) || empty($name)) {
         jsonResponse(['error' => 'Data tidak lengkap untuk update user.'], 400);
@@ -118,13 +121,15 @@ if ($method === 'PUT') {
             jsonResponse(['error' => "Username '{$username}' sudah digunakan oleh akun lain!"], 409);
         }
 
+        $pinValue = ($pin !== null && $pin !== '') ? $pin : ($targetUser['pin'] ?: '123456');
+
         if (!empty($password)) {
             $hashedPass = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("UPDATE users SET username = ?, password = ?, name = ?, role = ?, status = ? WHERE id = ?");
-            $stmt->execute([$username, $hashedPass, $name, $role, $status, $id]);
+            $stmt = $pdo->prepare("UPDATE users SET username = ?, password = ?, name = ?, role = ?, status = ?, pin = ? WHERE id = ?");
+            $stmt->execute([$username, $hashedPass, $name, $role, $status, $pinValue, $id]);
         } else {
-            $stmt = $pdo->prepare("UPDATE users SET username = ?, name = ?, role = ?, status = ? WHERE id = ?");
-            $stmt->execute([$username, $name, $role, $status, $id]);
+            $stmt = $pdo->prepare("UPDATE users SET username = ?, name = ?, role = ?, status = ?, pin = ? WHERE id = ?");
+            $stmt->execute([$username, $name, $role, $status, $pinValue, $id]);
         }
 
         jsonResponse([

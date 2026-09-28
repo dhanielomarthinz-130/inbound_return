@@ -89,3 +89,8 @@
     height: 8px;
 }
 
+/* Pastikan jarak tab content ke topbar presisi dan konsisten di semua halaman */
+.tab-content {
+    margin-top: 0 !important;
+}
+

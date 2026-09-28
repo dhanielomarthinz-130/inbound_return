@@ -127,6 +127,16 @@ try {
             `key_value` TEXT NULL,
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+        CREATE TABLE IF NOT EXISTS `master_conditions` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `code` VARCHAR(50) NOT NULL UNIQUE,
+            `name` VARCHAR(100) NOT NULL,
+            `description` VARCHAR(255) NULL,
+            `color` VARCHAR(30) DEFAULT 'slate',
+            `sort_order` INT DEFAULT 0,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     ");
 
     // Auto-patch kolom jika tabel sudah ada sebelumnya
@@ -225,6 +235,23 @@ try {
         // Bersihkan data dummy contoh awal jika ada
         $pdo->exec("DELETE FROM master_products WHERE barcode LIKE '899100%' AND (seller_sku IS NULL OR seller_sku = '')");
 
+        // Seed Default Kondisi jika tabel master_conditions masih kosong
+        $chkCond = $pdo->query("SELECT COUNT(*) AS total FROM master_conditions");
+        if ($chkCond->fetch()['total'] == 0) {
+            $seedCond = $pdo->prepare("INSERT INTO master_conditions (code, name, description, color, sort_order) VALUES (?, ?, ?, ?, ?)");
+            $defaultConds = [
+                ['GOOD',    'Baik / Good',          'Produk dalam kondisi baik, tidak ada kerusakan',       'emerald', 1],
+                ['DAMAGED', 'Rusak / Damaged',       'Produk mengalami kerusakan fisik',                     'red',     2],
+                ['MISSING', 'Kurang / Missing',      'Produk kurang dari jumlah yang tercantum di invoice',  'amber',   3],
+                ['EXPIRED', 'Kadaluarsa / Expired',  'Produk sudah melewati tanggal kadaluarsa',             'orange',  4],
+                ['WRONG',   'Salah Kirim / Wrong',   'Produk tidak sesuai dengan yang dipesan',             'purple',  5],
+            ];
+            foreach ($defaultConds as $cond) {
+                $seedCond->execute($cond);
+            }
+        }
+
+
         // Seed Default Users jika tabel users masih kosong
         $chkUserCount = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
         if ($chkUserCount == 0) {
@@ -278,7 +305,7 @@ function requireLogin($allowedRoles = []) {
         if ($isApi) {
             jsonResponse(['error' => 'Sesi berakhir atau belum login. Silakan login kembali.'], 401);
         } else {
-            header('Location: login.php');
+            header('Location: login');
             exit;
         }
     }
@@ -288,7 +315,7 @@ function requireLogin($allowedRoles = []) {
         if ($isApi) {
             jsonResponse(['error' => 'Akses ditolak: role Anda (' . $user['role'] . ') tidak memiliki izin.'], 403);
         } else {
-            $redirect = ($user['role'] === 'operator') ? 'index.php' : 'admin.php';
+            $redirect = ($user['role'] === 'operator') ? 'scanner' : 'admin';
             echo "<script>alert('Akses Ditolak: Halaman ini hanya untuk role " . implode('/', $allowedRoles) . "'); window.location.href = '{$redirect}';</script>";
             exit;
         }
