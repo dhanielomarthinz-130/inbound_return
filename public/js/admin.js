@@ -200,132 +200,70 @@ async function loadMetrics() {
 
 let trendChartInstance = null;
 
-// Donut Chart: Rasio Kondisi
 function renderRatioChart(good, damaged) {
     const canvas = document.getElementById('ratioChart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (ratioChartInstance) ratioChartInstance.destroy();
-
     const total = good + damaged;
     const dataVals = total === 0 ? [1] : [good, damaged];
     const bgColors = total === 0 ? ['#e2e8f0'] : ['#10b981', '#f43f5e'];
     const lbls     = total === 0 ? ['Tidak ada data'] : ['Good / Baik', 'Rusak / Defect'];
-
     ratioChartInstance = new Chart(ctx, {
         type: 'doughnut',
-        data: {
-            labels: lbls,
-            datasets: [{ data: dataVals, backgroundColor: bgColors, borderWidth: 0, hoverOffset: 6 }]
-        },
+        data: { labels: lbls, datasets: [{ data: dataVals, backgroundColor: bgColors, borderWidth: 0, hoverOffset: 6 }] },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '72%',
+            responsive: true, maintainAspectRatio: false, cutout: '72%',
             plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: { boxWidth: 10, padding: 12, font: { size: 10 } }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: (ctx) => ` ${ctx.label}: ${ctx.raw.toLocaleString('id-ID')} pcs`
-                    }
-                }
+                legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12, font: { size: 10 } } },
+                tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.raw.toLocaleString('id-ID')} pcs` } }
             }
         }
     });
 }
 
-// Line/Bar Chart: Trend 7 hari
 function renderTrendChart(trend) {
     const canvas = document.getElementById('trendChart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (trendChartInstance) trendChartInstance.destroy();
-
-    const labels = trend.map(t => {
-        const d = new Date(t.tgl);
-        return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
-    });
+    const labels = trend.map(t => { const d = new Date(t.tgl); return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }); });
     const values = trend.map(t => parseInt(t.total_qty) || 0);
-
     trendChartInstance = new Chart(ctx, {
         type: 'bar',
-        data: {
-            labels,
-            datasets: [{
-                label: 'Total Qty Retur',
-                data: values,
-                backgroundColor: 'rgba(99,102,241,0.15)',
-                borderColor: '#6366f1',
-                borderWidth: 2,
-                borderRadius: 6,
-                hoverBackgroundColor: 'rgba(99,102,241,0.3)',
-            }]
-        },
+        data: { labels, datasets: [{ label: 'Total Qty Retur', data: values, backgroundColor: 'rgba(99,102,241,0.15)', borderColor: '#6366f1', borderWidth: 2, borderRadius: 6 }] },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: (ctx) => ` ${ctx.raw.toLocaleString('id-ID')} pcs`
-                    }
-                }
-            },
-            scales: {
-                x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-                y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 }, precision: 0 }, beginAtZero: true }
-            }
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ` ${ctx.raw.toLocaleString('id-ID')} pcs` } } },
+            scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } }, y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 }, precision: 0 }, beginAtZero: true } }
         }
     });
 }
 
-// Table: Total Qty per Ekspedisi
 function renderDashExpeditionTable(list) {
     const tbody = document.getElementById('dashExpeditionTableBody');
     if (!tbody) return;
     tbody.innerHTML = '';
-    if (!list || list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 text-xs">Tidak ada data untuk periode ini.</td></tr>`;
-        return;
-    }
+    if (!list || list.length === 0) { tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 text-xs">Tidak ada data.</td></tr>`; return; }
     const totalAll = list.reduce((s, r) => s + parseInt(r.total_qty || 0), 0) || 1;
     const colors = ['indigo','blue','violet','cyan','teal','emerald','amber'];
     list.forEach((row, i) => {
-        const qty    = parseInt(row.total_qty || 0);
-        const pct    = Math.round((qty / totalAll) * 100);
-        const clr    = colors[i % colors.length];
+        const qty = parseInt(row.total_qty || 0);
+        const pct = Math.round((qty / totalAll) * 100);
+        const clr = colors[i % colors.length];
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-slate-50 border-b border-slate-100 transition';
         tr.innerHTML = `
             <td class="p-3 text-slate-400 font-mono text-xs text-center">${i + 1}</td>
-            <td class="p-3">
-                <span class="font-bold text-xs text-slate-800">${row.expedition}</span>
-            </td>
-            <td class="p-3 text-center">
-                <span class="bg-slate-100 text-slate-700 text-xs font-semibold px-2 py-0.5 rounded-lg">${parseInt(row.total_sessions || 0)}</span>
-            </td>
-            <td class="p-3 text-right">
-                <span class="font-black text-sm text-slate-800">${qty.toLocaleString('id-ID')}</span>
-                <span class="text-[10px] text-slate-400 ml-1">pcs</span>
-            </td>
-            <td class="p-3 w-28">
-                <div class="flex items-center gap-1.5">
-                    <div class="flex-1 bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                        <div class="h-full bg-${clr}-500 rounded-full transition-all" style="width:${pct}%"></div>
-                    </div>
-                    <span class="text-[10px] text-slate-500 font-semibold w-8 text-right">${pct}%</span>
-                </div>
-            </td>
+            <td class="p-3"><span class="font-bold text-xs text-slate-800">${row.expedition}</span></td>
+            <td class="p-3 text-center"><span class="bg-slate-100 text-slate-700 text-xs font-semibold px-2 py-0.5 rounded-lg">${parseInt(row.total_sessions || 0)}</span></td>
+            <td class="p-3 text-right"><span class="font-black text-sm text-slate-800">${qty.toLocaleString('id-ID')}</span> <span class="text-[10px] text-slate-400">pcs</span></td>
+            <td class="p-3 w-28"><div class="flex items-center gap-1.5"><div class="flex-1 bg-slate-100 rounded-full h-1.5 overflow-hidden"><div class="h-full bg-${clr}-500 rounded-full" style="width:${pct}%"></div></div><span class="text-[10px] text-slate-500 font-semibold w-8 text-right">${pct}%</span></div></td>
         `;
         tbody.appendChild(tr);
     });
 }
 
-// Grouped Condition breakdown per Expedition
 const COND_COLOR = {
     GOOD:    { dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
     DAMAGED: { dot: 'bg-red-500',     badge: 'bg-red-50 text-red-700 border-red-200' },
@@ -333,37 +271,20 @@ const COND_COLOR = {
     EXPIRED: { dot: 'bg-orange-500',  badge: 'bg-orange-50 text-orange-700 border-orange-200' },
     WRONG:   { dot: 'bg-purple-500',  badge: 'bg-purple-50 text-purple-700 border-purple-200' },
 };
-function getCondColor(code) {
-    return COND_COLOR[code.toUpperCase()] || { dot: 'bg-slate-400', badge: 'bg-slate-100 text-slate-600 border-slate-200' };
-}
+function getCondColor(code) { return COND_COLOR[code?.toUpperCase()] || { dot: 'bg-slate-400', badge: 'bg-slate-100 text-slate-600 border-slate-200' }; }
 
 function renderDashConditionBreakdown(byCondition) {
     const container = document.getElementById('dashConditionContainer');
     if (!container) return;
     const exps = Object.keys(byCondition);
-    if (exps.length === 0) {
-        container.innerHTML = `<div class="p-6 text-center text-slate-400 text-xs">Tidak ada data untuk periode ini.</div>`;
-        return;
-    }
+    if (exps.length === 0) { container.innerHTML = `<div class="p-6 text-center text-slate-400 text-xs">Tidak ada data.</div>`; return; }
     container.innerHTML = exps.map(exp => {
         const conds = byCondition[exp];
-        const badges = conds.map(c => {
-            const clr = getCondColor(c.code);
-            return `<span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg border ${clr.badge}">
-                        <span class="w-1.5 h-1.5 rounded-full ${clr.dot} inline-block"></span>
-                        ${c.code}: <strong>${c.total_qty.toLocaleString('id-ID')}</strong>
-                    </span>`;
-        }).join('');
-        return `<div class="p-3 flex items-start gap-3">
-                    <div class="w-24 shrink-0 pt-0.5">
-                        <span class="font-bold text-xs text-slate-700">${exp}</span>
-                    </div>
-                    <div class="flex flex-wrap gap-1.5">${badges}</div>
-                </div>`;
+        const badges = conds.map(c => { const clr = getCondColor(c.code); return `<span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg border ${clr.badge}"><span class="w-1.5 h-1.5 rounded-full ${clr.dot} inline-block"></span>${c.code}: <strong>${c.total_qty.toLocaleString('id-ID')}</strong></span>`; }).join('');
+        return `<div class="p-3 flex items-start gap-3"><div class="w-24 shrink-0 pt-0.5"><span class="font-bold text-xs text-slate-700">${exp}</span></div><div class="flex flex-wrap gap-1.5">${badges}</div></div>`;
     }).join('');
 }
 
-// Legacy alias
 function renderChart(good, damaged) { renderRatioChart(good, damaged); }
 
 
@@ -521,6 +442,8 @@ function initFlatpickr() {
 }
 
 window.clearDateFilter = function() {
+    if (flatpickrTransactionsInstance) flatpickrTransactionsInstance.clear();
+    if (flatpickrDashboardInstance) flatpickrDashboardInstance.clear();
     syncDateFilter('');
     updateBrowserUrl(false);
     loadTransactions();
@@ -545,15 +468,6 @@ window.clearDashboardDateFilter = function() {
     updateBrowserUrl(false);
     loadMetrics();
     loadTransactions();
-};
-
-window.clearDateFilter = function() {
-    if (flatpickrTransactionsInstance) flatpickrTransactionsInstance.clear();
-    if (flatpickrDashboardInstance) flatpickrDashboardInstance.clear();
-    syncDateFilter('');
-    updateBrowserUrl(false);
-    loadTransactions();
-    loadMetrics();
 };
 
 // 2. Load Transaksi (Full & Preview)
@@ -971,7 +885,7 @@ function renderFullProductsTable(products) {
                     </div>
                 </div>
             </td>
-            <td class="p-3 font-semibold text-slate-800 whitespace-normal break-words" style="max-width:260px;min-width:160px">${p.name}</td>
+            <td class="p-3 font-semibold text-slate-800 whitespace-normal break-words max-w-[220px]">${p.name}</td>
             <td class="p-3 font-mono text-slate-600 text-xs whitespace-nowrap">${barcodeBpom}</td>
         `;
         fullTbody.appendChild(tr);
@@ -997,14 +911,14 @@ window.syncProductsFromOCS = async function() {
         if (data.success) {
             await loadProducts();
             hideGlobalLoading();
-            alert(`Berhasil sinkronisasi!\nTotal ${data.total_synced || 0} produk dan rak dari OCS WMS berhasil diperbarui ke database.`);
+            showToast('success', `Total ${data.total_synced || 0} produk dan rak dari OCS WMS berhasil diperbarui ke database.`, 'Sinkronisasi Berhasil');
         } else {
             hideGlobalLoading();
-            alert('Sinkronisasi gagal: ' + (data.error || 'Terjadi kesalahan sistem'));
+            showToast('error', data.error || 'Terjadi kesalahan sistem', 'Sinkronisasi Gagal');
         }
     } catch (err) {
         hideGlobalLoading();
-        alert('Gagal menghubungi server sync: ' + err.message);
+        showToast('error', 'Gagal menghubungi server sync: ' + err.message, 'Koneksi Terputus');
     } finally {
         hideGlobalLoading();
         if (btn) btn.disabled = false;
@@ -1071,14 +985,14 @@ window.submitNewProduct = async function(e) {
         const result = await res.json();
 
         if (result.success) {
-            alert(`Produk "${name}" berhasil ditambahkan ke database!`);
+            showToast('success', `Produk "${name}" berhasil ditambahkan ke database!`, 'Produk Tersimpan');
             closeAddProductModal();
             loadProducts();
         } else {
-            alert("Gagal: " + (result.error || 'Terjadi kesalahan'));
+            showToast('error', result.error || 'Terjadi kesalahan', 'Gagal Menambah Produk');
         }
     } catch (err) {
-        alert("Gagal koneksi ke server: " + err.message);
+        showToast('error', "Gagal koneksi ke server: " + err.message, 'Koneksi Terputus');
     } finally {
         btn.disabled = false;
         btn.innerHTML = `<i class="fa-solid fa-save"></i> Simpan ke MySQL`;
@@ -1097,7 +1011,7 @@ if (btnApply) btnApply.addEventListener('click', loadTransactions);
 // ==============================================================
 function generateExcelFile(sheets, defaultFileName) {
     if (typeof XLSX === 'undefined') {
-        alert("Library Excel sedang diunduh oleh browser, mohon coba kembali dalam 2 detik.");
+        showToast('warning', "Library Excel sedang diunduh oleh browser, mohon coba kembali dalam 2 detik.", "Mohon Tunggu");
         return;
     }
 
@@ -1128,7 +1042,7 @@ function generateExcelFile(sheets, defaultFileName) {
         XLSX.writeFile(wb, `${defaultFileName}_${todayStr}.xlsx`);
     } catch (err) {
         console.error("Gagal export excel:", err);
-        alert("Terjadi kesalahan saat membuat file Excel: " + err.message);
+        showToast('error', "Terjadi kesalahan saat membuat file Excel: " + err.message, 'Gagal Ekspor Excel');
     }
 }
 
@@ -1177,7 +1091,7 @@ window.exportDashboardExcel = async function() {
 
     } catch (err) {
         hideGlobalLoading();
-        alert("Gagal mengunduh Excel Dashboard: " + err.message);
+        showToast('error', "Gagal mengunduh Excel Dashboard: " + err.message, 'Gagal Ekspor Excel');
     }
 };
 
@@ -1209,7 +1123,7 @@ window.exportInboundUnboxingExcel = async function() {
         hideGlobalLoading();
 
         if (!rows || !rows.length) {
-            alert("Tidak ada data transaksi inbound unboxing untuk diekspor.");
+            showToast('warning', "Tidak ada data transaksi inbound unboxing untuk diekspor.", "Data Kosong");
             return;
         }
 
@@ -1241,7 +1155,7 @@ window.exportInboundUnboxingExcel = async function() {
 
     } catch (err) {
         hideGlobalLoading();
-        alert("Gagal mengunduh Excel Inbound Unboxing: " + err.message);
+        showToast('error', "Gagal mengunduh Excel Inbound Unboxing: " + err.message, 'Gagal Ekspor Excel');
     }
 };
 
@@ -1257,7 +1171,7 @@ window.exportProductsExcel = async function() {
         hideGlobalLoading();
 
         if (!list || !list.length) {
-            alert("Tidak ada data produk untuk diekspor.");
+            showToast('warning', "Tidak ada data produk untuk diekspor.", "Data Kosong");
             return;
         }
 
@@ -1279,7 +1193,7 @@ window.exportProductsExcel = async function() {
 
     } catch (err) {
         hideGlobalLoading();
-        alert("Gagal mengunduh Excel Master Produk: " + err.message);
+        showToast('error', "Gagal mengunduh Excel Master Produk: " + err.message, 'Gagal Ekspor Excel');
     }
 };
 
@@ -1295,7 +1209,7 @@ window.exportExpeditionsExcel = async function() {
         hideGlobalLoading();
 
         if (!list || !list.length) {
-            alert("Tidak ada data ekspedisi untuk diekspor.");
+            showToast('warning', "Tidak ada data ekspedisi untuk diekspor.", "Data Kosong");
             return;
         }
 
@@ -1313,7 +1227,7 @@ window.exportExpeditionsExcel = async function() {
 
     } catch (err) {
         hideGlobalLoading();
-        alert("Gagal mengunduh Excel Ekspedisi: " + err.message);
+        showToast('error', "Gagal mengunduh Excel Ekspedisi: " + err.message, 'Gagal Ekspor Excel');
     }
 };
 
@@ -1442,11 +1356,12 @@ window.submitExpedition = async function(e) {
         if (data.success) {
             closeExpeditionModal();
             loadExpeditions();
+            showToast('success', `Ekspedisi berhasil disimpan!`, 'Ekspedisi Tersimpan');
         } else {
-            alert("Gagal: " + (data.error || 'Terjadi kesalahan'));
+            showToast('error', data.error || 'Terjadi kesalahan', 'Gagal Simpan Ekspedisi');
         }
     } catch (err) {
-        alert("Gagal koneksi ke server: " + err.message);
+        showToast('error', "Gagal koneksi ke server: " + err.message, 'Koneksi Terputus');
     } finally {
         btn.disabled = false;
         btn.innerHTML = `<i class="fa-solid fa-save"></i> Simpan Ekspedisi`;
@@ -1463,11 +1378,12 @@ window.deleteExpedition = async function(id, name) {
         const data = await res.json();
         if (data.success) {
             loadExpeditions();
+            showToast('success', `Ekspedisi berhasil dihapus.`, 'Ekspedisi Dihapus');
         } else {
-            alert("Gagal: " + (data.error || 'Tidak dapat menghapus'));
+            showToast('error', data.error || 'Tidak dapat menghapus', 'Gagal Hapus Ekspedisi');
         }
     } catch (err) {
-        alert("Gagal koneksi ke server: " + err.message);
+        showToast('error', "Gagal koneksi ke server: " + err.message, 'Koneksi Terputus');
     }
 };
 
@@ -1629,12 +1545,12 @@ window.submitUser = async function(e) {
         if (data.success) {
             closeUserModal();
             loadUsers();
-            alert(data.message || 'Pengguna berhasil disimpan!');
+            showToast('success', data.message || 'Pengguna berhasil disimpan!', 'Pengguna Tersimpan');
         } else {
-            alert('Gagal: ' + (data.error || 'Terjadi kesalahan'));
+            showToast('error', data.error || 'Terjadi kesalahan', 'Gagal Simpan Pengguna');
         }
     } catch (err) {
-        alert('Gagal koneksi ke server: ' + err.message);
+        showToast('error', 'Gagal koneksi ke server: ' + err.message, 'Koneksi Terputus');
     } finally {
         btn.disabled = false;
         btn.innerHTML = `<i class="fa-solid fa-save"></i> Simpan Pengguna`;
@@ -1651,12 +1567,12 @@ window.deleteUser = async function(id, name) {
         const data = await res.json();
         if (data.success) {
             loadUsers();
-            alert(data.message || 'Pengguna berhasil dihapus.');
+            showToast('success', data.message || 'Pengguna berhasil dihapus.', 'Pengguna Dihapus');
         } else {
-            alert('Gagal: ' + (data.error || 'Tidak dapat menghapus user'));
+            showToast('error', data.error || 'Tidak dapat menghapus user', 'Gagal Hapus Pengguna');
         }
     } catch (err) {
-        alert('Gagal koneksi ke server: ' + err.message);
+        showToast('error', 'Gagal koneksi ke server: ' + err.message, 'Koneksi Terputus');
     }
 };
 
@@ -1740,13 +1656,13 @@ window.toggleMaintenanceMode = async function() {
         hideGlobalLoading();
         if (data.success) {
             await loadMaintenanceStatus();
-            alert(data.message);
+            showToast('success', data.message, 'Mode Pemeliharaan Diperbarui');
         } else {
-            alert('Gagal: ' + (data.error || 'Terjadi kesalahan'));
+            showToast('error', data.error || 'Terjadi kesalahan', 'Gagal Mengubah Mode');
         }
     } catch (err) {
         hideGlobalLoading();
-        alert('Gagal koneksi ke server: ' + err.message);
+        showToast('error', 'Gagal koneksi ke server: ' + err.message, 'Koneksi Terputus');
     }
 };
 
@@ -1761,14 +1677,14 @@ window.optimizeDatabaseTables = async function() {
         const data = await res.json();
         hideGlobalLoading();
         if (data.success) {
-            alert(data.message || 'Optimasi tabel berhasil!');
+            showToast('success', data.message || 'Optimasi tabel berhasil!', 'Optimasi Berhasil');
             loadMaintenanceStatus();
         } else {
-            alert('Gagal: ' + (data.error || 'Terjadi kesalahan'));
+            showToast('error', data.error || 'Terjadi kesalahan', 'Optimasi Gagal');
         }
     } catch (err) {
         hideGlobalLoading();
-        alert('Gagal koneksi ke server: ' + err.message);
+        showToast('error', 'Gagal koneksi ke server: ' + err.message, 'Koneksi Terputus');
     }
 };
 
@@ -1784,16 +1700,16 @@ window.cleanTestTransactions = async function() {
         const data = await res.json();
         hideGlobalLoading();
         if (data.success) {
-            alert(data.message);
+            showToast('success', data.message, 'Pembersihan Data Berhasil');
             loadMaintenanceStatus();
             loadTransactions();
             loadMetrics();
         } else {
-            alert('Gagal: ' + (data.error || 'Gagal membersihkan data'));
+            showToast('error', data.error || 'Gagal membersihkan data', 'Pembersihan Gagal');
         }
     } catch (err) {
         hideGlobalLoading();
-        alert('Gagal koneksi ke server: ' + err.message);
+        showToast('error', 'Gagal koneksi ke server: ' + err.message, 'Koneksi Terputus');
     }
 };
 
@@ -1916,7 +1832,7 @@ function renderConditionsTable(list) {
     if (!list || list.length === 0) {
         tbody.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-slate-400">
             <i class="fa-solid fa-tag text-2xl mb-2 block text-slate-300"></i>
-            Belum ada data kondisi. Klik "Tambah Kondisi" untuk menambahkan.
+            Belum ada data kondisi.
         </td></tr>`;
         return;
     }
@@ -1985,7 +1901,6 @@ function openEditConditionModal(id) {
     document.getElementById('conditionDesc').value = c.description || '';
     document.getElementById('conditionColor').value = c.color || 'slate';
     document.getElementById('conditionSort').value = c.sort_order || 0;
-    document.getElementById('conditionCode').disabled = false;
     document.getElementById('modalCondition').classList.remove('hidden');
 }
 
@@ -2001,34 +1916,32 @@ async function saveCondition() {
     const color= document.getElementById('conditionColor').value;
     const sort = parseInt(document.getElementById('conditionSort').value) || 0;
 
-    if (!code || !name) {
-        alert('Kode dan Nama Kondisi wajib diisi!');
-        return;
-    }
+    if (!code || !name) { showToast('warning', 'Kode dan Nama Kondisi wajib diisi!', 'Data Tidak Lengkap'); return; }
 
     const btn = document.getElementById('btnSaveCondition');
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...';
 
     const isEdit = id && parseInt(id) > 0;
-    const body = { code, name, description: desc, color, sort_order: sort };
+    const body = { code, name, description: desc, color, sort_order: sort, action: isEdit ? 'update' : 'create' };
     if (isEdit) body.id = parseInt(id);
 
     try {
-        const res = await fetch('api/conditions.php' + (isEdit ? '?action=update' : ''), {
-            method: isEdit ? 'POST' : 'POST',
+        const res = await fetch('api/conditions.php', {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...body, action: isEdit ? 'update' : 'create' })
+            body: JSON.stringify(body)
         });
         const data = await res.json();
         if (data.success) {
             closeConditionModal();
             await loadConditions();
+            showToast('success', `Kondisi "${name}" berhasil disimpan!`, 'Kondisi Tersimpan');
         } else {
-            alert('Gagal: ' + (data.error || 'Terjadi kesalahan'));
+            showToast('error', data.error || 'Terjadi kesalahan', 'Gagal Simpan Kondisi');
         }
     } catch (e) {
-        alert('Error: ' + e.message);
+        showToast('error', 'Error: ' + e.message, 'Koneksi Terputus');
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan Kondisi';
@@ -2039,7 +1952,7 @@ async function deleteCondition(id, code, name) {
     if (!confirm(`Hapus kondisi "${code} - ${name}"?\n\nTindakan ini tidak bisa dibatalkan.`)) return;
 
     try {
-        const res = await fetch(`api/conditions.php?action=delete&id=${id}`, {
+        const res = await fetch('api/conditions.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'delete', id })
@@ -2047,10 +1960,11 @@ async function deleteCondition(id, code, name) {
         const data = await res.json();
         if (data.success) {
             await loadConditions();
+            showToast('success', `Kondisi "${code}" berhasil dihapus.`, 'Kondisi Dihapus');
         } else {
-            alert('Gagal menghapus: ' + (data.error || 'Terjadi kesalahan'));
+            showToast('error', data.error || 'Terjadi kesalahan', 'Gagal Menghapus Kondisi');
         }
     } catch (e) {
-        alert('Error: ' + e.message);
+        showToast('error', 'Error: ' + e.message, 'Koneksi Terputus');
     }
 }

@@ -94,3 +94,22 @@
     margin-top: 0 !important;
 }
 
+/* ========================================================
+   TOAST PREMIUM STYLING
+   ======================================================== */
+.ieg-toast-item {
+    box-shadow: 0 14px 34px -5px rgba(15, 23, 42, 0.14), 0 6px 12px -3px rgba(15, 23, 42, 0.06);
+}
+
+@media (max-width: 640px) {
+    #iegToastContainer {
+        top: 0.75rem !important;
+        right: 0 !important;
+        left: 0 !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+}
+

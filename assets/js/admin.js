@@ -911,14 +911,14 @@ window.syncProductsFromOCS = async function() {
         if (data.success) {
             await loadProducts();
             hideGlobalLoading();
-            alert(`Berhasil sinkronisasi!\nTotal ${data.total_synced || 0} produk dan rak dari OCS WMS berhasil diperbarui ke database.`);
+            showToast('success', `Total ${data.total_synced || 0} produk dan rak dari OCS WMS berhasil diperbarui ke database.`, 'Sinkronisasi Berhasil');
         } else {
             hideGlobalLoading();
-            alert('Sinkronisasi gagal: ' + (data.error || 'Terjadi kesalahan sistem'));
+            showToast('error', data.error || 'Terjadi kesalahan sistem', 'Sinkronisasi Gagal');
         }
     } catch (err) {
         hideGlobalLoading();
-        alert('Gagal menghubungi server sync: ' + err.message);
+        showToast('error', 'Gagal menghubungi server sync: ' + err.message, 'Koneksi Terputus');
     } finally {
         hideGlobalLoading();
         if (btn) btn.disabled = false;
@@ -985,14 +985,14 @@ window.submitNewProduct = async function(e) {
         const result = await res.json();
 
         if (result.success) {
-            alert(`Produk "${name}" berhasil ditambahkan ke database!`);
+            showToast('success', `Produk "${name}" berhasil ditambahkan ke database!`, 'Produk Tersimpan');
             closeAddProductModal();
             loadProducts();
         } else {
-            alert("Gagal: " + (result.error || 'Terjadi kesalahan'));
+            showToast('error', result.error || 'Terjadi kesalahan', 'Gagal Menambah Produk');
         }
     } catch (err) {
-        alert("Gagal koneksi ke server: " + err.message);
+        showToast('error', "Gagal koneksi ke server: " + err.message, 'Koneksi Terputus');
     } finally {
         btn.disabled = false;
         btn.innerHTML = `<i class="fa-solid fa-save"></i> Simpan ke MySQL`;
@@ -1011,7 +1011,7 @@ if (btnApply) btnApply.addEventListener('click', loadTransactions);
 // ==============================================================
 function generateExcelFile(sheets, defaultFileName) {
     if (typeof XLSX === 'undefined') {
-        alert("Library Excel sedang diunduh oleh browser, mohon coba kembali dalam 2 detik.");
+        showToast('warning', "Library Excel sedang diunduh oleh browser, mohon coba kembali dalam 2 detik.", "Mohon Tunggu");
         return;
     }
 
@@ -1042,7 +1042,7 @@ function generateExcelFile(sheets, defaultFileName) {
         XLSX.writeFile(wb, `${defaultFileName}_${todayStr}.xlsx`);
     } catch (err) {
         console.error("Gagal export excel:", err);
-        alert("Terjadi kesalahan saat membuat file Excel: " + err.message);
+        showToast('error', "Terjadi kesalahan saat membuat file Excel: " + err.message, 'Gagal Ekspor Excel');
     }
 }
 
@@ -1091,7 +1091,7 @@ window.exportDashboardExcel = async function() {
 
     } catch (err) {
         hideGlobalLoading();
-        alert("Gagal mengunduh Excel Dashboard: " + err.message);
+        showToast('error', "Gagal mengunduh Excel Dashboard: " + err.message, 'Gagal Ekspor Excel');
     }
 };
 
@@ -1123,7 +1123,7 @@ window.exportInboundUnboxingExcel = async function() {
         hideGlobalLoading();
 
         if (!rows || !rows.length) {
-            alert("Tidak ada data transaksi inbound unboxing untuk diekspor.");
+            showToast('warning', "Tidak ada data transaksi inbound unboxing untuk diekspor.", "Data Kosong");
             return;
         }
 
@@ -1155,7 +1155,7 @@ window.exportInboundUnboxingExcel = async function() {
 
     } catch (err) {
         hideGlobalLoading();
-        alert("Gagal mengunduh Excel Inbound Unboxing: " + err.message);
+        showToast('error', "Gagal mengunduh Excel Inbound Unboxing: " + err.message, 'Gagal Ekspor Excel');
     }
 };
 
@@ -1171,7 +1171,7 @@ window.exportProductsExcel = async function() {
         hideGlobalLoading();
 
         if (!list || !list.length) {
-            alert("Tidak ada data produk untuk diekspor.");
+            showToast('warning', "Tidak ada data produk untuk diekspor.", "Data Kosong");
             return;
         }
 
@@ -1193,7 +1193,7 @@ window.exportProductsExcel = async function() {
 
     } catch (err) {
         hideGlobalLoading();
-        alert("Gagal mengunduh Excel Master Produk: " + err.message);
+        showToast('error', "Gagal mengunduh Excel Master Produk: " + err.message, 'Gagal Ekspor Excel');
     }
 };
 
@@ -1209,7 +1209,7 @@ window.exportExpeditionsExcel = async function() {
         hideGlobalLoading();
 
         if (!list || !list.length) {
-            alert("Tidak ada data ekspedisi untuk diekspor.");
+            showToast('warning', "Tidak ada data ekspedisi untuk diekspor.", "Data Kosong");
             return;
         }
 
@@ -1227,7 +1227,7 @@ window.exportExpeditionsExcel = async function() {
 
     } catch (err) {
         hideGlobalLoading();
-        alert("Gagal mengunduh Excel Ekspedisi: " + err.message);
+        showToast('error', "Gagal mengunduh Excel Ekspedisi: " + err.message, 'Gagal Ekspor Excel');
     }
 };
 
@@ -1356,11 +1356,12 @@ window.submitExpedition = async function(e) {
         if (data.success) {
             closeExpeditionModal();
             loadExpeditions();
+            showToast('success', `Ekspedisi berhasil disimpan!`, 'Ekspedisi Tersimpan');
         } else {
-            alert("Gagal: " + (data.error || 'Terjadi kesalahan'));
+            showToast('error', data.error || 'Terjadi kesalahan', 'Gagal Simpan Ekspedisi');
         }
     } catch (err) {
-        alert("Gagal koneksi ke server: " + err.message);
+        showToast('error', "Gagal koneksi ke server: " + err.message, 'Koneksi Terputus');
     } finally {
         btn.disabled = false;
         btn.innerHTML = `<i class="fa-solid fa-save"></i> Simpan Ekspedisi`;
@@ -1377,11 +1378,12 @@ window.deleteExpedition = async function(id, name) {
         const data = await res.json();
         if (data.success) {
             loadExpeditions();
+            showToast('success', `Ekspedisi berhasil dihapus.`, 'Ekspedisi Dihapus');
         } else {
-            alert("Gagal: " + (data.error || 'Tidak dapat menghapus'));
+            showToast('error', data.error || 'Tidak dapat menghapus', 'Gagal Hapus Ekspedisi');
         }
     } catch (err) {
-        alert("Gagal koneksi ke server: " + err.message);
+        showToast('error', "Gagal koneksi ke server: " + err.message, 'Koneksi Terputus');
     }
 };
 
@@ -1543,12 +1545,12 @@ window.submitUser = async function(e) {
         if (data.success) {
             closeUserModal();
             loadUsers();
-            alert(data.message || 'Pengguna berhasil disimpan!');
+            showToast('success', data.message || 'Pengguna berhasil disimpan!', 'Pengguna Tersimpan');
         } else {
-            alert('Gagal: ' + (data.error || 'Terjadi kesalahan'));
+            showToast('error', data.error || 'Terjadi kesalahan', 'Gagal Simpan Pengguna');
         }
     } catch (err) {
-        alert('Gagal koneksi ke server: ' + err.message);
+        showToast('error', 'Gagal koneksi ke server: ' + err.message, 'Koneksi Terputus');
     } finally {
         btn.disabled = false;
         btn.innerHTML = `<i class="fa-solid fa-save"></i> Simpan Pengguna`;
@@ -1565,12 +1567,12 @@ window.deleteUser = async function(id, name) {
         const data = await res.json();
         if (data.success) {
             loadUsers();
-            alert(data.message || 'Pengguna berhasil dihapus.');
+            showToast('success', data.message || 'Pengguna berhasil dihapus.', 'Pengguna Dihapus');
         } else {
-            alert('Gagal: ' + (data.error || 'Tidak dapat menghapus user'));
+            showToast('error', data.error || 'Tidak dapat menghapus user', 'Gagal Hapus Pengguna');
         }
     } catch (err) {
-        alert('Gagal koneksi ke server: ' + err.message);
+        showToast('error', 'Gagal koneksi ke server: ' + err.message, 'Koneksi Terputus');
     }
 };
 
@@ -1654,13 +1656,13 @@ window.toggleMaintenanceMode = async function() {
         hideGlobalLoading();
         if (data.success) {
             await loadMaintenanceStatus();
-            alert(data.message);
+            showToast('success', data.message, 'Mode Pemeliharaan Diperbarui');
         } else {
-            alert('Gagal: ' + (data.error || 'Terjadi kesalahan'));
+            showToast('error', data.error || 'Terjadi kesalahan', 'Gagal Mengubah Mode');
         }
     } catch (err) {
         hideGlobalLoading();
-        alert('Gagal koneksi ke server: ' + err.message);
+        showToast('error', 'Gagal koneksi ke server: ' + err.message, 'Koneksi Terputus');
     }
 };
 
@@ -1675,14 +1677,14 @@ window.optimizeDatabaseTables = async function() {
         const data = await res.json();
         hideGlobalLoading();
         if (data.success) {
-            alert(data.message || 'Optimasi tabel berhasil!');
+            showToast('success', data.message || 'Optimasi tabel berhasil!', 'Optimasi Berhasil');
             loadMaintenanceStatus();
         } else {
-            alert('Gagal: ' + (data.error || 'Terjadi kesalahan'));
+            showToast('error', data.error || 'Terjadi kesalahan', 'Optimasi Gagal');
         }
     } catch (err) {
         hideGlobalLoading();
-        alert('Gagal koneksi ke server: ' + err.message);
+        showToast('error', 'Gagal koneksi ke server: ' + err.message, 'Koneksi Terputus');
     }
 };
 
@@ -1698,16 +1700,16 @@ window.cleanTestTransactions = async function() {
         const data = await res.json();
         hideGlobalLoading();
         if (data.success) {
-            alert(data.message);
+            showToast('success', data.message, 'Pembersihan Data Berhasil');
             loadMaintenanceStatus();
             loadTransactions();
             loadMetrics();
         } else {
-            alert('Gagal: ' + (data.error || 'Gagal membersihkan data'));
+            showToast('error', data.error || 'Gagal membersihkan data', 'Pembersihan Gagal');
         }
     } catch (err) {
         hideGlobalLoading();
-        alert('Gagal koneksi ke server: ' + err.message);
+        showToast('error', 'Gagal koneksi ke server: ' + err.message, 'Koneksi Terputus');
     }
 };
 
@@ -1914,7 +1916,7 @@ async function saveCondition() {
     const color= document.getElementById('conditionColor').value;
     const sort = parseInt(document.getElementById('conditionSort').value) || 0;
 
-    if (!code || !name) { alert('Kode dan Nama Kondisi wajib diisi!'); return; }
+    if (!code || !name) { showToast('warning', 'Kode dan Nama Kondisi wajib diisi!', 'Data Tidak Lengkap'); return; }
 
     const btn = document.getElementById('btnSaveCondition');
     btn.disabled = true;
@@ -1934,11 +1936,12 @@ async function saveCondition() {
         if (data.success) {
             closeConditionModal();
             await loadConditions();
+            showToast('success', `Kondisi "${name}" berhasil disimpan!`, 'Kondisi Tersimpan');
         } else {
-            alert('Gagal: ' + (data.error || 'Terjadi kesalahan'));
+            showToast('error', data.error || 'Terjadi kesalahan', 'Gagal Simpan Kondisi');
         }
     } catch (e) {
-        alert('Error: ' + e.message);
+        showToast('error', 'Error: ' + e.message, 'Koneksi Terputus');
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan Kondisi';
@@ -1957,10 +1960,11 @@ async function deleteCondition(id, code, name) {
         const data = await res.json();
         if (data.success) {
             await loadConditions();
+            showToast('success', `Kondisi "${code}" berhasil dihapus.`, 'Kondisi Dihapus');
         } else {
-            alert('Gagal menghapus: ' + (data.error || 'Terjadi kesalahan'));
+            showToast('error', data.error || 'Terjadi kesalahan', 'Gagal Menghapus Kondisi');
         }
     } catch (e) {
-        alert('Error: ' + e.message);
+        showToast('error', 'Error: ' + e.message, 'Koneksi Terputus');
     }
 }

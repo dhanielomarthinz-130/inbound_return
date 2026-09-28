@@ -155,7 +155,7 @@ async function processInvoiceScan(invoiceNumber) {
 
     } catch (err) {
         playBeep('error');
-        alert("Gagal memproses invoice: " + err.message);
+        showToast('error', "Gagal memproses invoice: " + err.message, "Gagal Invoice");
     }
 }
 
@@ -219,7 +219,7 @@ const inputType = document.getElementById('inputType');
 // Helper demo click barcode
 window.quickFillBarcode = function(barcode) {
     if (!activeInvoice) {
-        alert("Harap scan invoice terlebih dahulu!");
+        showToast('warning', "Harap scan nomor resi / invoice terlebih dahulu!", "Invoice Belum Di-scan");
         return;
     }
     inputBarcode.value = barcode;
@@ -279,7 +279,7 @@ async function lookupProduct(barcode) {
             document.getElementById('detectedProductName').innerText = `Produk [${barcode}] tidak ditemukan!`;
             document.getElementById('detectedProductName').className = "font-bold text-rose-600 ml-1 text-sm";
             document.getElementById('detectedProductSku').innerText = "";
-            alert(`Barcode [${barcode}] belum terdaftar di master data produk!`);
+            showToast('warning', `Barcode [${barcode}] belum terdaftar di master data produk!`, "Produk Tidak Ditemukan");
             inputBarcode.focus();
             inputBarcode.select();
             return;
@@ -330,7 +330,7 @@ window.handleAddItem = function(e) {
     if (e) e.preventDefault();
 
     if (!activeInvoice) {
-        alert("Harap scan invoice terlebih dahulu!");
+        showToast('warning', "Harap scan nomor resi / invoice terlebih dahulu!", "Invoice Belum Di-scan");
         return;
     }
 
@@ -709,11 +709,11 @@ window.submitFinalSession = async function() {
             document.getElementById('modalSuccessDesc').innerText = `Invoice [${activeInvoice}] berhasil disimpan ke MySQL dengan ${scannedProductsList.length} jenis barang.${videoNotice}`;
             document.getElementById('successModal').classList.remove('hidden');
         } else {
-            alert("Gagal: " + (result.error || 'Terjadi kesalahan saat menyimpan'));
+            showToast('error', result.error || 'Terjadi kesalahan saat menyimpan', "Gagal Menyimpan");
         }
     } catch (err) {
         hideGlobalLoading();
-        alert("Gagal koneksi ke server: " + err.message);
+        showToast('error', "Gagal koneksi ke server: " + err.message, "Koneksi Terputus");
     } finally {
         hideGlobalLoading();
         btn.disabled = false;
@@ -744,7 +744,7 @@ window.switchCamera = async function() {
         await getAvailableVideoDevices();
     }
     if (videoDevices.length <= 1) {
-        alert("Hanya ada 1 kamera yang terdeteksi pada perangkat ini.");
+        showToast('info', "Hanya ada 1 kamera yang terdeteksi pada perangkat ini.", "Informasi Kamera");
         return;
     }
     currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;
