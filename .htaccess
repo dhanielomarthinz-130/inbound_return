@@ -1,0 +1,21 @@
+Options -MultiViews
+RewriteEngine On
+
+# Allow direct access to existing files and directories
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# API Rewrites
+RewriteRule ^api/invoice/(.+)$ api/invoice.php?invoice_number=$1 [QSA,L]
+RewriteRule ^api/product/(.+)$ api/product.php?barcode=$1 [QSA,L]
+RewriteRule ^api/returns/?$ api/returns.php [QSA,L]
+RewriteRule ^api/admin/metrics/?$ api/admin/metrics.php [QSA,L]
+RewriteRule ^api/admin/transactions/?$ api/admin/transactions.php [QSA,L]
+RewriteRule ^api/admin/session/([^/]+)/items/?$ api/admin/session_items.php?session_id=$1 [QSA,L]
+RewriteRule ^api/products/?$ api/products.php [QSA,L]
+RewriteRule ^api/expeditions/?$ api/expeditions.php [QSA,L]
+
+# Route index / admin
+RewriteRule ^admin/?$ admin.php [L]
+RewriteRule ^scanner/?$ index.php [L]

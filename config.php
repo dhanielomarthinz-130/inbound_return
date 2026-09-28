@@ -1,0 +1,188 @@
+<?php
+// config.php - Konfigurasi Database MySQL untuk Laragon
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+
+if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
+$db_host = '127.0.0.1';
+$db_user = 'root';
+$db_pass = '';
+$db_name = 'inbound_return';
+
+try {
+    // 1. Koneksi awal ke server MySQL (untuk memastikan database ada)
+    $pdoServer = new PDO("mysql:host={$db_host};charset=utf8mb4", $db_user, $db_pass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+    ]);
+    $pdoServer->exec("CREATE DATABASE IF NOT EXISTS `{$db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+
+    // 2. Koneksi ke database inbound_return
+    $pdo = new PDO("mysql:host={$db_host};dbname={$db_name};charset=utf8mb4", $db_user, $db_pass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES => false
+    ]);
+
+    // 3. Auto Migration: Buat tabel jika belum ada
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `master_products` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `barcode` VARCHAR(100) NOT NULL UNIQUE,
+            `sku` VARCHAR(100) NOT NULL,
+            `name` VARCHAR(255) NOT NULL,
+            `category` VARCHAR(100) DEFAULT 'Umum',
+            `unit` VARCHAR(50) DEFAULT 'Pcs',
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+        CREATE TABLE IF NOT EXISTS `master_expeditions` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `code` VARCHAR(50) NOT NULL UNIQUE,
+            `name` VARCHAR(100) NOT NULL,
+            `status` VARCHAR(20) DEFAULT 'ACTIVE',
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+        CREATE TABLE IF NOT EXISTS `return_sessions` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `invoice_number` VARCHAR(100) NOT NULL,
+            `customer_name` VARCHAR(255) DEFAULT 'Pelanggan Umum',
+            `expedition` VARCHAR(100) NULL,
+            `operator_name` VARCHAR(100) DEFAULT 'Gudang 01',
+            `status` VARCHAR(50) DEFAULT 'COMPLETED',
+            `total_items` INT DEFAULT 0,
+            `total_good` INT DEFAULT 0,
+            `total_damaged` INT DEFAULT 0,
+            `notes` TEXT NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_invoice (`invoice_number`),
+            INDEX idx_created (`created_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+        CREATE TABLE IF NOT EXISTS `return_items` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `session_id` INT NOT NULL,
+            `barcode` VARCHAR(100) NOT NULL,
+            `product_name` VARCHAR(255) NOT NULL,
+            `sku` VARCHAR(100) NULL,
+            `batch_no` VARCHAR(100) NULL,
+            `exp_date` VARCHAR(50) NULL,
+            `type` VARCHAR(50) DEFAULT 'GOOD',
+            `qty` INT NOT NULL DEFAULT 1,
+            `condition` VARCHAR(20) NOT NULL DEFAULT 'GOOD',
+            `damage_reason` VARCHAR(255) NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_session (`session_id`),
+            CONSTRAINT fk_session_items FOREIGN KEY (`session_id`) REFERENCES `return_sessions`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    ");
+
+    // Auto-patch kolom jika tabel sudah ada sebelumnya
+    try {
+        $cols = $pdo->query("SHOW COLUMNS FROM return_items")->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('batch_no', $cols)) {
+            $pdo->exec("ALTER TABLE return_items ADD COLUMN batch_no VARCHAR(100) NULL AFTER sku");
+        }
+        if (!in_array('exp_date', $cols)) {
+            $pdo->exec("ALTER TABLE return_items ADD COLUMN exp_date VARCHAR(50) NULL AFTER batch_no");
+        }
+        if (!in_array('type', $cols)) {
+            $pdo->exec("ALTER TABLE return_items ADD COLUMN type VARCHAR(50) NULL DEFAULT 'GOOD' AFTER exp_date");
+        }
+
+        $colsSessions = $pdo->query("SHOW COLUMNS FROM return_sessions")->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('expedition', $colsSessions)) {
+            $pdo->exec("ALTER TABLE return_sessions ADD COLUMN expedition VARCHAR(100) NULL AFTER customer_name");
+        }
+
+        $colsExp = $pdo->query("SHOW COLUMNS FROM master_expeditions")->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('prefix_pattern', $colsExp)) {
+            $pdo->exec("ALTER TABLE master_expeditions ADD COLUMN prefix_pattern VARCHAR(255) NULL DEFAULT '' AFTER name");
+        }
+    } catch (Exception $e) {}
+
+    // Auto Seed & Update Master Ekspedisi dengan Prefix Deteksi
+    try {
+        $checkExp = $pdo->query("SELECT COUNT(*) AS total FROM master_expeditions");
+        if ($checkExp->fetch()['total'] == 0) {
+            $seedExp = $pdo->prepare("INSERT INTO master_expeditions (code, name, prefix_pattern, status) VALUES (?, ?, ?, ?)");
+            $dummyExp = [
+                ['SHOPEE', 'Shopee Xpress (SPX)', 'SPX,SPXID,ID', 'ACTIVE'],
+                ['GTL', 'GoTo Logistics (GTL)', 'GTL,TKP,GOTO', 'ACTIVE'],
+                ['JNT', 'J&T Express', 'JP,JX,JS,JT', 'ACTIVE'],
+                ['SICEPAT', 'SiCepat Ekspres', '00,SC,SICEPAT', 'ACTIVE'],
+                ['JNE', 'JNE Express', 'JNE,TJNE,01', 'ACTIVE'],
+                ['ANTERAJA', 'AnterAja', '100,10,AP', 'ACTIVE'],
+                ['GOSEND', 'GoSend / Grab', 'GK,GRAB,GO', 'ACTIVE'],
+                ['TIKI', 'TIKI', 'TIKI,12', 'ACTIVE'],
+                ['POS', 'Pos Indonesia', 'POS,P', 'ACTIVE']
+            ];
+            foreach ($dummyExp as $exp) {
+                $seedExp->execute($exp);
+            }
+        } else {
+            // Update prefix pattern untuk ekspedisi yang sudah ada
+            $defaultPrefixes = [
+                'SHOPEE'  => 'SPX,SPXID,ID',
+                'GTL'      => 'GTL,TKP,GOTO',
+                'JNT'      => 'JP,JX,JS,JT',
+                'SICEPAT'  => '00,SC,SICEPAT',
+                'JNE'      => 'JNE,TJNE,01',
+                'ANTERAJA' => '100,10,AP',
+                'GOSEND'   => 'GK,GRAB,GO',
+                'TIKI'     => 'TIKI,12',
+                'POS'      => 'POS,P'
+            ];
+            foreach ($defaultPrefixes as $code => $prefixes) {
+                $pdo->prepare("UPDATE master_expeditions SET prefix_pattern = ? WHERE code = ? AND (prefix_pattern IS NULL OR prefix_pattern = '')")->execute([$prefixes, $code]);
+            }
+            // Pastikan GTL ada di database
+            $chkGtl = $pdo->prepare("SELECT id FROM master_expeditions WHERE code = 'GTL'");
+            $chkGtl->execute();
+            if (!$chkGtl->fetch()) {
+                $pdo->prepare("INSERT INTO master_expeditions (code, name, prefix_pattern, status) VALUES ('GTL', 'GoTo Logistics (GTL)', 'GTL,TKP,GOTO', 'ACTIVE')")->execute();
+            }
+        }
+    } catch (Exception $e) {}
+
+    // 4. Auto Seed Master Produk Dummy jika masih kosong
+    $checkStmt = $pdo->query("SELECT COUNT(*) AS total FROM master_products");
+    $rowCount = $checkStmt->fetch()['total'];
+
+    if ($rowCount == 0) {
+        $seedStmt = $pdo->prepare("INSERT INTO master_products (barcode, sku, name, category, unit) VALUES (?, ?, ?, ?, ?)");
+        $dummy = [
+            ['8991001', 'SKU-KPS-01', 'Kipas Angin Portable USB', 'Elektronik', 'Pcs'],
+            ['8991002', 'SKU-TWS-02', 'Earphone TWS Bluetooth 5.3', 'Aksesoris', 'Unit'],
+            ['8991003', 'SKU-PB-03', 'Powerbank 10.000mAh Fast Charging', 'Gadget', 'Pcs'],
+            ['8991004', 'SKU-CHG-04', 'Adaptor Charger 20W Type C', 'Aksesoris', 'Pcs'],
+            ['8991005', 'SKU-BLB-05', 'Smart Lampu Bohlam LED 9W', 'Rumah Tangga', 'Pcs']
+        ];
+        foreach ($dummy as $row) {
+            $seedStmt->execute($row);
+        }
+    }
+
+} catch (PDOException $e) {
+    if (php_sapi_name() !== 'cli' && basename($_SERVER['PHP_SELF']) !== 'config.php') {
+        header('Content-Type: application/json; charset=utf-8', true, 500);
+        echo json_encode([
+            'error' => 'Gagal koneksi ke database Laragon MySQL: ' . $e->getMessage()
+        ]);
+        exit;
+    }
+}
+
+// Helper output json
+function jsonResponse($data, $statusCode = 200) {
+    header('Content-Type: application/json; charset=utf-8');
+    http_response_code($statusCode);
+    echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    exit;
+}

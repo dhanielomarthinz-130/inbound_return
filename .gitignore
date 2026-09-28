@@ -1,0 +1,12 @@
+# Dependencies & temp
+node_modules/
+vendor/
+*.log
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace

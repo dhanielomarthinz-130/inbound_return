@@ -1,0 +1,23 @@
+#reader video {
+    border-radius: 0.75rem;
+    object-fit: cover;
+    width: 100% !important;
+}
+
+#reader__scan_region {
+    background: transparent !important;
+}
+
+#reader__dashboard_section_csr button {
+    background-color: #4f46e5;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    margin: 0.25rem;
+}
+
+.condition-card:has(input:checked) {
+    border-color: #4f46e5;
+    background-color: #eef2ff;
+}

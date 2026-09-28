@@ -1,0 +1,651 @@
+let html5QrCode = null;
+let isCameraActive = false;
+let activeInvoice = null;
+let activeExpedition = null;
+let cachedExpeditionsList = [];
+let currentDetectedProduct = null;
+let scannedProductsList = [];
+
+// Audio Synthesizer Beep (Web Audio API)
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playBeep(type = 'success') {
+    try {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        if (type === 'success') {
+            osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.12);
+        } else {
+            osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.25);
+        }
+    } catch (e) {
+        console.warn('Audio error:', e);
+    }
+}
+
+// -------------------------------------------------------------
+// 1. INVOICE HANDLING (Auto Record on Scan / Enter)
+// -------------------------------------------------------------
+const inputInvoice = document.getElementById('inputInvoice');
+const btnLockInvoice = document.getElementById('btnLockInvoice');
+
+if (inputInvoice) {
+    inputInvoice.addEventListener('input', () => {
+        const val = inputInvoice.value.trim();
+        const autoBadge = document.getElementById('autoDetectBadge');
+        const autoLabel = document.getElementById('autoDetectLabel');
+        const expSelect = document.getElementById('selectExpedition');
+
+        if (val.length >= 2) {
+            const detected = detectExpeditionFromCode(val);
+            if (detected && expSelect) {
+                expSelect.value = detected.name;
+                expSelect.classList.add('border-emerald-500', 'bg-emerald-50/50');
+                if (autoBadge) {
+                    if (autoLabel) autoLabel.innerText = `Auto: ${detected.name}`;
+                    autoBadge.classList.remove('hidden');
+                }
+                return;
+            }
+        }
+        if (autoBadge) autoBadge.classList.add('hidden');
+        if (expSelect) expSelect.classList.remove('border-emerald-500', 'bg-emerald-50/50');
+    });
+
+    inputInvoice.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const val = inputInvoice.value.trim();
+            if (val) processInvoiceScan(val);
+        }
+    });
+}
+
+if (btnLockInvoice) {
+    btnLockInvoice.addEventListener('click', () => {
+        const val = inputInvoice.value.trim();
+        if (val) processInvoiceScan(val);
+    });
+}
+
+window.quickSelectInvoice = function(code) {
+    if (inputInvoice) {
+        inputInvoice.value = code;
+        processInvoiceScan(code);
+    }
+};
+
+async function processInvoiceScan(invoiceNumber) {
+    try {
+        const res = await fetch(`api/invoice/${encodeURIComponent(invoiceNumber)}`);
+        const data = await res.json();
+
+        activeInvoice = data.invoice_number || invoiceNumber;
+        
+        // Auto-detect ekspedisi dari invoice / resi
+        const detected = detectExpeditionFromCode(invoiceNumber);
+        const expSelect = document.getElementById('selectExpedition');
+
+        if (detected) {
+            activeExpedition = detected.name;
+            if (expSelect) expSelect.value = detected.name;
+        } else if (expSelect && expSelect.value) {
+            activeExpedition = expSelect.value;
+        } else {
+            activeExpedition = 'Reguler / Kurir';
+        }
+        
+        const expText = document.getElementById('displayExpeditionText');
+        if (expText) expText.innerText = activeExpedition;
+
+        playBeep('success');
+
+        // Update Indikator Mode
+        const scanMode = document.getElementById('scanModeIndicator');
+        if (scanMode) {
+            scanMode.innerText = 'LANGKAH 2: SCAN BARCODE PRODUK';
+            scanMode.className = 'font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 text-[11px]';
+        }
+
+        // Tampilkan Banner Terkunci & Sembunyikan Input Invoice
+        document.getElementById('displayActiveInvoice').innerText = activeInvoice;
+        document.getElementById('invoiceInputWrapper').classList.add('hidden');
+        document.getElementById('invoiceLockedBanner').classList.remove('hidden');
+
+        // Tampilkan Form Input Produk (Langkah 2)
+        const secProd = document.getElementById('sectionProductInput');
+        secProd.classList.remove('hidden');
+
+        // Auto Focus Langsung ke Barcode Produk!
+        setTimeout(() => {
+            const inputBarcode = document.getElementById('inputBarcode');
+            if (inputBarcode) {
+                inputBarcode.focus();
+                inputBarcode.select();
+            }
+        }, 100);
+
+    } catch (err) {
+        playBeep('error');
+        alert("Gagal memproses invoice: " + err.message);
+    }
+}
+
+window.resetInvoiceSession = function() {
+    if (scannedProductsList.length > 0 && !confirm("Ada barang yang sudah di-scan. Yakin ingin mereset sesi ini?")) {
+        return;
+    }
+
+    activeInvoice = null;
+    activeExpedition = null;
+    currentDetectedProduct = null;
+    scannedProductsList = [];
+
+    // Reset UI Invoice & Ekspedisi
+    document.getElementById('inputInvoice').value = '';
+    const expSelect = document.getElementById('selectExpedition');
+    if (expSelect) {
+        expSelect.value = '';
+        expSelect.classList.remove('border-emerald-500', 'bg-emerald-50/50');
+    }
+    const autoBadge = document.getElementById('autoDetectBadge');
+    if (autoBadge) autoBadge.classList.add('hidden');
+
+    document.getElementById('invoiceInputWrapper').classList.remove('hidden');
+    document.getElementById('invoiceLockedBanner').classList.add('hidden');
+
+    // Sembunyikan Form Produk
+    document.getElementById('sectionProductInput').classList.add('hidden');
+    resetProductInputs();
+
+    // Reset Indikator Mode
+    const scanMode = document.getElementById('scanModeIndicator');
+    if (scanMode) {
+        scanMode.innerText = 'LANGKAH 1: SCAN INVOICE';
+        scanMode.className = 'font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 text-[11px]';
+    }
+
+    // Sembunyikan Modal Sukses jika ada
+    document.getElementById('successModal').classList.add('hidden');
+
+    renderItemsTable();
+
+    // Auto Focus kembali ke Invoice
+    setTimeout(() => {
+        const invEl = document.getElementById('inputInvoice');
+        if (invEl) invEl.focus();
+    }, 100);
+};
+
+// -------------------------------------------------------------
+// 2. PRODUCT SCAN & DETAIL INPUT (Barcode, Batch, Exp Date, Qty, Type)
+// -------------------------------------------------------------
+const inputBarcode = document.getElementById('inputBarcode');
+const inputBatch = document.getElementById('inputBatch');
+const inputExpDate = document.getElementById('inputExpDate');
+const inputQty = document.getElementById('inputQty');
+const inputType = document.getElementById('inputType');
+
+// Helper demo click barcode
+window.quickFillBarcode = function(barcode) {
+    if (!activeInvoice) {
+        alert("Harap scan invoice terlebih dahulu!");
+        return;
+    }
+    inputBarcode.value = barcode;
+    lookupProduct(barcode);
+};
+
+// Deteksi Enter / Scan pada Kolom Barcode
+inputBarcode.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const code = inputBarcode.value.trim();
+        if (code) lookupProduct(code);
+    }
+});
+
+// Deteksi Enter berpindah kolom secara natural:
+// Barcode -> Batch -> ExpDate -> Qty -> Type -> Submit
+inputBatch.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        inputExpDate.focus();
+    }
+});
+
+inputExpDate.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        inputQty.focus();
+        inputQty.select();
+    }
+});
+
+inputQty.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        inputType.focus();
+    }
+});
+
+inputType.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('btnSubmitItem').click();
+    }
+});
+
+// Fungsi Lookup Produk dari Barcode ke Database MySQL
+async function lookupProduct(barcode) {
+    const loading = document.getElementById('barcodeLoadingIcon');
+    if (loading) loading.classList.remove('hidden');
+
+    try {
+        const res = await fetch(`api/product/${encodeURIComponent(barcode)}`);
+        if (!res.ok) {
+            playBeep('error');
+            currentDetectedProduct = null;
+            document.getElementById('detectedProductName').innerText = `Produk [${barcode}] tidak ditemukan!`;
+            document.getElementById('detectedProductName').className = "font-bold text-rose-600 ml-1 text-sm";
+            document.getElementById('detectedProductSku').innerText = "";
+            alert(`Barcode [${barcode}] belum terdaftar di master data produk!`);
+            inputBarcode.focus();
+            inputBarcode.select();
+            return;
+        }
+
+        const product = await res.json();
+        currentDetectedProduct = product;
+        playBeep('success');
+
+        // Tampilkan info produk terdeteksi
+        const nameEl = document.getElementById('detectedProductName');
+        nameEl.innerText = product.name;
+        nameEl.className = "font-bold text-emerald-700 ml-1 text-sm";
+        document.getElementById('detectedProductSku').innerText = `(SKU: ${product.sku})`;
+
+        // Pindahkan kursor otomatis ke NO. BATCH!
+        setTimeout(() => {
+            inputBatch.focus();
+        }, 50);
+
+    } catch (err) {
+        playBeep('error');
+        console.error(err);
+    } finally {
+        if (loading) loading.classList.add('hidden');
+    }
+}
+
+// Handler Submit Tambah Item ke Daftar
+window.handleAddItem = function(e) {
+    if (e) e.preventDefault();
+
+    if (!activeInvoice) {
+        alert("Harap scan invoice terlebih dahulu!");
+        return;
+    }
+
+    const barcode = inputBarcode.value.trim();
+    if (!barcode) {
+        inputBarcode.focus();
+        return;
+    }
+
+    if (!currentDetectedProduct || currentDetectedProduct.barcode !== barcode) {
+        // Jika belum ter-lookup, lookup dulu
+        lookupProduct(barcode).then(() => {
+            if (currentDetectedProduct) commitAddItem();
+        });
+        return;
+    }
+
+    commitAddItem();
+};
+
+function commitAddItem() {
+    const batchNo = inputBatch.value.trim();
+    const expDate = inputExpDate.value.trim();
+    const qty = parseInt(inputQty.value, 10) || 1;
+    const type = inputType.value || 'GOOD';
+
+    scannedProductsList.push({
+        barcode: currentDetectedProduct.barcode,
+        product_name: currentDetectedProduct.name,
+        sku: currentDetectedProduct.sku,
+        batch_no: batchNo || '-',
+        exp_date: expDate || '-',
+        qty: qty,
+        type: type,
+        condition: (type === 'GOOD') ? 'GOOD' : 'RUSAK'
+    });
+
+    playBeep('success');
+    renderItemsTable();
+    resetProductInputs();
+
+    // Auto Focus kembali ke Barcode untuk scan item berikutnya!
+    setTimeout(() => {
+        inputBarcode.focus();
+    }, 50);
+}
+
+function resetProductInputs() {
+    currentDetectedProduct = null;
+    inputBarcode.value = '';
+    inputBatch.value = '';
+    inputExpDate.value = '';
+    inputQty.value = 1;
+    inputType.value = 'GOOD';
+    document.getElementById('detectedProductName').innerText = "Silakan scan / ketik barcode...";
+    document.getElementById('detectedProductName').className = "font-bold text-indigo-700 ml-1 text-sm";
+    document.getElementById('detectedProductSku').innerText = "";
+}
+
+// -------------------------------------------------------------
+// 3. TABEL DAFTAR ITEM & RINGKASAN
+// -------------------------------------------------------------
+function renderItemsTable() {
+    const tbody = document.getElementById('itemsTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (scannedProductsList.length === 0) {
+        tbody.innerHTML = `
+            <tr id="emptyTablePlaceholder">
+                <td colspan="8" class="text-center py-10 text-slate-400 italic">
+                    Belum ada produk yang dimasukkan untuk invoice ini. Silakan scan barcode di atas.
+                </td>
+            </tr>`;
+        document.getElementById('btnFinalizeSession').disabled = true;
+        document.getElementById('totalItemsBadge').innerText = '0';
+        document.getElementById('summaryTotalUnits').innerText = '0';
+        return;
+    }
+
+    let totalUnits = 0;
+
+    scannedProductsList.forEach((item, index) => {
+        totalUnits += item.qty;
+
+        // Badge Tipe
+        let badge = `<span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold text-[10px]">GOOD</span>`;
+        if (item.type === 'RUSAK') {
+            badge = `<span class="bg-rose-100 text-rose-800 px-2 py-0.5 rounded font-bold text-[10px]">RUSAK</span>`;
+        } else if (item.type === 'EXPIRED') {
+            badge = `<span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold text-[10px]">EXPIRED</span>`;
+        } else if (item.type === 'SALAH_KIRIM') {
+            badge = `<span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-bold text-[10px]">SALAH KIRIM</span>`;
+        }
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+        tr.innerHTML = `
+            <td class="p-3 text-center text-slate-400 font-mono text-[11px]">${index + 1}</td>
+            <td class="p-3 font-mono font-bold text-indigo-700">${item.barcode}</td>
+            <td class="p-3">
+                <div class="font-bold text-slate-800">${item.product_name}</div>
+                <div class="text-[10px] text-slate-400 font-mono">SKU: ${item.sku}</div>
+            </td>
+            <td class="p-3 font-mono text-slate-600">${item.batch_no || '-'}</td>
+            <td class="p-3 font-mono text-slate-600">${item.exp_date || '-'}</td>
+            <td class="p-3 text-center font-bold text-slate-900 text-sm font-mono">${item.qty}</td>
+            <td class="p-3 text-center">${badge}</td>
+            <td class="p-3 text-center">
+                <button type="button" onclick="removeItem(${index})" title="Hapus Item" class="text-rose-500 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-50 transition">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById('totalItemsBadge').innerText = scannedProductsList.length;
+    document.getElementById('summaryTotalUnits').innerText = totalUnits;
+    document.getElementById('btnFinalizeSession').disabled = false;
+}
+
+window.removeItem = function(index) {
+    scannedProductsList.splice(index, 1);
+    renderItemsTable();
+};
+
+// -------------------------------------------------------------
+// 4. SELESAIKAN INBOUND RETURN (Simpan ke MySQL)
+// -------------------------------------------------------------
+window.submitFinalSession = async function() {
+    if (!activeInvoice || scannedProductsList.length === 0) return;
+
+    const notes = document.getElementById('sessionNotesInput').value.trim();
+    const btn = document.getElementById('btnFinalizeSession');
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...`;
+
+    const payload = {
+        invoice_number: activeInvoice,
+        expedition: activeExpedition || 'Lainnya',
+        operator_name: 'Gudang 01',
+        customer_name: 'Pelanggan Return',
+        notes: notes,
+        items: scannedProductsList
+    };
+
+    try {
+        const res = await fetch('api/returns', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+
+        if (result.success) {
+            document.getElementById('modalSuccessDesc').innerText = `Invoice [${activeInvoice}] berhasil disimpan ke MySQL dengan ${scannedProductsList.length} jenis barang.`;
+            document.getElementById('successModal').classList.remove('hidden');
+        } else {
+            alert("Gagal: " + (result.error || 'Terjadi kesalahan saat menyimpan'));
+        }
+    } catch (err) {
+        alert("Gagal koneksi ke server: " + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Selesaikan Inbound Invoice`;
+    }
+};
+
+// -------------------------------------------------------------
+// 5. KAMERA SCANNER (Live Left Viewport & Auto Scan Handler)
+// -------------------------------------------------------------
+let availableCameras = [];
+let currentCameraIndex = 0;
+let lastScanText = '';
+let lastScanTime = 0;
+
+window.switchCamera = async function() {
+    if (!availableCameras || availableCameras.length <= 1) {
+        alert("Hanya ada 1 kamera yang terdeteksi atau sistem kamera belum siap.");
+        return;
+    }
+    currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
+    await stopCamera();
+    await startCamera(availableCameras[currentCameraIndex].id);
+};
+
+window.simulateScan = function(code) {
+    if (!code) return;
+    onScanSuccess(code);
+};
+
+async function startCamera(cameraId = null) {
+    const loading = document.getElementById('cameraLoading');
+    const badge = document.getElementById('cameraStatusBadge');
+
+    try {
+        if (!html5QrCode) {
+            html5QrCode = new Html5Qrcode("reader");
+        }
+
+        if (!availableCameras || availableCameras.length === 0) {
+            availableCameras = await Html5Qrcode.getCameras();
+        }
+
+        if (availableCameras && availableCameras.length > 0) {
+            let targetCamId = cameraId;
+            if (!targetCamId) {
+                const backCamIdx = availableCameras.findIndex(c => 
+                    c.label.toLowerCase().includes('back') || 
+                    c.label.toLowerCase().includes('rear') ||
+                    c.label.toLowerCase().includes('environment')
+                );
+                currentCameraIndex = backCamIdx >= 0 ? backCamIdx : 0;
+                targetCamId = availableCameras[currentCameraIndex].id;
+            }
+
+            await html5QrCode.start(
+                targetCamId,
+                { 
+                    fps: 15, 
+                    qrbox: { width: 240, height: 240 }, 
+                    aspectRatio: 1.0 
+                },
+                (decodedText) => {
+                    const text = (decodedText || '').trim();
+                    if (!text) return;
+
+                    const now = Date.now();
+                    // Debounce jika scan kode yang sama berturut-turut dalam 2.5 detik
+                    if (text === lastScanText && (now - lastScanTime) < 2500) {
+                        return;
+                    }
+                    lastScanText = text;
+                    lastScanTime = now;
+
+                    onScanSuccess(text);
+                },
+                () => {}
+            );
+
+            isCameraActive = true;
+            if (loading) loading.classList.add('hidden');
+            if (badge) {
+                badge.className = "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5";
+                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Kamera Siap`;
+            }
+        } else {
+            throw new Error("Tidak ada kamera terdeteksi");
+        }
+    } catch (err) {
+        console.warn("Kamera tidak aktif:", err);
+        isCameraActive = false;
+        if (loading) {
+            loading.innerHTML = `
+                <div class="text-center p-4">
+                    <i class="fa-solid fa-barcode text-3xl text-indigo-400 mb-2"></i>
+                    <p class="text-xs text-slate-300 font-semibold">Mode Barcode Scanner Gun / Input Aktif</p>
+                    <p class="text-[10px] text-slate-400 mt-1">Kamera fisik tidak terdeteksi atau izin belum diberikan.</p>
+                </div>
+            `;
+        }
+        if (badge) {
+            badge.className = "bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5";
+            badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span> Barcode Gun Siap`;
+        }
+    }
+}
+
+async function stopCamera() {
+    try {
+        if (html5QrCode && html5QrCode.isScanning) {
+            await html5QrCode.stop();
+            isCameraActive = false;
+        }
+    } catch (e) {
+        console.warn("Stop camera error:", e);
+    }
+}
+
+async function onScanSuccess(decodedText) {
+    const text = decodedText.trim();
+    if (!text) return;
+
+    playBeep('success');
+
+    if (!activeInvoice) {
+        // Jika invoice belum diisi, kode ini otomatis dianggap Invoice!
+        if (inputInvoice) inputInvoice.value = text;
+        await processInvoiceScan(text);
+    } else {
+        // Jika invoice sudah aktif, kode ini otomatis dianggap Barcode Produk!
+        if (inputBarcode) inputBarcode.value = text;
+        await lookupProduct(text);
+    }
+}
+
+// Helper Algoritma Auto-Detect Ekspedisi dari Barcode / Invoice / Resi
+function detectExpeditionFromCode(code) {
+    if (!code || !cachedExpeditionsList || cachedExpeditionsList.length === 0) return null;
+    const cleanCode = code.toUpperCase().trim();
+
+    // 1. Cek dari prefix pattern yang terdaftar
+    for (const exp of cachedExpeditionsList) {
+        if (exp.status !== 'ACTIVE') continue;
+
+        if (exp.prefix_pattern) {
+            const prefixes = exp.prefix_pattern.split(',').map(p => p.trim().toUpperCase()).filter(p => p.length > 0);
+            for (const prefix of prefixes) {
+                if (cleanCode.startsWith(prefix)) {
+                    return exp;
+                }
+            }
+        }
+
+        // Cek juga jika kode berawalan nama/kode ekspedisi langsung (misal SPX..., GTL...)
+        if (exp.code && cleanCode.startsWith(exp.code.toUpperCase())) {
+            return exp;
+        }
+    }
+    return null;
+}
+
+// Helper Load Daftar Ekspedisi untuk Dropdown
+async function loadExpeditions() {
+    try {
+        const res = await fetch('api/expeditions.php');
+        const list = await res.json();
+        cachedExpeditionsList = Array.isArray(list) ? list : [];
+        const select = document.getElementById('selectExpedition');
+        if (!select || !Array.isArray(list)) return;
+
+        select.innerHTML = '<option value="">-- Pilih Ekspedisi --</option>';
+        cachedExpeditionsList.forEach(item => {
+            if (item.status === 'ACTIVE') {
+                const opt = document.createElement('option');
+                opt.value = item.name;
+                opt.innerText = `${item.name} (${item.code})`;
+                select.appendChild(opt);
+            }
+        });
+    } catch (e) {
+        console.warn('Gagal memuat master ekspedisi:', e);
+    }
+}
+
+// Inisialisasi Otomatis saat Halaman Dimuat
+window.addEventListener('DOMContentLoaded', () => {
+    if (inputInvoice) {
+        inputInvoice.focus();
+    }
+    // Muat daftar ekspedisi
+    loadExpeditions();
+    // Langsung jalankan kamera live scanner di sebelah kiri
+    startCamera();
+});
