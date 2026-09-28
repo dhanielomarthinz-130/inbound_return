@@ -503,40 +503,95 @@ async function startCamera(deviceId = null) {
     const badge = document.getElementById('cameraStatusBadge');
     const videoElement = document.getElementById('liveVideoFeed');
 
-    try {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            throw new Error("WebRTC getUserMedia tidak didukung di browser ini");
-        }
+    if (loading) {
+        loading.classList.remove('hidden');
+        loading.innerHTML = `
+            <i class="fa-solid fa-circle-notch fa-spin text-3xl text-indigo-500"></i>
+            <span class="text-xs text-slate-300">Menghubungkan ke kamera video...</span>
+        `;
+    }
 
-        // Hentikan stream kamera aktif sebelumnya jika ada
+    // Periksa apakah browser memblokir getUserMedia karena akses lewat IP HTTP biasa
+    const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    const isSecure = window.isSecureContext || isLocalhost || location.protocol === 'https:';
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.warn("navigator.mediaDevices tidak tersedia. isSecureContext:", window.isSecureContext);
+        isCameraActive = false;
+        if (loading) {
+            if (!isSecure) {
+                loading.innerHTML = `
+                    <div class="text-center p-4 max-w-sm space-y-2">
+                        <i class="fa-solid fa-shield-halved text-amber-400 text-3xl mb-1"></i>
+                        <p class="text-xs text-white font-bold">Kamera Diblokir Keamanan Browser (HTTP IP)</p>
+                        <p class="text-[11px] text-slate-300 leading-normal">
+                            Browser (Chrome/Edge) mewajibkan <b>localhost</b> atau <b>HTTPS</b> untuk membuka kamera webcam.
+                        </p>
+                        <div class="bg-slate-800/90 p-2.5 rounded-xl border border-slate-700 text-[10px] text-slate-300 text-left space-y-1">
+                            <div><b>1. Jika di PC Ini (Server):</b> Buka alamat <a href="http://localhost/return.inbound" class="text-indigo-400 underline font-bold">http://localhost/return.inbound</a></div>
+                            <div><b>2. Jika dari PC Lain:</b> Buka tab baru di Chrome <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code> &rarr; masukkan <code>http://${location.host}</code> &rarr; Enabled & Relaunch.</div>
+                        </div>
+                        <button onclick="startCamera()" class="mt-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5">
+                            <i class="fa-solid fa-rotate-right"></i> Coba Hubungkan Lagi
+                        </button>
+                    </div>
+                `;
+            } else {
+                loading.innerHTML = `
+                    <div class="text-center p-4">
+                        <i class="fa-solid fa-video-slash text-3xl text-rose-400 mb-2"></i>
+                        <p class="text-xs text-slate-300 font-semibold">Kamera Tidak Tersedia</p>
+                        <p class="text-[10px] text-slate-400 mt-1">Browser ini tidak mendukung WebRTC Camera API.</p>
+                    </div>
+                `;
+            }
+        }
+        if (badge) {
+            badge.className = "bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5";
+            badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span> Kamera Off (Gun Aktif)`;
+        }
+        return;
+    }
+
+    try {
         stopCamera();
 
         if (videoDevices.length === 0) {
             await getAvailableVideoDevices();
         }
 
-        const constraints = {
-            video: deviceId 
-                ? { deviceId: { exact: deviceId } } 
-                : { 
-                    facingMode: { ideal: "environment" }, 
-                    width: { ideal: 1280 }, 
-                    height: { ideal: 720 } 
-                  },
-            audio: false
-        };
+        let stream = null;
 
-        mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-        
-        // Refresh daftar video devices setelah permission diberikan (agar label nama terisi)
+        // Upaya 1: Coba dengan constraint spesifik / deviceId
+        try {
+            const constraints = {
+                video: deviceId 
+                    ? { deviceId: { exact: deviceId } } 
+                    : { facingMode: { ideal: "environment" }, width: { ideal: 1280 } },
+                audio: false
+            };
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (specErr) {
+            console.warn("Gagal constraint spesifik, fallback ke video standar:", specErr);
+            // Upaya 2: Fallback ke parameter paling dasar (cocok untuk semua jenis USB webcam)
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: deviceId ? { deviceId: deviceId } : true,
+                audio: false
+            });
+        }
+
+        mediaStream = stream;
         await getAvailableVideoDevices();
 
         if (videoElement) {
             videoElement.srcObject = mediaStream;
-            videoElement.onloadedmetadata = () => {
-                videoElement.play();
-                if (loading) loading.classList.add('hidden');
-            };
+            videoElement.muted = true;
+            try {
+                await videoElement.play();
+            } catch (playErr) {
+                console.warn("video.play error:", playErr);
+            }
+            if (loading) loading.classList.add('hidden');
         }
 
         isCameraActive = true;
@@ -545,20 +600,23 @@ async function startCamera(deviceId = null) {
             badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Video Record Siap`;
         }
     } catch (err) {
-        console.warn("Kamera tidak aktif atau ditolak:", err);
+        console.warn("Kamera tidak aktif atau izin ditolak:", err);
         isCameraActive = false;
         if (loading) {
             loading.innerHTML = `
-                <div class="text-center p-4">
-                    <i class="fa-solid fa-barcode text-3xl text-indigo-400 mb-2"></i>
-                    <p class="text-xs text-slate-300 font-semibold">Mode Barcode Scanner Gun / Input Aktif</p>
-                    <p class="text-[10px] text-slate-400 mt-1">Kamera fisik tidak terdeteksi atau izin belum diberikan.</p>
+                <div class="text-center p-4 max-w-xs space-y-2">
+                    <i class="fa-solid fa-video-slash text-3xl text-amber-400 mb-1"></i>
+                    <p class="text-xs text-white font-semibold">Izin Kamera Belum Diberikan</p>
+                    <p class="text-[10px] text-slate-400">Klik ikon kamera/gembok di sebelah kiri address bar browser Anda lalu pilih <b>Izinkan (Allow)</b>.</p>
+                    <button onclick="startCamera()" class="mt-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5">
+                        <i class="fa-solid fa-power-off"></i> Nyalakan Kamera
+                    </button>
                 </div>
             `;
         }
         if (badge) {
             badge.className = "bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5";
-            badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span> Barcode Gun Siap`;
+            badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span> Butuh Izin Kamera`;
         }
     }
 }
