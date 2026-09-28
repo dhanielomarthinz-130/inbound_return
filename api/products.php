@@ -53,3 +53,4 @@ if ($method === 'POST') {
         jsonResponse(['error' => $e->getMessage()], 500);
     }
 }
+

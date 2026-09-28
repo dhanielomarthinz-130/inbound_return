@@ -9,25 +9,51 @@ if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS
     exit;
 }
 
-$db_host = '127.0.0.1';
-$db_user = 'root';
-$db_pass = '';
-$db_name = 'inbound_return';
+$http_host = $_SERVER['HTTP_HOST'] ?? '';
+$is_remote = (
+    strpos($http_host, 'great-site.net') !== false ||
+    strpos($http_host, 'infinityfree') !== false ||
+    strpos($http_host, 'rf.gd') !== false ||
+    strpos($http_host, 'page.gd') !== false ||
+    strpos($http_host, '42web.io') !== false ||
+    strpos($http_host, 'infy.uk') !== false ||
+    getenv('APP_ENV') === 'production'
+);
+
+if ($is_remote) {
+    // Production InfinityFree (returninboundieg.great-site.net)
+    $db_host = 'sql202.infinityfree.com';
+    $db_user = 'if0_38464190';
+    $db_pass = 'Dhaniel0';
+    $db_name = 'if0_38464190_inboundreturnIEG';
+} else {
+    // Localhost (Laragon / XAMPP)
+    $db_host = '127.0.0.1';
+    $db_user = 'root';
+    $db_pass = '';
+    $db_name = 'inbound_return';
+}
 
 try {
-    // 1. Koneksi awal ke server MySQL (untuk memastikan database ada)
-    $pdoServer = new PDO("mysql:host={$db_host};charset=utf8mb4", $db_user, $db_pass, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
-    ]);
-    $pdoServer->exec("CREATE DATABASE IF NOT EXISTS `{$db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+    if (!$is_remote) {
+        // Hanya di localhost coba buat database jika belum ada
+        $pdoServer = new PDO("mysql:host={$db_host};charset=utf8mb4", $db_user, $db_pass, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+        ]);
+        $pdoServer->exec("CREATE DATABASE IF NOT EXISTS `{$db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+    }
 
-    // 2. Koneksi ke database inbound_return
+    // Koneksi ke database
     $pdo = new PDO("mysql:host={$db_host};dbname={$db_name};charset=utf8mb4", $db_user, $db_pass, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false
     ]);
+
+    // Set Timezone WIB (+07:00)
+    date_default_timezone_set('Asia/Jakarta');
+    $pdo->exec("SET time_zone = '+07:00'");
 
     // 3. Auto Migration: Buat tabel jika belum ada
     $pdo->exec("
