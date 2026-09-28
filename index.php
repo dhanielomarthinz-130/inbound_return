@@ -49,31 +49,32 @@ require_once __DIR__ . '/config.php';
         <!-- ============================================================== -->
         <div class="lg:col-span-5 xl:col-span-4 space-y-4">
 
-            <!-- Card Video Scanner -->
+            <!-- Card Live Video Dokumentasi / Record (Tanpa Kotak Scanner) -->
             <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
                 <div class="p-3.5 bg-slate-900 text-white flex justify-between items-center">
                     <div class="flex items-center space-x-2 text-sm font-semibold">
-                        <i class="fa-solid fa-camera text-indigo-400"></i>
-                        <span>Live Camera Scanner</span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+                        <i class="fa-solid fa-video text-rose-400"></i>
+                        <span>Live Video Record</span>
                     </div>
                     <button id="btnSwitchCamera" onclick="switchCamera()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700 transition flex items-center gap-1">
                         <i class="fa-solid fa-arrows-rotate"></i> Putar Kamera
                     </button>
                 </div>
 
-                <!-- Video Viewport -->
-                <div class="relative bg-black flex justify-center items-center min-h-[280px]">
-                    <div id="reader" class="w-full"></div>
+                <!-- Video Viewport Bersih (Full Layar Tanpa Kotak Scanner) -->
+                <div class="relative bg-slate-950 flex justify-center items-center min-h-[300px]">
+                    <video id="liveVideoFeed" autoplay playsinline muted class="w-full h-auto object-cover min-h-[300px] max-h-[440px]"></video>
                     <div id="cameraLoading" class="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center text-white space-y-2">
                         <i class="fa-solid fa-circle-notch fa-spin text-3xl text-indigo-500"></i>
-                        <span class="text-xs text-slate-300">Mengaktifkan kamera pemindai...</span>
+                        <span class="text-xs text-slate-300">Menghubungkan ke kamera video...</span>
                     </div>
                 </div>
 
                 <!-- Status Mode Scan -->
                 <div class="p-3 bg-slate-50 border-t border-slate-200 text-xs flex justify-between items-center text-slate-600">
-                    <span class="flex items-center gap-1 text-[11px]">
-                        <i class="fa-solid fa-keyboard text-slate-400"></i> Barcode Gun USB Aktif
+                    <span class="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
+                        <i class="fa-solid fa-barcode text-indigo-600 text-sm"></i> Barcode Gun Scanner Aktif
                     </span>
                     <span id="scanModeIndicator" class="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 text-[11px]">
                         LANGKAH 1: SCAN INVOICE

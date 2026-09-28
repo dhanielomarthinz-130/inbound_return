@@ -1,4 +1,4 @@
-let html5QrCode = null;
+let mediaStream = null;
 let isCameraActive = false;
 let activeInvoice = null;
 let activeExpedition = null;
@@ -463,21 +463,34 @@ window.submitFinalSession = async function() {
 };
 
 // -------------------------------------------------------------
-// 5. KAMERA SCANNER (Live Left Viewport & Auto Scan Handler)
+// 5. KAMERA DOKUMENTASI / LIVE VIDEO RECORD (Tanpa Kotak Scanner)
 // -------------------------------------------------------------
-let availableCameras = [];
-let currentCameraIndex = 0;
-let lastScanText = '';
-let lastScanTime = 0;
+let videoDevices = [];
+let currentDeviceIndex = 0;
+
+async function getAvailableVideoDevices() {
+    try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return [];
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        videoDevices = devices.filter(d => d.kind === 'videoinput');
+        return videoDevices;
+    } catch (e) {
+        console.warn("enumerateDevices error:", e);
+        return [];
+    }
+}
 
 window.switchCamera = async function() {
-    if (!availableCameras || availableCameras.length <= 1) {
-        alert("Hanya ada 1 kamera yang terdeteksi atau sistem kamera belum siap.");
+    if (videoDevices.length <= 1) {
+        await getAvailableVideoDevices();
+    }
+    if (videoDevices.length <= 1) {
+        alert("Hanya ada 1 kamera yang terdeteksi pada perangkat ini.");
         return;
     }
-    currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
-    await stopCamera();
-    await startCamera(availableCameras[currentCameraIndex].id);
+    currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;
+    const targetId = videoDevices[currentDeviceIndex].deviceId;
+    await startCamera(targetId);
 };
 
 window.simulateScan = function(code) {
@@ -485,66 +498,54 @@ window.simulateScan = function(code) {
     onScanSuccess(code);
 };
 
-async function startCamera(cameraId = null) {
+async function startCamera(deviceId = null) {
     const loading = document.getElementById('cameraLoading');
     const badge = document.getElementById('cameraStatusBadge');
+    const videoElement = document.getElementById('liveVideoFeed');
 
     try {
-        if (!html5QrCode) {
-            html5QrCode = new Html5Qrcode("reader");
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error("WebRTC getUserMedia tidak didukung di browser ini");
         }
 
-        if (!availableCameras || availableCameras.length === 0) {
-            availableCameras = await Html5Qrcode.getCameras();
+        // Hentikan stream kamera aktif sebelumnya jika ada
+        stopCamera();
+
+        if (videoDevices.length === 0) {
+            await getAvailableVideoDevices();
         }
 
-        if (availableCameras && availableCameras.length > 0) {
-            let targetCamId = cameraId;
-            if (!targetCamId) {
-                const backCamIdx = availableCameras.findIndex(c => 
-                    c.label.toLowerCase().includes('back') || 
-                    c.label.toLowerCase().includes('rear') ||
-                    c.label.toLowerCase().includes('environment')
-                );
-                currentCameraIndex = backCamIdx >= 0 ? backCamIdx : 0;
-                targetCamId = availableCameras[currentCameraIndex].id;
-            }
+        const constraints = {
+            video: deviceId 
+                ? { deviceId: { exact: deviceId } } 
+                : { 
+                    facingMode: { ideal: "environment" }, 
+                    width: { ideal: 1280 }, 
+                    height: { ideal: 720 } 
+                  },
+            audio: false
+        };
 
-            await html5QrCode.start(
-                targetCamId,
-                { 
-                    fps: 15, 
-                    qrbox: { width: 240, height: 240 }, 
-                    aspectRatio: 1.0 
-                },
-                (decodedText) => {
-                    const text = (decodedText || '').trim();
-                    if (!text) return;
+        mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        // Refresh daftar video devices setelah permission diberikan (agar label nama terisi)
+        await getAvailableVideoDevices();
 
-                    const now = Date.now();
-                    // Debounce jika scan kode yang sama berturut-turut dalam 2.5 detik
-                    if (text === lastScanText && (now - lastScanTime) < 2500) {
-                        return;
-                    }
-                    lastScanText = text;
-                    lastScanTime = now;
+        if (videoElement) {
+            videoElement.srcObject = mediaStream;
+            videoElement.onloadedmetadata = () => {
+                videoElement.play();
+                if (loading) loading.classList.add('hidden');
+            };
+        }
 
-                    onScanSuccess(text);
-                },
-                () => {}
-            );
-
-            isCameraActive = true;
-            if (loading) loading.classList.add('hidden');
-            if (badge) {
-                badge.className = "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5";
-                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Kamera Siap`;
-            }
-        } else {
-            throw new Error("Tidak ada kamera terdeteksi");
+        isCameraActive = true;
+        if (badge) {
+            badge.className = "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5";
+            badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Video Record Siap`;
         }
     } catch (err) {
-        console.warn("Kamera tidak aktif:", err);
+        console.warn("Kamera tidak aktif atau ditolak:", err);
         isCameraActive = false;
         if (loading) {
             loading.innerHTML = `
@@ -562,12 +563,17 @@ async function startCamera(cameraId = null) {
     }
 }
 
-async function stopCamera() {
+function stopCamera() {
     try {
-        if (html5QrCode && html5QrCode.isScanning) {
-            await html5QrCode.stop();
-            isCameraActive = false;
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(track => track.stop());
+            mediaStream = null;
         }
+        const videoElement = document.getElementById('liveVideoFeed');
+        if (videoElement) {
+            videoElement.srcObject = null;
+        }
+        isCameraActive = false;
     } catch (e) {
         console.warn("Stop camera error:", e);
     }
