@@ -122,6 +122,8 @@ function renderChart(good, damaged) {
     });
 }
 
+let cachedTransactions = [];
+
 // 2. Load Transaksi (Full & Preview)
 async function loadTransactions() {
     const searchInput = document.getElementById('filterSearch');
@@ -129,20 +131,21 @@ async function loadTransactions() {
     const search = searchInput ? searchInput.value : '';
     const date = dateInput ? dateInput.value : '';
     
-    let url = `api/admin/transactions?`;
+    let url = `api/admin/transactions.php?`;
     if (search) url += `search=${encodeURIComponent(search)}&`;
     if (date) url += `date=${encodeURIComponent(date)}&`;
 
     try {
         const res = await fetch(url);
         const rows = await res.json();
+        cachedTransactions = Array.isArray(rows) ? rows : [];
         
         // Render di tabel transaksi penuh
         const tbody = document.getElementById('transactionsTableBody');
         if (tbody) {
             tbody.innerHTML = '';
             if (!rows || rows.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-400">Tidak ada riwayat transaksi ditemukan.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-slate-400">Tidak ada riwayat transaksi ditemukan.</td></tr>`;
             } else {
                 rows.forEach(r => tbody.appendChild(createTransactionRow(r)));
             }
@@ -153,7 +156,7 @@ async function loadTransactions() {
         if (previewTbody) {
             previewTbody.innerHTML = '';
             if (!rows || rows.length === 0) {
-                previewTbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-400">Belum ada transaksi retur hari ini.</td></tr>`;
+                previewTbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-400">Belum ada transaksi retur hari ini.</td></tr>`;
             } else {
                 rows.slice(0, 5).forEach(r => previewTbody.appendChild(createTransactionRow(r)));
             }
@@ -174,6 +177,15 @@ function createTransactionRow(r) {
          </span>` : 
         `<span class="text-slate-400 italic text-[11px]">-</span>`;
 
+    const hasVideo = Boolean(r.video_path && r.video_path.trim() !== '');
+    const actionBtn = hasVideo ? 
+        `<button onclick="viewDetails(${r.id})" class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition inline-flex items-center gap-1.5 shadow-xs">
+            <i class="fa-solid fa-circle-play text-rose-600"></i> Video & Detail
+         </button>` :
+        `<button onclick="viewDetails(${r.id})" class="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-2.5 py-1.5 rounded-xl font-semibold text-[11px] transition inline-flex items-center gap-1">
+            <i class="fa-solid fa-eye text-slate-500"></i> Detail
+         </button>`;
+
     tr.innerHTML = `
         <td class="p-3 text-slate-500 font-mono text-[11px]">${new Date(r.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
         <td class="p-3 font-mono font-bold text-indigo-700">${r.invoice_number}</td>
@@ -183,14 +195,103 @@ function createTransactionRow(r) {
         <td class="p-3 text-center text-emerald-600 font-bold">${r.total_good}</td>
         <td class="p-3 text-center text-rose-600 font-bold">${r.total_damaged}</td>
         <td class="p-3 text-slate-600 truncate max-w-xs text-xs">${r.items_summary || '-'}</td>
-        <td class="p-3 text-center">
-            <button onclick="viewDetails(${r.id}, '${r.invoice_number}', '${r.expedition || ''}')" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-lg font-semibold text-[11px] transition">
-                <i class="fa-solid fa-eye mr-0.5"></i> Detail
-            </button>
-        </td>
+        <td class="p-3 text-center">${actionBtn}</td>
     `;
     return tr;
 }
+
+// 2b. View Details & Video Player Modal
+window.viewDetails = async function(id) {
+    const r = cachedTransactions.find(t => t.id == id);
+    if (!r) return;
+
+    const modal = document.getElementById('transactionDetailModal');
+    if (!modal) return;
+
+    document.getElementById('modalDetailInvoice').innerText = r.invoice_number;
+    document.getElementById('modalDetailExpedition').innerText = r.expedition || 'Reguler';
+    document.getElementById('modalDetailMeta').innerText = `Operator: ${r.operator_name} • ${new Date(r.created_at).toLocaleString('id-ID')}`;
+    document.getElementById('modalTotalUnit').innerText = r.total_items || 0;
+    document.getElementById('modalTotalGood').innerText = r.total_good || 0;
+    document.getElementById('modalTotalDamaged').innerText = r.total_damaged || 0;
+    document.getElementById('modalNotes').innerText = r.notes || 'Tidak ada catatan.';
+
+    // Setup Video Player
+    const videoPlayer = document.getElementById('modalVideoPlayer');
+    const noVideoNotice = document.getElementById('modalNoVideo');
+    const videoBadge = document.getElementById('modalVideoStatusBadge');
+    const videoFilename = document.getElementById('modalVideoFilename');
+    const downloadBtn = document.getElementById('modalDownloadVideoBtn');
+
+    if (r.video_path && r.video_path.trim() !== '') {
+        videoPlayer.src = r.video_path;
+        videoPlayer.classList.remove('hidden');
+        noVideoNotice.classList.add('hidden');
+        videoBadge.className = "text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200";
+        videoBadge.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-500"></i> Rekaman Tersedia`;
+        videoFilename.innerText = r.video_path.split('/').pop();
+        downloadBtn.href = r.video_path;
+        downloadBtn.classList.remove('hidden');
+        videoPlayer.load();
+    } else {
+        videoPlayer.pause();
+        videoPlayer.src = '';
+        videoPlayer.classList.add('hidden');
+        noVideoNotice.classList.remove('hidden');
+        videoBadge.className = "text-[10px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200";
+        videoBadge.innerHTML = `<i class="fa-solid fa-circle-exclamation text-amber-500"></i> Tanpa Video`;
+        videoFilename.innerText = 'Tidak ada file rekaman';
+        downloadBtn.classList.add('hidden');
+    }
+
+    // Load Items List
+    const tbody = document.getElementById('modalItemsTableBody');
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat detail item...</td></tr>`;
+
+    modal.classList.remove('hidden');
+
+    try {
+        const res = await fetch(`api/admin/session_items.php?session_id=${id}`);
+        const items = await res.json();
+        tbody.innerHTML = '';
+        if (!items || items.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-400">Tidak ada rincian produk untuk invoice ini.</td></tr>`;
+            document.getElementById('modalItemCount').innerText = 0;
+            return;
+        }
+
+        document.getElementById('modalItemCount').innerText = items.length;
+        items.forEach(it => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50 border-b border-slate-100 text-xs';
+            const isGood = (it.type || it.condition) === 'GOOD';
+            const badgeCond = isGood ? 
+                `<span class="bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded text-[10px] border border-emerald-200">GOOD</span>` :
+                `<span class="bg-rose-50 text-rose-700 font-semibold px-2 py-0.5 rounded text-[10px] border border-rose-200">${it.type || 'RUSAK'}</span>`;
+
+            tr.innerHTML = `
+                <td class="p-2.5 font-mono font-bold text-slate-700">${it.barcode}</td>
+                <td class="p-2.5 font-medium text-slate-800">${it.product_name || '-'}</td>
+                <td class="p-2.5 text-slate-500 font-mono text-[11px]">${it.batch_no || '-'} / ${it.exp_date || '-'}</td>
+                <td class="p-2.5 text-center font-bold text-slate-800">${it.qty}</td>
+                <td class="p-2.5 text-center">${badgeCond}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-rose-500 font-semibold">Gagal memuat item: ${e.message}</td></tr>`;
+    }
+};
+
+window.closeDetailModal = function() {
+    const modal = document.getElementById('transactionDetailModal');
+    if (modal) modal.classList.add('hidden');
+    const videoPlayer = document.getElementById('modalVideoPlayer');
+    if (videoPlayer) {
+        videoPlayer.pause();
+        videoPlayer.src = '';
+    }
+};
 
 // 3. Load Master Produk
 async function loadProducts() {

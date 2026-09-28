@@ -56,6 +56,9 @@ require_once __DIR__ . '/config.php';
                         <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
                         <i class="fa-solid fa-video text-rose-400"></i>
                         <span>Live Video Record</span>
+                        <span id="cameraRecBadge" class="hidden bg-rose-600 text-white font-mono text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span> REC <span id="cameraRecTime">00:00</span>
+                        </span>
                     </div>
                     <button id="btnSwitchCamera" onclick="switchCamera()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700 transition flex items-center gap-1">
                         <i class="fa-solid fa-arrows-rotate"></i> Putar Kamera

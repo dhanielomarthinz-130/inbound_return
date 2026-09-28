@@ -86,6 +86,7 @@ try {
             `total_good` INT DEFAULT 0,
             `total_damaged` INT DEFAULT 0,
             `notes` TEXT NULL,
+            `video_path` VARCHAR(255) NULL,
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_invoice (`invoice_number`),
             INDEX idx_created (`created_at`)
@@ -125,6 +126,9 @@ try {
         $colsSessions = $pdo->query("SHOW COLUMNS FROM return_sessions")->fetchAll(PDO::FETCH_COLUMN);
         if (!in_array('expedition', $colsSessions)) {
             $pdo->exec("ALTER TABLE return_sessions ADD COLUMN expedition VARCHAR(100) NULL AFTER customer_name");
+        }
+        if (!in_array('video_path', $colsSessions)) {
+            $pdo->exec("ALTER TABLE return_sessions ADD COLUMN video_path VARCHAR(255) NULL AFTER notes");
         }
 
         $colsExp = $pdo->query("SHOW COLUMNS FROM master_expeditions")->fetchAll(PDO::FETCH_COLUMN);

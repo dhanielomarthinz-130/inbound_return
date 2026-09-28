@@ -532,6 +532,121 @@ require_once __DIR__ . '/config.php';
                     </button>
                 </div>
             </form>
+    <!-- MODAL DETAIL TRANSAKSI & PEMUTAR VIDEO INBOUND -->
+    <div id="transactionDetailModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden p-3 md:p-6 overflow-y-auto">
+        <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+            <!-- Modal Header -->
+            <div class="p-4 bg-slate-900 text-white flex justify-between items-center border-b border-slate-800">
+                <div class="flex items-center space-x-3">
+                    <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white text-base shadow-sm">
+                        <i class="fa-solid fa-box-archive"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-bold text-base tracking-tight" id="modalDetailInvoice">INV-XXXXXX</h3>
+                            <span id="modalDetailExpedition" class="bg-indigo-500/20 text-indigo-300 text-[10px] font-semibold px-2 py-0.5 rounded border border-indigo-500/30">Kurir</span>
+                        </div>
+                        <p class="text-[11px] text-slate-400" id="modalDetailMeta">Operator &bull; Waktu Transaksi</p>
+                    </div>
+                </div>
+                <button onclick="closeDetailModal()" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body (Grid: Video di Kiri/Atas, Info & Tabel Produk di Kanan/Bawah) -->
+            <div class="p-5 overflow-y-auto flex-1 space-y-5">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                    
+                    <!-- SISI KIRI (6 Kolom): PEMUTAR VIDEO REKAMAN UNBOXING -->
+                    <div class="lg:col-span-6 space-y-2">
+                        <div class="flex items-center justify-between text-xs text-slate-700 font-bold mb-1">
+                            <span class="flex items-center gap-1.5">
+                                <i class="fa-solid fa-video text-rose-500"></i> Video Rekaman Inbound:
+                            </span>
+                            <span id="modalVideoStatusBadge" class="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                Rekaman Tersedia
+                            </span>
+                        </div>
+
+                        <!-- Video Container -->
+                        <div class="relative bg-slate-950 rounded-2xl overflow-hidden shadow-inner aspect-video flex items-center justify-center border border-slate-800">
+                            <video id="modalVideoPlayer" controls playsinline class="w-full h-full object-contain"></video>
+                            
+                            <!-- Placeholder Bila Tidak Ada Video -->
+                            <div id="modalNoVideo" class="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center text-slate-400 p-4 text-center hidden">
+                                <i class="fa-solid fa-video-slash text-4xl text-slate-600 mb-2"></i>
+                                <span class="text-xs font-bold text-slate-300">Tidak Ada Video Rekaman</span>
+                                <span class="text-[10px] text-slate-500 mt-1 max-w-xs">
+                                    Kamera tidak aktif atau izin kamera belum diberikan saat sesi transaksi ini diselesaikan.
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-between items-center text-[11px] text-slate-500 pt-1">
+                            <span id="modalVideoFilename" class="font-mono truncate max-w-[220px] text-[10px] text-slate-400">-</span>
+                            <a id="modalDownloadVideoBtn" href="#" download class="text-indigo-600 hover:text-indigo-700 font-semibold flex items-center gap-1">
+                                <i class="fa-solid fa-download"></i> Unduh Video
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- SISI KANAN (6 Kolom): STATISTIK KONDISI PRODUK -->
+                    <div class="lg:col-span-6 space-y-3">
+                        <div class="grid grid-cols-3 gap-2">
+                            <div class="bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-center">
+                                <span class="text-[10px] text-slate-500 block uppercase font-bold">Total Unit</span>
+                                <span class="text-lg font-black text-slate-800" id="modalTotalUnit">0</span>
+                            </div>
+                            <div class="bg-emerald-50 border border-emerald-200 p-2.5 rounded-xl text-center">
+                                <span class="text-[10px] text-emerald-600 block uppercase font-bold">Layak (Good)</span>
+                                <span class="text-lg font-black text-emerald-600" id="modalTotalGood">0</span>
+                            </div>
+                            <div class="bg-rose-50 border border-rose-200 p-2.5 rounded-xl text-center">
+                                <span class="text-[10px] text-rose-600 block uppercase font-bold">Rusak / Exp</span>
+                                <span class="text-lg font-black text-rose-600" id="modalTotalDamaged">0</span>
+                            </div>
+                        </div>
+
+                        <!-- Catatan Transaksi -->
+                        <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs space-y-1">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase">Catatan Operator:</span>
+                            <p class="text-slate-700 italic text-[11px]" id="modalNotes">-</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TABEL DETAIL PRODUK YANG DI-RETURN -->
+                <div class="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                    <div class="p-3 bg-slate-50 border-b border-slate-200 font-bold text-xs text-slate-700 flex items-center justify-between">
+                        <span>Daftar Produk Dalam Invoice (<span id="modalItemCount">0</span> Item)</span>
+                        <span class="text-[10px] text-slate-400 font-normal">Audit Trail Kondisi & Serial Barcode</span>
+                    </div>
+                    <div class="overflow-x-auto max-h-56">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-100/70 text-slate-600 uppercase text-[10px] sticky top-0">
+                                <tr>
+                                    <th class="p-2.5">Barcode</th>
+                                    <th class="p-2.5">Nama Produk</th>
+                                    <th class="p-2.5">Batch / Exp</th>
+                                    <th class="p-2.5 text-center">Qty</th>
+                                    <th class="p-2.5 text-center">Kondisi / Tipe</th>
+                                </tr>
+                            </thead>
+                            <tbody id="modalItemsTableBody" class="divide-y divide-slate-100">
+                                <tr><td colspan="5" class="text-center py-4 text-slate-400">Memuat rincian produk...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex justify-end">
+                <button type="button" onclick="closeDetailModal()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2 rounded-xl text-xs font-semibold transition">
+                    Tutup
+                </button>
+            </div>
         </div>
     </div>
 

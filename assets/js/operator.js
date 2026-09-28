@@ -134,6 +134,9 @@ async function processInvoiceScan(invoiceNumber) {
             }
         }, 100);
 
+        // Mulai Perekaman Video Unboxing Otomatis
+        startVideoRecording();
+
     } catch (err) {
         playBeep('error');
         alert("Gagal memproses invoice: " + err.message);
@@ -144,6 +147,8 @@ window.resetInvoiceSession = function() {
     if (scannedProductsList.length > 0 && !confirm("Ada barang yang sudah di-scan. Yakin ingin mereset sesi ini?")) {
         return;
     }
+
+    stopVideoRecording();
 
     activeInvoice = null;
     activeExpedition = null;
@@ -421,15 +426,97 @@ window.removeItem = function(index) {
 };
 
 // -------------------------------------------------------------
-// 4. SELESAIKAN INBOUND RETURN (Simpan ke MySQL)
+// 4. SELESAIKAN INBOUND RETURN (Simpan ke MySQL & Upload Video)
 // -------------------------------------------------------------
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordingTimerInterval = null;
+let recordingSeconds = 0;
+
+function startVideoRecording() {
+    if (!mediaStream) {
+        console.warn("mediaStream belum aktif, perekaman video ditunda.");
+        return;
+    }
+    try {
+        recordedChunks = [];
+        let mime = 'video/webm;codecs=vp8,opus';
+        if (!window.MediaRecorder || !MediaRecorder.isTypeSupported(mime)) {
+            mime = 'video/webm';
+            if (!MediaRecorder.isTypeSupported(mime)) {
+                mime = '';
+            }
+        }
+        const options = mime ? { mimeType: mime } : undefined;
+        mediaRecorder = new MediaRecorder(mediaStream, options);
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) {
+                recordedChunks.push(e.data);
+            }
+        };
+        mediaRecorder.start(1000); // slice tiap 1 detik
+
+        recordingSeconds = 0;
+        const recBadge = document.getElementById('cameraRecBadge');
+        if (recBadge) recBadge.classList.remove('hidden');
+        if (recordingTimerInterval) clearInterval(recordingTimerInterval);
+        recordingTimerInterval = setInterval(() => {
+            recordingSeconds++;
+            const mins = String(Math.floor(recordingSeconds / 60)).padStart(2, '0');
+            const secs = String(recordingSeconds % 60).padStart(2, '0');
+            const timeEl = document.getElementById('cameraRecTime');
+            if (timeEl) timeEl.innerText = `${mins}:${secs}`;
+        }, 1000);
+        console.log("Perekaman video unboxing dimulai...");
+    } catch (e) {
+        console.warn("Gagal start recording video:", e);
+    }
+}
+
+function stopVideoRecording() {
+    return new Promise((resolve) => {
+        if (recordingTimerInterval) {
+            clearInterval(recordingTimerInterval);
+            recordingTimerInterval = null;
+        }
+        const recBadge = document.getElementById('cameraRecBadge');
+        if (recBadge) recBadge.classList.add('hidden');
+
+        if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+            resolve(null);
+            return;
+        }
+
+        mediaRecorder.onstop = () => {
+            if (recordedChunks.length > 0) {
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                resolve(blob);
+            } else {
+                resolve(null);
+            }
+        };
+
+        try {
+            mediaRecorder.stop();
+        } catch (e) {
+            resolve(null);
+        }
+    });
+}
+
 window.submitFinalSession = async function() {
     if (!activeInvoice || scannedProductsList.length === 0) return;
 
     const notes = document.getElementById('sessionNotesInput').value.trim();
     const btn = document.getElementById('btnFinalizeSession');
     btn.disabled = true;
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...`;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan Sesi & Video...`;
+
+    // Ambil file video rekaman sesi unboxing jika kamera aktif
+    let videoBlob = null;
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        videoBlob = await stopVideoRecording();
+    }
 
     const payload = {
         invoice_number: activeInvoice,
@@ -441,15 +528,27 @@ window.submitFinalSession = async function() {
     };
 
     try {
-        const res = await fetch('api/returns', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        let res;
+        if (videoBlob && videoBlob.size > 0) {
+            const formData = new FormData();
+            formData.append('data', JSON.stringify(payload));
+            formData.append('video', videoBlob, `video_${activeInvoice}.webm`);
+            res = await fetch('api/returns.php', {
+                method: 'POST',
+                body: formData
+            });
+        } else {
+            res = await fetch('api/returns.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        }
         const result = await res.json();
 
         if (result.success) {
-            document.getElementById('modalSuccessDesc').innerText = `Invoice [${activeInvoice}] berhasil disimpan ke MySQL dengan ${scannedProductsList.length} jenis barang.`;
+            const videoNotice = (videoBlob && videoBlob.size > 0) ? ' Rekaman video unboxing berhasil disimpan.' : '';
+            document.getElementById('modalSuccessDesc').innerText = `Invoice [${activeInvoice}] berhasil disimpan ke MySQL dengan ${scannedProductsList.length} jenis barang.${videoNotice}`;
             document.getElementById('successModal').classList.remove('hidden');
         } else {
             alert("Gagal: " + (result.error || 'Terjadi kesalahan saat menyimpan'));
