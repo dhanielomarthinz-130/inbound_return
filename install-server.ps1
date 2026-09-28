@@ -21,8 +21,11 @@ if (Test-Path "C:\laragon\www") {
 }
 
 # Jika script dijalankan di dalam folder repo yang sudah ada, gunakan folder saat ini
-if (Test-Path "$PSScriptRoot\config.php") {
+if (![string]::IsNullOrEmpty($PSScriptRoot) -and (Test-Path "$PSScriptRoot\config.php")) {
     $installDir = $PSScriptRoot
+    Write-Host "[✓] Dijalankan di dalam folder aplikasi: $installDir" -ForegroundColor Green
+} elseif (Test-Path ".\config.php") {
+    $installDir = (Get-Location).Path
     Write-Host "[✓] Dijalankan di dalam folder aplikasi: $installDir" -ForegroundColor Green
 } else {
     $installDir = $defaultDir
