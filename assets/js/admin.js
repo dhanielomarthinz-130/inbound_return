@@ -2,7 +2,9 @@
 let ratioChartInstance = null;
 let currentTab = 'dashboard';
 let cachedProducts = [];
-let activeDateFilter = '';
+let activeInboundDateFilter = '';
+let activeDashboardDateFilter = '';
+let activeDateFilter = ''; // alias mundur untuk kompatibilitas
 let flatpickrTransactionsInstance = null;
 let flatpickrDashboardInstance = null;
 
@@ -38,9 +40,10 @@ function updateBrowserUrl(pushHistory = false) {
     // Selalu cantumkan nama halaman ?page=...
     params.set('page', slug);
 
-    // Cantumkan filter tanggal jika sedang aktif
-    if (activeDateFilter) {
-        params.set('date', activeDateFilter);
+    // Cantumkan filter tanggal jika sedang aktif (mandiri per-halaman)
+    const dateToUse = (currentTab === 'dashboard') ? activeDashboardDateFilter : activeInboundDateFilter;
+    if (dateToUse) {
+        params.set('date', dateToUse);
     }
 
     // Filter tambahan per-tab
@@ -159,7 +162,6 @@ window.switchTab = function(tabName, updateUrl = true) {
     // Trigger tab-specific refresh if needed
     if (tabName === 'dashboard') {
         loadMetrics();
-        loadTransactions();
     }
     if (tabName === 'products') loadProducts();
     if (tabName === 'transactions') loadTransactions();
@@ -174,12 +176,19 @@ window.switchTab = function(tabName, updateUrl = true) {
     }
 };
 
-// 1. Load Metrics KPI
-async function loadMetrics() {
+// 1. Load Metrics KPI (Refresh di backend via cache atau query)
+async function loadMetrics(forceRefresh = false) {
     try {
         let url = 'api/admin/metrics';
-        if (activeDateFilter) {
-            url += `?date=${encodeURIComponent(activeDateFilter)}`;
+        const qParams = [];
+        if (activeDashboardDateFilter) {
+            qParams.push(`date=${encodeURIComponent(activeDashboardDateFilter)}`);
+        }
+        if (forceRefresh) {
+            qParams.push('refresh=1');
+        }
+        if (qParams.length > 0) {
+            url += '?' + qParams.join('&');
         }
         const res = await fetch(url);
         const data = await res.json();
@@ -312,59 +321,30 @@ function formatDateTime(dateStr) {
     return { date: dateFormatted, time: timeFormatted };
 }
 
-// Sinkronisasi Filter Tanggal antara Flatpickr Inbound Unboxing & Dashboard
-function syncDateFilter(dateVal) {
-    activeDateFilter = dateVal ? dateVal.trim() : '';
-
-    // 1. Update elemen Inbound Unboxing
+// Update UI Filter Tanggal Inbound Unboxing (Mandiri - Tidak Mirroring Dashboard)
+function updateInboundDateUI() {
     const trDateEl = document.getElementById('filterDate');
     const trClearBtn = document.getElementById('btnClearDate');
-    if (trDateEl) {
-        trDateEl.value = activeDateFilter;
-        if (flatpickrTransactionsInstance) {
-            if (activeDateFilter) {
-                if (activeDateFilter.includes(' to ')) {
-                    const p = activeDateFilter.split(' to ');
-                    flatpickrTransactionsInstance.setDate([p[0], p[1]], false);
-                } else {
-                    flatpickrTransactionsInstance.setDate(activeDateFilter, false);
-                }
-            } else {
-                flatpickrTransactionsInstance.clear();
-            }
-        }
-    }
+    if (trDateEl) trDateEl.value = activeInboundDateFilter;
     if (trClearBtn) {
-        if (activeDateFilter) trClearBtn.classList.remove('hidden');
+        if (activeInboundDateFilter) trClearBtn.classList.remove('hidden');
         else trClearBtn.classList.add('hidden');
     }
+}
 
-    // 2. Update elemen Dashboard
+// Update UI Filter Tanggal Dashboard (Mandiri - Tidak Mirroring Inbound)
+function updateDashboardDateUI() {
     const dbDateEl = document.getElementById('dashboardFilterDate');
     const dbClearBtn = document.getElementById('btnClearDashboardDate');
     const dbBadge = document.getElementById('dashboardDateBadge');
-    if (dbDateEl) {
-        dbDateEl.value = activeDateFilter;
-        if (flatpickrDashboardInstance) {
-            if (activeDateFilter) {
-                if (activeDateFilter.includes(' to ')) {
-                    const p = activeDateFilter.split(' to ');
-                    flatpickrDashboardInstance.setDate([p[0], p[1]], false);
-                } else {
-                    flatpickrDashboardInstance.setDate(activeDateFilter, false);
-                }
-            } else {
-                flatpickrDashboardInstance.clear();
-            }
-        }
-    }
+    if (dbDateEl) dbDateEl.value = activeDashboardDateFilter;
     if (dbClearBtn) {
-        if (activeDateFilter) dbClearBtn.classList.remove('hidden');
+        if (activeDashboardDateFilter) dbClearBtn.classList.remove('hidden');
         else dbClearBtn.classList.add('hidden');
     }
     if (dbBadge) {
-        if (activeDateFilter) {
-            dbBadge.innerText = activeDateFilter;
+        if (activeDashboardDateFilter) {
+            dbBadge.innerText = activeDashboardDateFilter;
             dbBadge.className = 'bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200';
         } else {
             dbBadge.innerText = 'Hari Ini';
@@ -388,11 +368,11 @@ function getDateStrFromInstance(instance) {
     return fmt(instance.selectedDates[0]);
 }
 
-// Inisialisasi Datepicker Flatpickr Premium untuk Inbound Unboxing & Dashboard
+// Inisialisasi Datepicker Flatpickr Premium (Mandiri untuk Inbound Unboxing & Dashboard)
 function initFlatpickr() {
     if (typeof flatpickr === 'undefined') return;
 
-    // 1. Inbound Unboxing
+    // 1. Inbound Unboxing (Hanya mengontrol tabel Inbound)
     const el = document.getElementById('filterDate');
     if (el) {
         if (flatpickrTransactionsInstance) flatpickrTransactionsInstance.destroy();
@@ -405,16 +385,15 @@ function initFlatpickr() {
             locale: (flatpickr.l10ns && flatpickr.l10ns.id) ? flatpickr.l10ns.id : 'default',
             allowInput: false,
             onClose: function(selectedDates, dateStr, instance) {
-                const val = getDateStrFromInstance(instance);
-                syncDateFilter(val);
+                activeInboundDateFilter = getDateStrFromInstance(instance);
+                updateInboundDateUI();
                 updateBrowserUrl(false);
                 loadTransactions();
-                loadMetrics();
             }
         });
     }
 
-    // 2. Dashboard
+    // 2. Dashboard (Hanya mengontrol metrik Dashboard - Bebas dari Inbound)
     const dbEl = document.getElementById('dashboardFilterDate');
     if (dbEl) {
         if (flatpickrDashboardInstance) flatpickrDashboardInstance.destroy();
@@ -427,54 +406,68 @@ function initFlatpickr() {
             locale: (flatpickr.l10ns && flatpickr.l10ns.id) ? flatpickr.l10ns.id : 'default',
             allowInput: false,
             onClose: function(selectedDates, dateStr, instance) {
-                const val = getDateStrFromInstance(instance);
-                syncDateFilter(val);
+                activeDashboardDateFilter = getDateStrFromInstance(instance);
+                updateDashboardDateUI();
                 updateBrowserUrl(false);
                 loadMetrics();
-                loadTransactions();
             }
         });
     }
-
-    if (activeDateFilter) {
-        syncDateFilter(activeDateFilter);
-    }
 }
 
+// Reset filter tanggal Inbound Unboxing
 window.clearDateFilter = function() {
     if (flatpickrTransactionsInstance) flatpickrTransactionsInstance.clear();
-    if (flatpickrDashboardInstance) flatpickrDashboardInstance.clear();
-    syncDateFilter('');
+    activeInboundDateFilter = '';
+    updateInboundDateUI();
     updateBrowserUrl(false);
     loadTransactions();
-    loadMetrics();
 };
 
+// Terapkan filter tanggal Dashboard
 window.applyDashboardDateFilter = function() {
-    // Baca langsung dari Flatpickr instance (altInput menyembunyikan input asli)
     const val = getDateStrFromInstance(flatpickrDashboardInstance)
              || document.getElementById('dashboardFilterDate')?.value?.trim()
              || '';
-    syncDateFilter(val);
+    activeDashboardDateFilter = val;
+    updateDashboardDateUI();
     updateBrowserUrl(false);
     loadMetrics();
-    loadTransactions();
 };
 
+// Reset filter tanggal Dashboard
 window.clearDashboardDateFilter = function() {
     if (flatpickrDashboardInstance) flatpickrDashboardInstance.clear();
-    if (flatpickrTransactionsInstance) flatpickrTransactionsInstance.clear();
-    syncDateFilter('');
+    activeDashboardDateFilter = '';
+    updateDashboardDateUI();
     updateBrowserUrl(false);
     loadMetrics();
-    loadTransactions();
+};
+
+// Refresh Metrik Dashboard di Backend
+window.refreshDashboardMetrics = async function() {
+    const btn = event?.currentTarget;
+    if (btn) {
+        btn.disabled = true;
+        const icon = btn.querySelector('i');
+        if (icon) icon.classList.add('fa-spin');
+    }
+    await loadMetrics(true);
+    if (btn) {
+        btn.disabled = false;
+        const icon = btn.querySelector('i');
+        if (icon) icon.classList.remove('fa-spin');
+    }
+    if (typeof showToast === 'function') {
+        showToast('success', 'Statistik dashboard berhasil diperbarui dari server backend.', 'Dashboard Refreshed');
+    }
 };
 
 // 2. Load Transaksi (Full & Preview)
 async function loadTransactions() {
     const searchInput = document.getElementById('filterSearch');
     const search = searchInput ? searchInput.value.trim() : '';
-    const date = activeDateFilter;
+    const date = activeInboundDateFilter;
     const expedition = document.getElementById('filterExpedition')?.value || '';
     const condition = document.getElementById('filterCondition')?.value || '';
     const operator = document.getElementById('filterOperator')?.value || '';
@@ -504,18 +497,6 @@ async function loadTransactions() {
                 rows.forEach(r => tbody.appendChild(createTransactionRow(r, false)));
             }
         }
-
-        // Render di tabel preview (5 teratas) pada tab dashboard
-        const previewTbody = document.getElementById('previewTransactionsTableBody');
-        if (previewTbody) {
-            previewTbody.innerHTML = '';
-            if (!rows || rows.length === 0) {
-                previewTbody.innerHTML = `<tr><td colspan="12" class="text-center py-6 text-slate-400">Belum ada transaksi retur hari ini.</td></tr>`;
-            } else {
-                rows.slice(0, 5).forEach(r => previewTbody.appendChild(createTransactionRow(r, true)));
-            }
-        }
-
     } catch (err) {
         console.error("Gagal load transaksi:", err);
     }
@@ -1050,10 +1031,12 @@ function generateExcelFile(sheets, defaultFileName) {
 window.exportDashboardExcel = async function() {
     showGlobalLoading("Menyiapkan Excel...", "Mengumpulkan data dashboard dan transaksi...");
     try {
-        const resMetrics = await fetch('api/admin/metrics');
+        const metricsUrl = activeDashboardDateFilter ? `api/admin/metrics?date=${encodeURIComponent(activeDashboardDateFilter)}` : 'api/admin/metrics';
+        const resMetrics = await fetch(metricsUrl);
         const kpi = await resMetrics.json();
 
-        const resTrans = await fetch('api/admin/transactions.php');
+        const transUrl = activeDashboardDateFilter ? `api/admin/transactions.php?date=${encodeURIComponent(activeDashboardDateFilter)}` : 'api/admin/transactions.php';
+        const resTrans = await fetch(transUrl);
         const transList = await resTrans.json();
 
         const kpiData = [
@@ -1726,7 +1709,29 @@ function initFromUrlParams() {
 
     // Pulihkan filter tanggal jika ada di URL
     if (dateParam) {
-        syncDateFilter(dateParam);
+        if (targetTab === 'transactions') {
+            activeInboundDateFilter = dateParam;
+            if (flatpickrTransactionsInstance) {
+                if (dateParam.includes(' to ')) {
+                    const p = dateParam.split(' to ');
+                    flatpickrTransactionsInstance.setDate([p[0], p[1]], false);
+                } else {
+                    flatpickrTransactionsInstance.setDate(dateParam, false);
+                }
+            }
+            updateInboundDateUI();
+        } else {
+            activeDashboardDateFilter = dateParam;
+            if (flatpickrDashboardInstance) {
+                if (dateParam.includes(' to ')) {
+                    const p = dateParam.split(' to ');
+                    flatpickrDashboardInstance.setDate([p[0], p[1]], false);
+                } else {
+                    flatpickrDashboardInstance.setDate(dateParam, false);
+                }
+            }
+            updateDashboardDateUI();
+        }
     }
 
     // Pulihkan filter search jika ada di URL
@@ -1789,11 +1794,7 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Auto refresh data tiap 15 detik
-    setInterval(() => {
-        loadMetrics();
-        loadTransactions();
-    }, 15000);
+    // Refresh otomatis via frontend dinonaktifkan (refresh metrik dilakukan di backend / tombol Refresh)
 });
 
 

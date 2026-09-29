@@ -8,7 +8,10 @@ header('Content-Type: application/json; charset=utf-8');
 try {
     require_once __DIR__ . '/../config.php';
 
-    // 1. Skema tabel dan kolom baru sudah dieksekusi secara otomatis oleh config.php
+    // 1. Eksekusi skema tabel dan kolom terbaru jika dipanggil lewat endpoint ini
+    if (function_exists('ensureDatabaseSchema')) {
+        ensureDatabaseSchema($pdo);
+    }
     $tables = [];
     $stmt = $pdo->query("SHOW TABLES");
     while ($row = $stmt->fetch(PDO::FETCH_NUM)) {

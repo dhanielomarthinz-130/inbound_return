@@ -29,20 +29,30 @@ $items         = $body['items'] ?? [];
 $videoPath     = trim($body['video_path'] ?? '');
 
 // 2. Cek apakah ada file video yang di-upload via $_FILES
-if (isset($_FILES['video']) && $_FILES['video']['error'] === UPLOAD_ERR_OK) {
-    $uploadDir = __DIR__ . '/../uploads/videos/';
-    if (!is_dir($uploadDir)) {
-        @mkdir($uploadDir, 0777, true);
-    }
-    
-    $cleanInv = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $invoiceNumber);
-    $ext = pathinfo($_FILES['video']['name'], PATHINFO_EXTENSION);
-    if (empty($ext)) $ext = 'webm';
-    $fileName = 'video_' . $cleanInv . '_' . time() . '.' . $ext;
-    $targetFile = $uploadDir . $fileName;
+$videoStatus = 'no_video';
+if (isset($_FILES['video'])) {
+    if ($_FILES['video']['error'] === UPLOAD_ERR_OK) {
+        $uploadDir = __DIR__ . '/../uploads/videos/';
+        if (!is_dir($uploadDir)) {
+            @mkdir($uploadDir, 0777, true);
+        }
+        
+        $cleanInv = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $invoiceNumber);
+        $ext = pathinfo($_FILES['video']['name'], PATHINFO_EXTENSION);
+        if (empty($ext)) $ext = 'webm';
+        $fileName = 'video_' . $cleanInv . '_' . time() . '.' . $ext;
+        $targetFile = $uploadDir . $fileName;
 
-    if (move_uploaded_file($_FILES['video']['tmp_name'], $targetFile)) {
-        $videoPath = 'uploads/videos/' . $fileName;
+        if (move_uploaded_file($_FILES['video']['tmp_name'], $targetFile)) {
+            $videoPath = 'uploads/videos/' . $fileName;
+            $videoStatus = 'uploaded';
+        } else {
+            $videoStatus = 'move_error';
+            error_log("Failed to move uploaded video file to " . $targetFile);
+        }
+    } else {
+        $videoStatus = 'upload_err_' . $_FILES['video']['error'];
+        error_log("Video upload failed with PHP error code: " . $_FILES['video']['error']);
     }
 }
 
@@ -123,9 +133,23 @@ try {
 
     $pdo->commit();
 
+    // Hapus cache dashboard agar dashboard menampilkan data terbaru di request berikutnya
+    $cacheDir = __DIR__ . '/../uploads/cache/';
+    if (is_dir($cacheDir)) {
+        $cFiles = glob($cacheDir . 'metrics_*.json');
+        if ($cFiles) {
+            foreach ($cFiles as $cf) {
+                @unlink($cf);
+            }
+        }
+    }
+
     jsonResponse([
         'success' => true,
         'session_id' => (int)$sessionId,
+        'video_saved' => !empty($videoPath),
+        'video_path' => $videoPath,
+        'video_status' => $videoStatus,
         'message' => 'Inbound Return berhasil direkam!'
     ]);
 } catch (Exception $e) {

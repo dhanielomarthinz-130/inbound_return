@@ -162,6 +162,9 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                         <button onclick="applyDashboardDateFilter()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-sm shadow-indigo-600/30 shrink-0">
                             <i class="fa-solid fa-filter text-[11px]"></i> Terapkan
                         </button>
+                        <button onclick="refreshDashboardMetrics()" title="Refresh data metrik dashboard dari backend" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 border border-slate-300 shadow-2xs shrink-0">
+                            <i class="fa-solid fa-rotate text-indigo-600"></i> Refresh
+                        </button>
                         <button onclick="exportDashboardExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 shrink-0">
                             <i class="fa-solid fa-file-excel text-xs"></i> Export Excel
                         </button>
@@ -291,39 +294,6 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                         <div id="dashConditionContainer" class="divide-y divide-slate-100 max-h-[340px] overflow-y-auto">
                             <div class="p-6 text-center text-slate-400 text-xs">Memuat data...</div>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Recent Transactions Preview -->
-                <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
-                    <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                        <h3 class="font-bold text-sm text-slate-800">Transaksi Terbaru</h3>
-                        <button onclick="switchTab('transactions')" class="text-xs text-indigo-600 hover:text-indigo-800 font-bold border border-indigo-200 hover:border-indigo-400 px-3 py-2 rounded-xl transition">
-                            Lihat Semua &rarr;
-                        </button>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-xs border-collapse">
-                            <thead class="bg-slate-100 text-slate-600 uppercase font-semibold text-[11px]">
-                                <tr>
-                                    <th class="p-3 whitespace-nowrap">Tanggal & Waktu</th>
-                                    <th class="p-3 whitespace-nowrap">Invoice</th>
-                                    <th class="p-3 whitespace-nowrap">Ekspedisi</th>
-                                    <th class="p-3 whitespace-nowrap">Operator</th>
-                                    <th class="p-3 whitespace-nowrap">Seller SKU</th>
-                                    <th class="p-3 min-w-[200px] max-w-[340px]">Nama Produk</th>
-                                    <th class="p-3 whitespace-nowrap">Batch</th>
-                                    <th class="p-3 whitespace-nowrap">Exp Date</th>
-                                    <th class="p-3 text-center whitespace-nowrap">Qty</th>
-                                    <th class="p-3 text-center whitespace-nowrap">Type (Kondisi)</th>
-                                    <th class="p-3 text-center whitespace-nowrap">Video</th>
-                                    <th class="p-3 text-center whitespace-nowrap">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody id="previewTransactionsTableBody" class="divide-y divide-slate-100">
-                                <tr><td colspan="12" class="text-center py-6 text-slate-400">Memuat data...</td></tr>
-                            </tbody>
-                        </table>
                     </div>
                 </div>
             </div>

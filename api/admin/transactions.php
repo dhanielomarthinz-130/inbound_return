@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../config.php';
+session_write_close();
 
 $search     = trim($_GET['search'] ?? '');
 $date       = trim($_GET['date'] ?? '');
@@ -48,7 +49,7 @@ try {
             OR i.sku LIKE ? 
             OR i.product_name LIKE ? 
             OR i.barcode LIKE ? 
-            OR i.batch_no LIKE ?
+            OR i.batch_no LIKE ? 
             OR p.seller_sku LIKE ? 
             OR p.name LIKE ?
         )";
@@ -63,12 +64,13 @@ try {
             $parts = explode(' to ', $date);
             $startDate = trim($parts[0]);
             $endDate = trim($parts[1] ?? $parts[0]);
-            $sql .= " AND DATE(s.created_at) >= ? AND DATE(s.created_at) <= ?";
-            $params[] = $startDate;
-            $params[] = $endDate;
+            $sql .= " AND s.created_at >= ? AND s.created_at <= ?";
+            $params[] = $startDate . ' 00:00:00';
+            $params[] = $endDate . ' 23:59:59';
         } else {
-            $sql .= " AND DATE(s.created_at) = ?";
-            $params[] = $date;
+            $sql .= " AND s.created_at >= ? AND s.created_at <= ?";
+            $params[] = $date . ' 00:00:00';
+            $params[] = $date . ' 23:59:59';
         }
     }
 

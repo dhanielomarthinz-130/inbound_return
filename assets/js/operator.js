@@ -491,28 +491,47 @@ let recordingSeconds = 0;
 let watermarkCanvas = null;
 let watermarkCtx = null;
 let watermarkAnimId = null;
+let watermarkIntervalId = null;
 let isVideoRecordingActive = false;
+let pendingVideoRecord = false;
 
 function startVideoRecording() {
     if (!mediaStream) {
-        console.warn("mediaStream belum aktif, perekaman video ditunda.");
+        console.warn("mediaStream belum aktif, perekaman video ditunda hingga kamera siap.");
+        pendingVideoRecord = true;
         return;
     }
+    pendingVideoRecord = false;
+
     try {
+        // Hentikan sesi rekam lama jika ada
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            try { mediaRecorder.stop(); } catch(e){}
+        }
         recordedChunks = [];
-        let mime = 'video/webm;codecs=vp8,opus';
-        if (!window.MediaRecorder || !MediaRecorder.isTypeSupported(mime)) {
-            mime = 'video/webm';
-            if (!MediaRecorder.isTypeSupported(mime)) {
-                mime = '';
+
+        let mime = '';
+        const candidateTypes = [
+            'video/webm;codecs=vp8,opus',
+            'video/webm;codecs=vp8',
+            'video/webm',
+            'video/mp4;codecs=avc1',
+            'video/mp4'
+        ];
+        if (window.MediaRecorder) {
+            for (const t of candidateTypes) {
+                if (MediaRecorder.isTypeSupported(t)) {
+                    mime = t;
+                    break;
+                }
             }
         }
         const options = mime ? { mimeType: mime } : undefined;
 
         // Inisialisasi Canvas Watermark (Membakar Watermark ke Dalam Video)
         const liveVideo = document.getElementById('liveVideoFeed');
-        const vW = (liveVideo && liveVideo.videoWidth) ? liveVideo.videoWidth : 1280;
-        const vH = (liveVideo && liveVideo.videoHeight) ? liveVideo.videoHeight : 720;
+        const vW = (liveVideo && liveVideo.videoWidth > 0) ? liveVideo.videoWidth : 1280;
+        const vH = (liveVideo && liveVideo.videoHeight > 0) ? liveVideo.videoHeight : 720;
 
         if (!watermarkCanvas) {
             watermarkCanvas = document.createElement('canvas');
@@ -521,14 +540,24 @@ function startVideoRecording() {
         watermarkCanvas.height = vH;
         watermarkCtx = watermarkCanvas.getContext('2d');
 
+        // Draw initial frame
+        if (liveVideo && liveVideo.readyState >= 2) {
+            try { watermarkCtx.drawImage(liveVideo, 0, 0, vW, vH); } catch(e){}
+        } else {
+            watermarkCtx.fillStyle = '#0f172a';
+            watermarkCtx.fillRect(0, 0, vW, vH);
+        }
+
         isVideoRecordingActive = true;
 
-        function renderWatermarkLoop() {
+        function drawWatermarkFrame() {
             if (!isVideoRecordingActive) return;
 
             // 1. Render frame kamera terkini
             if (liveVideo && liveVideo.readyState >= 2) {
-                watermarkCtx.drawImage(liveVideo, 0, 0, vW, vH);
+                try {
+                    watermarkCtx.drawImage(liveVideo, 0, 0, vW, vH);
+                } catch(e) {}
             }
 
             // 2. Render Banner Watermark di bagian bawah video
@@ -573,19 +602,33 @@ function startVideoRecording() {
             const rightW = watermarkCtx.measureText(rightText).width;
             watermarkCtx.fillStyle = '#f8fafc';
             watermarkCtx.fillText(rightText, vW - rightW - 16, centerY);
-
-            watermarkAnimId = requestAnimationFrame(renderWatermarkLoop);
         }
 
+        function renderWatermarkLoop() {
+            if (!isVideoRecordingActive) return;
+            drawWatermarkFrame();
+            watermarkAnimId = requestAnimationFrame(renderWatermarkLoop);
+        }
         renderWatermarkLoop();
 
-        // Rekam dari canvas stream (dengan watermark), fallback ke mediaStream jika tidak didukung
+        // Interval cadangan untuk menjaga feed frame saat tab terminimalkan / background
+        if (watermarkIntervalId) clearInterval(watermarkIntervalId);
+        watermarkIntervalId = setInterval(() => {
+            if (document.hidden && isVideoRecordingActive) {
+                drawWatermarkFrame();
+            }
+        }, 50);
+
+        // Rekam dari canvas stream (dengan watermark), fallback ke direct mediaStream jika captureStream terkendala
         let streamToRecord = mediaStream;
         try {
-            if (watermarkCanvas.captureStream) {
-                streamToRecord = watermarkCanvas.captureStream(25);
-                if (mediaStream.getAudioTracks && mediaStream.getAudioTracks().length > 0) {
-                    streamToRecord.addTrack(mediaStream.getAudioTracks()[0]);
+            if (watermarkCanvas && watermarkCanvas.captureStream) {
+                const cStream = watermarkCanvas.captureStream(25);
+                if (cStream && cStream.getVideoTracks().length > 0) {
+                    streamToRecord = cStream;
+                    if (mediaStream.getAudioTracks && mediaStream.getAudioTracks().length > 0) {
+                        streamToRecord.addTrack(mediaStream.getAudioTracks()[0]);
+                    }
                 }
             }
         } catch (csErr) {
@@ -593,12 +636,27 @@ function startVideoRecording() {
             streamToRecord = mediaStream;
         }
 
-        mediaRecorder = new MediaRecorder(streamToRecord, options);
+        try {
+            mediaRecorder = new MediaRecorder(streamToRecord, options);
+        } catch (recErr) {
+            console.warn("Gagal init recorder dengan options, mencoba fallback:", recErr);
+            try {
+                mediaRecorder = new MediaRecorder(streamToRecord);
+            } catch (fallbackErr) {
+                mediaRecorder = new MediaRecorder(mediaStream);
+            }
+        }
+
         mediaRecorder.ondataavailable = (e) => {
             if (e.data && e.data.size > 0) {
                 recordedChunks.push(e.data);
             }
         };
+
+        mediaRecorder.onerror = (err) => {
+            console.error("MediaRecorder runtime error:", err);
+        };
+
         mediaRecorder.start(1000); // slice tiap 1 detik
 
         recordingSeconds = 0;
@@ -612,7 +670,7 @@ function startVideoRecording() {
             const timeEl = document.getElementById('cameraRecTime');
             if (timeEl) timeEl.innerText = `${mins}:${secs}`;
         }, 1000);
-        console.log("Perekaman video unboxing dengan watermark dimulai...");
+        console.log("Perekaman video unboxing aktif dimulai untuk invoice:", activeInvoice);
     } catch (e) {
         console.warn("Gagal start recording video:", e);
     }
@@ -621,9 +679,14 @@ function startVideoRecording() {
 function stopVideoRecording() {
     return new Promise((resolve) => {
         isVideoRecordingActive = false;
+        pendingVideoRecord = false;
         if (watermarkAnimId) {
             cancelAnimationFrame(watermarkAnimId);
             watermarkAnimId = null;
+        }
+        if (watermarkIntervalId) {
+            clearInterval(watermarkIntervalId);
+            watermarkIntervalId = null;
         }
 
         if (recordingTimerInterval) {
@@ -633,24 +696,67 @@ function stopVideoRecording() {
         const recBadge = document.getElementById('cameraRecBadge');
         if (recBadge) recBadge.classList.add('hidden');
 
-        if (!mediaRecorder || mediaRecorder.state === 'inactive') {
-            resolve(null);
+        if (!mediaRecorder) {
+            if (recordedChunks.length > 0) {
+                resolve(new Blob(recordedChunks, { type: 'video/webm' }));
+            } else {
+                resolve(null);
+            }
             return;
         }
 
-        mediaRecorder.onstop = () => {
+        if (mediaRecorder.state === 'inactive') {
             if (recordedChunks.length > 0) {
-                const blob = new Blob(recordedChunks, { type: 'video/webm' });
-                resolve(blob);
+                resolve(new Blob(recordedChunks, { type: 'video/webm' }));
             } else {
                 resolve(null);
+            }
+            return;
+        }
+
+        let resolved = false;
+        const safetyTimeout = setTimeout(() => {
+            if (!resolved) {
+                resolved = true;
+                if (recordedChunks.length > 0) {
+                    resolve(new Blob(recordedChunks, { type: 'video/webm' }));
+                } else {
+                    resolve(null);
+                }
+            }
+        }, 1500);
+
+        mediaRecorder.onstop = () => {
+            if (!resolved) {
+                resolved = true;
+                clearTimeout(safetyTimeout);
+                if (recordedChunks.length > 0) {
+                    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                    resolve(blob);
+                } else {
+                    resolve(null);
+                }
             }
         };
 
         try {
+            if (mediaRecorder.state === 'recording') {
+                if (typeof mediaRecorder.requestData === 'function') {
+                    mediaRecorder.requestData();
+                }
+            }
             mediaRecorder.stop();
         } catch (e) {
-            resolve(null);
+            console.warn("mediaRecorder.stop error:", e);
+            if (!resolved) {
+                resolved = true;
+                clearTimeout(safetyTimeout);
+                if (recordedChunks.length > 0) {
+                    resolve(new Blob(recordedChunks, { type: 'video/webm' }));
+                } else {
+                    resolve(null);
+                }
+            }
         }
     });
 }
@@ -663,10 +769,12 @@ window.submitFinalSession = async function() {
     btn.disabled = true;
     btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan Sesi & Video...`;
 
-    // Ambil file video rekaman sesi unboxing jika kamera aktif
+    // Ambil file video rekaman sesi unboxing jika kamera aktif atau ada potongan tersimpan
     let videoBlob = null;
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
+    if (mediaRecorder && (mediaRecorder.state === 'recording' || mediaRecorder.state === 'paused')) {
         videoBlob = await stopVideoRecording();
+    } else if (recordedChunks.length > 0) {
+        videoBlob = new Blob(recordedChunks, { type: 'video/webm' });
     }
 
     const payload = {
@@ -705,7 +813,8 @@ window.submitFinalSession = async function() {
         hideGlobalLoading();
 
         if (result.success) {
-            const videoNotice = (videoBlob && videoBlob.size > 0) ? ' Rekaman video unboxing berhasil disimpan.' : '';
+            const hasVideo = (videoBlob && videoBlob.size > 0 && result.video_saved !== false);
+            const videoNotice = hasVideo ? ' Rekaman video unboxing berhasil disimpan.' : (videoBlob ? ' (Catatan: File video sedang diproses/berukuran besar).' : '');
             document.getElementById('modalSuccessDesc').innerText = `Invoice [${activeInvoice}] berhasil disimpan ke MySQL dengan ${scannedProductsList.length} jenis barang.${videoNotice}`;
             document.getElementById('successModal').classList.remove('hidden');
         } else {
@@ -857,6 +966,12 @@ async function startCamera(deviceId = null) {
         if (badge) {
             badge.className = "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5";
             badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Video Record Siap`;
+        }
+
+        // Jika invoice sudah aktif/terkunci (atau tertunda menunggu kamera siap), otomatis mulai rekam sekarang!
+        if (activeInvoice && (pendingVideoRecord || !mediaRecorder || mediaRecorder.state === 'inactive')) {
+            console.log("Kamera siap, otomatis memulai perekaman unboxing untuk invoice:", activeInvoice);
+            startVideoRecording();
         }
     } catch (err) {
         console.warn("Kamera tidak aktif atau izin ditolak:", err);

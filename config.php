@@ -38,284 +38,240 @@ if ($is_remote) {
 }
 
 try {
-    if (!$is_remote) {
-        // Hanya di localhost coba buat database jika belum ada
-        $pdoServer = new PDO("mysql:host={$db_host};charset=utf8mb4", $db_user, $db_pass, [
+    // 1. Koneksi langsung ke database
+    try {
+        $pdo = new PDO("mysql:host={$db_host};dbname={$db_name};charset=utf8mb4", $db_user, $db_pass, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false
         ]);
-        $pdoServer->exec("CREATE DATABASE IF NOT EXISTS `{$db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+    } catch (PDOException $connErr) {
+        if (!$is_remote && ($connErr->getCode() == 1049 || strpos($connErr->getMessage(), 'Unknown database') !== false)) {
+            // Database belum ada di localhost, buatkan otomatis
+            $pdoServer = new PDO("mysql:host={$db_host};charset=utf8mb4", $db_user, $db_pass, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
+            ]);
+            $pdoServer->exec("CREATE DATABASE IF NOT EXISTS `{$db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+            $pdo = new PDO("mysql:host={$db_host};dbname={$db_name};charset=utf8mb4", $db_user, $db_pass, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false
+            ]);
+        } else {
+            throw $connErr;
+        }
     }
-
-    // Koneksi ke database
-    $pdo = new PDO("mysql:host={$db_host};dbname={$db_name};charset=utf8mb4", $db_user, $db_pass, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES => false
-    ]);
 
     // Set Timezone WIB (+07:00)
     date_default_timezone_set('Asia/Jakarta');
     $pdo->exec("SET time_zone = '+07:00'");
 
-    // 3. Auto Migration: Buat tabel jika belum ada
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS `master_products` (
-            `id` INT AUTO_INCREMENT PRIMARY KEY,
-            `barcode` VARCHAR(100) NOT NULL UNIQUE,
-            `sku` VARCHAR(100) NOT NULL,
-            `name` VARCHAR(255) NOT NULL,
-            `category` VARCHAR(100) DEFAULT 'Umum',
-            `unit` VARCHAR(50) DEFAULT 'Pcs',
-            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    // 2. Fungsi Skema & Migrasi (Hanya berjalan sekali saat pertama install atau saat api/migrate.php dipanggil)
+    function ensureDatabaseSchema($pdo) {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS `master_products` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `barcode` VARCHAR(100) NOT NULL UNIQUE,
+                `sku` VARCHAR(100) NOT NULL,
+                `seller_sku` VARCHAR(150) NULL,
+                `sap_code` VARCHAR(100) NULL,
+                `name` VARCHAR(255) NOT NULL,
+                `category` VARCHAR(100) DEFAULT 'Umum',
+                `unit` VARCHAR(50) DEFAULT 'Pcs',
+                `shop` VARCHAR(100) NULL,
+                `bin_code` VARCHAR(100) NULL,
+                `barcode_bpom` VARCHAR(150) NULL,
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_prod_sku (`sku`),
+                INDEX idx_prod_seller_sku (`seller_sku`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-        CREATE TABLE IF NOT EXISTS `master_expeditions` (
-            `id` INT AUTO_INCREMENT PRIMARY KEY,
-            `code` VARCHAR(50) NOT NULL UNIQUE,
-            `name` VARCHAR(100) NOT NULL,
-            `status` VARCHAR(20) DEFAULT 'ACTIVE',
-            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            CREATE TABLE IF NOT EXISTS `master_expeditions` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `code` VARCHAR(50) NOT NULL UNIQUE,
+                `name` VARCHAR(100) NOT NULL,
+                `prefix_pattern` VARCHAR(255) NULL DEFAULT '',
+                `status` VARCHAR(20) DEFAULT 'ACTIVE',
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-        CREATE TABLE IF NOT EXISTS `return_sessions` (
-            `id` INT AUTO_INCREMENT PRIMARY KEY,
-            `invoice_number` VARCHAR(100) NOT NULL,
-            `customer_name` VARCHAR(255) DEFAULT 'Pelanggan Umum',
-            `expedition` VARCHAR(100) NULL,
-            `operator_name` VARCHAR(100) DEFAULT 'Gudang 01',
-            `status` VARCHAR(50) DEFAULT 'COMPLETED',
-            `total_items` INT DEFAULT 0,
-            `total_good` INT DEFAULT 0,
-            `total_damaged` INT DEFAULT 0,
-            `notes` TEXT NULL,
-            `video_path` VARCHAR(255) NULL,
-            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_invoice (`invoice_number`),
-            INDEX idx_created (`created_at`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            CREATE TABLE IF NOT EXISTS `return_sessions` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `invoice_number` VARCHAR(100) NOT NULL,
+                `customer_name` VARCHAR(255) DEFAULT 'Pelanggan Umum',
+                `expedition` VARCHAR(100) NULL,
+                `operator_name` VARCHAR(100) DEFAULT 'Gudang 01',
+                `status` VARCHAR(50) DEFAULT 'COMPLETED',
+                `total_items` INT DEFAULT 0,
+                `total_good` INT DEFAULT 0,
+                `total_damaged` INT DEFAULT 0,
+                `notes` TEXT NULL,
+                `video_path` VARCHAR(255) NULL,
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_invoice (`invoice_number`),
+                INDEX idx_created (`created_at`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-        CREATE TABLE IF NOT EXISTS `return_items` (
-            `id` INT AUTO_INCREMENT PRIMARY KEY,
-            `session_id` INT NOT NULL,
-            `barcode` VARCHAR(100) NOT NULL,
-            `product_name` VARCHAR(255) NOT NULL,
-            `sku` VARCHAR(100) NULL,
-            `batch_no` VARCHAR(100) NULL,
-            `exp_date` VARCHAR(50) NULL,
-            `type` VARCHAR(50) DEFAULT 'GOOD',
-            `qty` INT NOT NULL DEFAULT 1,
-            `condition` VARCHAR(20) NOT NULL DEFAULT 'GOOD',
-            `damage_reason` VARCHAR(255) NULL,
-            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_session (`session_id`),
-            CONSTRAINT fk_session_items FOREIGN KEY (`session_id`) REFERENCES `return_sessions`(`id`) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            CREATE TABLE IF NOT EXISTS `return_items` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `session_id` INT NOT NULL,
+                `barcode` VARCHAR(100) NOT NULL,
+                `product_name` VARCHAR(255) NOT NULL,
+                `sku` VARCHAR(100) NULL,
+                `seller_sku` VARCHAR(150) NULL,
+                `sap_code` VARCHAR(100) NULL,
+                `batch_no` VARCHAR(100) NULL,
+                `exp_date` VARCHAR(50) NULL,
+                `type` VARCHAR(50) DEFAULT 'GOOD',
+                `qty` INT NOT NULL DEFAULT 1,
+                `condition` VARCHAR(20) NOT NULL DEFAULT 'GOOD',
+                `damage_reason` VARCHAR(255) NULL,
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_session (`session_id`),
+                INDEX idx_item_barcode (`barcode`),
+                INDEX idx_item_sku (`sku`),
+                INDEX idx_item_seller_sku (`seller_sku`),
+                INDEX idx_item_created (`created_at`),
+                CONSTRAINT fk_session_items FOREIGN KEY (`session_id`) REFERENCES `return_sessions`(`id`) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-        CREATE TABLE IF NOT EXISTS `users` (
-            `id` INT AUTO_INCREMENT PRIMARY KEY,
-            `username` VARCHAR(50) NOT NULL UNIQUE,
-            `password` VARCHAR(255) NOT NULL,
-            `name` VARCHAR(100) NOT NULL,
-            `role` ENUM('superadmin', 'admin', 'operator') NOT NULL DEFAULT 'operator',
-            `pin` VARCHAR(20) NULL DEFAULT '123456',
-            `status` VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
-            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            CREATE TABLE IF NOT EXISTS `users` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `username` VARCHAR(50) NOT NULL UNIQUE,
+                `password` VARCHAR(255) NOT NULL,
+                `name` VARCHAR(100) NOT NULL,
+                `role` ENUM('superadmin', 'admin', 'operator') NOT NULL DEFAULT 'operator',
+                `pin` VARCHAR(20) NULL DEFAULT '123456',
+                `status` VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-        CREATE TABLE IF NOT EXISTS `system_settings` (
-            `key_name` VARCHAR(100) PRIMARY KEY,
-            `key_value` TEXT NULL,
-            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            CREATE TABLE IF NOT EXISTS `system_settings` (
+                `key_name` VARCHAR(100) PRIMARY KEY,
+                `key_value` TEXT NULL,
+                `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-        CREATE TABLE IF NOT EXISTS `master_conditions` (
-            `id` INT AUTO_INCREMENT PRIMARY KEY,
-            `code` VARCHAR(50) NOT NULL UNIQUE,
-            `name` VARCHAR(100) NOT NULL,
-            `description` VARCHAR(255) NULL,
-            `color` VARCHAR(30) DEFAULT 'slate',
-            `sort_order` INT DEFAULT 0,
-            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-    ");
+            CREATE TABLE IF NOT EXISTS `master_conditions` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `code` VARCHAR(50) NOT NULL UNIQUE,
+                `name` VARCHAR(100) NOT NULL,
+                `description` VARCHAR(255) NULL,
+                `color` VARCHAR(30) DEFAULT 'slate',
+                `sort_order` INT DEFAULT 0,
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
 
-    // Auto-patch kolom jika tabel sudah ada sebelumnya
-    try {
-        $cols = $pdo->query("SHOW COLUMNS FROM return_items")->fetchAll(PDO::FETCH_COLUMN);
-        if (!in_array('batch_no', $cols)) {
-            $pdo->exec("ALTER TABLE return_items ADD COLUMN batch_no VARCHAR(100) NULL AFTER sku");
-        }
-        if (!in_array('exp_date', $cols)) {
-            $pdo->exec("ALTER TABLE return_items ADD COLUMN exp_date VARCHAR(50) NULL AFTER batch_no");
-        }
-        if (!in_array('type', $cols)) {
-            $pdo->exec("ALTER TABLE return_items ADD COLUMN type VARCHAR(50) NULL DEFAULT 'GOOD' AFTER exp_date");
-        }
+        // Auto-patch kolom jika sebelumnya belum ada
+        try {
+            $cols = $pdo->query("SHOW COLUMNS FROM return_items")->fetchAll(PDO::FETCH_COLUMN);
+            if (!in_array('batch_no', $cols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN batch_no VARCHAR(100) NULL AFTER sku");
+            if (!in_array('exp_date', $cols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN exp_date VARCHAR(50) NULL AFTER batch_no");
+            if (!in_array('type', $cols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN type VARCHAR(50) NULL DEFAULT 'GOOD' AFTER exp_date");
+            if (!in_array('seller_sku', $cols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN seller_sku VARCHAR(150) NULL AFTER sku");
+            if (!in_array('sap_code', $cols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN sap_code VARCHAR(100) NULL AFTER seller_sku");
 
-        $colsSessions = $pdo->query("SHOW COLUMNS FROM return_sessions")->fetchAll(PDO::FETCH_COLUMN);
-        if (!in_array('expedition', $colsSessions)) {
-            $pdo->exec("ALTER TABLE return_sessions ADD COLUMN expedition VARCHAR(100) NULL AFTER customer_name");
-        }
-        if (!in_array('video_path', $colsSessions)) {
-            $pdo->exec("ALTER TABLE return_sessions ADD COLUMN video_path VARCHAR(255) NULL AFTER notes");
-        }
+            $colsSessions = $pdo->query("SHOW COLUMNS FROM return_sessions")->fetchAll(PDO::FETCH_COLUMN);
+            if (!in_array('expedition', $colsSessions)) $pdo->exec("ALTER TABLE return_sessions ADD COLUMN expedition VARCHAR(100) NULL AFTER customer_name");
+            if (!in_array('video_path', $colsSessions)) $pdo->exec("ALTER TABLE return_sessions ADD COLUMN video_path VARCHAR(255) NULL AFTER notes");
 
-        $colsProd = $pdo->query("SHOW COLUMNS FROM master_products")->fetchAll(PDO::FETCH_COLUMN);
-        if (!in_array('seller_sku', $colsProd)) {
-            $pdo->exec("ALTER TABLE master_products ADD COLUMN seller_sku VARCHAR(150) NULL AFTER sku");
-        }
-        if (!in_array('sap_code', $colsProd)) {
-            $pdo->exec("ALTER TABLE master_products ADD COLUMN sap_code VARCHAR(100) NULL AFTER seller_sku");
-        }
-        if (!in_array('shop', $colsProd)) {
-            $pdo->exec("ALTER TABLE master_products ADD COLUMN shop VARCHAR(100) NULL AFTER sap_code");
-        }
-        if (!in_array('bin_code', $colsProd)) {
-            $pdo->exec("ALTER TABLE master_products ADD COLUMN bin_code VARCHAR(100) NULL AFTER shop");
-        }
-        if (!in_array('barcode_bpom', $colsProd)) {
-            $pdo->exec("ALTER TABLE master_products ADD COLUMN barcode_bpom VARCHAR(150) NULL AFTER bin_code");
-        }
+            $colsProd = $pdo->query("SHOW COLUMNS FROM master_products")->fetchAll(PDO::FETCH_COLUMN);
+            if (!in_array('seller_sku', $colsProd)) $pdo->exec("ALTER TABLE master_products ADD COLUMN seller_sku VARCHAR(150) NULL AFTER sku");
+            if (!in_array('sap_code', $colsProd)) $pdo->exec("ALTER TABLE master_products ADD COLUMN sap_code VARCHAR(100) NULL AFTER seller_sku");
+            if (!in_array('shop', $colsProd)) $pdo->exec("ALTER TABLE master_products ADD COLUMN shop VARCHAR(100) NULL AFTER sap_code");
+            if (!in_array('bin_code', $colsProd)) $pdo->exec("ALTER TABLE master_products ADD COLUMN bin_code VARCHAR(100) NULL AFTER shop");
+            if (!in_array('barcode_bpom', $colsProd)) $pdo->exec("ALTER TABLE master_products ADD COLUMN barcode_bpom VARCHAR(150) NULL AFTER bin_code");
 
-        if (!in_array('seller_sku', $cols)) {
-            $pdo->exec("ALTER TABLE return_items ADD COLUMN seller_sku VARCHAR(150) NULL AFTER sku");
-        }
-        if (!in_array('sap_code', $cols)) {
-            $pdo->exec("ALTER TABLE return_items ADD COLUMN sap_code VARCHAR(100) NULL AFTER seller_sku");
-        }
+            $colsExp = $pdo->query("SHOW COLUMNS FROM master_expeditions")->fetchAll(PDO::FETCH_COLUMN);
+            if (!in_array('prefix_pattern', $colsExp)) $pdo->exec("ALTER TABLE master_expeditions ADD COLUMN prefix_pattern VARCHAR(255) NULL DEFAULT '' AFTER name");
 
-        $colsExp = $pdo->query("SHOW COLUMNS FROM master_expeditions")->fetchAll(PDO::FETCH_COLUMN);
-        if (!in_array('prefix_pattern', $colsExp)) {
-            $pdo->exec("ALTER TABLE master_expeditions ADD COLUMN prefix_pattern VARCHAR(255) NULL DEFAULT '' AFTER name");
-        }
+            $colsUsers = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
+            if (!in_array('pin', $colsUsers)) $pdo->exec("ALTER TABLE users ADD COLUMN pin VARCHAR(20) NULL DEFAULT '123456' AFTER role");
+        } catch (Exception $e) {}
 
-        // Auto-patch kolom pin pada tabel users
-        $colsUsers = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
-        if (!in_array('pin', $colsUsers)) {
-            $pdo->exec("ALTER TABLE users ADD COLUMN pin VARCHAR(20) NULL DEFAULT '123456' AFTER role");
-        }
-    } catch (Exception $e) {}
+        // Seed Ekspedisi
+        try {
+            $checkExp = $pdo->query("SELECT COUNT(*) AS total FROM master_expeditions");
+            if ($checkExp->fetch()['total'] == 0) {
+                $seedExp = $pdo->prepare("INSERT INTO master_expeditions (code, name, prefix_pattern, status) VALUES (?, ?, ?, ?)");
+                $dummyExp = [
+                    ['SHOPEE',  'Shopee Xpress (SPX)', 'SPX,SPXID,ID', 'ACTIVE'],
+                    ['GTL',      'GoTo Logistics (GTL)', 'GTL,TKP,GOTO', 'ACTIVE'],
+                    ['JNT',      'J&T Express',          'JP,JX,JS,JT', 'ACTIVE'],
+                    ['SICEPAT',  'SiCepat Ekspres',      '00,SC,SICEPAT', 'ACTIVE'],
+                    ['JNE',      'JNE Express',          'JNE,TJNE,01', 'ACTIVE'],
+                    ['ANTERAJA', 'AnterAja',             '100,10,AP', 'ACTIVE'],
+                    ['GOSEND',   'GoSend / Grab',        'GK,GRAB,GO', 'ACTIVE'],
+                    ['TIKI',     'TIKI',                 'TIKI,12', 'ACTIVE'],
+                    ['POS',      'Pos Indonesia',        'POS,P', 'ACTIVE']
+                ];
+                foreach ($dummyExp as $exp) {
+                    $seedExp->execute($exp);
+                }
+            }
+        } catch (Exception $e) {}
 
-    // Auto Seed & Update Master Ekspedisi dengan Prefix Deteksi
-    try {
-        $checkExp = $pdo->query("SELECT COUNT(*) AS total FROM master_expeditions");
-        if ($checkExp->fetch()['total'] == 0) {
-            $seedExp = $pdo->prepare("INSERT INTO master_expeditions (code, name, prefix_pattern, status) VALUES (?, ?, ?, ?)");
-            $dummyExp = [
-                ['SHOPEE', 'Shopee Xpress (SPX)', 'SPX,SPXID,ID', 'ACTIVE'],
-                ['GTL', 'GoTo Logistics (GTL)', 'GTL,TKP,GOTO', 'ACTIVE'],
-                ['JNT', 'J&T Express', 'JP,JX,JS,JT', 'ACTIVE'],
-                ['SICEPAT', 'SiCepat Ekspres', '00,SC,SICEPAT', 'ACTIVE'],
-                ['JNE', 'JNE Express', 'JNE,TJNE,01', 'ACTIVE'],
-                ['ANTERAJA', 'AnterAja', '100,10,AP', 'ACTIVE'],
-                ['GOSEND', 'GoSend / Grab', 'GK,GRAB,GO', 'ACTIVE'],
-                ['TIKI', 'TIKI', 'TIKI,12', 'ACTIVE'],
-                ['POS', 'Pos Indonesia', 'POS,P', 'ACTIVE']
+        // Seed Kondisi
+        try {
+            $chkCond = $pdo->query("SELECT COUNT(*) AS total FROM master_conditions");
+            if ($chkCond->fetch()['total'] == 0) {
+                $seedCond = $pdo->prepare("INSERT INTO master_conditions (code, name, description, color, sort_order) VALUES (?, ?, ?, ?, ?)");
+                $defaultConds = [
+                    ['GOOD',    'Baik / Good',          'Produk dalam kondisi baik, tidak ada kerusakan',       'emerald', 1],
+                    ['DAMAGED', 'Rusak / Damaged',       'Produk mengalami kerusakan fisik',                     'red',     2],
+                    ['MISSING', 'Kurang / Missing',      'Produk kurang dari jumlah yang tercantum di invoice',  'amber',   3],
+                    ['EXPIRED', 'Kadaluarsa / Expired',  'Produk sudah melewati tanggal kadaluarsa',             'orange',  4],
+                    ['WRONG',   'Salah Kirim / Wrong',   'Produk tidak sesuai dengan yang dipesan',             'purple',  5],
+                ];
+                foreach ($defaultConds as $cond) {
+                    $seedCond->execute($cond);
+                }
+            }
+        } catch (Exception $e) {}
+
+        // Seed / Update Pengguna Resmi (Hanya jika belum ada atau password kosong)
+        try {
+            $requiredUsers = [
+                ['username' => 'Daniel',     'password' => 'Dh@niel0',   'name' => 'Daniel',     'role' => 'superadmin', 'pin' => '123456'],
+                ['username' => 'Admin',      'password' => 'Password01', 'name' => 'Admin',      'role' => 'admin',      'pin' => '123456'],
+                ['username' => 'Operator 1', 'password' => 'Password01', 'name' => 'Operator 1', 'role' => 'operator',   'pin' => '123456'],
+                ['username' => 'Operator 2', 'password' => 'Password01', 'name' => 'Operator 2', 'role' => 'operator',   'pin' => '123456']
             ];
-            foreach ($dummyExp as $exp) {
-                $seedExp->execute($exp);
+
+            foreach ($requiredUsers as $reqUser) {
+                $chkU = $pdo->prepare("SELECT id, password FROM users WHERE username = ?");
+                $chkU->execute([$reqUser['username']]);
+                $existing = $chkU->fetch();
+
+                if (!$existing) {
+                    $hashedPass = password_hash($reqUser['password'], PASSWORD_DEFAULT);
+                    $pdo->prepare("INSERT INTO users (username, password, name, role, pin, status) VALUES (?, ?, ?, ?, ?, 'ACTIVE')")
+                        ->execute([$reqUser['username'], $hashedPass, $reqUser['name'], $reqUser['role'], $reqUser['pin']]);
+                }
             }
-        } else {
-            // Update prefix pattern untuk ekspedisi yang sudah ada
-            $defaultPrefixes = [
-                'SHOPEE'  => 'SPX,SPXID,ID',
-                'GTL'      => 'GTL,TKP,GOTO',
-                'JNT'      => 'JP,JX,JS,JT',
-                'SICEPAT'  => '00,SC,SICEPAT',
-                'JNE'      => 'JNE,TJNE,01',
-                'ANTERAJA' => '100,10,AP',
-                'GOSEND'   => 'GK,GRAB,GO',
-                'TIKI'     => 'TIKI,12',
-                'POS'      => 'POS,P'
-            ];
-            foreach ($defaultPrefixes as $code => $prefixes) {
-                $pdo->prepare("UPDATE master_expeditions SET prefix_pattern = ? WHERE code = ? AND (prefix_pattern IS NULL OR prefix_pattern = '')")->execute([$prefixes, $code]);
+
+            $pdo->exec("DELETE FROM users WHERE username IN ('superadmin', 'operator')");
+
+            $chkMaint = $pdo->prepare("SELECT key_value FROM system_settings WHERE key_name = 'maintenance_mode'");
+            $chkMaint->execute();
+            if (!$chkMaint->fetch()) {
+                $pdo->prepare("INSERT INTO system_settings (key_name, key_value) VALUES ('maintenance_mode', '0')")->execute();
             }
-            // Pastikan GTL ada di database
-            $chkGtl = $pdo->prepare("SELECT id FROM master_expeditions WHERE code = 'GTL'");
-            $chkGtl->execute();
-            if (!$chkGtl->fetch()) {
-                $pdo->prepare("INSERT INTO master_expeditions (code, name, prefix_pattern, status) VALUES ('GTL', 'GoTo Logistics (GTL)', 'GTL,TKP,GOTO', 'ACTIVE')")->execute();
-            }
-        }
-        // Bersihkan data dummy contoh awal jika ada
-        $pdo->exec("DELETE FROM master_products WHERE barcode LIKE '899100%' AND (seller_sku IS NULL OR seller_sku = '')");
+        } catch (Exception $e) {}
 
-        // Seed Default Kondisi jika tabel master_conditions masih kosong
-        $chkCond = $pdo->query("SELECT COUNT(*) AS total FROM master_conditions");
-        if ($chkCond->fetch()['total'] == 0) {
-            $seedCond = $pdo->prepare("INSERT INTO master_conditions (code, name, description, color, sort_order) VALUES (?, ?, ?, ?, ?)");
-            $defaultConds = [
-                ['GOOD',    'Baik / Good',          'Produk dalam kondisi baik, tidak ada kerusakan',       'emerald', 1],
-                ['DAMAGED', 'Rusak / Damaged',       'Produk mengalami kerusakan fisik',                     'red',     2],
-                ['MISSING', 'Kurang / Missing',      'Produk kurang dari jumlah yang tercantum di invoice',  'amber',   3],
-                ['EXPIRED', 'Kadaluarsa / Expired',  'Produk sudah melewati tanggal kadaluarsa',             'orange',  4],
-                ['WRONG',   'Salah Kirim / Wrong',   'Produk tidak sesuai dengan yang dipesan',             'purple',  5],
-            ];
-            foreach ($defaultConds as $cond) {
-                $seedCond->execute($cond);
-            }
-        }
+        // Buat file penanda bahwa skema sudah siap
+        $lockFile = __DIR__ . '/uploads/.db_ready';
+        @file_put_contents($lockFile, date('Y-m-d H:i:s'));
+    }
 
-        // PASTIKAN USER WAJIB SELALU TERSEDIA & TERUPDATE (Daniel, Admin, Operator 1, Operator 2)
-        $requiredUsers = [
-            [
-                'username' => 'Daniel',
-                'password' => 'Dh@niel0',
-                'name'     => 'Daniel',
-                'role'     => 'superadmin',
-                'pin'      => '123456'
-            ],
-            [
-                'username' => 'Admin',
-                'password' => 'Password01',
-                'name'     => 'Admin',
-                'role'     => 'admin',
-                'pin'      => '123456'
-            ],
-            [
-                'username' => 'Operator 1',
-                'password' => 'Password01',
-                'name'     => 'Operator 1',
-                'role'     => 'operator',
-                'pin'      => '123456'
-            ],
-            [
-                'username' => 'Operator 2',
-                'password' => 'Password01',
-                'name'     => 'Operator 2',
-                'role'     => 'operator',
-                'pin'      => '123456'
-            ]
-        ];
-
-        foreach ($requiredUsers as $reqUser) {
-            $chkU = $pdo->prepare("SELECT id FROM users WHERE username = ?");
-            $chkU->execute([$reqUser['username']]);
-            $existing = $chkU->fetch();
-
-            $hashedPass = password_hash($reqUser['password'], PASSWORD_DEFAULT);
-            if ($existing) {
-                $pdo->prepare("UPDATE users SET username = ?, password = ?, name = ?, role = ?, pin = ?, status = 'ACTIVE' WHERE id = ?")
-                    ->execute([$reqUser['username'], $hashedPass, $reqUser['name'], $reqUser['role'], $reqUser['pin'], $existing['id']]);
-            } else {
-                $pdo->prepare("INSERT INTO users (username, password, name, role, pin, status) VALUES (?, ?, ?, ?, ?, 'ACTIVE')")
-                    ->execute([$reqUser['username'], $hashedPass, $reqUser['name'], $reqUser['role'], $reqUser['pin']]);
-            }
-        }
-
-        // Hapus akun dummy default lama agar database bersih dan hanya ada user resmi
-        $pdo->exec("DELETE FROM users WHERE username IN ('superadmin', 'operator')");
-
-        // Setting maintenance_mode default 0 (OFF)
-        $chkMaint = $pdo->prepare("SELECT key_value FROM system_settings WHERE key_name = 'maintenance_mode'");
-        $chkMaint->execute();
-        if (!$chkMaint->fetch()) {
-            $pdo->prepare("INSERT INTO system_settings (key_name, key_value) VALUES ('maintenance_mode', '0')")->execute();
-        }
-
-    } catch (Exception $e) {}
+    // Jalankan migrasi HANYA jika file .db_ready belum ada atau diminta migrasi
+    $readyFlag = __DIR__ . '/uploads/.db_ready';
+    if (!file_exists($readyFlag) || isset($_GET['run_migration'])) {
+        $uploadDir = __DIR__ . '/uploads';
+        if (!is_dir($uploadDir)) @mkdir($uploadDir, 0777, true);
+        ensureDatabaseSchema($pdo);
+    }
 
 } catch (PDOException $e) {
     if (php_sapi_name() !== 'cli' && basename($_SERVER['PHP_SELF']) !== 'config.php') {

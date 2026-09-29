@@ -1,12 +1,26 @@
 <?php
 require_once __DIR__ . '/../../config.php';
+session_write_close(); // Lepas session lock agar request paralel cepat
 
-$date = trim($_GET['date'] ?? '');
+$date    = trim($_GET['date'] ?? '');
+$refresh = isset($_GET['refresh']) && ($_GET['refresh'] == '1' || $_GET['refresh'] === 'true');
+
+// Backend Caching (TTL: 60 detik atau refresh on-demand)
+$cacheDir = __DIR__ . '/../../uploads/cache';
+if (!is_dir($cacheDir)) {
+    @mkdir($cacheDir, 0777, true);
+}
+$cacheKey = md5('metrics_' . $date);
+$cacheFile = $cacheDir . '/metrics_' . $cacheKey . '.json';
+
+if (!$refresh && file_exists($cacheFile) && (time() - filemtime($cacheFile) < 60)) {
+    header('Content-Type: application/json; charset=utf-8');
+    echo file_get_contents($cacheFile);
+    exit;
+}
 
 try {
     $params = [];
-    $paramsExp = [];
-    $paramsCond = [];
     $where = "WHERE 1=1";
 
     if (!empty($date)) {
@@ -14,14 +28,16 @@ try {
             $parts = explode(' to ', $date);
             $startDate = trim($parts[0]);
             $endDate   = trim($parts[1] ?? $parts[0]);
-            $where .= " AND DATE(s.created_at) >= ? AND DATE(s.created_at) <= ?";
-            $params[] = $startDate; $params[] = $endDate;
+            $where .= " AND s.created_at >= ? AND s.created_at <= ?";
+            $params[] = $startDate . ' 00:00:00';
+            $params[] = $endDate . ' 23:59:59';
         } else {
-            $where .= " AND DATE(s.created_at) = ?";
-            $params[] = $date;
+            $where .= " AND s.created_at >= ? AND s.created_at <= ?";
+            $params[] = $date . ' 00:00:00';
+            $params[] = $date . ' 23:59:59';
         }
     } else {
-        $where .= " AND DATE(s.created_at) = CURDATE()";
+        $where .= " AND s.created_at >= CURDATE() AND s.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)";
     }
 
     // ── 1. KPI Summary ──────────────────────────────────────────────────────
@@ -88,21 +104,21 @@ try {
         ];
     }
 
-    // ── 4. Trend 7 hari terakhir ────────────────────────────────────────────
+    // ── 4. Trend 7 hari terakhir (Gunakan Index created_at) ────────────────
     $sqlTrend = "
         SELECT
             DATE(s.created_at) AS tgl,
             COALESCE(SUM(i.qty), 0) AS total_qty
         FROM return_sessions s
         LEFT JOIN return_items i ON i.session_id = s.id
-        WHERE DATE(s.created_at) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
-        GROUP BY tgl
+        WHERE s.created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+        GROUP BY DATE(s.created_at)
         ORDER BY tgl ASC
     ";
     $stmtTrend = $pdo->query($sqlTrend);
     $trend = $stmtTrend->fetchAll();
 
-    jsonResponse([
+    $response = [
         'total_invoices'  => (int)($metrics['total_invoices'] ?? 0),
         'total_items'     => (int)($metrics['total_items'] ?? 0),
         'total_good'      => (int)($metrics['total_good'] ?? 0),
@@ -110,7 +126,13 @@ try {
         'by_expedition'   => $byExpedition,
         'by_condition'    => $byCondition,
         'trend_7days'     => $trend,
-    ]);
+        'cached_at'       => date('Y-m-d H:i:s')
+    ];
+
+    // Simpan ke cache backend
+    @file_put_contents($cacheFile, json_encode($response, JSON_UNESCAPED_UNICODE));
+
+    jsonResponse($response);
 } catch (Exception $e) {
     jsonResponse(['error' => $e->getMessage()], 500);
 }
