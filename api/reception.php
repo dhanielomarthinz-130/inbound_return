@@ -1,0 +1,267 @@
+<?php
+require_once __DIR__ . '/../config.php';
+$user = requireLogin(['operator', 'admin', 'superadmin']);
+
+header('Content-Type: application/json; charset=utf-8');
+
+$method = $_SERVER['REQUEST_METHOD'];
+
+// ==========================================
+// 1. GET: GENERATE ID, LIST, ATAU DETAIL
+// ==========================================
+if ($method === 'GET') {
+    $action = $_GET['action'] ?? 'list';
+
+    // A. Generate Receipt Number unik (RCV-YYYYMMDD-XXXX)
+    if ($action === 'generate_id') {
+        $todayPrefix = 'RCV-' . date('Ymd') . '-';
+        $stmt = $pdo->prepare("
+            SELECT receipt_number 
+            FROM expedition_receptions 
+            WHERE receipt_number LIKE ? 
+            ORDER BY id DESC 
+            LIMIT 1
+        ");
+        $stmt->execute([$todayPrefix . '%']);
+        $lastRow = $stmt->fetch();
+
+        $nextSeq = 1;
+        if ($lastRow && !empty($lastRow['receipt_number'])) {
+            $parts = explode('-', $lastRow['receipt_number']);
+            $numPart = end($parts);
+            if (is_numeric($numPart)) {
+                $nextSeq = intval($numPart) + 1;
+            }
+        }
+
+        $newId = $todayPrefix . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+        jsonResponse([
+            'success' => true,
+            'receipt_number' => $newId
+        ]);
+    }
+
+    // B. Detail Penerimaan beserta daftar resi/paketnya
+    if ($action === 'detail') {
+        $id = intval($_GET['id'] ?? 0);
+        if ($id <= 0) {
+            jsonResponse(['error' => 'ID Penerimaan tidak valid'], 400);
+        }
+
+        $stmt = $pdo->prepare("SELECT * FROM expedition_receptions WHERE id = ? LIMIT 1");
+        $stmt->execute([$id]);
+        $reception = $stmt->fetch();
+
+        if (!$reception) {
+            jsonResponse(['error' => 'Data penerimaan tidak ditemukan'], 404);
+        }
+
+        $stmtPkg = $pdo->prepare("
+            SELECT id, package_barcode, scanned_at 
+            FROM reception_packages 
+            WHERE reception_id = ? 
+            ORDER BY id ASC
+        ");
+        $stmtPkg->execute([$id]);
+        $packages = $stmtPkg->fetchAll();
+
+        jsonResponse([
+            'success' => true,
+            'reception' => $reception,
+            'packages' => $packages
+        ]);
+    }
+
+    // C. List Riwayat Penerimaan (Mendukung rentang tanggal, ekspedisi, dan search)
+    $startDate  = trim($_GET['start_date'] ?? '');
+    $endDate    = trim($_GET['end_date'] ?? '');
+    $date       = trim($_GET['date'] ?? '');
+    $expedition = trim($_GET['expedition'] ?? '');
+    $search     = trim($_GET['search'] ?? '');
+
+    $where = [];
+    $params = [];
+
+    if (!empty($startDate) && !empty($endDate)) {
+        $where[] = "DATE(created_at) BETWEEN ? AND ?";
+        $params[] = $startDate;
+        $params[] = $endDate;
+    } elseif (!empty($date)) {
+        $where[] = "DATE(created_at) = ?";
+        $params[] = $date;
+    }
+
+    if (!empty($expedition)) {
+        $where[] = "expedition = ?";
+        $params[] = $expedition;
+    }
+
+    if (!empty($search)) {
+        $where[] = "(receipt_number LIKE ? OR courier_name LIKE ? OR operator_name LIKE ?)";
+        $params[] = "%$search%";
+        $params[] = "%$search%";
+        $params[] = "%$search%";
+    }
+
+    $whereSql = count($where) > 0 ? implode(' AND ', $where) : '1=1';
+
+    $stmt = $pdo->prepare("
+        SELECT id, receipt_number, expedition, courier_name, vehicle_no, operator_name, total_packages, notes, status, created_at
+        FROM expedition_receptions
+        WHERE {$whereSql}
+        ORDER BY id DESC
+    ");
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll();
+
+    jsonResponse([
+        'success' => true,
+        'date' => $date ?: "$startDate s/d $endDate",
+        'total' => count($rows),
+        'data' => $rows
+    ]);
+}
+
+// ==========================================
+// 2. DELETE: HAPUS PENERIMAAN (KHUSUS ADMIN)
+// ==========================================
+if ($method === 'DELETE' || ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'delete')) {
+    if (!in_array($user['role'], ['admin', 'superadmin'])) {
+        jsonResponse(['error' => 'Akses ditolak. Hanya Admin yang dapat menghapus data serah terima.'], 403);
+    }
+
+    $id = intval($_GET['id'] ?? ($_POST['id'] ?? 0));
+    if ($id <= 0) {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $id = intval($input['id'] ?? 0);
+    }
+
+    if ($id <= 0) {
+        jsonResponse(['error' => 'ID Penerimaan tidak valid'], 400);
+    }
+
+    try {
+        $stmt = $pdo->prepare("DELETE FROM expedition_receptions WHERE id = ?");
+        $stmt->execute([$id]);
+        jsonResponse(['success' => true, 'message' => 'Data penerimaan berhasil dihapus']);
+    } catch (Exception $e) {
+        jsonResponse(['error' => 'Gagal menghapus: ' . $e->getMessage()], 500);
+    }
+}
+
+// ==========================================
+// 2. POST: SIMPAN PENERIMAAN PAKET MULTIPLE
+// ==========================================
+if ($method === 'POST') {
+    $input = json_decode(file_get_contents('php://input'), true);
+    if (!is_array($input)) {
+        $input = $_POST;
+    }
+
+    $expedition   = trim($input['expedition'] ?? '');
+    $courierName  = trim($input['courier_name'] ?? '');
+    $vehicleNo    = trim($input['vehicle_no'] ?? '');
+    $notes        = trim($input['notes'] ?? '');
+    $receiptNo    = trim($input['receipt_number'] ?? '');
+    $packages     = $input['packages'] ?? [];
+
+    if (empty($expedition)) {
+        jsonResponse(['error' => 'Pilih Ekspedisi pengantar terlebih dahulu!'], 400);
+    }
+
+    if (!is_array($packages) || count($packages) === 0) {
+        jsonResponse(['error' => 'Minimal 1 barcode/resi paket harus di-scan sebelum submit!'], 400);
+    }
+
+    // Bersihkan dan unikkan resi (jika ada barcode kosong atau spasi)
+    $cleanPackages = [];
+    foreach ($packages as $pkg) {
+        $val = trim((string)$pkg);
+        if ($val !== '') {
+            $cleanPackages[] = $val;
+        }
+    }
+
+    if (count($cleanPackages) === 0) {
+        jsonResponse(['error' => 'Daftar barcode paket tidak boleh kosong!'], 400);
+    }
+
+    // Jika nomor tanda terima belum diisi, generate otomatis
+    if (empty($receiptNo)) {
+        $todayPrefix = 'RCV-' . date('Ymd') . '-';
+        $stmtSeq = $pdo->prepare("
+            SELECT receipt_number 
+            FROM expedition_receptions 
+            WHERE receipt_number LIKE ? 
+            ORDER BY id DESC 
+            LIMIT 1
+        ");
+        $stmtSeq->execute([$todayPrefix . '%']);
+        $lastRow = $stmtSeq->fetch();
+        $nextSeq = 1;
+        if ($lastRow && !empty($lastRow['receipt_number'])) {
+            $parts = explode('-', $lastRow['receipt_number']);
+            $numPart = end($parts);
+            if (is_numeric($numPart)) {
+                $nextSeq = intval($numPart) + 1;
+            }
+        }
+        $receiptNo = $todayPrefix . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+    }
+
+    try {
+        $pdo->beginTransaction();
+
+        $operatorName = $user['name'] ?? $user['username'] ?? 'Operator';
+        $totalCount   = count($cleanPackages);
+
+        // 1. Simpan Header Penerimaan
+        $stmtHead = $pdo->prepare("
+            INSERT INTO expedition_receptions 
+                (receipt_number, expedition, courier_name, vehicle_no, operator_name, total_packages, notes, status, created_at)
+            VALUES 
+                (?, ?, ?, ?, ?, ?, ?, 'RECEIVED', NOW())
+        ");
+        $stmtHead->execute([
+            $receiptNo,
+            $expedition,
+            $courierName ?: null,
+            $vehicleNo ?: null,
+            $operatorName,
+            $totalCount,
+            $notes ?: null
+        ]);
+        $receptionId = $pdo->lastInsertId();
+
+        // 2. Simpan Detail Paket (Multiple Items)
+        $stmtItem = $pdo->prepare("
+            INSERT INTO reception_packages (reception_id, package_barcode, scanned_at)
+            VALUES (?, ?, NOW())
+        ");
+
+        foreach ($cleanPackages as $pkgBarcode) {
+            $stmtItem->execute([$receptionId, $pkgBarcode]);
+        }
+
+        $pdo->commit();
+
+        jsonResponse([
+            'success' => true,
+            'message' => "Penerimaan {$totalCount} paket ekspedisi {$expedition} berhasil disimpan!",
+            'reception_id' => $receptionId,
+            'receipt_number' => $receiptNo,
+            'expedition' => $expedition,
+            'total_packages' => $totalCount,
+            'operator_name' => $operatorName,
+            'created_at' => date('Y-m-d H:i:s')
+        ]);
+
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        jsonResponse([
+            'error' => 'Gagal menyimpan penerimaan: ' . $e->getMessage()
+        ], 500);
+    }
+}

@@ -25,6 +25,25 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="https://npmcdn.com/flatpickr/dist/themes/airbnb.css">
     <link rel="stylesheet" href="assets/css/custom.css?v=<?= file_exists(__DIR__ . '/assets/css/custom.css') ? filemtime(__DIR__ . '/assets/css/custom.css') : time() ?>">
+    <style>
+        @media print {
+            body * { visibility: hidden !important; }
+            #printableReceivingReceiptArea, #printableReceivingReceiptArea * { visibility: visible !important; }
+            #printableReceivingReceiptArea {
+                position: fixed !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                background: white !important;
+                color: black !important;
+                padding: 24px !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+            }
+            .no-print { display: none !important; }
+        }
+    </style>
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800 flex overflow-x-hidden">
 
@@ -58,9 +77,21 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 <span>Dashboard Overview</span>
             </button>
 
+            <!-- MENU BARU: RECEIVING INBOUND (PENERIMAAN EKSPEDISI) -->
+            <button onclick="switchTab('receiving')" id="nav-receiving" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/80">
+                <i class="fa-solid fa-truck-ramp-box w-5 text-center text-emerald-400"></i>
+                <span>Receiving Inbound</span>
+            </button>
+
             <button onclick="switchTab('transactions')" id="nav-transactions" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/80">
                 <i class="fa-solid fa-box-open w-5 text-center"></i>
                 <span>Inbound Unboxing</span>
+            </button>
+
+            <!-- MENU BARU: PUSAT KLAIM & BANDING (CLAIM DOSSIER) -->
+            <button onclick="switchTab('claims')" id="nav-claims" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/80">
+                <i class="fa-solid fa-shield-halved w-5 text-center text-amber-400"></i>
+                <span>Pusat Klaim & Banding</span>
             </button>
 
             <button onclick="switchTab('products')" id="nav-products" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/80">
@@ -298,6 +329,124 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 </div>
             </div>
 
+            <!-- TAB: RECEIVING INBOUND (PENERIMAAN PAKET EKSPEDISI) -->
+            <div id="tab-receiving" class="tab-content hidden space-y-6">
+                <!-- Filter & Header Bar -->
+                <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+                    <div class="p-4 border-b border-slate-200 flex flex-col lg:flex-row justify-between items-center gap-4">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h3 class="font-bold text-base text-slate-800">Receiving Inbound Ekspedisi</h3>
+                                <span class="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">Serah Terima Paket</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-0.5">Daftar tanda terima dan serah terima paket dari kurir ekspedisi sebelum unboxing</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+                            <!-- Filter Tanggal (Flatpickr) -->
+                            <div class="relative flex items-center">
+                                <span class="absolute left-3 text-emerald-600 pointer-events-none text-xs z-10">
+                                    <i class="fa-regular fa-calendar-days"></i>
+                                </span>
+                                <input type="text" id="filterReceivingDate" placeholder="Pilih Tanggal / Rentang..." readonly
+                                    class="bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs transition w-44 sm:w-56 cursor-pointer">
+                                <button type="button" id="btnClearReceivingDate" onclick="clearReceivingDateFilter()" title="Hapus filter tanggal" class="absolute right-2.5 text-slate-400 hover:text-rose-500 transition text-xs hidden z-10">
+                                    <i class="fa-solid fa-circle-xmark"></i>
+                                </button>
+                            </div>
+
+                            <!-- Filter Ekspedisi -->
+                            <select id="filterReceivingExpedition" onchange="loadReceivingData()"
+                                class="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs transition">
+                                <option value="">Semua Ekspedisi</option>
+                            </select>
+
+                            <!-- Search Input -->
+                            <div class="relative flex-1 sm:w-52">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+                                    <i class="fa-solid fa-search"></i>
+                                </span>
+                                <input type="text" id="searchReceivingInput" placeholder="Cari No. RCV / Kurir..."
+                                    class="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs transition">
+                            </div>
+
+                            <!-- Refresh Button -->
+                            <button onclick="loadReceivingData(true)" title="Refresh data receiving"
+                                class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-bold border border-slate-300 transition flex items-center gap-1.5 shadow-2xs">
+                                <i class="fa-solid fa-arrows-rotate text-emerald-600"></i> Refresh
+                            </button>
+
+                            <!-- Export Excel -->
+                            <button onclick="exportReceivingExcel()" title="Export data ke Excel"
+                                class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/20">
+                                <i class="fa-solid fa-file-excel"></i> Export Excel
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Summary Mini Cards -->
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3 p-4 bg-slate-50/60 border-b border-slate-200">
+                        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-sm shrink-0">
+                                <i class="fa-solid fa-receipt"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] text-slate-400 font-bold uppercase block">Total Penerimaan</span>
+                                <span id="summaryReceivingTotalBatches" class="font-black text-base text-slate-800">0</span>
+                                <span class="text-[10px] text-slate-500"> Sesi</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm shrink-0">
+                                <i class="fa-solid fa-boxes-stacked"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] text-slate-400 font-bold uppercase block">Total Paket Diterima</span>
+                                <span id="summaryReceivingTotalPackages" class="font-black text-base text-indigo-600">0</span>
+                                <span class="text-[10px] text-slate-500"> Paket/Resi</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex items-center gap-3 col-span-2 md:col-span-1">
+                            <div class="w-9 h-9 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-sm shrink-0">
+                                <i class="fa-solid fa-truck-fast"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] text-slate-400 font-bold uppercase block">Ekspedisi Aktif</span>
+                                <span id="summaryReceivingTotalExpeditions" class="font-black text-base text-slate-800">0</span>
+                                <span class="text-[10px] text-slate-500"> Ekspedisi</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Table Data -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-50 text-slate-600 border-b border-slate-200 font-bold uppercase text-[10px]">
+                                <tr>
+                                    <th class="py-3 px-4">#</th>
+                                    <th class="py-3 px-4">No. Tanda Terima</th>
+                                    <th class="py-3 px-4">Ekspedisi</th>
+                                    <th class="py-3 px-4">Driver / Kurir</th>
+                                    <th class="py-3 px-4 text-center">Total Paket</th>
+                                    <th class="py-3 px-4">Operator Penerima</th>
+                                    <th class="py-3 px-4">Waktu Penerimaan</th>
+                                    <th class="py-3 px-4 text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="receivingTableBody" class="divide-y divide-slate-100">
+                                <tr>
+                                    <td colspan="8" class="text-center py-12 text-slate-400">
+                                        <i class="fa-solid fa-truck-ramp-box text-3xl mb-2 text-slate-300 block"></i>
+                                        Memuat data receiving inbound...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- TAB 2: INBOUND UNBOXING & RIWAYAT TRANSAKSI LENGKAP -->
             <div id="tab-transactions" class="tab-content hidden space-y-6">
                 <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
@@ -382,6 +531,296 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             </thead>
                             <tbody id="transactionsTableBody" class="divide-y divide-slate-100">
                                 <tr><td colspan="12" class="text-center py-8 text-slate-400">Memuat data transaksi unboxing...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB BARU: PUSAT KLAIM & BANDING (CLAIM DOSSIER) -->
+            <div id="tab-claims" class="tab-content hidden space-y-6">
+                <!-- Search & Quick Actions -->
+                <div class="bg-white rounded-2xl shadow-xs border border-slate-200 p-5">
+                    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                        <div>
+                            <div class="flex items-center gap-2.5">
+                                <span class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold text-base shrink-0">
+                                    <i class="fa-solid fa-shield-halved"></i>
+                                </span>
+                                <div>
+                                    <h3 class="font-bold text-base text-slate-800">Pusat Klaim & Banding Ekspedisi</h3>
+                                    <p class="text-xs text-slate-500">Lookup otomatis data pesanan, nomor resi, video packing OCS, dan video unboxing retur untuk bukti klaim/banding resmi.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Form Pencarian Resi / Order -->
+                        <form id="formClaimLookup" onsubmit="executeClaimLookup(event)" class="w-full lg:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <div class="relative flex-1 sm:w-80">
+                                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs">
+                                    <i class="fa-solid fa-magnifying-glass"></i>
+                                </span>
+                                <input type="text" id="claimSearchInput" placeholder="Masukkan No. Resi atau Order ID / Invoice..." required
+                                    class="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 transition shadow-2xs">
+                            </div>
+                            <button type="submit" id="btnClaimSearch" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm shadow-amber-500/20 shrink-0">
+                                <i class="fa-solid fa-search"></i>
+                                <span>Cari Bukti</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Hasil Dossier Klaim (Muncul setelah pencarian) -->
+                <div id="claimResultContainer" class="hidden space-y-6">
+                    <!-- Skor Kelengkapan Bukti -->
+                    <div class="bg-gradient-to-r from-slate-900 to-indigo-950 rounded-2xl p-5 text-white shadow-md">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div>
+                                <div class="flex flex-wrap items-center gap-2 mb-1.5">
+                                    <span class="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 font-bold text-[10px] uppercase tracking-wider">Berkas Klaim Resmi</span>
+                                    <span id="claimMarketplaceBadge" class="px-2 py-0.5 rounded-md bg-white/10 text-white font-bold text-[10px] uppercase">Marketplace</span>
+                                    <span id="claimPriceBadge" class="px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-bold text-xs border border-emerald-400/30 flex items-center gap-1.5 shadow-xs">
+                                        <i class="fa-solid fa-money-bill-wave text-emerald-400 text-xs"></i> Nilai Paket: <span id="claimPriceText" class="font-black text-white">Rp -</span>
+                                    </span>
+                                </div>
+                                <h4 id="claimOrderTitle" class="text-lg font-black tracking-tight">Order # - Resi #</h4>
+                                <p id="claimShopSubtitle" class="text-xs text-slate-300">Toko: - | Ekspedisi: -</p>
+                            </div>
+
+                            <div class="flex items-center gap-3">
+                                <button onclick="printClaimDossier()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm">
+                                    <i class="fa-solid fa-print"></i> Cetak Berkas Klaim (PDF)
+                                </button>
+                                <button onclick="copyClaimPacketSummary()" class="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
+                                    <i class="fa-solid fa-copy"></i> Salin Ringkasan
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 4 Indikator Kelengkapan Checklist -->
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 pt-4 border-t border-white/10 text-xs">
+                            <div id="checkOrder" class="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 border border-white/10">
+                                <i class="fa-solid fa-circle-check text-emerald-400 text-base" id="iconCheckOrder"></i>
+                                <div>
+                                    <span class="font-bold block text-white text-[11px]">Invoice & Resi OCS</span>
+                                    <span id="labelCheckOrder" class="text-[10px] text-slate-300">Terverifikasi</span>
+                                </div>
+                            </div>
+                            <div id="checkPackVideo" class="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 border border-white/10">
+                                <i class="fa-solid fa-circle-check text-emerald-400 text-base" id="iconCheckPack"></i>
+                                <div>
+                                    <span class="font-bold block text-white text-[11px]">Video Packing OCS</span>
+                                    <span id="labelCheckPack" class="text-[10px] text-slate-300">Tersedia</span>
+                                </div>
+                            </div>
+                            <div id="checkReception" class="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 border border-white/10">
+                                <i class="fa-solid fa-circle-check text-emerald-400 text-base" id="iconCheckRec"></i>
+                                <div>
+                                    <span class="font-bold block text-white text-[11px]">Tanda Terima Kurir</span>
+                                    <span id="labelCheckRec" class="text-[10px] text-slate-300">Diterima Fisik</span>
+                                </div>
+                            </div>
+                            <div id="checkUnboxVideo" class="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 border border-white/10">
+                                <i class="fa-solid fa-circle-check text-emerald-400 text-base" id="iconCheckUnbox"></i>
+                                <div>
+                                    <span class="font-bold block text-white text-[11px]">Video Unboxing Retur</span>
+                                    <span id="labelCheckUnbox" class="text-[10px] text-slate-300">Terekam Lengkap</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Banner Status Kelayakan Klaim (Hanya Paket Rusak / Bukan Good) -->
+                    <div id="claimEligibilityBanner" class="p-4 rounded-2xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+                        <div class="flex items-center gap-3">
+                            <span id="claimEligibilityIcon" class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                            </span>
+                            <div>
+                                <b id="claimEligibilityTitle" class="text-xs font-black block">Status Kelayakan Klaim</b>
+                                <span id="claimEligibilitySubtitle" class="text-[11px]">-</span>
+                            </div>
+                        </div>
+                        <span id="claimEligibilityTag" class="px-3 py-1 rounded-lg text-white font-black text-[10px] uppercase tracking-wider shrink-0 self-start sm:self-center">Status</span>
+                    </div>
+
+                    <!-- Dual Video Player: Side-by-Side Comparison -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <!-- Video Packing OCS (Saat Kirim) -->
+                        <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden flex flex-col">
+                            <div class="p-3 bg-slate-900 text-white flex items-center justify-between text-xs">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                                    <span class="font-bold">1. Video Packing (Gudang Saat Kirim)</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400">Sumber: OCS IEG System</span>
+                            </div>
+                            <div class="relative bg-black aspect-video flex items-center justify-center">
+                                <video id="playerPackingVideo" controls class="w-full h-full object-contain hidden"></video>
+                                <div id="noPackingVideoPlaceholder" class="text-center p-6 text-slate-400">
+                                    <i class="fa-solid fa-video-slash text-3xl mb-2 text-slate-600 block"></i>
+                                    <span class="text-xs">Video packing belum tersedia di OCS untuk order ini.</span>
+                                </div>
+                            </div>
+                            <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-600">
+                                <span>Status: <b id="packingVideoStatusText" class="text-slate-800">-</b></span>
+                                <a id="btnOpenPackingVideoNewTab" href="#" target="_blank" class="text-indigo-600 hover:text-indigo-800 font-bold hidden">
+                                    Buka Video OCS <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Video Unboxing Retur (Saat Diterima Kembali) -->
+                        <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden flex flex-col">
+                            <div class="p-3 bg-slate-900 text-white flex items-center justify-between text-xs">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    <span class="font-bold">2. Video Unboxing (Gudang Saat Retur)</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400">Stasiun Inbound Unboxing</span>
+                            </div>
+                            <div class="relative bg-black aspect-video flex items-center justify-center">
+                                <video id="playerUnboxingVideo" controls class="w-full h-full object-contain hidden"></video>
+                                <div id="noUnboxingVideoPlaceholder" class="text-center p-6 text-slate-400">
+                                    <i class="fa-solid fa-video-slash text-3xl mb-2 text-slate-600 block"></i>
+                                    <span class="text-xs">Video unboxing stasiun retur belum tersedia / belum di-unboxing.</span>
+                                </div>
+                            </div>
+                            <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-600">
+                                <span>Operator: <b id="unboxingOperatorText" class="text-slate-800">-</b></span>
+                                <span id="unboxingTimestampText" class="text-slate-500">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rincian Data Komparasi -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Data Pengiriman Asal (OCS) -->
+                        <div class="bg-white rounded-2xl shadow-xs border border-slate-200 p-4 space-y-3">
+                            <div class="flex items-center gap-2 pb-2 border-b border-slate-100 text-xs font-bold text-slate-800">
+                                <i class="fa-solid fa-paper-plane text-indigo-600"></i>
+                                <span>Rincian Pengiriman Asal (OCS IEG System)</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3 text-xs">
+                                <div>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Nomor Order / Invoice</span>
+                                    <span id="detailOrderId" class="font-bold text-slate-800">-</span>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Nomor Resi (AWB)</span>
+                                    <span id="detailTrackingNumber" class="font-mono font-bold text-indigo-600">-</span>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Platform / Marketplace</span>
+                                    <span id="detailPlatform" class="font-semibold text-slate-700">-</span>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Toko / Official Shop</span>
+                                    <span id="detailShopName" class="font-semibold text-slate-700">-</span>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Ekspedisi Pengiriman</span>
+                                    <span id="detailShippingProvider" class="font-semibold text-slate-700">-</span>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Waktu Pesanan</span>
+                                    <span id="detailOrderCreatedAt" class="text-slate-600">-</span>
+                                </div>
+                                <div class="col-span-2 p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 flex items-center justify-between">
+                                    <div>
+                                        <span class="text-[10px] text-emerald-800 uppercase font-black block">Nilai / Harga Paket (Tuntutan Klaim)</span>
+                                        <span id="detailPackagePrice" class="font-black text-emerald-700 text-sm">Rp -</span>
+                                    </div>
+                                    <span class="text-[10px] text-emerald-600 font-semibold bg-white px-2 py-1 rounded-md border border-emerald-200">Berdasarkan NMV OCS</span>
+                                </div>
+                                <div class="col-span-2">
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Produk / Keterangan</span>
+                                    <span id="detailOrderProductName" class="text-slate-700 font-medium block bg-slate-50 p-2 rounded-lg border border-slate-200">-</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Data Penerimaan & Unboxing Fisik -->
+                        <div class="bg-white rounded-2xl shadow-xs border border-slate-200 p-4 space-y-3">
+                            <div class="flex items-center gap-2 pb-2 border-b border-slate-100 text-xs font-bold text-slate-800">
+                                <i class="fa-solid fa-boxes-packing text-emerald-600"></i>
+                                <span>Rincian Penerimaan & Unboxing Fisik di Gudang</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3 text-xs">
+                                <div>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">No. Tanda Terima Ekspedisi</span>
+                                    <span id="detailReceiptNo" class="font-mono font-bold text-emerald-700">-</span>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Kurir Pengantar Fisik</span>
+                                    <span id="detailCourier" class="font-semibold text-slate-700">-</span>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Waktu Diterima di Gudang</span>
+                                    <span id="detailReceivedAt" class="text-slate-600">-</span>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Status Hasil Unboxing</span>
+                                    <span id="detailUnboxStatus" class="font-bold text-slate-800">-</span>
+                                </div>
+                                <div class="col-span-2">
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Kondisi Barang & Alasan Retur</span>
+                                    <span id="detailConditionNotes" class="font-semibold text-slate-800 bg-amber-50 p-2.5 rounded-lg border border-amber-200 block text-xs">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Placeholder Belum Ada Pencarian -->
+                <div id="claimEmptyPlaceholder" class="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+                    <div class="w-16 h-16 rounded-2xl bg-amber-50 text-amber-500 mx-auto flex items-center justify-center text-2xl mb-3 shadow-inner">
+                        <i class="fa-solid fa-magnifying-glass-location"></i>
+                    </div>
+                    <h4 class="font-bold text-base text-slate-800 mb-1">Siap Mencari Bukti Klaim & Banding</h4>
+                    <p class="text-xs text-slate-500 max-w-md mx-auto">
+                        Ketik Nomor Resi Paket (AWB) atau Order ID / No Invoice di kolom pencarian di atas. Sistem akan otomatis menarik data pesanan dari OCS, video packing saat barang dikirim, dan mencocokkan dengan video unboxing retur lokal.
+                    </p>
+                </div>
+
+                <!-- Tabel Kandidat Paket Layak Klaim (Kondisi BUKAN GOOD) -->
+                <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+                    <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-sm">
+                                <i class="fa-solid fa-box-tissue"></i>
+                            </span>
+                            <div>
+                                <h4 class="font-bold text-sm text-slate-800">Daftar Paket Rusak / Layak Klaim</h4>
+                                <span class="text-[11px] text-slate-500">Menampilkan paket unboxing yang kondisinya <b>BUKAN GOOD</b> (Cacat, Pecah, Bocor, Rusak).</span>
+                            </div>
+                        </div>
+                        <button onclick="loadClaimCandidates(true)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-slate-300 shadow-2xs">
+                            <i class="fa-solid fa-arrows-rotate text-amber-600" id="iconRefreshCandidates"></i> Refresh Daftar
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-50 text-slate-600 border-b border-slate-200 font-bold uppercase text-[10px]">
+                                <tr>
+                                    <th class="py-3 px-4">#</th>
+                                    <th class="py-3 px-4">No. Resi / Invoice</th>
+                                    <th class="py-3 px-4">Ekspedisi</th>
+                                    <th class="py-3 px-4">Waktu Unboxing</th>
+                                    <th class="py-3 px-4 text-center">Qty Rusak</th>
+                                    <th class="py-3 px-4">Kondisi / Alasan Rusak</th>
+                                    <th class="py-3 px-4 text-center">Video Unbox</th>
+                                    <th class="py-3 px-4 text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="claimCandidatesTableBody" class="divide-y divide-slate-100">
+                                <tr>
+                                    <td colspan="8" class="text-center py-10 text-slate-400">
+                                        <i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat daftar paket rusak...
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -1094,6 +1533,120 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 </button>
                 <button onclick="saveCondition()" id="btnSaveCondition" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-5 py-2 rounded-xl font-bold transition flex items-center gap-2 shadow-sm">
                     <i class="fa-solid fa-floppy-disk"></i> Simpan Kondisi
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- MODAL BUKTI SERAH TERIMA PAKET (RECEIVING INBOUND)            -->
+    <!-- ============================================================== -->
+    <div id="modalReceivingReceipt" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-100">
+            <!-- Header Modal -->
+            <div class="p-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-file-circle-check text-emerald-400 text-base"></i>
+                    <h3 class="font-bold text-sm">Bukti Serah Terima Paket</h3>
+                </div>
+                <button onclick="closeReceivingReceiptModal()" class="text-slate-400 hover:text-white text-base">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Content Area (Printable) -->
+            <div id="printableReceivingReceiptArea" class="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
+                <!-- Header Slip -->
+                <div class="text-center border-b border-dashed border-slate-300 pb-3">
+                    <h2 class="font-black text-base tracking-tight text-slate-900">PT. INDO EXPRESS GLOBAL</h2>
+                    <p class="text-[10px] text-slate-500 font-medium">INBOUND WAREHOUSE RETURN RECEPTION</p>
+                    <p id="adminSlipReceiptNo" class="font-mono font-bold text-xs text-emerald-600 mt-1">-</p>
+                </div>
+
+                <!-- Info Grid -->
+                <div class="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div>
+                        <span class="text-slate-400 block text-[9px] uppercase font-bold">Ekspedisi</span>
+                        <span id="adminSlipExpedition" class="font-bold text-slate-800 text-xs">-</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[9px] uppercase font-bold">Waktu Penerimaan</span>
+                        <span id="adminSlipDateTime" class="font-semibold text-slate-700">-</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[9px] uppercase font-bold">Driver / Kurir</span>
+                        <span id="adminSlipCourier" class="font-semibold text-slate-700">-</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[9px] uppercase font-bold">Operator Penerima</span>
+                        <span id="adminSlipOperator" class="font-bold text-slate-800">-</span>
+                    </div>
+                </div>
+
+                <!-- Total Count Banner -->
+                <div class="bg-emerald-500 text-white rounded-xl p-3 text-center">
+                    <span class="text-[10px] uppercase font-bold opacity-80 block">Jumlah Paket Diterima</span>
+                    <span id="adminSlipTotalPackages" class="font-black text-2xl">0</span>
+                    <span class="text-xs font-semibold"> Paket</span>
+                </div>
+
+                <!-- Daftar Resi Paket -->
+                <div>
+                    <h4 class="font-bold text-slate-700 mb-1.5 text-[11px] uppercase">Rincian Nomor Resi / Barcode:</h4>
+                    <div id="adminSlipPackageList" class="bg-slate-50 rounded-xl p-3 max-h-48 overflow-y-auto space-y-1 font-mono text-[11px] border border-slate-200">
+                        <!-- List Resi -->
+                    </div>
+                </div>
+
+                <!-- Tanda Tangan Serah Terima (Untuk Cetak Fisik) -->
+                <div class="grid grid-cols-2 gap-4 text-center pt-4 border-t border-dashed border-slate-300">
+                    <div>
+                        <p class="text-[10px] text-slate-400 font-semibold mb-10">Yang Menyerahkan (Kurir)</p>
+                        <p class="text-[10px] font-bold text-slate-700 border-t border-slate-300 mx-4 pt-1">( ........................... )</p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] text-slate-400 font-semibold mb-10">Yang Menerima (Gudang)</p>
+                        <p id="adminSlipSignOperator" class="text-[10px] font-bold text-slate-700 border-t border-slate-300 mx-4 pt-1">-</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Modal Actions -->
+            <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2 shrink-0 no-print">
+                <button onclick="window.print()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm">
+                    <i class="fa-solid fa-print"></i> Cetak Bukti
+                </button>
+                <button onclick="closeReceivingReceiptModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DAFTAR RESI PAKET LENGKAP -->
+    <div id="modalReceivingPackages" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-slate-100">
+            <div class="p-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-barcode text-indigo-400 text-base"></i>
+                    <h3 class="font-bold text-sm" id="pkgModalTitle">Daftar Resi Paket</h3>
+                </div>
+                <button onclick="closeReceivingPackagesModal()" class="text-slate-400 hover:text-white text-base">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-4 overflow-y-auto space-y-2 flex-1 text-xs">
+                <div class="flex justify-between items-center text-slate-500 text-[11px] mb-1">
+                    <span>Total: <b id="pkgModalTotal" class="text-slate-800">0</b> Paket</span>
+                    <button onclick="copyAllReceivingBarcodes()" class="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1">
+                        <i class="fa-regular fa-copy"></i> Salin Semua
+                    </button>
+                </div>
+                <div id="pkgModalList" class="divide-y divide-slate-100 font-mono text-xs max-h-80 overflow-y-auto border border-slate-200 rounded-xl bg-slate-50 p-2"></div>
+            </div>
+            <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+                <button onclick="closeReceivingPackagesModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition">
+                    Tutup
                 </button>
             </div>
         </div>

@@ -11,21 +11,27 @@ let flatpickrDashboardInstance = null;
 // Tab & Page Slug Mappings (URL Friendly)
 const TAB_SLUG_MAP = {
     'dashboard': 'dashboard',
+    'receiving': 'receiving-inbound',
     'transactions': 'inbound-unboxing',
     'products': 'master-produk',
     'expeditions': 'master-ekspedisi',
+    'conditions': 'master-kondisi',
     'users': 'kelola-pengguna',
     'maintenance': 'pemeliharaan'
 };
 
 const SLUG_TAB_MAP = {
     'dashboard': 'dashboard',
+    'receiving-inbound': 'receiving',
+    'receiving': 'receiving',
     'inbound-unboxing': 'transactions',
     'transactions': 'transactions',
     'master-produk': 'products',
     'products': 'products',
     'master-ekspedisi': 'expeditions',
     'expeditions': 'expeditions',
+    'master-kondisi': 'conditions',
+    'conditions': 'conditions',
     'kelola-pengguna': 'users',
     'users': 'users',
     'pemeliharaan': 'maintenance',
@@ -149,9 +155,12 @@ window.switchTab = function(tabName, updateUrl = true) {
     const titleEl = document.getElementById('currentViewTitle');
     if (titleEl) {
         if (tabName === 'dashboard') titleEl.innerText = 'Dashboard Monitoring Retur';
+        else if (tabName === 'receiving') titleEl.innerText = 'Receiving Inbound - Penerimaan Ekspedisi';
         else if (tabName === 'transactions') titleEl.innerText = 'Inbound Unboxing';
+        else if (tabName === 'claims') titleEl.innerText = 'Pusat Klaim & Banding Ekspedisi';
         else if (tabName === 'products') titleEl.innerText = 'Master Data Produk & Barcode';
         else if (tabName === 'expeditions') titleEl.innerText = 'Master Data Ekspedisi & Kurir';
+        else if (tabName === 'conditions') titleEl.innerText = 'Master Data Kondisi Produk';
         else if (tabName === 'users') titleEl.innerText = 'Kelola Akun Pengguna';
         else if (tabName === 'maintenance') titleEl.innerText = 'Pemeliharaan Sistem & Database';
     }
@@ -163,8 +172,10 @@ window.switchTab = function(tabName, updateUrl = true) {
     if (tabName === 'dashboard') {
         loadMetrics();
     }
+    if (tabName === 'receiving') loadReceivingData();
     if (tabName === 'products') loadProducts();
     if (tabName === 'transactions') loadTransactions();
+    if (tabName === 'claims') loadClaimCandidates();
     if (tabName === 'expeditions') loadExpeditions();
     if (tabName === 'conditions') loadConditions();
     if (tabName === 'users') loadUsers();
@@ -1969,3 +1980,848 @@ async function deleteCondition(id, code, name) {
         showToast('error', 'Error: ' + e.message, 'Koneksi Terputus');
     }
 }
+
+// ==========================================
+// RECEIVING INBOUND MANAGEMENT (ADMIN)
+// ==========================================
+let flatpickrReceivingInstance = null;
+let activeReceivingDateFilter = '';
+let cachedReceivingData = [];
+let receivingSearchDebounceTimer = null;
+
+// Inisialisasi Flatpickr Filter Tanggal Receiving
+function initReceivingDatepicker() {
+    const el = document.getElementById('filterReceivingDate');
+    if (!el || flatpickrReceivingInstance) return;
+
+    flatpickrReceivingInstance = flatpickr(el, {
+        mode: "range",
+        dateFormat: "Y-m-d",
+        altInput: true,
+        altFormat: "j F Y",
+        locale: "id",
+        maxDate: "today",
+        onChange: function(selectedDates) {
+            const btnClear = document.getElementById('btnClearReceivingDate');
+            if (selectedDates.length === 2) {
+                const start = flatpickr.formatDate(selectedDates[0], "Y-m-d");
+                const end = flatpickr.formatDate(selectedDates[1], "Y-m-d");
+                activeReceivingDateFilter = `${start} to ${end}`;
+                if (btnClear) btnClear.classList.remove('hidden');
+                loadReceivingData();
+            } else if (selectedDates.length === 1) {
+                const single = flatpickr.formatDate(selectedDates[0], "Y-m-d");
+                activeReceivingDateFilter = single;
+                if (btnClear) btnClear.classList.remove('hidden');
+            } else {
+                activeReceivingDateFilter = '';
+                if (btnClear) btnClear.classList.add('hidden');
+            }
+        },
+        onClose: function(selectedDates) {
+            if (selectedDates.length === 1) {
+                loadReceivingData();
+            }
+        }
+    });
+
+    // Pasang listener search box dengan debounce
+    const searchInput = document.getElementById('searchReceivingInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            if (receivingSearchDebounceTimer) clearTimeout(receivingSearchDebounceTimer);
+            receivingSearchDebounceTimer = setTimeout(() => {
+                loadReceivingData();
+            }, 300);
+        });
+    }
+}
+
+window.clearReceivingDateFilter = function() {
+    if (flatpickrReceivingInstance) {
+        flatpickrReceivingInstance.clear();
+    }
+    activeReceivingDateFilter = '';
+    const btnClear = document.getElementById('btnClearReceivingDate');
+    if (btnClear) btnClear.classList.add('hidden');
+    loadReceivingData();
+};
+
+// Muat data receiving dari API
+window.loadReceivingData = async function(forceRefresh = false) {
+    initReceivingDatepicker();
+
+    const tbody = document.getElementById('receivingTableBody');
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-12 text-slate-400"><i class="fa-solid fa-spinner fa-spin text-2xl text-emerald-500 mb-2 block"></i>Memuat data receiving inbound...</td></tr>`;
+    }
+
+    try {
+        let url = 'api/reception.php?action=list';
+
+        // Filter Tanggal
+        if (activeReceivingDateFilter) {
+            if (activeReceivingDateFilter.includes(' to ')) {
+                const [start, end] = activeReceivingDateFilter.split(' to ');
+                url += `&start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}`;
+            } else {
+                url += `&date=${encodeURIComponent(activeReceivingDateFilter)}`;
+            }
+        }
+
+        // Filter Ekspedisi
+        const expSelect = document.getElementById('filterReceivingExpedition');
+        if (expSelect && expSelect.value) {
+            url += `&expedition=${encodeURIComponent(expSelect.value)}`;
+        }
+
+        // Search Query
+        const searchInput = document.getElementById('searchReceivingInput');
+        if (searchInput && searchInput.value.trim()) {
+            url += `&search=${encodeURIComponent(searchInput.value.trim())}`;
+        }
+
+        const res = await fetch(url);
+        const json = await res.json();
+
+        if (json && json.success) {
+            cachedReceivingData = json.data || [];
+            renderReceivingTable(cachedReceivingData);
+            populateReceivingExpeditionFilter(cachedReceivingData);
+            if (forceRefresh) {
+                showToast('success', 'Data receiving berhasil diperbarui.', 'Refresh Selesai');
+            }
+        } else {
+            if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-rose-500">Gagal memuat data: ${escapeHtml(json.error || 'Kesalahan server')}</td></tr>`;
+        }
+    } catch (e) {
+        console.error('Error loadReceivingData:', e);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-rose-500">Terjadi kesalahan koneksi saat memuat data receiving.</td></tr>`;
+    }
+};
+
+// Render tabel receiving dan update kartu KPI
+function renderReceivingTable(data) {
+    const tbody = document.getElementById('receivingTableBody');
+    if (!tbody) return;
+
+    // Update KPI
+    const totalBatches = data.length;
+    let totalPackages = 0;
+    const uniqueExpeditions = new Set();
+
+    data.forEach(item => {
+        totalPackages += parseInt(item.total_packages || 0);
+        if (item.expedition) uniqueExpeditions.add(item.expedition);
+    });
+
+    const elTotalBatches = document.getElementById('summaryReceivingTotalBatches');
+    const elTotalPackages = document.getElementById('summaryReceivingTotalPackages');
+    const elTotalExpeditions = document.getElementById('summaryReceivingTotalExpeditions');
+
+    if (elTotalBatches) elTotalBatches.innerText = totalBatches.toLocaleString('id-ID');
+    if (elTotalPackages) elTotalPackages.innerText = totalPackages.toLocaleString('id-ID');
+    if (elTotalExpeditions) elTotalExpeditions.innerText = uniqueExpeditions.size;
+
+    if (!data || data.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-12 text-slate-400">
+                    <i class="fa-solid fa-box-open text-3xl mb-2 text-slate-300 block"></i>
+                    Tidak ada data receiving inbound yang ditemukan untuk filter ini.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    let rowsHtml = '';
+    data.forEach((item, idx) => {
+        const timeStr = item.created_at || '-';
+        rowsHtml += `
+            <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                <td class="py-3 px-4 font-bold text-slate-400 text-center">${idx + 1}</td>
+                <td class="py-3 px-4 font-mono font-bold text-slate-900">${escapeHtml(item.receipt_number)}</td>
+                <td class="py-3 px-4">
+                    <span class="bg-emerald-50 text-emerald-700 font-bold px-2.5 py-1 rounded-lg border border-emerald-200 text-xs inline-block">
+                        ${escapeHtml(item.expedition)}
+                    </span>
+                </td>
+                <td class="py-3 px-4 font-medium text-slate-700">${escapeHtml(item.courier_name || '-')}</td>
+                <td class="py-3 px-4 text-center">
+                    <span class="bg-indigo-50 text-indigo-700 font-black px-2.5 py-1 rounded-lg border border-indigo-200 text-xs inline-block">
+                        ${item.total_packages} Paket
+                    </span>
+                </td>
+                <td class="py-3 px-4 font-semibold text-slate-700">${escapeHtml(item.operator_name || '-')}</td>
+                <td class="py-3 px-4 text-slate-500 font-mono text-[11px]">${timeStr}</td>
+                <td class="py-3 px-4 text-center">
+                    <div class="flex items-center justify-center gap-1.5">
+                        <button onclick="viewReceivingReceipt(${item.id})" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold px-2.5 py-1.5 rounded-xl border border-emerald-200 text-xs flex items-center gap-1.5 transition shadow-2xs" title="Lihat & Cetak Bukti Serah Terima">
+                            <i class="fa-solid fa-file-invoice text-emerald-600"></i>
+                            <span>Bukti Serah Terima</span>
+                        </button>
+                        <button onclick="viewReceivingPackagesList(${item.id})" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-2.5 py-1.5 rounded-xl border border-indigo-200 text-xs flex items-center gap-1 transition" title="Lihat Daftar Resi Paket">
+                            <i class="fa-solid fa-list-check"></i>
+                        </button>
+                        <button onclick="deleteReceivingRecord(${item.id}, '${escapeHtml(item.receipt_number)}')" class="bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold p-1.5 rounded-xl border border-rose-200 text-xs flex items-center transition" title="Hapus Data">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = rowsHtml;
+}
+
+// Buka Modal Bukti Serah Terima Resmi
+window.viewReceivingReceipt = async function(id) {
+    showGlobalLoading("Memuat Bukti Serah Terima...", "Mengambil rincian nomor resi paket...");
+    try {
+        const res = await fetch(`api/reception.php?action=detail&id=${id}`);
+        const data = await res.json();
+        hideGlobalLoading();
+
+        if (data && data.success && data.reception) {
+            const r = data.reception;
+            document.getElementById('adminSlipReceiptNo').innerText = r.receipt_number || '-';
+            document.getElementById('adminSlipExpedition').innerText = r.expedition || '-';
+            document.getElementById('adminSlipDateTime').innerText = r.created_at || '-';
+            document.getElementById('adminSlipCourier').innerText = r.courier_name || '-';
+            document.getElementById('adminSlipOperator').innerText = r.operator_name || '-';
+            document.getElementById('adminSlipTotalPackages').innerText = r.total_packages || 0;
+            document.getElementById('adminSlipSignOperator').innerText = r.operator_name || 'Gudang';
+
+            const listEl = document.getElementById('adminSlipPackageList');
+            let listHtml = '';
+            (data.packages || []).forEach((bar, i) => {
+                listHtml += `<div class="flex justify-between border-b border-slate-100 py-1"><span>${i + 1}. ${escapeHtml(bar.package_barcode)}</span><span class="text-[9px] text-emerald-600 font-bold">TERIMA OK</span></div>`;
+            });
+            listEl.innerHTML = listHtml || '<div class="text-slate-400 text-center py-2">Tidak ada rincian resi.</div>';
+
+            document.getElementById('modalReceivingReceipt').classList.remove('hidden');
+        } else {
+            showToast('error', data.error || 'Data bukti serah terima tidak ditemukan', 'Gagal Memuat');
+        }
+    } catch (e) {
+        hideGlobalLoading();
+        showToast('error', 'Terjadi kesalahan: ' + e.message, 'Gagal Memuat');
+    }
+};
+
+window.closeReceivingReceiptModal = function() {
+    const modal = document.getElementById('modalReceivingReceipt');
+    if (modal) modal.classList.add('hidden');
+};
+
+// Buka Modal Daftar Resi Paket Lengkap
+window.viewReceivingPackagesList = async function(id) {
+    showGlobalLoading("Memuat Daftar Resi...", "Mengambil nomor resi...");
+    try {
+        const res = await fetch(`api/reception.php?action=detail&id=${id}`);
+        const data = await res.json();
+        hideGlobalLoading();
+
+        if (data && data.success && data.reception) {
+            const r = data.reception;
+            document.getElementById('pkgModalTitle').innerText = `Daftar Resi ${r.receipt_number}`;
+            document.getElementById('pkgModalTotal').innerText = data.packages ? data.packages.length : 0;
+
+            window._currentReceivingPackages = (data.packages || []).map(p => p.package_barcode);
+
+            const listEl = document.getElementById('pkgModalList');
+            let html = '';
+            (data.packages || []).forEach((p, idx) => {
+                html += `
+                    <div class="py-1.5 px-2 flex justify-between items-center hover:bg-slate-100/80 transition">
+                        <span>${idx + 1}. <b class="text-slate-800">${escapeHtml(p.package_barcode)}</b></span>
+                        <span class="text-[10px] text-slate-400">${(p.scanned_at || '').split(' ')[1] || ''}</span>
+                    </div>
+                `;
+            });
+            listEl.innerHTML = html || '<div class="text-slate-400 text-center py-4">Belum ada barcode paket.</div>';
+            document.getElementById('modalReceivingPackages').classList.remove('hidden');
+        } else {
+            showToast('error', data.error || 'Gagal memuat daftar resi', 'Gagal');
+        }
+    } catch (e) {
+        hideGlobalLoading();
+        showToast('error', e.message, 'Gagal');
+    }
+};
+
+window.closeReceivingPackagesModal = function() {
+    const m = document.getElementById('modalReceivingPackages');
+    if (m) m.classList.add('hidden');
+};
+
+window.copyAllReceivingBarcodes = function() {
+    if (window._currentReceivingPackages && window._currentReceivingPackages.length) {
+        navigator.clipboard.writeText(window._currentReceivingPackages.join('\n')).then(() => {
+            showToast('success', `${window._currentReceivingPackages.length} nomor resi berhasil disalin ke clipboard!`, 'Berhasil Disalin');
+        }).catch(() => {
+            showToast('info', 'Gagal menyalin otomatis', 'Info');
+        });
+    }
+};
+
+// Hapus Data Penerimaan
+window.deleteReceivingRecord = async function(id, receiptNumber) {
+    if (!confirm(`Yakin ingin menghapus data penerimaan "${receiptNumber}" beserta seluruh resi di dalamnya?\n\nTindakan ini tidak bisa dibatalkan.`)) {
+        return;
+    }
+
+    showGlobalLoading("Menghapus Penerimaan...", "Memproses penghapusan data...");
+    try {
+        const res = await fetch(`api/reception.php?action=delete&id=${id}`, {
+            method: 'POST'
+        });
+        const json = await res.json();
+        hideGlobalLoading();
+
+        if (json && json.success) {
+            showToast('success', `Penerimaan ${receiptNumber} berhasil dihapus.`, 'Data Dihapus');
+            loadReceivingData();
+        } else {
+            showToast('error', json.error || 'Gagal menghapus data', 'Gagal Hapus');
+        }
+    } catch (e) {
+        hideGlobalLoading();
+        showToast('error', e.message, 'Gagal Hapus');
+    }
+};
+
+// Export Excel Receiving
+window.exportReceivingExcel = function() {
+    if (!cachedReceivingData || cachedReceivingData.length === 0) {
+        showToast('warning', 'Tidak ada data receiving untuk diekspor.', 'Data Kosong');
+        return;
+    }
+
+    showGlobalLoading("Menyiapkan Excel...", "Mengolah data serah terima...");
+    try {
+        const excelData = cachedReceivingData.map((r, idx) => ({
+            "No": idx + 1,
+            "No. Tanda Terima": r.receipt_number || '-',
+            "Ekspedisi": r.expedition || '-',
+            "Driver / Kurir": r.courier_name || '-',
+            "Total Paket (Pieces)": parseInt(r.total_packages || 0),
+            "Operator Penerima": r.operator_name || '-',
+            "Waktu Penerimaan": r.created_at || '-'
+        }));
+
+        generateExcelFile([
+            { name: "Receiving Inbound", data: excelData }
+        ], "Receiving_Inbound_Ekspedisi");
+
+        hideGlobalLoading();
+        showToast('success', 'File Excel Receiving Inbound berhasil diunduh!', 'Ekspor Berhasil');
+    } catch (e) {
+        hideGlobalLoading();
+        showToast('error', 'Gagal ekspor: ' + e.message, 'Gagal Ekspor');
+    }
+};
+
+// Isi Opsi Filter Ekspedisi secara Dinamis
+function populateReceivingExpeditionFilter(data) {
+    const sel = document.getElementById('filterReceivingExpedition');
+    if (!sel) return;
+    const currentVal = sel.value;
+
+    const setExp = new Set();
+    data.forEach(item => {
+        if (item.expedition) setExp.add(item.expedition);
+    });
+
+    let opts = '<option value="">Semua Ekspedisi</option>';
+    setExp.forEach(name => {
+        opts += `<option value="${escapeHtml(name)}" ${currentVal === name ? 'selected' : ''}>${escapeHtml(name)}</option>`;
+    });
+    sel.innerHTML = opts;
+}
+
+// =========================================================================
+// PUSAT KLAIM & BANDING EKSPEDISI / MARKETPLACE (CLAIM DOSSIER)
+// =========================================================================
+window.currentClaimDossier = null;
+
+window.executeClaimLookup = async function(e) {
+    if (e && e.preventDefault) e.preventDefault();
+
+    const input = document.getElementById('claimSearchInput');
+    const btn = document.getElementById('btnClaimSearch');
+    const query = input ? input.value.trim() : '';
+
+    if (!query) {
+        showToast('warning', 'Masukkan nomor resi atau Order ID terlebih dahulu', 'Input Kosong');
+        return;
+    }
+
+    const originalBtnHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mencari...';
+
+    try {
+        const res = await fetch(`api/ocs_lookup.php?q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+
+        if (!data.success) {
+            showToast('error', data.message || 'Gagal mencari data bukti klaim', 'Pencarian Gagal');
+            return;
+        }
+
+        window.currentClaimDossier = data;
+        renderClaimDossier(data);
+        showToast('success', 'Data bukti berhasil ditemukan & diverifikasi!', 'Dossier Ditemukan');
+    } catch (err) {
+        showToast('error', 'Terjadi kesalahan: ' + err.message, 'Gagal');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalBtnHtml;
+    }
+};
+
+function renderClaimDossier(data) {
+    const emptyPlaceholder = document.getElementById('claimEmptyPlaceholder');
+    const resultContainer = document.getElementById('claimResultContainer');
+
+    if (emptyPlaceholder) emptyPlaceholder.classList.add('hidden');
+    if (resultContainer) resultContainer.classList.remove('hidden');
+
+    const order = data.order || {};
+    const packVid = data.packing_video || {};
+    const reception = data.reception || null;
+    const unboxing = data.unboxing || null;
+    const readiness = data.claim_readiness || {};
+
+    // Header Title
+    const orderTitle = document.getElementById('claimOrderTitle');
+    if (orderTitle) {
+        orderTitle.innerText = `Order #${order.Id || '-'}  •  Resi #${order.TrackingNumber || data.query}`;
+    }
+
+    const shopSub = document.getElementById('claimShopSubtitle');
+    if (shopSub) {
+        shopSub.innerText = `Toko: ${order.ShopName || '-'} | Ekspedisi: ${order.ShippingProvider || reception?.expedition || '-'}`;
+    }
+
+    const platformBadge = document.getElementById('claimMarketplaceBadge');
+    if (platformBadge) {
+        platformBadge.innerText = (order.CommercePlatform || 'Marketplace').toUpperCase();
+    }
+
+    // Checklist Badges
+    updateChecklistBadge('iconCheckOrder', 'labelCheckOrder', readiness.has_order, 'Terverifikasi OCS', 'Tidak Ditemukan');
+    updateChecklistBadge('iconCheckPack', 'labelCheckPack', readiness.has_pack_video, 'Tersedia di OCS', 'Belum Ada Video');
+    updateChecklistBadge('iconCheckRec', 'labelCheckRec', readiness.has_reception, 'Diterima di Gudang', 'Belum Ada Tanda Terima');
+    updateChecklistBadge('iconCheckUnbox', 'labelCheckUnbox', readiness.has_unbox_video, 'Terekam Lengkap', 'Belum Di-unboxing');
+
+    // Banner Status Kelayakan Klaim: HANYA PAKET DENGAN KONDISI BUKAN GOOD / BAGUS
+    const eligBanner = document.getElementById('claimEligibilityBanner');
+    const eligIcon = document.getElementById('claimEligibilityIcon');
+    const eligTitle = document.getElementById('claimEligibilityTitle');
+    const eligSubtitle = document.getElementById('claimEligibilitySubtitle');
+    const eligTag = document.getElementById('claimEligibilityTag');
+
+    if (eligBanner && eligTitle && eligSubtitle && eligTag) {
+        if (data.is_claimable) {
+            eligBanner.className = 'p-4 rounded-2xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition bg-rose-50 border-rose-200 text-rose-900 shadow-2xs';
+            if (eligIcon) {
+                eligIcon.className = 'w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 bg-rose-100 text-rose-600';
+                eligIcon.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+            }
+            eligTitle.innerText = '⚠️ PAKET LAYAK KLAIM (Kondisi Bukan Good / Cacat)';
+            eligSubtitle.innerText = data.claim_eligibility_reason || 'Kondisi barang tercatat cacat/rusak saat unboxing retur. Memenuhi syarat untuk diajukan klaim atau banding ekspedisi.';
+            eligTag.className = 'px-3 py-1 rounded-lg text-white font-black text-[10px] uppercase tracking-wider shrink-0 self-start sm:self-center bg-rose-600';
+            eligTag.innerText = 'LAYAK KLAIM';
+        } else {
+            eligBanner.className = 'p-4 rounded-2xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition bg-emerald-50 border-emerald-200 text-emerald-900 shadow-2xs';
+            if (eligIcon) {
+                eligIcon.className = 'w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 bg-emerald-100 text-emerald-600';
+                eligIcon.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+            }
+            eligTitle.innerText = '✓ BUKAN PAKET KLAIM (Kondisi Bagus / Good)';
+            eligSubtitle.innerText = data.claim_eligibility_reason || 'Kondisi barang tercatat BAGUS (GOOD). Paket retur normal, BUKAN paket klaim kerusakan.';
+            eligTag.className = 'px-3 py-1 rounded-lg text-white font-black text-[10px] uppercase tracking-wider shrink-0 self-start sm:self-center bg-emerald-600';
+            eligTag.innerText = 'RETUR NORMAL';
+        }
+    }
+
+    // Video 1: Packing OCS
+    const packVideoEl = document.getElementById('playerPackingVideo');
+    const noPackPlaceholder = document.getElementById('noPackingVideoPlaceholder');
+    const packStatusText = document.getElementById('packingVideoStatusText');
+    const btnOpenPackTab = document.getElementById('btnOpenPackingVideoNewTab');
+
+    if (packVid.has_video && packVid.proxy_url) {
+        packVideoEl.src = packVid.proxy_url;
+        packVideoEl.classList.remove('hidden');
+        noPackPlaceholder.classList.add('hidden');
+        packStatusText.innerText = 'Video Packing Siap Diputar';
+        packStatusText.className = 'text-emerald-600 font-bold';
+        if (btnOpenPackTab) {
+            btnOpenPackTab.href = packVid.proxy_url;
+            btnOpenPackTab.classList.remove('hidden');
+        }
+    } else {
+        packVideoEl.pause();
+        packVideoEl.removeAttribute('src');
+        packVideoEl.classList.add('hidden');
+        noPackPlaceholder.classList.remove('hidden');
+        packStatusText.innerText = 'Tidak Tersedia di OCS';
+        packStatusText.className = 'text-slate-400 font-medium';
+        if (btnOpenPackTab) btnOpenPackTab.classList.add('hidden');
+    }
+
+    // Video 2: Unboxing Retur Lokal
+    const unboxVideoEl = document.getElementById('playerUnboxingVideo');
+    const noUnboxPlaceholder = document.getElementById('noUnboxingVideoPlaceholder');
+    const unboxOpText = document.getElementById('unboxingOperatorText');
+    const unboxTimeText = document.getElementById('unboxingTimestampText');
+
+    if (unboxing && unboxing.video_path) {
+        unboxVideoEl.src = unboxing.video_path;
+        unboxVideoEl.classList.remove('hidden');
+        noUnboxPlaceholder.classList.add('hidden');
+        if (unboxOpText) unboxOpText.innerText = unboxing.operator_name || 'Operator';
+        if (unboxTimeText) unboxTimeText.innerText = unboxing.created_at || '-';
+    } else {
+        unboxVideoEl.pause();
+        unboxVideoEl.removeAttribute('src');
+        unboxVideoEl.classList.add('hidden');
+        noUnboxPlaceholder.classList.remove('hidden');
+        if (unboxOpText) unboxOpText.innerText = '-';
+        if (unboxTimeText) unboxTimeText.innerText = 'Belum ada rekaman';
+    }
+
+    // Detail Grid OCS
+    setElText('detailOrderId', order.Id || '-');
+    setElText('detailTrackingNumber', order.TrackingNumber || data.query || '-');
+    setElText('detailPlatform', order.CommercePlatform || '-');
+    setElText('detailShopName', order.ShopName || '-');
+    setElText('detailShippingProvider', order.ShippingProvider || '-');
+    setElText('detailOrderCreatedAt', order.CreatedAt || '-');
+    setElText('detailPackagePrice', order.PackagePriceFormatted || (order.PackagePrice ? 'Rp ' + Number(order.PackagePrice).toLocaleString('id-ID') : 'Rp -'));
+    setElText('detailOrderProductName', order.ProductName || '-');
+
+    // Header Price Badge
+    const priceBadgeText = document.getElementById('claimPriceText');
+    if (priceBadgeText) {
+        priceBadgeText.innerText = order.PackagePriceFormatted || (order.PackagePrice ? 'Rp ' + Number(order.PackagePrice).toLocaleString('id-ID') : 'Rp -');
+    }
+
+    // Detail Grid Gudang
+    setElText('detailReceiptNo', reception?.receipt_number || '- (Belum discan di Receiving)');
+    setElText('detailCourier', reception ? `${reception.courier_name || '-'} (${reception.expedition || ''})` : '-');
+    setElText('detailReceivedAt', reception?.scanned_at || reception?.created_at || '-');
+    setElText('detailUnboxStatus', unboxing ? `${unboxing.status} (${unboxing.total_damaged || 0} Rusak, ${unboxing.total_good || 0} Bagus)` : '- (Belum di-unboxing)');
+
+    let notes = '-';
+    if (unboxing) {
+        const damageItems = (unboxing.items || []).filter(i => i.condition === 'DAMAGED' || i.damage_reason);
+        if (damageItems.length > 0) {
+            notes = damageItems.map(i => `• ${i.product_name}: ${i.damage_reason || 'Rusak'}`).join('<br>');
+        } else if (unboxing.notes) {
+            notes = unboxing.notes;
+        } else {
+            notes = 'Semua barang dalam kondisi baik (GOOD).';
+        }
+    } else if (order.ReturnReason || order.ReturnReasonText) {
+        notes = `Alasan Retur Marketplace: [${order.ReturnReason || ''}] ${order.ReturnReasonText || ''}`;
+    }
+    const notesEl = document.getElementById('detailConditionNotes');
+    if (notesEl) notesEl.innerHTML = notes;
+}
+
+function updateChecklistBadge(iconId, labelId, isOk, textOk, textFail) {
+    const icon = document.getElementById(iconId);
+    const label = document.getElementById(labelId);
+    if (!icon || !label) return;
+
+    if (isOk) {
+        icon.className = 'fa-solid fa-circle-check text-emerald-400 text-base';
+        label.innerText = textOk;
+        label.className = 'text-[10px] text-emerald-300 font-semibold';
+    } else {
+        icon.className = 'fa-solid fa-circle-xmark text-rose-400 text-base';
+        label.innerText = textFail;
+        label.className = 'text-[10px] text-rose-300 font-semibold';
+    }
+}
+
+function setElText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.innerText = text;
+}
+
+window.copyClaimPacketSummary = function() {
+    if (!window.currentClaimDossier) {
+        showToast('warning', 'Belum ada data klaim yang dipilih', 'Peringatan');
+        return;
+    }
+    const d = window.currentClaimDossier;
+    const ord = d.order || {};
+    const rec = d.reception || {};
+    const unb = d.unboxing || {};
+
+    const summary = `=== BERKAS KLAIM & BANDING RETUR ===\n` +
+        `Order ID / No. Pesanan : ${ord.Id || '-'}\n` +
+        `No. Resi Pengiriman (AWB): ${ord.TrackingNumber || d.query}\n` +
+        `Nilai / Harga Paket   : ${ord.PackagePriceFormatted || '-'}\n` +
+        `Platform / Marketplace : ${ord.CommercePlatform || '-'}\n` +
+        `Nama Toko             : ${ord.ShopName || '-'}\n` +
+        `Ekspedisi Pengiriman   : ${ord.ShippingProvider || rec.expedition || '-'}\n` +
+        `No. Tanda Terima Gudang: ${rec.receipt_number || '-'}\n` +
+        `Kurir Pengantar        : ${rec.courier_name || '-'}\n` +
+        `Hasil Unboxing         : ${unb.status || '-'} (${unb.total_damaged || 0} Rusak, ${unb.total_good || 0} Bagus)\n` +
+        `Video Packing OCS      : ${d.packing_video?.has_video ? 'TERSEDIA' : 'TIDAK TERSEDIA'}\n` +
+        `Video Unboxing Retur   : ${unb.video_path ? 'TEREKAM LENGKAP' : 'BELUM ADA'}\n` +
+        `Waktu Generate         : ${new Date().toLocaleString('id-ID')}\n` +
+        `====================================`;
+
+    navigator.clipboard.writeText(summary).then(() => {
+        showToast('success', 'Ringkasan bukti klaim berhasil disalin ke clipboard!', 'Tersalin');
+    }).catch(() => {
+        showToast('info', 'Gagal menyalin otomatis, silakan salin manual.', 'Info');
+    });
+};
+
+window.printClaimDossier = function() {
+    if (!window.currentClaimDossier) {
+        showToast('warning', 'Belum ada data klaim untuk dicetak', 'Peringatan');
+        return;
+    }
+    const d = window.currentClaimDossier;
+    const ord = d.order || {};
+    const rec = d.reception || {};
+    const unb = d.unboxing || {};
+
+    const printWin = window.open('', '_blank', 'width=900,height=750');
+    if (!printWin) {
+        showToast('error', 'Popup diblokir oleh browser. Izinkan popup untuk mencetak.', 'Popup Diblokir');
+        return;
+    }
+
+    const html = `<!DOCTYPE html>
+    <html lang="id">
+    <head>
+        <meta charset="UTF-8">
+        <title>Berkas Klaim - ${ord.TrackingNumber || ord.Id || 'Dossier'}</title>
+        <style>
+            @page { size: A4 portrait; margin: 15mm; }
+            body { font-family: Arial, sans-serif; font-size: 11pt; color: #1e293b; margin: 0; padding: 20px; line-height: 1.4; }
+            .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px; }
+            .title { text-align: center; margin-bottom: 16px; }
+            .title h2 { margin: 0; font-size: 15pt; text-transform: uppercase; color: #0f172a; }
+            .title p { margin: 4px 0 0 0; font-size: 9pt; color: #64748b; }
+            .box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 14px; }
+            .box-title { font-weight: bold; font-size: 10pt; text-transform: uppercase; color: #334155; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px; }
+            table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+            td { padding: 4px 6px; vertical-align: top; }
+            .label { width: 35%; color: #64748b; font-weight: normal; }
+            .val { font-weight: bold; color: #0f172a; }
+            .badge-ok { background: #dcfce7; color: #15803d; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 9pt; display: inline-block; }
+            .badge-no { background: #fee2e2; color: #b91c1c; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 9pt; display: inline-block; }
+            .signatures { display: flex; justify-content: space-between; margin-top: 40px; text-align: center; }
+            .sig-box { width: 45%; }
+            .sig-line { margin-top: 60px; border-bottom: 1px solid #0f172a; font-weight: bold; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <div>
+                <b style="font-size: 13pt;">IEG RETURN INBOUND & CLAIMS</b><br>
+                <span style="font-size: 9pt; color: #64748b;">Warehouse Management & Expedition Dispute Department</span>
+            </div>
+            <div style="text-align: right; font-size: 9pt; color: #64748b;">
+                Tanggal: <b>${new Date().toLocaleDateString('id-ID')}</b><br>
+                Status: <span class="badge-ok">VERIFIKASI SISTEM</span>
+            </div>
+        </div>
+
+        <div class="title">
+            <h2>BERITA ACARA BUKTI BANDING / KLAIM EKSPEDISI</h2>
+            <p>Lampiran Resmi Bukti Cross-Lookup OCS WMS & Rekaman Inbound Warehouse</p>
+        </div>
+
+        ${d.is_claimable ? `
+        <div style="background: #fee2e2; border: 2px solid #ef4444; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; color: #991b1b;">
+            <b style="font-size: 11pt;">⚠️ STATUS: PAKET LAYAK KLAIM / BANDING EKSPEDISI (Kondisi Bukan Good / Cacat)</b><br>
+            <span style="font-size: 9.5pt;">${d.claim_eligibility_reason || 'Kondisi barang tercatat cacat/rusak saat unboxing retur.'}</span>
+        </div>
+        ` : `
+        <div style="background: #dcfce7; border: 2px solid #22c55e; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; color: #166534;">
+            <b style="font-size: 11pt;">✓ STATUS: BUKAN PAKET KLAIM (Kondisi Good / Retur Normal)</b><br>
+            <span style="font-size: 9.5pt;">${d.claim_eligibility_reason || 'Barang diterima dalam kondisi baik. Tidak memenuhi syarat klaim kerusakan.'}</span>
+        </div>
+        `}
+
+        <div class="box">
+            <div class="box-title">I. IDENTITAS PESANAN & PENGIRIMAN ASAL (OCS IEG SYSTEM)</div>
+            <table>
+                <tr><td class="label">Nomor Order / Invoice:</td><td class="val">${ord.Id || '-'}</td></tr>
+                <tr><td class="label">Nomor Resi Paket (AWB):</td><td class="val">${ord.TrackingNumber || d.query}</td></tr>
+                <tr><td class="label">Nilai / Harga Paket (Klaim):</td><td class="val" style="color: #047857; font-size: 11pt; font-weight: 900;">${ord.PackagePriceFormatted || '-'}</td></tr>
+                <tr><td class="label">Marketplace / Platform:</td><td class="val">${ord.CommercePlatform || '-'}</td></tr>
+                <tr><td class="label">Nama Official Shop / Toko:</td><td class="val">${ord.ShopName || '-'}</td></tr>
+                <tr><td class="label">Jasa Ekspedisi Kirim:</td><td class="val">${ord.ShippingProvider || '-'}</td></tr>
+                <tr><td class="label">Keterangan Produk:</td><td class="val">${ord.ProductName || '-'}</td></tr>
+            </table>
+        </div>
+
+        <div class="box">
+            <div class="box-title">II. BUKTI FISIK SERAH TERIMA DARI EKSPEDISI (RECEIVING INBOUND)</div>
+            <table>
+                <tr><td class="label">No. Tanda Terima Ekspedisi:</td><td class="val">${rec.receipt_number || '-'}</td></tr>
+                <tr><td class="label">Kurir / Driver Pengantar:</td><td class="val">${rec.courier_name || '-'} (${rec.expedition || ''})</td></tr>
+                <tr><td class="label">Waktu Fisik Diterima:</td><td class="val">${rec.scanned_at || rec.created_at || '-'}</td></tr>
+                <tr><td class="label">Operator Penerima:</td><td class="val">${rec.operator_name || '-'}</td></tr>
+            </table>
+        </div>
+
+        <div class="box">
+            <div class="box-title">III. HASIL PEMERIKSAAN & UNBOXING RETUR DI GUDANG</div>
+            <table>
+                <tr><td class="label">Status Hasil Unboxing:</td><td class="val">${unb.status || '-'} (${unb.total_damaged || 0} Rusak, ${unb.total_good || 0} Bagus)</td></tr>
+                <tr><td class="label">Waktu Unboxing:</td><td class="val">${unb.created_at || '-'}</td></tr>
+                <tr><td class="label">Operator Pemeriksa:</td><td class="val">${unb.operator_name || '-'}</td></tr>
+                <tr><td class="label">Catatan Kerusakan:</td><td class="val">${unb.notes || (ord.ReturnReasonText ? '[' + ord.ReturnReason + '] ' + ord.ReturnReasonText : 'Lihat rincian fisik')}</td></tr>
+            </table>
+        </div>
+
+        <div class="box">
+            <div class="box-title">IV. STATUS VERIFIKASI VIDEO DIGITAL</div>
+            <table>
+                <tr>
+                    <td class="label">1. Video Rekaman Packing (Saat Kirim dari Gudang):</td>
+                    <td class="val">${d.packing_video?.has_video ? '<span class="badge-ok">✓ TERSEDIA DI OCS</span>' : '<span class="badge-no">✕ BELUM TERSEDIA</span>'}</td>
+                </tr>
+                <tr>
+                    <td class="label">2. Video Rekaman Unboxing (Saat Retur Kembali):</td>
+                    <td class="val">${unb.video_path ? '<span class="badge-ok">✓ TEREKAM LENGKAP</span>' : '<span class="badge-no">✕ BELUM DIREKAM</span>'}</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="signatures">
+            <div class="sig-box">
+                <span>Diverifikasi Oleh:</span>
+                <div class="sig-line">Operator / Petugas Inbound</div>
+            </div>
+            <div class="sig-box">
+                <span>Mengetahui / Disetujui:</span>
+                <div class="sig-line">Supervisor Gudang & Klaim</div>
+            </div>
+        </div>
+
+        <script>
+            window.onload = function() {
+                window.print();
+            };
+        </script>
+    </body>
+    </html>`;
+
+    printWin.document.open();
+    printWin.document.write(html);
+    printWin.document.close();
+};
+
+// ==========================================
+// KANDIDAT PAKET KLAIM (KONDISI BUKAN GOOD)
+// ==========================================
+window.loadClaimCandidates = async function(force = false) {
+    const tbody = document.getElementById('claimCandidatesTableBody');
+    const refreshIcon = document.getElementById('iconRefreshCandidates');
+    if (!tbody) return;
+
+    if (refreshIcon) refreshIcon.classList.add('fa-spin');
+
+    try {
+        const res = await fetch('api/ocs_lookup.php?action=list_claimable');
+        const data = await res.json();
+
+        if (!data.success) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-rose-500 font-semibold">${data.message || 'Gagal memuat kandidat klaim'}</td></tr>`;
+            return;
+        }
+
+        const candidates = data.candidates || [];
+        if (candidates.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-slate-400">
+                <i class="fa-solid fa-box-open text-2xl text-slate-300 mb-2 block"></i>
+                Tidak ada paket unboxing yang berkondisi rusak / cacat saat ini. Semua paket berkondisi BAGUS (GOOD).
+            </td></tr>`;
+            return;
+        }
+
+        let html = '';
+        candidates.forEach((c, idx) => {
+            const hasVideo = !!c.video_path;
+            const damagedCount = c.total_damaged > 0 ? c.total_damaged : (c.damaged_items_count || 1);
+            const reason = c.damage_reasons || c.notes || 'Kondisi Rusak / Bukan Good';
+
+            html += `
+                <tr class="hover:bg-rose-50/40 transition border-b border-slate-100">
+                    <td class="py-3 px-4 font-bold text-slate-500">${idx + 1}</td>
+                    <td class="py-3 px-4">
+                        <button onclick="lookupClaimCandidate('${c.invoice_number}')" class="font-mono font-bold text-indigo-600 hover:text-indigo-800 text-left block hover:underline">
+                            ${c.invoice_number}
+                        </button>
+                        <span class="text-[10px] text-slate-400 block">${c.operator_name || 'Operator'}</span>
+                    </td>
+                    <td class="py-3 px-4 font-semibold text-slate-700">${c.expedition || '-'}</td>
+                    <td class="py-3 px-4 text-slate-500 text-[11px] whitespace-nowrap">${c.created_at || '-'}</td>
+                    <td class="py-3 px-4 text-center">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
+                            ${damagedCount} Rusak
+                        </span>
+                    </td>
+                    <td class="py-3 px-4">
+                        <span class="text-slate-800 font-medium block max-w-xs truncate" title="${reason}">
+                            ${reason}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                        ${hasVideo ? 
+                            `<span class="inline-flex items-center gap-1 text-[11px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                                <i class="fa-solid fa-video"></i> Ada
+                             </span>` : 
+                            `<span class="inline-flex items-center gap-1 text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
+                                <i class="fa-solid fa-video-slash"></i> -
+                             </span>`
+                        }
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                        <button onclick="lookupClaimCandidate('${c.invoice_number}')" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[11px] font-bold transition shadow-2xs flex items-center gap-1.5 mx-auto">
+                            <i class="fa-solid fa-file-shield"></i> Berkas Klaim
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+        if (force) {
+            showToast('success', `Berhasil memuat ${candidates.length} paket rusak / layak klaim`, 'Daftar Diperbarui');
+        }
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-rose-500">Error: ${err.message}</td></tr>`;
+    } finally {
+        if (refreshIcon) refreshIcon.classList.remove('fa-spin');
+    }
+};
+
+window.lookupClaimCandidate = function(identifier) {
+    const input = document.getElementById('claimSearchInput');
+    if (input) {
+        input.value = identifier;
+        searchClaimDossier();
+        const resEl = document.getElementById('claimResultContainer');
+        if (resEl) {
+            resEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+};
+

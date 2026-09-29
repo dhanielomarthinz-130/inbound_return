@@ -235,12 +235,240 @@ inputBarcode.addEventListener('keypress', (e) => {
     }
 });
 
+// -------------------------------------------------------------
+// AUTO-DETECT EXP DATE DARI NO. BATCH
+// -------------------------------------------------------------
+function parseExpDateFromBatch(batchStr) {
+    if (!batchStr) return null;
+    const raw = batchStr.trim().toUpperCase();
+
+    // 1. Cek format dengan tanda pemisah: YYYY-MM-DD, DD-MM-YYYY, DD/MM/YYYY, MM/YYYY, dll.
+    let m = raw.match(/\b(20[2-3]\d)[-/.](0[1-9]|1[0-2])[-/.](0[1-9]|[12]\d|3[01])\b/);
+    if (m) return { date: `${m[1]}-${m[2]}-${m[3]}`, label: 'Pola Tanggal' };
+
+    m = raw.match(/\b(0[1-9]|[12]\d|3[01])[-/.](0[1-9]|1[0-2])[-/.](20[2-3]\d)\b/);
+    if (m) return { date: `${m[3]}-${m[2]}-${m[1]}`, label: 'Pola Tanggal' };
+
+    m = raw.match(/\b(0[1-9]|[12]\d|3[01])[-/.](0[1-9]|1[0-2])[-/.]([2-3]\d)\b/);
+    if (m) return { date: `20${m[3]}-${m[2]}-${m[1]}`, label: 'Pola Tanggal' };
+
+    m = raw.match(/\b(0[1-9]|1[0-2])[-/.](20[2-3]\d)\b/);
+    if (m) return { date: `${m[2]}-${m[1]}-01`, label: 'Pola Bulan/Tahun' };
+
+    m = raw.match(/\b(0[1-9]|1[0-2])[-/.]([2-3]\d)\b/);
+    if (m) return { date: `20${m[2]}-${m[1]}-01`, label: 'Pola Bulan/Tahun' };
+
+    // 2. Format dengan nama bulan (cth: 20 APR 2029, 20APR29, 20-APR-2029, APR 2029)
+    const monthNames = {
+        'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04',
+        'MEI': '05', 'MAY': '05', 'JUN': '06', 'JUL': '07',
+        'AGU': '08', 'AUG': '08', 'SEP': '09', 'OKT': '10',
+        'OCT': '10', 'NOV': '11', 'DES': '12', 'DEC': '12'
+    };
+    const monthList = 'JAN|FEB|MAR|APR|MEI|MAY|JUN|JUL|AGU|AUG|SEP|OKT|OCT|NOV|DES|DEC';
+
+    // cth: 20 APR 2029 atau 20APR29
+    let mText = raw.match(new RegExp(`\\b(0?[1-9]|[12]\\d|3[01])[-/\\s]?(${monthList})[-/\\s]?(20[2-3]\\d|[2-3]\\d)\\b`));
+    if (mText) {
+        const d = mText[1].padStart(2, '0');
+        const mo = monthNames[mText[2]];
+        const yr = mText[3].length === 2 ? `20${mText[3]}` : mText[3];
+        return { date: `${yr}-${mo}-${d}`, label: `Pola (${mText[2]} ${yr})` };
+    }
+
+    // cth: APR 2029 atau APR 29
+    mText = raw.match(new RegExp(`\\b(${monthList})[-/\\s]?(20[2-3]\\d|[2-3]\\d)\\b`));
+    if (mText) {
+        const mo = monthNames[mText[1]];
+        const yr = mText[2].length === 2 ? `20${mText[2]}` : mText[2];
+        return { date: `${yr}-${mo}-01`, label: `Pola (${mText[1]} ${yr})` };
+    }
+
+    // 3. Format Huruf Bulan + Tahun Produksi + No. Lot (Standar Pabrik Kosmetik & FMCG)
+    // Cth: D26342 -> D = Bulan 4 (April), 26 = Thn Produksi 2026 -> Exp: 2026 + 3 thn shelf-life = Apr 2029
+    // Huruf A=Jan, B=Feb, C=Mar, D=Apr, E=Mei, F=Jun, G=Jul, H=Agu, I=Sep, J=Okt, K=Nov, L=Des
+    const letterToMonth = {
+        'A': { mo: '01', name: 'Jan' },
+        'B': { mo: '02', name: 'Feb' },
+        'C': { mo: '03', name: 'Mar' },
+        'D': { mo: '04', name: 'Apr' },
+        'E': { mo: '05', name: 'Mei' },
+        'F': { mo: '06', name: 'Jun' },
+        'G': { mo: '07', name: 'Jul' },
+        'H': { mo: '08', name: 'Agu' },
+        'I': { mo: '09', name: 'Sep' },
+        'J': { mo: '10', name: 'Okt' },
+        'K': { mo: '11', name: 'Nov' },
+        'L': { mo: '12', name: 'Des' }
+    };
+    const fmcgMatch = raw.match(/^([A-L])(2[3-9]|[3-4]\d)(\d{1,5})?$/);
+    if (fmcgMatch) {
+        const letter = fmcgMatch[1];
+        const mfgYear = parseInt(fmcgMatch[2]); // 26 -> 2026
+        const info = letterToMonth[letter];
+        if (info && mfgYear >= 23 && mfgYear <= 35) {
+            const expYear = 2000 + mfgYear + 3; // Masa simpan standar kosmetik/FMCG: 3 Tahun
+            return {
+                date: `${expYear}-${info.mo}-20`,
+                label: `Pola ${letter}${mfgYear} (${info.name} ${expYear})`
+            };
+        }
+    }
+
+    // 4. Bersihkan prefix umum (B, LOT, EXP, ED, BT, BATCH, #, dll)
+    const cleanedDigits = raw.replace(/^(B|LOT|EXP|ED|BT|BATCH|L)[-_\s.:]*/i, '');
+    const numMatch = cleanedDigits.match(/\d{4,8}/);
+    if (!numMatch) return null;
+    const digits = numMatch[0];
+
+    // Kasus 8 digit: YYYYMMDD atau DDMMYYYY
+    if (digits.length === 8) {
+        const y1 = parseInt(digits.slice(0, 4));
+        const m1 = parseInt(digits.slice(4, 6));
+        const d1 = parseInt(digits.slice(6, 8));
+        if (y1 >= 2023 && y1 <= 2038 && m1 >= 1 && m1 <= 12 && d1 >= 1 && d1 <= 31) {
+            return { date: `${y1}-${String(m1).padStart(2, '0')}-${String(d1).padStart(2, '0')}`, label: 'Pola 8 Digit' };
+        }
+
+        const d2 = parseInt(digits.slice(0, 2));
+        const m2 = parseInt(digits.slice(2, 4));
+        const y2 = parseInt(digits.slice(4, 8));
+        if (y2 >= 2023 && y2 <= 2038 && m2 >= 1 && m2 <= 12 && d2 >= 1 && d2 <= 31) {
+            return { date: `${y2}-${String(m2).padStart(2, '0')}-${String(d2).padStart(2, '0')}`, label: 'Pola 8 Digit' };
+        }
+    }
+
+    // Kasus 6 digit: YYMMDD atau DDMMYY (Format standar Indonesia, cth: B260901 -> 2026-09-01)
+    if (digits.length === 6) {
+        const yy1 = parseInt(digits.slice(0, 2));
+        const mm1 = parseInt(digits.slice(2, 4));
+        const dd1 = parseInt(digits.slice(4, 6));
+        if (yy1 >= 23 && yy1 <= 38 && mm1 >= 1 && mm1 <= 12 && dd1 >= 1 && dd1 <= 31) {
+            return { date: `20${String(yy1).padStart(2, '0')}-${String(mm1).padStart(2, '0')}-${String(dd1).padStart(2, '0')}`, label: 'Pola 6 Digit' };
+        }
+
+        const dd2 = parseInt(digits.slice(0, 2));
+        const mm2 = parseInt(digits.slice(2, 4));
+        const yy2 = parseInt(digits.slice(4, 6));
+        if (yy2 >= 23 && yy2 <= 38 && mm2 >= 1 && mm2 <= 12 && dd2 >= 1 && dd2 <= 31) {
+            return { date: `20${String(yy2).padStart(2, '0')}-${String(mm2).padStart(2, '0')}-${String(dd2).padStart(2, '0')}`, label: 'Pola 6 Digit' };
+        }
+    }
+
+    // Kasus 5 digit Julian date: YYDDD (cth: 26244 -> thn 2026, hari ke-244)
+    if (digits.length === 5) {
+        const yy = parseInt(digits.slice(0, 2));
+        const ddd = parseInt(digits.slice(2, 5));
+        if (yy >= 23 && yy <= 38 && ddd >= 1 && ddd <= 366) {
+            const dateObj = new Date(2000 + yy, 0, ddd);
+            if (!isNaN(dateObj.getTime())) {
+                const yyyy = dateObj.getFullYear();
+                const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const dd = String(dateObj.getDate()).padStart(2, '0');
+                return { date: `${yyyy}-${mm}-${dd}`, label: 'Pola Julian Date' };
+            }
+        }
+    }
+
+    // Kasus 4 digit: YYMM atau MMYY (cth: 2609 -> 2026-09-01)
+    if (digits.length === 4) {
+        const p1 = parseInt(digits.slice(0, 2));
+        const p2 = parseInt(digits.slice(2, 4));
+        if (p1 >= 23 && p1 <= 38 && p2 >= 1 && p2 <= 12) {
+            return { date: `20${p1}-${String(p2).padStart(2, '0')}-01`, label: 'Pola YYMM' };
+        }
+        if (p1 >= 1 && p1 <= 12 && p2 >= 23 && p2 <= 38) {
+            return { date: `20${p2}-${String(p1).padStart(2, '0')}-01`, label: 'Pola MMYY' };
+        }
+    }
+
+    return null;
+}
+
+let batchLookupDebounceTimer = null;
+
+async function checkAndApplyExpDateFromBatch(batchVal) {
+    const val = (batchVal || '').trim();
+    if (!val) {
+        clearAutoExpIndicator();
+        return false;
+    }
+
+    // 1. Coba deteksi pola tanggal secara cerdas langsung di browser (0ms / instan)
+    const detected = parseExpDateFromBatch(val);
+    if (detected) {
+        const expDateStr = typeof detected === 'object' ? detected.date : detected;
+        const expLabel = typeof detected === 'object' && detected.label ? detected.label : 'Pola Batch Terdeteksi';
+        inputExpDate.value = expDateStr;
+        showAutoExpIndicator(expLabel);
+    }
+
+    // 2. Cek juga riwayat batch dari server database (untuk mengambil tanggal persis yang pernah diinput sebelumnya)
+    const currentBarcode = inputBarcode ? inputBarcode.value.trim() : '';
+    if (batchLookupDebounceTimer) clearTimeout(batchLookupDebounceTimer);
+    batchLookupDebounceTimer = setTimeout(async () => {
+        try {
+            const res = await fetch(`api/batch_lookup.php?barcode=${encodeURIComponent(currentBarcode)}&batch=${encodeURIComponent(val)}`);
+            const data = await res.json();
+            if (data && data.found && data.exp_date) {
+                inputExpDate.value = data.exp_date;
+                showAutoExpIndicator('Dari Riwayat Scan');
+            } else if (!detected) {
+                clearAutoExpIndicator();
+            }
+        } catch (e) {
+            if (!detected) clearAutoExpIndicator();
+        }
+    }, 200);
+
+    return Boolean(detected);
+}
+
+function showAutoExpIndicator(label = 'Auto') {
+    const badge = document.getElementById('autoExpBadge');
+    const badgeLabel = document.getElementById('autoExpLabel');
+    if (badge) {
+        if (badgeLabel) badgeLabel.innerText = label;
+        badge.classList.remove('hidden');
+    }
+    if (inputExpDate) {
+        inputExpDate.classList.add('border-emerald-500', 'bg-emerald-50/50');
+    }
+}
+
+function clearAutoExpIndicator() {
+    const badge = document.getElementById('autoExpBadge');
+    if (badge) badge.classList.add('hidden');
+    if (inputExpDate) {
+        inputExpDate.classList.remove('border-emerald-500', 'bg-emerald-50/50');
+    }
+}
+
+// Deteksi perubahan pada input No. Batch
+inputBatch.addEventListener('input', () => {
+    checkAndApplyExpDateFromBatch(inputBatch.value);
+});
+
+inputBatch.addEventListener('paste', () => {
+    setTimeout(() => {
+        checkAndApplyExpDateFromBatch(inputBatch.value);
+    }, 50);
+});
+
 // Deteksi Enter berpindah kolom secara natural:
-// Barcode -> Batch -> ExpDate -> Qty -> Type -> Submit
+// Barcode -> Batch -> ExpDate (atau langsung Qty jika Exp Date sudah otomatis terisi) -> Qty -> Type -> Submit
 inputBatch.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         e.preventDefault();
-        inputExpDate.focus();
+        const hasDate = Boolean(inputExpDate && inputExpDate.value);
+        if (hasDate) {
+            // Exp Date sudah terisi otomatis! Langsung lompat ke Qty agar operator cepat
+            inputQty.focus();
+            inputQty.select();
+        } else {
+            // Jika belum terisi, arahkan kursor ke Exp Date agar operator bisa isi manual
+            inputExpDate.focus();
+        }
     }
 });
 
@@ -404,6 +632,7 @@ function resetProductInputs() {
     inputExpDate.value = '';
     inputQty.value = 1;
     inputType.value = 'GOOD';
+    clearAutoExpIndicator();
     document.getElementById('detectedProductName').innerText = "Silakan scan / ketik barcode...";
     document.getElementById('detectedProductName').className = "font-bold text-indigo-700 ml-1 text-sm";
     document.getElementById('detectedProductSku').innerText = "";

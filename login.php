@@ -72,7 +72,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'name' => $user['name'],
                             'role' => $user['role']
                         ];
-                        header('Location: scanner');
+                        
+                        $destination = trim($_POST['destination'] ?? 'scanner');
+                        if ($destination === 'reception') {
+                            header('Location: reception');
+                        } else {
+                            header('Location: scanner');
+                        }
                         exit;
                     } else {
                         $error = 'PIN yang Anda masukkan salah!';
@@ -230,6 +236,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div id="sectionOperator" class="<?= $activeTab === 'operator' ? '' : 'hidden' ?> space-y-4">
             <form method="POST" action="login" id="formOperator" class="space-y-4">
                 <input type="hidden" name="tab" value="operator">
+
+                <!-- PILIHAN MENU / AKTIVITAS -->
+                <div class="grid grid-cols-2 gap-2">
+                    <!-- Pilihan 1: Inbound Unboxing -->
+                    <label class="flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl border-2 cursor-pointer transition select-none text-xs font-bold border-slate-200 bg-white text-slate-600 hover:border-slate-300 has-[:checked]:border-indigo-600 has-[:checked]:bg-indigo-50/60 has-[:checked]:text-indigo-700">
+                        <input type="radio" name="destination" value="scanner" class="sr-only" <?= (!isset($_POST['destination']) || $_POST['destination'] === 'scanner') ? 'checked' : '' ?>>
+                        <i class="fa-solid fa-box-open text-indigo-500 text-sm"></i>
+                        <span>Inbound Unboxing</span>
+                    </label>
+
+                    <!-- Pilihan 2: Receiving Inbound -->
+                    <label class="flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl border-2 cursor-pointer transition select-none text-xs font-bold border-slate-200 bg-white text-slate-600 hover:border-slate-300 has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-50/60 has-[:checked]:text-emerald-700">
+                        <input type="radio" name="destination" value="reception" class="sr-only" <?= (isset($_POST['destination']) && $_POST['destination'] === 'reception') ? 'checked' : '' ?>>
+                        <i class="fa-solid fa-truck-ramp-box text-emerald-500 text-sm"></i>
+                        <span>Receiving Inbound</span>
+                    </label>
+                </div>
                 
                 <div>
                     <div class="flex items-center justify-between mb-1.5">
@@ -249,7 +272,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <option value="">-- Pilih Operator Inbound --</option>
                             <?php foreach ($operators as $op): ?>
                                 <option value="<?= htmlspecialchars($op['username']) ?>" <?= (isset($_POST['operator_username']) && $_POST['operator_username'] === $op['username']) ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($op['name']) ?> (<?= htmlspecialchars($op['username']) ?>)
+                                    <?= htmlspecialchars(!empty($op['name']) ? $op['name'] : $op['username']) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -270,9 +293,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <!-- Input PIN Operator -->
                 <div>
-                    <div class="flex items-center justify-between mb-1.5">
+                    <div class="mb-1.5">
                         <label class="block text-xs font-bold text-slate-600">PIN Keamanan (6 Digit)</label>
-                        <span class="text-[10px] text-slate-400">Gunakan Numpad atau Keyboard</span>
                     </div>
                     <div class="relative">
                         <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">

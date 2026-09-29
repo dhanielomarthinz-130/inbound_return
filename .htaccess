@@ -20,10 +20,13 @@ RewriteRule ^api/admin/transactions/?$ api/admin/transactions.php [QSA,L]
 RewriteRule ^api/admin/session/([^/]+)/items/?$ api/admin/session_items.php?session_id=$1 [QSA,L]
 RewriteRule ^api/products/?$ api/products.php [QSA,L]
 RewriteRule ^api/expeditions/?$ api/expeditions.php [QSA,L]
+RewriteRule ^api/reception/?$ api/reception.php [QSA,L]
 
 # 5. Route Clean URLs ke PHP scripts
 RewriteRule ^admin/?$ admin.php [QSA,L]
 RewriteRule ^scanner/?$ index.php [QSA,L]
+RewriteRule ^reception/?$ reception.php [QSA,L]
+RewriteRule ^penerimaan/?$ reception.php [QSA,L]
 RewriteRule ^login/?$ login.php [QSA,L]
 RewriteRule ^logout/?$ logout.php [QSA,L]
 

@@ -53,6 +53,12 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                     <span class="hidden md:inline">Reset Sesi</span>
                 </button>
 
+                <!-- Menu Penerimaan Ekspedisi (Mobile & Dok) -->
+                <a href="reception" title="Penerimaan Returan dari Ekspedisi (Mobile)" class="bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-500/50 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/30">
+                    <i class="fa-solid fa-truck-ramp-box"></i>
+                    <span class="hidden sm:inline">Penerimaan Ekspedisi</span>
+                </a>
+
                 <?php if (in_array($user['role'], ['admin', 'superadmin'])): ?>
                 <a href="admin" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded-xl font-semibold transition flex items-center gap-1.5 shadow-sm shadow-indigo-600/30">
                     <i class="fa-solid fa-chart-pie"></i>
@@ -105,8 +111,8 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                     </button>
                 </div>
 
-                <!-- Video Viewport Bersih & Responsif -->
-                <div class="relative bg-slate-950 flex justify-center items-center aspect-[4/3] md:aspect-video w-full overflow-hidden">
+                <!-- Video Viewport Bersih & Responsif (Panjang ke Bawah) -->
+                <div class="relative bg-slate-950 flex justify-center items-center w-full h-[520px] sm:h-[600px] lg:h-[680px] overflow-hidden">
                     <video id="liveVideoFeed" autoplay playsinline muted class="w-full h-full object-cover"></video>
                     <div id="cameraLoading" class="absolute inset-0 bg-slate-900/95 flex flex-col items-center justify-center text-white space-y-2.5">
                         <div class="traffic-loader py-2">
@@ -126,28 +132,6 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                     <span id="scanModeIndicator" class="font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-xl text-[10px] tracking-wide uppercase">
                         LANGKAH 1: SCAN INVOICE
                     </span>
-                </div>
-            </div>
-
-            <!-- Card Panduan Cepat Alur Station -->
-            <div class="bg-white rounded-3xl p-4 shadow-sm border border-slate-200/90 text-xs space-y-2.5">
-                <div class="flex items-center gap-2 font-bold text-slate-800">
-                    <i class="fa-solid fa-lightbulb text-amber-500 text-sm"></i>
-                    <span>Panduan Alur Kerja Cepat:</span>
-                </div>
-                <div class="space-y-1.5 text-slate-600 text-[11px]">
-                    <div class="flex items-start gap-2">
-                        <span class="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">1</span>
-                        <span><strong>Scan Invoice / Resi</strong> &mdash; Video unboxing otomatis mulai merekam dengan watermark.</span>
-                    </div>
-                    <div class="flex items-start gap-2">
-                        <span class="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">2</span>
-                        <span><strong>Scan Barcode Produk</strong> &mdash; Kursor otomatis fokus ke input Batch & Exp Date.</span>
-                    </div>
-                    <div class="flex items-start gap-2">
-                        <span class="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">3</span>
-                        <span><strong>Selesaikan Inbound</strong> &mdash; Rekaman video & seluruh transaksi tersimpan permanen.</span>
-                    </div>
                 </div>
             </div>
 
@@ -294,10 +278,15 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                     <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
                         <!-- Exp Date (4 Kolom) -->
                         <div class="sm:col-span-4">
-                            <label class="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1">
-                                <i class="fa-regular fa-calendar-days text-indigo-600"></i>
-                                <span>Exp Date (dd-mm-yyyy)</span>
-                            </label>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="block text-xs font-bold text-slate-700 flex items-center gap-1">
+                                    <i class="fa-regular fa-calendar-days text-indigo-600"></i>
+                                    <span>Exp Date (dd-mm-yyyy)</span>
+                                </label>
+                                <span id="autoExpBadge" class="hidden text-[10px] text-emerald-700 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                    <i class="fa-solid fa-wand-magic-sparkles text-emerald-600"></i> <span id="autoExpLabel">Auto</span>
+                                </span>
+                            </div>
                             <input type="date" id="inputExpDate"
                                 class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-2xl text-xs font-mono text-slate-800 focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition">
                         </div>

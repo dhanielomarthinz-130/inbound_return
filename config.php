@@ -161,10 +161,66 @@ try {
                 `sort_order` INT DEFAULT 0,
                 `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+            CREATE TABLE IF NOT EXISTS `expedition_receptions` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `receipt_number` VARCHAR(100) NOT NULL UNIQUE,
+                `expedition` VARCHAR(100) NOT NULL,
+                `courier_name` VARCHAR(150) NULL,
+                `vehicle_no` VARCHAR(50) NULL,
+                `operator_name` VARCHAR(100) NOT NULL,
+                `total_packages` INT DEFAULT 0,
+                `notes` TEXT NULL,
+                `status` VARCHAR(50) DEFAULT 'RECEIVED',
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_receipt_number (`receipt_number`),
+                INDEX idx_reception_expedition (`expedition`),
+                INDEX idx_reception_created (`created_at`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+            CREATE TABLE IF NOT EXISTS `reception_packages` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `reception_id` INT NOT NULL,
+                `package_barcode` VARCHAR(100) NOT NULL,
+                `scanned_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_reception_id (`reception_id`),
+                INDEX idx_package_barcode (`package_barcode`),
+                CONSTRAINT fk_reception_packages FOREIGN KEY (`reception_id`) REFERENCES `expedition_receptions`(`id`) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+            CREATE TABLE IF NOT EXISTS `ocs_orders` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `order_id` VARCHAR(100) NOT NULL UNIQUE,
+                `tracking_number` VARCHAR(100) NULL,
+                `platform_id` INT NULL,
+                `commerce_platform` VARCHAR(50) NULL,
+                `shop_name` VARCHAR(100) NULL,
+                `shipping_provider` VARCHAR(150) NULL,
+                `status_code` INT NULL,
+                `product_name` TEXT NULL,
+                `total_qty` INT DEFAULT 1,
+                `package_price` DECIMAL(15,2) DEFAULT 0.00,
+                `gmv` DECIMAL(15,2) DEFAULT 0.00,
+                `nmv` DECIMAL(15,2) DEFAULT 0.00,
+                `has_packing_video` TINYINT(1) DEFAULT 0,
+                `packing_video_url` VARCHAR(255) NULL,
+                `order_created_at` VARCHAR(50) NULL,
+                `raw_payload` LONGTEXT NULL,
+                `synced_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_ocs_order_id (`order_id`),
+                INDEX idx_ocs_tracking (`tracking_number`),
+                INDEX idx_ocs_platform (`commerce_platform`),
+                INDEX idx_ocs_shop (`shop_name`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
 
         // Auto-patch kolom jika sebelumnya belum ada
         try {
+            $colsOcs = $pdo->query("SHOW COLUMNS FROM ocs_orders")->fetchAll(PDO::FETCH_COLUMN);
+            if (!in_array('package_price', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN package_price DECIMAL(15,2) DEFAULT 0.00 AFTER total_qty");
+            if (!in_array('gmv', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN gmv DECIMAL(15,2) DEFAULT 0.00 AFTER package_price");
+            if (!in_array('nmv', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN nmv DECIMAL(15,2) DEFAULT 0.00 AFTER gmv");
+
             $cols = $pdo->query("SHOW COLUMNS FROM return_items")->fetchAll(PDO::FETCH_COLUMN);
             if (!in_array('batch_no', $cols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN batch_no VARCHAR(100) NULL AFTER sku");
             if (!in_array('exp_date', $cols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN exp_date VARCHAR(50) NULL AFTER batch_no");
