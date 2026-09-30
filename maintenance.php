@@ -23,7 +23,7 @@
             </div>
             <div class="text-left">
                 <h2 class="font-bold text-white text-base leading-tight">Inbound Return IEG</h2>
-                <p class="text-[10px] text-slate-400">PT. Indo Express Global</p>
+                <p class="text-[10px] text-slate-400">IEG</p>
             </div>
         </div>
 

@@ -1445,7 +1445,7 @@ function generateWatermarkedPhoto({ badgeText, badgeColor = '#4f46e5', fields = 
     const titleFontSize = Math.max(14, Math.round(topBarHeight * 0.40));
     ctx.font = `bold ${titleFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
     ctx.fillStyle = '#ffffff';
-    ctx.fillText("PT. INDO EXPRESS GLOBAL • INBOUND RETURN STATION", 20, Math.round(topBarHeight * 0.65));
+    ctx.fillText("IEG • INBOUND RETURN STATION", 20, Math.round(topBarHeight * 0.65));
 
     // Badge Kanan Atas
     const badgeFontSize = Math.max(12, Math.round(topBarHeight * 0.36));

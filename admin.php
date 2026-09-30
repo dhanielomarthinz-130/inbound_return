@@ -1570,7 +1570,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
             <div id="printableReceivingReceiptArea" class="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
                 <!-- Header Slip -->
                 <div class="text-center border-b border-dashed border-slate-300 pb-3">
-                    <h2 class="font-black text-base tracking-tight text-slate-900">PT. INDO EXPRESS GLOBAL</h2>
+                    <h2 class="font-black text-base tracking-tight text-slate-900">IEG</h2>
                     <p class="text-[10px] text-slate-500 font-medium">INBOUND WAREHOUSE RETURN RECEPTION</p>
                     <p id="adminSlipReceiptNo" class="font-mono font-bold text-xs text-emerald-600 mt-1">-</p>
                 </div>

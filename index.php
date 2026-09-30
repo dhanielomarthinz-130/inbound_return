@@ -35,7 +35,7 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                 </div>
                 <div>
                     <h1 class="font-black text-white text-base md:text-lg leading-tight tracking-tight">Inbound Return Station</h1>
-                    <p class="text-[10px] text-slate-400 font-medium hidden sm:block">PT. Indo Express Global &bull; Warehouse Station</p>
+                    <p class="text-[10px] text-slate-400 font-medium hidden sm:block">IEG &bull; Warehouse Station</p>
                 </div>
             </div>
             
@@ -518,7 +518,7 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
 
     <!-- FOOTER STATUS -->
     <footer class="bg-white border-t border-slate-200 py-3 px-4 md:px-8 text-center text-xs text-slate-400 w-full mt-auto">
-        <span>&copy; <?= date('Y') ?> Inbound Return Station &bull; PT. Indo Express Global</span>
+        <span>&copy; <?= date('Y') ?> Inbound Return Station &bull; IEG</span>
     </footer>
 
     <!-- MODAL PREVIEW FOTO WATERMARK -->

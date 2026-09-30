@@ -36,7 +36,7 @@ $initials = strtoupper(substr($nameParts[0], 0, 1) . (isset($nameParts[1]) ? sub
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Inbound Hub • PT IEG</title>
+    <title>Inbound Hub • IEG</title>
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="assets/image/favicon.svg">
@@ -160,7 +160,7 @@ $initials = strtoupper(substr($nameParts[0], 0, 1) . (isset($nameParts[1]) ? sub
                         <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
                     </div>
                     <p class="text-[11px] text-slate-400 font-mono uppercase tracking-wider mt-0.5">
-                        <?= htmlspecialchars($user['role']) ?> &bull; PT IEG
+                        <?= htmlspecialchars($user['role']) ?> &bull; IEG
                     </p>
                 </div>
             </div>

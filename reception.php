@@ -457,7 +457,7 @@ try {
             <div id="printReceiptArea" class="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
                 <!-- Header Slip -->
                 <div class="text-center border-b border-dashed border-slate-300 pb-3">
-                    <h2 class="font-black text-base tracking-tight">PT. INDO EXPRESS GLOBAL</h2>
+                    <h2 class="font-black text-base tracking-tight">IEG</h2>
                     <p class="text-[10px] text-slate-500 font-medium">INBOUND WAREHOUSE RETURN RECEPTION</p>
                     <p id="slipReceiptNo" class="font-mono font-bold text-xs text-emerald-600 mt-1">RCV-20260929-0001</p>
                 </div>
@@ -806,7 +806,7 @@ try {
             ctx.textAlign = 'left';
             ctx.fillStyle = '#10b981';
             ctx.font = `900 ${titleSize}px monospace, sans-serif`;
-            ctx.fillText('PT. INDO EXPRESS GLOBAL • INBOUND RECEIVING', 16, h - barHeight + 10);
+            ctx.fillText('IEG • INBOUND RECEIVING', 16, h - barHeight + 10);
 
             ctx.fillStyle = '#ffffff';
             ctx.font = `bold ${bodySize}px monospace, sans-serif`;
