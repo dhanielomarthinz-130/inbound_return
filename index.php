@@ -104,12 +104,9 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                 <!-- Header Live Video Card -->
                 <div class="p-3.5 bg-slate-900 text-white flex justify-between items-center border-b border-slate-800">
                     <div class="flex items-center space-x-2 text-xs font-bold">
-                        <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
-                        <i class="fa-solid fa-video text-rose-400"></i>
-                        <span>Live Video Record</span>
-                        <span id="cameraRecBadge" class="hidden bg-rose-600 text-white font-mono text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
-                            <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span> REC <span id="cameraRecTime">00:00</span>
-                        </span>
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <i class="fa-solid fa-camera text-emerald-400"></i>
+                        <span>Live Kamera Dokumentasi</span>
                     </div>
                     <button id="btnSwitchCamera" onclick="switchCamera()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1 rounded-xl border border-slate-700 transition flex items-center gap-1.5">
                         <i class="fa-solid fa-arrows-rotate"></i>
