@@ -48,99 +48,100 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
 <body class="bg-slate-100 min-h-screen text-slate-800 flex overflow-x-hidden">
 
     <!-- Mobile Backdrop -->
-    <div id="sidebarBackdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-40 lg:hidden hidden"></div>
+    <div id="sidebarBackdrop" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 lg:hidden hidden"></div>
 
     <!-- SIDEBAR -->
-    <aside id="sidebar" class="w-64 bg-slate-900 text-slate-200 flex flex-col shrink-0 fixed inset-y-0 left-0 z-50 lg:static transition-transform duration-300 transform -translate-x-full lg:translate-x-0 shadow-2xl lg:shadow-none border-r border-slate-800">
+    <aside id="sidebar" class="w-64 bg-white text-slate-700 flex flex-col shrink-0 fixed inset-y-0 left-0 z-50 lg:static transition-transform duration-300 transform -translate-x-full lg:translate-x-0 shadow-xl lg:shadow-none border-r border-slate-200">
         
         <!-- Sidebar Brand -->
-        <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+        <div class="p-5 border-b border-slate-100 flex items-center justify-between">
             <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-white p-1.5 flex items-center justify-center shadow-md shrink-0">
+                <div class="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 p-1.5 flex items-center justify-center shadow-xs shrink-0">
                     <img src="assets/image/logo-IEG.png" alt="Logo IEG" class="w-full h-full object-contain">
                 </div>
                 <div>
-                    <h1 class="font-bold text-white text-base leading-tight tracking-tight">Return Inbound</h1>
+                    <h1 class="font-bold text-slate-900 text-base leading-tight tracking-tight">Return Inbound</h1>
+                    <p class="text-[10px] text-slate-400 font-medium">IEG Warehouse System</p>
                 </div>
             </div>
-            <button id="btnCloseSidebar" class="lg:hidden text-slate-400 hover:text-white p-1">
+            <button id="btnCloseSidebar" class="lg:hidden text-slate-400 hover:text-slate-700 p-1">
                 <i class="fa-solid fa-xmark text-lg"></i>
             </button>
         </div>
 
         <!-- Sidebar Navigation -->
         <div class="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-            <div class="px-3 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Menu Navigasi</div>
+            <div class="px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Menu Navigasi</div>
 
             <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition text-white bg-indigo-600 shadow-sm shadow-indigo-600/30">
-                <i class="fa-solid fa-gauge-high w-5 text-center text-indigo-200"></i>
+                <i class="fa-solid fa-gauge-high w-5 text-center text-indigo-100"></i>
                 <span>Dashboard Overview</span>
             </button>
 
-            <!-- MENU BARU: RECEIVING INBOUND (PENERIMAAN EKSPEDISI) -->
-            <button onclick="switchTab('receiving')" id="nav-receiving" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/80">
-                <i class="fa-solid fa-truck-ramp-box w-5 text-center text-emerald-400"></i>
+            <!-- MENU: RECEIVING INBOUND (PENERIMAAN EKSPEDISI) -->
+            <button onclick="switchTab('receiving')" id="nav-receiving" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
+                <i class="fa-solid fa-truck-ramp-box w-5 text-center text-emerald-600"></i>
                 <span>Receiving Inbound</span>
             </button>
 
-            <button onclick="switchTab('transactions')" id="nav-transactions" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/80">
-                <i class="fa-solid fa-box-open w-5 text-center"></i>
+            <button onclick="switchTab('transactions')" id="nav-transactions" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
+                <i class="fa-solid fa-box-open w-5 text-center text-indigo-500"></i>
                 <span>Inbound Unboxing</span>
             </button>
 
-            <!-- MENU BARU: PUSAT KLAIM & BANDING (CLAIM DOSSIER) -->
-            <button onclick="switchTab('claims')" id="nav-claims" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/80">
-                <i class="fa-solid fa-shield-halved w-5 text-center text-amber-400"></i>
+            <!-- MENU: PUSAT KLAIM & BANDING (CLAIM DOSSIER) -->
+            <button onclick="switchTab('claims')" id="nav-claims" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
+                <i class="fa-solid fa-shield-halved w-5 text-center text-amber-500"></i>
                 <span>Pusat Klaim & Banding</span>
             </button>
 
-            <button onclick="switchTab('products')" id="nav-products" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/80">
-                <i class="fa-solid fa-tags w-5 text-center"></i>
+            <button onclick="switchTab('products')" id="nav-products" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
+                <i class="fa-solid fa-tags w-5 text-center text-blue-500"></i>
                 <span>Master Produk</span>
             </button>
 
-            <button onclick="switchTab('expeditions')" id="nav-expeditions" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/80">
-                <i class="fa-solid fa-truck-fast w-5 text-center"></i>
+            <button onclick="switchTab('expeditions')" id="nav-expeditions" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
+                <i class="fa-solid fa-truck-fast w-5 text-center text-teal-500"></i>
                 <span>Master Ekspedisi</span>
             </button>
 
-            <button onclick="switchTab('conditions')" id="nav-conditions" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/80">
-                <i class="fa-solid fa-tags w-5 text-center"></i>
+            <button onclick="switchTab('conditions')" id="nav-conditions" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
+                <i class="fa-solid fa-clipboard-check w-5 text-center text-purple-500"></i>
                 <span>Master Kondisi</span>
             </button>
 
-            <button onclick="switchTab('users')" id="nav-users" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/80">
-                <i class="fa-solid fa-users-gear w-5 text-center"></i>
+            <button onclick="switchTab('users')" id="nav-users" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
+                <i class="fa-solid fa-users-gear w-5 text-center text-slate-500"></i>
                 <span>Kelola Pengguna</span>
             </button>
 
             <?php if ($isSuperAdmin): ?>
-            <button onclick="switchTab('maintenance')" id="nav-maintenance" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-amber-400 hover:text-amber-300 hover:bg-amber-950/40 border border-amber-500/20">
-                <i class="fa-solid fa-screwdriver-wrench w-5 text-center text-amber-400"></i>
+            <button onclick="switchTab('maintenance')" id="nav-maintenance" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-amber-700 hover:text-amber-800 hover:bg-amber-100/70 border border-amber-300/80 bg-amber-50/60">
+                <i class="fa-solid fa-screwdriver-wrench w-5 text-center text-amber-600"></i>
                 <span>Pemeliharaan</span>
             </button>
             <?php endif; ?>
 
-            <div class="pt-4 px-3 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Akses Langsung</div>
+            <div class="pt-4 px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Akses Langsung</div>
 
-            <a href="scanner" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/40 border border-emerald-500/20 transition">
-                <i class="fa-solid fa-barcode w-5 text-center"></i>
+            <a href="scanner" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100/70 border border-emerald-300/80 bg-emerald-50/60 transition">
+                <i class="fa-solid fa-barcode w-5 text-center text-emerald-600"></i>
                 <span>Buka Scanner Operator</span>
             </a>
         </div>
 
         <!-- Sidebar Footer: User Info & Logout Button -->
-        <div class="p-3.5 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between">
+        <div class="p-3.5 border-t border-slate-100 bg-slate-50/90 flex items-center justify-between">
             <div class="flex items-center space-x-2.5 overflow-hidden">
-                <div class="w-8 h-8 rounded-xl bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 flex items-center justify-center shrink-0">
-                    <i class="fa-solid <?= $isSuperAdmin ? 'fa-shield-halved text-amber-400' : 'fa-user-tie text-indigo-400' ?> text-xs"></i>
+                <div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200/80 flex items-center justify-center shrink-0">
+                    <i class="fa-solid <?= $isSuperAdmin ? 'fa-shield-halved text-amber-500' : 'fa-user-tie text-indigo-600' ?> text-xs"></i>
                 </div>
                 <div class="truncate">
-                    <div class="text-xs font-bold text-slate-200 truncate"><?= htmlspecialchars($user['name']) ?></div>
-                    <div class="text-[10px] <?= $isSuperAdmin ? 'text-amber-400' : 'text-indigo-400' ?> font-mono uppercase font-semibold"><?= $user['role'] ?></div>
+                    <div class="text-xs font-bold text-slate-800 truncate"><?= htmlspecialchars($user['name']) ?></div>
+                    <div class="text-[10px] <?= $isSuperAdmin ? 'text-amber-600' : 'text-indigo-600' ?> font-mono uppercase font-semibold"><?= $user['role'] ?></div>
                 </div>
             </div>
-            <a href="logout" onclick="return confirm('Apakah Anda yakin ingin logout?')" title="Logout / Keluar" class="text-rose-400 hover:text-white hover:bg-rose-600/30 p-2 rounded-xl transition">
+            <a href="logout" onclick="return confirm('Apakah Anda yakin ingin logout?')" title="Logout / Keluar" class="text-rose-500 hover:text-rose-700 hover:bg-rose-100/60 p-2 rounded-xl transition">
                 <i class="fa-solid fa-arrow-right-from-bracket"></i>
             </a>
         </div>

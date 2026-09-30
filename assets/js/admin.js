@@ -133,17 +133,17 @@ window.switchTab = function(tabName, updateUrl = true) {
     // Reset styles navigasi
     document.querySelectorAll('.nav-item').forEach(el => {
         el.classList.remove('text-white', 'bg-indigo-600', 'shadow-sm', 'shadow-indigo-600/30');
-        el.classList.add('text-slate-400', 'hover:text-white', 'hover:bg-slate-800/80');
+        el.classList.add('text-slate-600', 'hover:text-slate-900', 'hover:bg-slate-100');
         const icon = el.querySelector('i');
-        if (icon) icon.classList.remove('text-indigo-200');
+        if (icon) icon.classList.remove('text-indigo-100');
     });
 
     const activeNav = document.getElementById(`nav-${tabName}`);
     if (activeNav) {
-        activeNav.classList.remove('text-slate-400', 'hover:text-white', 'hover:bg-slate-800/80');
+        activeNav.classList.remove('text-slate-600', 'hover:text-slate-900', 'hover:bg-slate-100');
         activeNav.classList.add('text-white', 'bg-indigo-600', 'shadow-sm', 'shadow-indigo-600/30');
         const icon = activeNav.querySelector('i');
-        if (icon) icon.classList.add('text-indigo-200');
+        if (icon) icon.classList.add('text-indigo-100');
     }
 
     // Toggle Tab Content
