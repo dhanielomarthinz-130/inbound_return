@@ -143,7 +143,7 @@ $initials = strtoupper(substr($nameParts[0], 0, 1) . (isset($nameParts[1]) ? sub
     <!-- ============================================================== -->
     <!-- ANDROID MOBILE APP CONTAINER FRAME (PAS & RAPI DI HP & DESKTOP)-->
     <!-- ============================================================== -->
-    <div class="relative z-10 w-full max-w-[480px] bg-slate-900/90 sm:rounded-[36px] border-0 sm:border sm:border-slate-800/90 shadow-2xl overflow-hidden flex flex-col justify-between min-h-screen sm:min-h-[780px] sm:max-h-[920px] backdrop-blur-xl">
+    <div class="relative z-10 w-full max-w-[460px] bg-slate-900/90 sm:rounded-[36px] border-0 sm:border sm:border-slate-800/90 shadow-2xl overflow-hidden flex flex-col justify-between min-h-screen sm:min-h-0 sm:my-auto backdrop-blur-xl">
 
         <!-- 1. TOP APP BAR (MATERIAL 3) -->
         <header class="pt-4 sm:pt-5 pb-3 px-5 border-b border-white/5 flex items-center justify-between bg-slate-900/80 sticky top-0 z-20">
@@ -222,7 +222,7 @@ $initials = strtoupper(substr($nameParts[0], 0, 1) . (isset($nameParts[1]) ? sub
                 <div class="grid grid-cols-2 gap-3.5">
 
                     <!-- APP 01: INBOUND RECEIVING -->
-                    <a href="reception" class="android-ripple bg-gradient-to-b from-slate-800/90 to-slate-900/95 border border-emerald-500/35 rounded-2xl p-4 flex flex-col justify-between items-center text-center shadow-android-card hover:border-emerald-400 hover:shadow-android-glow-emerald group">
+                    <a href="reception" class="android-ripple bg-gradient-to-b from-slate-800/90 to-slate-900/95 border border-emerald-500/35 rounded-2xl p-4 sm:p-5 flex flex-col justify-between items-center text-center shadow-android-card hover:border-emerald-400 hover:shadow-android-glow-emerald group">
                         
                         <!-- Icon App Squircle Hijau -->
                         <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 p-0.5 shadow-lg shadow-emerald-500/30 group-hover:scale-105 transition-transform mb-3 app-icon-gloss">
@@ -233,26 +233,23 @@ $initials = strtoupper(substr($nameParts[0], 0, 1) . (isset($nameParts[1]) ? sub
 
                         <!-- Info Teks -->
                         <div class="w-full">
-                            <span class="text-[9px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full inline-block mb-1">
+                            <span class="text-[9px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full inline-block mb-1.5">
                                 MODUL 01
                             </span>
                             <h4 class="font-extrabold text-white text-sm leading-snug group-hover:text-emerald-300 transition-colors">
                                 Inbound Receiving
                             </h4>
-                            <p class="text-[10px] text-slate-400 mt-1 leading-tight line-clamp-2">
-                                Terima tumpukan paket kurir & foto fisik.
-                            </p>
                         </div>
 
                         <!-- Shortcut Badge -->
-                        <div class="mt-3 w-full pt-2 border-t border-white/5 flex items-center justify-center gap-1 text-[10px] font-mono text-emerald-300">
-                            <i class="fa-solid fa-keyboard text-[9px]"></i>
+                        <div class="mt-4 w-full pt-2.5 border-t border-white/5 flex items-center justify-center gap-1.5 text-[11px] font-mono text-emerald-300 font-bold">
+                            <i class="fa-solid fa-keyboard text-[10px]"></i>
                             <span>Tuts [TAB]</span>
                         </div>
                     </a>
 
                     <!-- APP 02: INBOUND UNBOXING -->
-                    <a href="scanner" class="android-ripple bg-gradient-to-b from-slate-800/90 to-slate-900/95 border border-indigo-500/35 rounded-2xl p-4 flex flex-col justify-between items-center text-center shadow-android-card hover:border-indigo-400 hover:shadow-android-glow-indigo group">
+                    <a href="scanner" class="android-ripple bg-gradient-to-b from-slate-800/90 to-slate-900/95 border border-indigo-500/35 rounded-2xl p-4 sm:p-5 flex flex-col justify-between items-center text-center shadow-android-card hover:border-indigo-400 hover:shadow-android-glow-indigo group">
                         
                         <!-- Icon App Squircle Biru/Indigo -->
                         <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-600 to-blue-400 p-0.5 shadow-lg shadow-indigo-500/30 group-hover:scale-105 transition-transform mb-3 app-icon-gloss">
@@ -263,20 +260,17 @@ $initials = strtoupper(substr($nameParts[0], 0, 1) . (isset($nameParts[1]) ? sub
 
                         <!-- Info Teks -->
                         <div class="w-full">
-                            <span class="text-[9px] font-black uppercase tracking-wider text-indigo-400 bg-indigo-500/15 border border-indigo-500/30 px-2 py-0.5 rounded-full inline-block mb-1">
+                            <span class="text-[9px] font-black uppercase tracking-wider text-indigo-400 bg-indigo-500/15 border border-indigo-500/30 px-2 py-0.5 rounded-full inline-block mb-1.5">
                                 MODUL 02
                             </span>
                             <h4 class="font-extrabold text-white text-sm leading-snug group-hover:text-indigo-300 transition-colors">
                                 Inbound Unboxing
                             </h4>
-                            <p class="text-[10px] text-slate-400 mt-1 leading-tight line-clamp-2">
-                                Rekam video unboxing, foto paket & cek SKU.
-                            </p>
                         </div>
 
                         <!-- Shortcut Badge -->
-                        <div class="mt-3 w-full pt-2 border-t border-white/5 flex items-center justify-center gap-1 text-[10px] font-mono text-indigo-300">
-                            <i class="fa-solid fa-keyboard text-[9px]"></i>
+                        <div class="mt-4 w-full pt-2.5 border-t border-white/5 flex items-center justify-center gap-1.5 text-[11px] font-mono text-indigo-300 font-bold">
+                            <i class="fa-solid fa-keyboard text-[10px]"></i>
                             <span>Tuts [F2] & [F4]</span>
                         </div>
                     </a>
@@ -284,81 +278,12 @@ $initials = strtoupper(substr($nameParts[0], 0, 1) . (isset($nameParts[1]) ? sub
                 </div>
             </div>
 
-            <!-- QUICK SHORTCUT TILES (FITUR PENDUKUNG) -->
-            <div class="pt-2">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-2 px-0.5">Akses Cepat</span>
-                <div class="grid grid-cols-3 gap-2">
-                    
-                    <a href="reception" class="android-ripple bg-slate-900/70 border border-white/5 hover:border-emerald-500/30 rounded-xl p-2.5 flex flex-col items-center justify-center text-center">
-                        <i class="fa-solid fa-barcode text-emerald-400 text-sm mb-1"></i>
-                        <span class="text-[10px] font-bold text-slate-300">Scan Resi</span>
-                    </a>
-
-                    <a href="scanner" class="android-ripple bg-slate-900/70 border border-white/5 hover:border-indigo-500/30 rounded-xl p-2.5 flex flex-col items-center justify-center text-center">
-                        <i class="fa-solid fa-video text-indigo-400 text-sm mb-1"></i>
-                        <span class="text-[10px] font-bold text-slate-300">Unbox Video</span>
-                    </a>
-
-                    <?php if (in_array($user['role'], ['admin', 'superadmin'])): ?>
-                    <a href="admin" class="android-ripple bg-slate-900/70 border border-white/5 hover:border-amber-500/30 rounded-xl p-2.5 flex flex-col items-center justify-center text-center">
-                        <i class="fa-solid fa-file-invoice text-amber-400 text-sm mb-1"></i>
-                        <span class="text-[10px] font-bold text-slate-300">Klaim & OCS</span>
-                    </a>
-                    <?php else: ?>
-                    <div class="bg-slate-900/40 border border-white/5 rounded-xl p-2.5 flex flex-col items-center justify-center text-center opacity-60">
-                        <i class="fa-solid fa-shield-halved text-slate-400 text-sm mb-1"></i>
-                        <span class="text-[10px] font-bold text-slate-400">Station 01</span>
-                    </div>
-                    <?php endif; ?>
-
-                </div>
-            </div>
-
         </main>
 
-        <!-- 3. BOTTOM NAVIGATION BAR (KHAS ANDROID MATERIAL 3 DENGAN PILL AKTIF) -->
-        <nav class="bg-slate-950/95 border-t border-white/10 px-4 pt-2.5 pb-3 sticky bottom-0 z-20">
-            <div class="flex items-center justify-around">
-                
-                <!-- Nav Item: Hub / Home (Aktif dengan Pill) -->
-                <a href="menu" class="flex flex-col items-center group">
-                    <div class="w-14 h-7 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center transition group-hover:bg-indigo-500 group-hover:text-white">
-                        <i class="fa-solid fa-shapes text-sm"></i>
-                    </div>
-                    <span class="text-[10px] font-bold text-indigo-300 mt-0.5">Hub</span>
-                </a>
-
-                <!-- Nav Item: Receiving -->
-                <a href="reception" class="flex flex-col items-center group text-slate-400 hover:text-emerald-400 transition">
-                    <div class="w-14 h-7 rounded-full flex items-center justify-center group-hover:bg-emerald-500/15">
-                        <i class="fa-solid fa-truck-ramp-box text-sm"></i>
-                    </div>
-                    <span class="text-[10px] font-medium mt-0.5">Receiving</span>
-                </a>
-
-                <!-- Nav Item: Unboxing -->
-                <a href="scanner" class="flex flex-col items-center group text-slate-400 hover:text-indigo-400 transition">
-                    <div class="w-14 h-7 rounded-full flex items-center justify-center group-hover:bg-indigo-500/15">
-                        <i class="fa-solid fa-box-open text-sm"></i>
-                    </div>
-                    <span class="text-[10px] font-medium mt-0.5">Unboxing</span>
-                </a>
-
-                <?php if (in_array($user['role'], ['admin', 'superadmin'])): ?>
-                <!-- Nav Item: Admin -->
-                <a href="admin" class="flex flex-col items-center group text-slate-400 hover:text-amber-400 transition">
-                    <div class="w-14 h-7 rounded-full flex items-center justify-center group-hover:bg-amber-500/15">
-                        <i class="fa-solid fa-chart-pie text-sm"></i>
-                    </div>
-                    <span class="text-[10px] font-medium mt-0.5">Admin</span>
-                </a>
-                <?php endif; ?>
-
-            </div>
-
-            <!-- Gesture Navigation Bar Android (Material Bar Pill) -->
-            <div class="w-28 h-1 bg-white/20 rounded-full mx-auto mt-2.5"></div>
-        </nav>
+        <!-- FOOTER GESTURE BAR (MINIMALIS KHAS ANDROID) -->
+        <footer class="pb-5 pt-2 text-center">
+            <div class="w-28 h-1 bg-white/20 rounded-full mx-auto"></div>
+        </footer>
 
     </div>
 
