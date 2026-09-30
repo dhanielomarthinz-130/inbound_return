@@ -53,6 +53,12 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                     <span class="hidden md:inline">Reset Sesi</span>
                 </button>
 
+                <!-- Tombol Kembali ke Menu Utama Operator (Hub) -->
+                <a href="menu" title="Kembali ke Menu Utama Portal" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-sm">
+                    <i class="fa-solid fa-shapes text-indigo-400"></i>
+                    <span class="hidden sm:inline">Menu Utama</span>
+                </a>
+
                 <!-- Menu Penerimaan Ekspedisi (Mobile & Dok) -->
                 <a href="reception" title="Penerimaan Returan dari Ekspedisi (Mobile)" class="bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-500/50 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/30">
                     <i class="fa-solid fa-truck-ramp-box"></i>

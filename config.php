@@ -337,14 +337,33 @@ try {
         @file_put_contents($lockFile, date('Y-m-d H:i:s'));
     }
 
-    // Jalankan migrasi jika tabel belum ada atau jika file .db_ready belum ada atau diminta migrasi
-    $readyFlag = __DIR__ . '/uploads/.db_ready';
-    $needsMigration = !file_exists($readyFlag) || isset($_GET['run_migration']);
+    // Jalankan migrasi cerdas (Self-Healing Schema Check)
+    $needsMigration = isset($_GET['run_migration']);
     if (!$needsMigration) {
         try {
-            $chkTable = $pdo->query("SHOW TABLES LIKE 'return_sessions'");
-            if (!$chkTable || $chkTable->rowCount() === 0) {
-                $needsMigration = true;
+            $existingTables = $pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+            $requiredTables = ['return_sessions', 'return_items', 'expedition_receptions', 'reception_packages', 'ocs_orders', 'users', 'master_expeditions'];
+            foreach ($requiredTables as $rt) {
+                if (!in_array($rt, $existingTables)) {
+                    $needsMigration = true;
+                    break;
+                }
+            }
+
+            // Verifikasi kolom foto receiving
+            if (!$needsMigration && in_array('expedition_receptions', $existingTables)) {
+                $recCols = $pdo->query("SHOW COLUMNS FROM expedition_receptions")->fetchAll(PDO::FETCH_COLUMN);
+                if (!in_array('photo_path', $recCols) || !in_array('package_photos', $recCols)) {
+                    $needsMigration = true;
+                }
+            }
+
+            // Verifikasi kolom foto unboxing
+            if (!$needsMigration && in_array('return_sessions', $existingTables)) {
+                $sessCols = $pdo->query("SHOW COLUMNS FROM return_sessions")->fetchAll(PDO::FETCH_COLUMN);
+                if (!in_array('package_photo', $sessCols) || !in_array('photos', $sessCols)) {
+                    $needsMigration = true;
+                }
             }
         } catch (Exception $e) {
             $needsMigration = true;
@@ -397,7 +416,7 @@ function requireLogin($allowedRoles = []) {
         if ($isApi) {
             jsonResponse(['error' => 'Akses ditolak: role Anda (' . $user['role'] . ') tidak memiliki izin.'], 403);
         } else {
-            $redirect = ($user['role'] === 'operator') ? 'scanner' : 'admin';
+            $redirect = ($user['role'] === 'operator') ? 'menu' : 'admin';
             echo "<script>alert('Akses Ditolak: Halaman ini hanya untuk role " . implode('/', $allowedRoles) . "'); window.location.href = '{$redirect}';</script>";
             exit;
         }

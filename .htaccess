@@ -23,6 +23,7 @@ RewriteRule ^api/expeditions/?$ api/expeditions.php [QSA,L]
 RewriteRule ^api/reception/?$ api/reception.php [QSA,L]
 
 # 5. Route Clean URLs ke PHP scripts
+RewriteRule ^menu/?$ menu.php [QSA,L]
 RewriteRule ^admin/?$ admin.php [QSA,L]
 RewriteRule ^scanner/?$ index.php [QSA,L]
 RewriteRule ^reception/?$ reception.php [QSA,L]

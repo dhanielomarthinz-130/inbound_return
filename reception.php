@@ -76,6 +76,12 @@ try {
             
             <!-- Navigation Switcher & User Profile -->
             <div class="flex items-center space-x-1.5 md:space-x-3">
+                <!-- Tombol Kembali ke Menu Utama Operator (Hub) -->
+                <a href="menu" title="Kembali ke Menu Utama Portal" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-sm">
+                    <i class="fa-solid fa-shapes text-indigo-400"></i>
+                    <span class="hidden sm:inline">Menu Utama</span>
+                </a>
+
                 <!-- Nav Switcher ke Unboxing Station -->
                 <a href="scanner" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-sm">
                     <i class="fa-solid fa-box-open text-indigo-400"></i>

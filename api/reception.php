@@ -105,14 +105,50 @@ if ($method === 'GET') {
 
     $whereSql = count($where) > 0 ? implode(' AND ', $where) : '1=1';
 
-    $stmt = $pdo->prepare("
-        SELECT id, receipt_number, expedition, courier_name, vehicle_no, operator_name, total_packages, notes, photo_path, package_photos, status, created_at
-        FROM expedition_receptions
-        WHERE {$whereSql}
-        ORDER BY id DESC
-    ");
-    $stmt->execute($params);
-    $rows = $stmt->fetchAll();
+    $rows = [];
+    try {
+        $stmt = $pdo->prepare("
+            SELECT id, receipt_number, expedition, courier_name, vehicle_no, operator_name, total_packages, notes, photo_path, package_photos, status, created_at
+            FROM expedition_receptions
+            WHERE {$whereSql}
+            ORDER BY id DESC
+        ");
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+    } catch (PDOException $e) {
+        // Jika tabel atau kolom baru belum ada di hosting, jalankan auto-repair
+        if (function_exists('ensureDatabaseSchema')) {
+            try {
+                ensureDatabaseSchema($pdo);
+            } catch (Exception $ign) {}
+        }
+
+        try {
+            // Coba lagi dengan kolom foto
+            $stmt = $pdo->prepare("
+                SELECT id, receipt_number, expedition, courier_name, vehicle_no, operator_name, total_packages, notes, photo_path, package_photos, status, created_at
+                FROM expedition_receptions
+                WHERE {$whereSql}
+                ORDER BY id DESC
+            ");
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll();
+        } catch (PDOException $e2) {
+            try {
+                // Fallback jika hosting belum mengizinkan kolom photo_path / package_photos
+                $stmtFallback = $pdo->prepare("
+                    SELECT id, receipt_number, expedition, courier_name, vehicle_no, operator_name, total_packages, notes, NULL as photo_path, NULL as package_photos, status, created_at
+                    FROM expedition_receptions
+                    WHERE {$whereSql}
+                    ORDER BY id DESC
+                ");
+                $stmtFallback->execute($params);
+                $rows = $stmtFallback->fetchAll();
+            } catch (PDOException $e3) {
+                $rows = [];
+            }
+        }
+    }
 
     jsonResponse([
         'success' => true,

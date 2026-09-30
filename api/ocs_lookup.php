@@ -15,27 +15,67 @@ $refresh = isset($_GET['refresh']) && $_GET['refresh'] == '1';
 // JIKA TANPA QUERY ATAU MEMINTA LIST KANDIDAT KLAIM: Tampilkan semua paket unboxing yang kondisinya BUKAN GOOD
 if ($query === '' || $action === 'list_claimable') {
     try {
-        $stmtDamaged = $pdo->query("
-            SELECT rs.id, rs.invoice_number, rs.expedition, rs.operator_name, rs.status, 
-                   rs.total_items, rs.total_good, rs.total_damaged, rs.notes, rs.video_path, rs.created_at,
-                   COUNT(ri.id) as item_count,
-                   SUM(CASE WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
-                              OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
-                              OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') THEN 1 ELSE 0 END) as damaged_items_count,
-                   GROUP_CONCAT(DISTINCT CASE WHEN ri.damage_reason IS NOT NULL AND ri.damage_reason != '' THEN ri.damage_reason ELSE NULL END SEPARATOR '; ') as damage_reasons,
-                   MAX(o.package_price) as package_price, 
-                   MAX(o.commerce_platform) as commerce_platform, 
-                   MAX(o.shop_name) as shop_name, 
-                   MAX(o.has_packing_video) as has_packing_video
-            FROM return_sessions rs
-            LEFT JOIN return_items ri ON ri.session_id = rs.id
-            LEFT JOIN ocs_orders o ON (o.order_id = rs.invoice_number OR o.tracking_number = rs.invoice_number)
-            GROUP BY rs.id, rs.invoice_number, rs.expedition, rs.operator_name, rs.status, 
-                     rs.total_items, rs.total_good, rs.total_damaged, rs.notes, rs.video_path, rs.created_at
-            HAVING rs.total_damaged > 0 OR damaged_items_count > 0
-            ORDER BY rs.id DESC
-            LIMIT 50
-        ");
+        // Pastikan tabel ocs_orders ada
+        $hasOcsTable = false;
+        try {
+            $chkOcs = $pdo->query("SHOW TABLES LIKE 'ocs_orders'");
+            if ($chkOcs && $chkOcs->rowCount() > 0) {
+                $hasOcsTable = true;
+            } else {
+                if (function_exists('ensureDatabaseSchema')) {
+                    ensureDatabaseSchema($pdo);
+                    $hasOcsTable = true;
+                }
+            }
+        } catch (Exception $e) {}
+
+        if ($hasOcsTable) {
+            $sqlDamaged = "
+                SELECT rs.id, rs.invoice_number, rs.expedition, rs.operator_name, rs.status, 
+                       rs.total_items, rs.total_good, rs.total_damaged, rs.notes, rs.video_path, rs.created_at,
+                       COUNT(ri.id) as item_count,
+                       SUM(CASE WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
+                                  OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
+                                  OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') THEN 1 ELSE 0 END) as damaged_items_count,
+                       GROUP_CONCAT(DISTINCT CASE WHEN ri.damage_reason IS NOT NULL AND ri.damage_reason != '' THEN ri.damage_reason ELSE NULL END SEPARATOR '; ') as damage_reasons,
+                       MAX(o.package_price) as package_price, 
+                       MAX(o.commerce_platform) as commerce_platform, 
+                       MAX(o.shop_name) as shop_name, 
+                       MAX(o.has_packing_video) as has_packing_video
+                FROM return_sessions rs
+                LEFT JOIN return_items ri ON ri.session_id = rs.id
+                LEFT JOIN ocs_orders o ON (o.order_id = rs.invoice_number OR o.tracking_number = rs.invoice_number)
+                GROUP BY rs.id, rs.invoice_number, rs.expedition, rs.operator_name, rs.status, 
+                         rs.total_items, rs.total_good, rs.total_damaged, rs.notes, rs.video_path, rs.created_at
+                HAVING rs.total_damaged > 0 OR damaged_items_count > 0
+                ORDER BY rs.id DESC
+                LIMIT 50
+            ";
+        } else {
+            // Fallback query jika ocs_orders belum siap
+            $sqlDamaged = "
+                SELECT rs.id, rs.invoice_number, rs.expedition, rs.operator_name, rs.status, 
+                       rs.total_items, rs.total_good, rs.total_damaged, rs.notes, rs.video_path, rs.created_at,
+                       COUNT(ri.id) as item_count,
+                       SUM(CASE WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
+                                  OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
+                                  OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') THEN 1 ELSE 0 END) as damaged_items_count,
+                       GROUP_CONCAT(DISTINCT CASE WHEN ri.damage_reason IS NOT NULL AND ri.damage_reason != '' THEN ri.damage_reason ELSE NULL END SEPARATOR '; ') as damage_reasons,
+                       0 as package_price, 
+                       NULL as commerce_platform, 
+                       NULL as shop_name, 
+                       0 as has_packing_video
+                FROM return_sessions rs
+                LEFT JOIN return_items ri ON ri.session_id = rs.id
+                GROUP BY rs.id, rs.invoice_number, rs.expedition, rs.operator_name, rs.status, 
+                         rs.total_items, rs.total_good, rs.total_damaged, rs.notes, rs.video_path, rs.created_at
+                HAVING rs.total_damaged > 0 OR damaged_items_count > 0
+                ORDER BY rs.id DESC
+                LIMIT 50
+            ";
+        }
+
+        $stmtDamaged = $pdo->query($sqlDamaged);
         $candidates = $stmtDamaged->fetchAll(PDO::FETCH_ASSOC);
 
         // Format harga paket

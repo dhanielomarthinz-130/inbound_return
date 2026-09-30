@@ -7,7 +7,7 @@ $currentUser = getSessionUser();
 // Jika sudah login, langsung redirect sesuai role
 if ($currentUser) {
     if ($currentUser['role'] === 'operator') {
-        header('Location: scanner');
+        header('Location: menu');
     } else {
         header('Location: admin');
     }
@@ -73,12 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'role' => $user['role']
                         ];
                         
-                        $destination = trim($_POST['destination'] ?? 'scanner');
-                        if ($destination === 'reception') {
-                            header('Location: reception');
-                        } else {
-                            header('Location: scanner');
-                        }
+                        header('Location: menu');
                         exit;
                     } else {
                         $error = 'PIN yang Anda masukkan salah!';
@@ -237,21 +232,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <form method="POST" action="login" id="formOperator" class="space-y-4">
                 <input type="hidden" name="tab" value="operator">
 
-                <!-- PILIHAN MENU / AKTIVITAS -->
-                <div class="grid grid-cols-2 gap-2">
-                    <!-- Pilihan 1: Inbound Unboxing -->
-                    <label class="flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl border-2 cursor-pointer transition select-none text-xs font-bold border-slate-200 bg-white text-slate-600 hover:border-slate-300 has-[:checked]:border-indigo-600 has-[:checked]:bg-indigo-50/60 has-[:checked]:text-indigo-700">
-                        <input type="radio" name="destination" value="scanner" class="sr-only" <?= (!isset($_POST['destination']) || $_POST['destination'] === 'scanner') ? 'checked' : '' ?>>
-                        <i class="fa-solid fa-box-open text-indigo-500 text-sm"></i>
-                        <span>Inbound Unboxing</span>
-                    </label>
-
-                    <!-- Pilihan 2: Receiving Inbound -->
-                    <label class="flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl border-2 cursor-pointer transition select-none text-xs font-bold border-slate-200 bg-white text-slate-600 hover:border-slate-300 has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-50/60 has-[:checked]:text-emerald-700">
-                        <input type="radio" name="destination" value="reception" class="sr-only" <?= (isset($_POST['destination']) && $_POST['destination'] === 'reception') ? 'checked' : '' ?>>
-                        <i class="fa-solid fa-truck-ramp-box text-emerald-500 text-sm"></i>
-                        <span>Receiving Inbound</span>
-                    </label>
+                <!-- INFO LOGIN OPERATOR -->
+                <div class="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-3 flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm shadow-emerald-600/30">
+                        <i class="fa-solid fa-shapes"></i>
+                    </div>
+                    <div class="leading-tight">
+                        <span class="text-xs font-bold text-emerald-900 block">Stasiun Operator Inbound</span>
+                        <span class="text-[10px] text-emerald-700">Pilih akun & masukkan PIN untuk mengakses Menu Portal</span>
+                    </div>
                 </div>
                 
                 <div>
