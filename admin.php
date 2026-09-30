@@ -549,7 +549,6 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 </span>
                                 <div>
                                     <h3 class="font-bold text-base text-slate-800">Pusat Klaim & Banding Ekspedisi</h3>
-                                    <p class="text-xs text-slate-500">Lookup otomatis data pesanan, nomor resi, video packing OCS, dan video unboxing retur untuk bukti klaim/banding resmi.</p>
                                 </div>
                             </div>
                         </div>
@@ -778,10 +777,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                     <div class="w-16 h-16 rounded-2xl bg-amber-50 text-amber-500 mx-auto flex items-center justify-center text-2xl mb-3 shadow-inner">
                         <i class="fa-solid fa-magnifying-glass-location"></i>
                     </div>
-                    <h4 class="font-bold text-base text-slate-800 mb-1">Siap Mencari Bukti Klaim & Banding</h4>
-                    <p class="text-xs text-slate-500 max-w-md mx-auto">
-                        Ketik Nomor Resi Paket (AWB) atau Order ID / No Invoice di kolom pencarian di atas. Sistem akan otomatis menarik data pesanan dari OCS, video packing saat barang dikirim, dan mencocokkan dengan video unboxing retur lokal.
-                    </p>
+                    <h4 class="font-bold text-base text-slate-800">Siap Mencari Bukti Klaim & Banding</h4>
                 </div>
 
                 <!-- Tabel Kandidat Paket Layak Klaim (Kondisi BUKAN GOOD) -->
@@ -793,7 +789,6 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             </span>
                             <div>
                                 <h4 class="font-bold text-sm text-slate-800">Daftar Paket Rusak / Layak Klaim</h4>
-                                <span class="text-[11px] text-slate-500">Menampilkan paket unboxing yang kondisinya <b>BUKAN GOOD</b> (Cacat, Pecah, Bocor, Rusak).</span>
                             </div>
                         </div>
                         <button onclick="loadClaimCandidates(true)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-slate-300 shadow-2xs">
