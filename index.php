@@ -160,6 +160,10 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                     </span>
                 </div>
 
+                <!-- Input File Fallback Tersembunyi (jika kamera offline atau ingin upload file langsung) -->
+                <input type="file" id="filePackagePhoto" accept="image/*" class="hidden" onchange="handlePhotoUpload('package', this)">
+                <input type="file" id="fileProductPhoto" accept="image/*" class="hidden" onchange="handlePhotoUpload('product', this)">
+
                 <!-- Tombol Shortcut Tuts Keyboard -->
                 <div class="grid grid-cols-2 gap-2">
                     <button id="btnCapturePackagePhoto" onclick="capturePackagePhoto()" type="button" 
@@ -189,7 +193,12 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                             <span class="text-[10px] font-bold text-slate-700 flex items-center gap-1">
                                 <i class="fa-solid fa-box text-indigo-500"></i> Paket
                             </span>
-                            <span id="badgePackagePhoto" class="hidden text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">SIAP</span>
+                            <div class="flex items-center gap-1">
+                                <button type="button" onclick="document.getElementById('filePackagePhoto').click()" title="Pilih foto paket dari file / galeri" class="text-[10px] text-slate-400 hover:text-indigo-600 p-0.5 rounded transition">
+                                    <i class="fa-solid fa-upload"></i>
+                                </button>
+                                <span id="badgePackagePhoto" class="hidden text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">SIAP</span>
+                            </div>
                         </div>
                         <div id="previewPackagePhotoEmpty" class="flex-1 flex flex-col items-center justify-center text-center py-2 text-slate-300">
                             <i class="fa-regular fa-image text-2xl mb-1 text-slate-300"></i>
@@ -210,7 +219,12 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                             <span class="text-[10px] font-bold text-slate-700 flex items-center gap-1">
                                 <i class="fa-solid fa-tag text-emerald-500"></i> Produk
                             </span>
-                            <span id="badgeProductPhoto" class="hidden text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">SIAP</span>
+                            <div class="flex items-center gap-1">
+                                <button type="button" onclick="document.getElementById('fileProductPhoto').click()" title="Pilih foto produk dari file / galeri" class="text-[10px] text-slate-400 hover:text-emerald-600 p-0.5 rounded transition">
+                                    <i class="fa-solid fa-upload"></i>
+                                </button>
+                                <span id="badgeProductPhoto" class="hidden text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">SIAP</span>
+                            </div>
                         </div>
                         <div id="previewProductPhotoEmpty" class="flex-1 flex flex-col items-center justify-center text-center py-2 text-slate-300">
                             <i class="fa-regular fa-image text-2xl mb-1 text-slate-300"></i>

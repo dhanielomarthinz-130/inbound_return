@@ -117,6 +117,8 @@ try {
 
         if ($cached) {
             $pkgPrice = (float)($cached['package_price'] > 0 ? $cached['package_price'] : ($cached['nmv'] > 0 ? $cached['nmv'] : $cached['gmv']));
+            $shippingFee = (float)($cached['shipping_fee'] ?? 0);
+            $totalClaim = $pkgPrice + $shippingFee;
             $orderData = [
                 'Id'                     => $cached['order_id'],
                 'TrackingNumber'         => $cached['tracking_number'],
@@ -129,11 +131,13 @@ try {
                 'TotalQtyOrder'          => $cached['total_qty'],
                 'PackagePrice'           => $pkgPrice,
                 'PackagePriceFormatted'  => 'Rp ' . number_format($pkgPrice, 0, ',', '.'),
+                'ShippingFee'            => $shippingFee,
+                'ShippingFeeFormatted'   => $shippingFee > 0 ? 'Rp ' . number_format($shippingFee, 0, ',', '.') : 'Rp 0',
+                'TotalClaimAmount'       => $totalClaim,
+                'TotalClaimAmountFormatted' => $totalClaim > 0 ? 'Rp ' . number_format($totalClaim, 0, ',', '.') : 'Rp ' . number_format($pkgPrice, 0, ',', '.'),
                 'GMV'                    => (float)($cached['gmv'] ?? 0),
                 'NMV'                    => (float)($cached['nmv'] ?? 0),
                 'CreatedAt'              => $cached['order_created_at'],
-                'HasPackingVideo'        => (bool)$cached['has_packing_video'],
-                'PackingVideoUrl'        => $cached['packing_video_url'],
                 '_source'                => 'local_cache'
             ];
         }
@@ -141,242 +145,219 @@ try {
 
     // 2. Jika belum ada di cache atau di-refresh, query langsung ke OCS IEG System
     if (!$orderData) {
-        // Login ke OCS untuk mendapatkan Bearer Token
-        $chLogin = curl_init("{$ocsBaseUrl}/Auth/Login");
-        curl_setopt_array($chLogin, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => json_encode([
-                'username'  => $ocsUser,
-                'password'  => $ocsPass,
-                'companydb' => $ocsCompany
-            ]),
-            CURLOPT_HTTPHEADER     => [
-                'Content-Type: application/json',
-                'Accept: application/json'
-            ],
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
-            CURLOPT_TIMEOUT        => 15
-        ]);
-        $loginRes = curl_exec($chLogin);
-        $loginHttp = curl_getinfo($chLogin, CURLINFO_HTTP_CODE);
-        curl_close($chLogin);
-
-        if ($loginHttp !== 200 || !$loginRes) {
-            throw new Exception("Gagal login ke OCS IEG System (HTTP {$loginHttp}).");
-        }
-
-        $loginJson = json_decode($loginRes, true);
-        $token = $loginJson['Token'] ?? null;
-        if (!$token) {
-            throw new Exception("Token otentikasi OCS tidak valid.");
-        }
-
-        // 1. Coba cari di DTO_Orders berdasarkan Id (Sangat cepat karena Primary Key terindeks ~0.3s)
-        $chOrd = curl_init("{$ocsBaseUrl}/odata/DTO_Orders?\$filter=" . urlencode("Id eq '{$query}'") . "&\$top=1");
-        curl_setopt_array($chOrd, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPGET        => true,
-            CURLOPT_HTTPHEADER     => [
-                "Authorization: Bearer {$token}",
-                "Accept: application/json"
-            ],
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
-            CURLOPT_TIMEOUT        => 5
-        ]);
-        $ordRes = curl_exec($chOrd);
-        curl_close($chOrd);
-        $ordJson = json_decode($ordRes, true);
-
-        // 2. Jika tidak ditemukan berdasarkan Id, cari berdasarkan TrackingNumber
-        if (empty($ordJson['value'][0])) {
-            $chOrdTrack = curl_init("{$ocsBaseUrl}/odata/DTO_Orders?\$filter=" . urlencode("TrackingNumber eq '{$query}'") . "&\$top=1");
-            curl_setopt_array($chOrdTrack, [
+        try {
+            // Login ke OCS untuk mendapatkan Bearer Token
+            $chLogin = curl_init("{$ocsBaseUrl}/Auth/Login");
+            curl_setopt_array($chLogin, [
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_HTTPGET        => true,
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => json_encode([
+                    'username'  => $ocsUser,
+                    'password'  => $ocsPass,
+                    'companydb' => $ocsCompany
+                ]),
                 CURLOPT_HTTPHEADER     => [
-                    "Authorization: Bearer {$token}",
-                    "Accept: application/json"
+                    'Content-Type: application/json',
+                    'Accept: application/json'
                 ],
                 CURLOPT_SSL_VERIFYPEER => false,
                 CURLOPT_SSL_VERIFYHOST => false,
-                CURLOPT_TIMEOUT        => 6
+                CURLOPT_TIMEOUT        => 8
             ]);
-            $ordTrackRes = curl_exec($chOrdTrack);
-            curl_close($chOrdTrack);
-            $ordJson = json_decode($ordTrackRes, true);
-        }
+            $loginRes = curl_exec($chLogin);
+            $loginHttp = curl_getinfo($chLogin, CURLINFO_HTTP_CODE);
+            curl_close($chLogin);
 
-        if (!empty($ordJson['value'][0])) {
-            $raw = $ordJson['value'][0];
-            $orderData = [
-                'Id'                 => $raw['Id'] ?? '',
-                'TrackingNumber'     => $raw['TrackingNumber'] ?? '',
-                'PlatformId'         => $raw['PlatformId'] ?? null,
-                'CommercePlatform'   => $raw['CommercePlatform'] ?? '',
-                'ShopName'           => $raw['ShopName'] ?? '',
-                'ShippingProvider'   => $raw['ShippingProvider'] ?? '',
-                'StatusCode'         => $raw['StatusCode'] ?? null,
-                'ProductName'        => $raw['ProductName'] ?? '',
-                'TotalQtyOrder'      => $raw['TotalQtyOrder'] ?? 1,
-                'CreatedAt'          => $raw['CreatedAt'] ?? '',
-                '_source'            => 'ocs_api'
-            ];
-        } else {
-            // Jika tidak ada di DTO_Orders, coba cari di DTO_ReturnOrder
-            $filterRetUrl = "{$ocsBaseUrl}/odata/DTO_ReturnOrder?\$filter=" . urlencode("TrackingNumber eq '{$query}' or ReturnId eq '{$query}' or SalesOrderId eq '{$query}'") . "&\$top=1";
-            $chRet = curl_init($filterRetUrl);
-            curl_setopt_array($chRet, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_HTTPGET        => true,
-                CURLOPT_HTTPHEADER     => [
-                    "Authorization: Bearer {$token}",
-                    "Accept: application/json"
-                ],
-                CURLOPT_SSL_VERIFYPEER => false,
-                CURLOPT_SSL_VERIFYHOST => false,
-                CURLOPT_TIMEOUT        => 20
-            ]);
-            $retRes = curl_exec($chRet);
-            curl_close($chRet);
-            $retJson = json_decode($retRes, true);
+            if ($loginHttp === 200 && $loginRes) {
+                $loginJson = json_decode($loginRes, true);
+                $token = $loginJson['Token'] ?? null;
+                if ($token) {
+                    // 1. Coba cari di DTO_Orders berdasarkan Id
+                    $chOrd = curl_init("{$ocsBaseUrl}/odata/DTO_Orders?\$filter=" . urlencode("Id eq '{$query}'") . "&\$top=1");
+                    curl_setopt_array($chOrd, [
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_HTTPGET        => true,
+                        CURLOPT_HTTPHEADER     => [
+                            "Authorization: Bearer {$token}",
+                            "Accept: application/json"
+                        ],
+                        CURLOPT_SSL_VERIFYPEER => false,
+                        CURLOPT_SSL_VERIFYHOST => false,
+                        CURLOPT_TIMEOUT        => 5
+                    ]);
+                    $ordRes = curl_exec($chOrd);
+                    curl_close($chOrd);
+                    $ordJson = json_decode($ordRes, true);
 
-            if (!empty($retJson['value'][0])) {
-                $rawRet = $retJson['value'][0];
-                $orderData = [
-                    'Id'                 => $rawRet['SalesOrderId'] ?? $rawRet['ReturnId'],
-                    'TrackingNumber'     => $rawRet['TrackingNumber'] ?? '',
-                    'PlatformId'         => $rawRet['PlatformId'] ?? null,
-                    'CommercePlatform'   => $rawRet['CommercePlatform'] ?? '',
-                    'ShopName'           => $rawRet['ShopName'] ?? '',
-                    'ShippingProvider'   => 'Ekspedisi Marketplace',
-                    'StatusCode'         => 0,
-                    'ProductName'        => $rawRet['ReturnReasonText'] ?? 'Retur: ' . ($rawRet['ReturnReason'] ?? ''),
-                    'TotalQtyOrder'      => 1,
-                    'CreatedAt'          => $rawRet['CreatedAt'] ?? '',
-                    'ReturnReason'       => $rawRet['ReturnReason'] ?? '',
-                    'ReturnReasonText'   => $rawRet['ReturnReasonText'] ?? '',
-                    '_source'            => 'ocs_return_order'
-                ];
-            }
-        }
+                    // 2. Jika tidak ditemukan berdasarkan Id, cari berdasarkan TrackingNumber
+                    if (empty($ordJson['value'][0])) {
+                        $chOrdTrack = curl_init("{$ocsBaseUrl}/odata/DTO_Orders?\$filter=" . urlencode("TrackingNumber eq '{$query}'") . "&\$top=1");
+                        curl_setopt_array($chOrdTrack, [
+                            CURLOPT_RETURNTRANSFER => true,
+                            CURLOPT_HTTPGET        => true,
+                            CURLOPT_HTTPHEADER     => [
+                                "Authorization: Bearer {$token}",
+                                "Accept: application/json"
+                            ],
+                            CURLOPT_SSL_VERIFYPEER => false,
+                            CURLOPT_SSL_VERIFYHOST => false,
+                            CURLOPT_TIMEOUT        => 5
+                        ]);
+                        $ordTrackRes = curl_exec($chOrdTrack);
+                        curl_close($chOrdTrack);
+                        $ordJson = json_decode($ordTrackRes, true);
+                    }
 
-        // Jika data order ditemukan di OCS, cek ketersediaan video packing
-        if ($orderData) {
-            $orderId = $orderData['Id'];
-            $hasVideo = false;
-            $videoStreamUrl = null;
+                    if (!empty($ordJson['value'][0])) {
+                        $raw = $ordJson['value'][0];
+                        $shipFee = (float)($raw['ShippingFee'] ?? $raw['ShippingCost'] ?? 0);
+                        $orderData = [
+                            'Id'                 => $raw['Id'] ?? '',
+                            'TrackingNumber'     => $raw['TrackingNumber'] ?? '',
+                            'PlatformId'         => $raw['PlatformId'] ?? null,
+                            'CommercePlatform'   => $raw['CommercePlatform'] ?? '',
+                            'ShopName'           => $raw['ShopName'] ?? '',
+                            'ShippingProvider'   => $raw['ShippingProvider'] ?? '',
+                            'StatusCode'         => $raw['StatusCode'] ?? null,
+                            'ProductName'        => $raw['ProductName'] ?? '',
+                            'TotalQtyOrder'      => $raw['TotalQtyOrder'] ?? 1,
+                            'ShippingFee'        => $shipFee,
+                            'CreatedAt'          => $raw['CreatedAt'] ?? '',
+                            '_source'            => 'ocs_api'
+                        ];
+                    } else {
+                        // Coba cari di DTO_ReturnOrder
+                        $filterRetUrl = "{$ocsBaseUrl}/odata/DTO_ReturnOrder?\$filter=" . urlencode("TrackingNumber eq '{$query}' or ReturnId eq '{$query}' or SalesOrderId eq '{$query}'") . "&\$top=1";
+                        $chRet = curl_init($filterRetUrl);
+                        curl_setopt_array($chRet, [
+                            CURLOPT_RETURNTRANSFER => true,
+                            CURLOPT_HTTPGET        => true,
+                            CURLOPT_HTTPHEADER     => [
+                                "Authorization: Bearer {$token}",
+                                "Accept: application/json"
+                            ],
+                            CURLOPT_SSL_VERIFYPEER => false,
+                            CURLOPT_SSL_VERIFYHOST => false,
+                            CURLOPT_TIMEOUT        => 8
+                        ]);
+                        $retRes = curl_exec($chRet);
+                        curl_close($chRet);
+                        $retJson = json_decode($retRes, true);
 
-            if ($orderId) {
-                $chVidTest = curl_init("{$ocsBaseUrl}/Streaming/PackingTest?orderId=" . urlencode($orderId));
-                curl_setopt_array($chVidTest, [
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_HTTPGET        => true,
-                    CURLOPT_HTTPHEADER     => [
-                        "Authorization: Bearer {$token}",
-                        "Accept: application/json"
-                    ],
-                    CURLOPT_SSL_VERIFYPEER => false,
-                    CURLOPT_SSL_VERIFYHOST => false,
-                    CURLOPT_TIMEOUT        => 10
-                ]);
-                $testRes = curl_exec($chVidTest);
-                $testCode = curl_getinfo($chVidTest, CURLINFO_HTTP_CODE);
-                curl_close($chVidTest);
+                        if (!empty($retJson['value'][0])) {
+                            $rawRet = $retJson['value'][0];
+                            $orderData = [
+                                'Id'                 => $rawRet['SalesOrderId'] ?? $rawRet['ReturnId'],
+                                'TrackingNumber'     => $rawRet['TrackingNumber'] ?? '',
+                                'PlatformId'         => $rawRet['PlatformId'] ?? null,
+                                'CommercePlatform'   => $rawRet['CommercePlatform'] ?? '',
+                                'ShopName'           => $rawRet['ShopName'] ?? '',
+                                'ShippingProvider'   => 'Ekspedisi Marketplace',
+                                'StatusCode'         => 0,
+                                'ProductName'        => $rawRet['ReturnReasonText'] ?? 'Retur: ' . ($rawRet['ReturnReason'] ?? ''),
+                                'TotalQtyOrder'      => 1,
+                                'ShippingFee'        => 0,
+                                'CreatedAt'          => $rawRet['CreatedAt'] ?? '',
+                                'ReturnReason'       => $rawRet['ReturnReason'] ?? '',
+                                'ReturnReasonText'   => $rawRet['ReturnReasonText'] ?? '',
+                                '_source'            => 'ocs_return_order'
+                            ];
+                        }
+                    }
 
-                if ($testCode === 200) {
-                    $hasVideo = true;
-                    $videoStreamUrl = "{$ocsBaseUrl}/Streaming/Packing?orderId=" . urlencode($orderId);
+                    // Ambil GMV & NMV Nilai Paket dari DTO_OrderGmv (TANPA CEK PACKING VIDEO)
+                    if ($orderData) {
+                        $orderId = $orderData['Id'];
+                        $pkgPrice = 0.0;
+                        $gmv = 0.0;
+                        $nmv = 0.0;
+                        if ($orderId) {
+                            $chGmv = curl_init("{$ocsBaseUrl}/odata/DTO_OrderGmv?\$filter=" . urlencode("Id eq '{$orderId}'") . "&\$top=1");
+                            curl_setopt_array($chGmv, [
+                                CURLOPT_RETURNTRANSFER => true,
+                                CURLOPT_HTTPGET        => true,
+                                CURLOPT_HTTPHEADER     => [
+                                    "Authorization: Bearer {$token}",
+                                    "Accept: application/json"
+                                ],
+                                CURLOPT_SSL_VERIFYPEER => false,
+                                CURLOPT_SSL_VERIFYHOST => false,
+                                CURLOPT_TIMEOUT        => 4
+                            ]);
+                            $gmvRes = curl_exec($chGmv);
+                            curl_close($chGmv);
+                            $gmvJson = json_decode($gmvRes, true);
+                            if (!empty($gmvJson['value'][0])) {
+                                $gmv = (float)($gmvJson['value'][0]['GMV'] ?? 0);
+                                $nmv = (float)($gmvJson['value'][0]['NMV'] ?? 0);
+                                $pkgPrice = $nmv > 0 ? $nmv : $gmv;
+                            }
+                        }
+
+                        $shipFee = (float)($orderData['ShippingFee'] ?? 0);
+                        $totalClaim = $pkgPrice + $shipFee;
+
+                        $orderData['PackagePrice'] = $pkgPrice;
+                        $orderData['PackagePriceFormatted'] = 'Rp ' . number_format($pkgPrice, 0, ',', '.');
+                        $orderData['ShippingFeeFormatted'] = $shipFee > 0 ? 'Rp ' . number_format($shipFee, 0, ',', '.') : 'Rp 0';
+                        $orderData['TotalClaimAmount'] = $totalClaim;
+                        $orderData['TotalClaimAmountFormatted'] = $totalClaim > 0 ? 'Rp ' . number_format($totalClaim, 0, ',', '.') : 'Rp ' . number_format($pkgPrice, 0, ',', '.');
+                        $orderData['GMV'] = $gmv;
+                        $orderData['NMV'] = $nmv;
+
+                        // Simpan atau perbarui cache di tabel ocs_orders
+                        try {
+                            $stmtUpsert = $pdo->prepare("
+                                INSERT INTO ocs_orders (
+                                    order_id, tracking_number, platform_id, commerce_platform, 
+                                    shop_name, shipping_provider, status_code, product_name, 
+                                    total_qty, package_price, gmv, nmv, has_packing_video, packing_video_url, order_created_at, raw_payload
+                                ) VALUES (
+                                    :order_id, :tracking_number, :platform_id, :commerce_platform, 
+                                    :shop_name, :shipping_provider, :status_code, :product_name, 
+                                    :total_qty, :package_price, :gmv, :nmv, 0, NULL, :order_created_at, :raw_payload
+                                )
+                                ON DUPLICATE KEY UPDATE 
+                                    tracking_number = VALUES(tracking_number),
+                                    platform_id = VALUES(platform_id),
+                                    commerce_platform = VALUES(commerce_platform),
+                                    shop_name = VALUES(shop_name),
+                                    shipping_provider = VALUES(shipping_provider),
+                                    status_code = VALUES(status_code),
+                                    product_name = VALUES(product_name),
+                                    total_qty = VALUES(total_qty),
+                                    package_price = VALUES(package_price),
+                                    gmv = VALUES(gmv),
+                                    nmv = VALUES(nmv),
+                                    order_created_at = VALUES(order_created_at),
+                                    raw_payload = VALUES(raw_payload)
+                            ");
+                            $stmtUpsert->execute([
+                                ':order_id'          => $orderData['Id'],
+                                ':tracking_number'   => $orderData['TrackingNumber'],
+                                ':platform_id'       => $orderData['PlatformId'],
+                                ':commerce_platform' => $orderData['CommercePlatform'],
+                                ':shop_name'         => $orderData['ShopName'],
+                                ':shipping_provider' => $orderData['ShippingProvider'],
+                                ':status_code'       => $orderData['StatusCode'],
+                                ':product_name'      => $orderData['ProductName'],
+                                ':total_qty'         => $orderData['TotalQtyOrder'],
+                                ':package_price'     => $orderData['PackagePrice'],
+                                ':gmv'               => $orderData['GMV'],
+                                ':nmv'               => $orderData['NMV'],
+                                ':order_created_at'  => $orderData['CreatedAt'],
+                                ':raw_payload'       => json_encode($orderData)
+                            ]);
+                        } catch (Exception $eUpsert) {}
+                    }
                 }
             }
-
-            $orderData['HasPackingVideo'] = $hasVideo;
-            $orderData['PackingVideoUrl'] = $videoStreamUrl;
-
-            // Ambil Nilai / Harga Paket (GMV & NMV) dari DTO_OrderGmv
-            $pkgPrice = 0.0;
-            $gmv = 0.0;
-            $nmv = 0.0;
-            if ($orderId) {
-                $chGmv = curl_init("{$ocsBaseUrl}/odata/DTO_OrderGmv?\$filter=" . urlencode("Id eq '{$orderId}'") . "&\$top=1");
-                curl_setopt_array($chGmv, [
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_HTTPGET        => true,
-                    CURLOPT_HTTPHEADER     => [
-                        "Authorization: Bearer {$token}",
-                        "Accept: application/json"
-                    ],
-                    CURLOPT_SSL_VERIFYPEER => false,
-                    CURLOPT_SSL_VERIFYHOST => false,
-                    CURLOPT_TIMEOUT        => 6
-                ]);
-                $gmvRes = curl_exec($chGmv);
-                curl_close($chGmv);
-                $gmvJson = json_decode($gmvRes, true);
-                if (!empty($gmvJson['value'][0])) {
-                    $gmv = (float)($gmvJson['value'][0]['GMV'] ?? 0);
-                    $nmv = (float)($gmvJson['value'][0]['NMV'] ?? 0);
-                    $pkgPrice = $nmv > 0 ? $nmv : $gmv;
-                }
-            }
-
-            $orderData['PackagePrice'] = $pkgPrice;
-            $orderData['PackagePriceFormatted'] = 'Rp ' . number_format($pkgPrice, 0, ',', '.');
-            $orderData['GMV'] = $gmv;
-            $orderData['NMV'] = $nmv;
-
-            // Simpan atau perbarui cache di tabel ocs_orders
-            $stmtUpsert = $pdo->prepare("
-                INSERT INTO ocs_orders (
-                    order_id, tracking_number, platform_id, commerce_platform, 
-                    shop_name, shipping_provider, status_code, product_name, 
-                    total_qty, package_price, gmv, nmv, has_packing_video, packing_video_url, order_created_at, raw_payload
-                ) VALUES (
-                    :order_id, :tracking_number, :platform_id, :commerce_platform, 
-                    :shop_name, :shipping_provider, :status_code, :product_name, 
-                    :total_qty, :package_price, :gmv, :nmv, :has_packing_video, :packing_video_url, :order_created_at, :raw_payload
-                )
-                ON DUPLICATE KEY UPDATE 
-                    tracking_number = VALUES(tracking_number),
-                    platform_id = VALUES(platform_id),
-                    commerce_platform = VALUES(commerce_platform),
-                    shop_name = VALUES(shop_name),
-                    shipping_provider = VALUES(shipping_provider),
-                    status_code = VALUES(status_code),
-                    product_name = VALUES(product_name),
-                    total_qty = VALUES(total_qty),
-                    package_price = VALUES(package_price),
-                    gmv = VALUES(gmv),
-                    nmv = VALUES(nmv),
-                    has_packing_video = VALUES(has_packing_video),
-                    packing_video_url = VALUES(packing_video_url),
-                    order_created_at = VALUES(order_created_at),
-                    raw_payload = VALUES(raw_payload)
-            ");
-            $stmtUpsert->execute([
-                ':order_id'          => $orderData['Id'],
-                ':tracking_number'   => $orderData['TrackingNumber'],
-                ':platform_id'       => $orderData['PlatformId'],
-                ':commerce_platform' => $orderData['CommercePlatform'],
-                ':shop_name'         => $orderData['ShopName'],
-                ':shipping_provider' => $orderData['ShippingProvider'],
-                ':status_code'       => $orderData['StatusCode'],
-                ':product_name'      => $orderData['ProductName'],
-                ':total_qty'         => $orderData['TotalQtyOrder'],
-                ':package_price'     => $orderData['PackagePrice'],
-                ':gmv'               => $orderData['GMV'],
-                ':nmv'               => $orderData['NMV'],
-                ':has_packing_video' => $orderData['HasPackingVideo'] ? 1 : 0,
-                ':packing_video_url' => $orderData['PackingVideoUrl'],
-                ':order_created_at'  => $orderData['CreatedAt'],
-                ':raw_payload'       => json_encode($orderData)
-            ]);
+        } catch (Exception $ocsErr) {
+            // Abaikan kegagalan koneksi OCS, lanjutkan lookup lokal
         }
     }
 
-    // 3. CROSS-REFERENCE DATA LOKAL RECEIVING INBOUND (Tanda Terima Ekspedisi)
+    // 3. CROSS-REFERENCE DATA LOKAL RECEIVING INBOUND (Tanda Terima Ekspedisi & Kurir)
     $receptionData = null;
     $searchResi = $orderData['TrackingNumber'] ?? $query;
     $searchOrder = $orderData['Id'] ?? $query;
@@ -401,8 +382,11 @@ try {
             'receipt_number' => $receptionRow['receipt_number'],
             'expedition'     => $receptionRow['expedition'],
             'courier_name'   => $receptionRow['courier_name'],
+            'vehicle_no'     => $receptionRow['vehicle_no'] ?? null,
             'operator_name'  => $receptionRow['operator_name'],
             'package_barcode'=> $receptionRow['package_barcode'],
+            'photo_path'     => $receptionRow['photo_path'] ?? null,
+            'package_photos' => $receptionRow['package_photos'] ? json_decode($receptionRow['package_photos'], true) : [],
             'scanned_at'     => $receptionRow['package_scanned_at'] ?: $receptionRow['created_at'],
             'created_at'     => $receptionRow['created_at']
         ];
@@ -424,8 +408,8 @@ try {
     ]);
     $unboxRow = $stmtUnbox->fetch(PDO::FETCH_ASSOC);
 
+    $items = [];
     if ($unboxRow) {
-        // Ambil list item unboxing
         $stmtItems = $pdo->prepare("SELECT * FROM return_items WHERE session_id = :sid ORDER BY id ASC");
         $stmtItems->execute([':sid' => $unboxRow['id']]);
         $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
@@ -442,18 +426,133 @@ try {
             'total_damaged'  => $unboxRow['total_damaged'],
             'notes'          => $unboxRow['notes'],
             'video_path'     => $unboxRow['video_path'],
+            'package_photo'  => $unboxRow['package_photo'] ?? null,
+            'product_photo'  => $unboxRow['product_photo'] ?? null,
+            'photos'         => $unboxRow['photos'] ? json_decode($unboxRow['photos'], true) : [],
             'created_at'     => $unboxRow['created_at'],
             'items'          => $items
         ];
     }
 
-    // Proxy URL untuk video packing OCS agar bisa diputar di browser tanpa kendala Bearer token
-    $packingProxyUrl = null;
-    if (!empty($orderData['Id'])) {
-        $packingProxyUrl = "api/ocs_video_stream.php?orderId=" . urlencode($orderData['Id']);
+    // 5. GATHER SEMUA FOTO BUKTI (FOTO PAKET, PRODUK, ITEM RUSAK, SERAH TERIMA KURIR)
+    $photosList = [];
+
+    // Foto Paket Unboxing
+    if (!empty($unboxRow['package_photo'])) {
+        $photosList[] = [
+            'type'  => 'package',
+            'badge' => 'Paket Retur',
+            'title' => 'Foto Fisik Paket Saat Unboxing',
+            'url'   => $unboxRow['package_photo']
+        ];
+    }
+    // Foto Produk Unboxing
+    if (!empty($unboxRow['product_photo'])) {
+        $photosList[] = [
+            'type'  => 'product',
+            'badge' => 'Produk Retur',
+            'title' => 'Foto Produk Saat Unboxing',
+            'url'   => $unboxRow['product_photo']
+        ];
+    }
+    // Foto Tambahan Unboxing
+    if (!empty($unboxRow['photos'])) {
+        $extraPhotos = is_array($unboxRow['photos']) ? $unboxRow['photos'] : json_decode($unboxRow['photos'], true);
+        if (is_array($extraPhotos)) {
+            foreach ($extraPhotos as $idx => $ep) {
+                $pPath = is_array($ep) ? ($ep['path'] ?? '') : $ep;
+                $pType = is_array($ep) ? ($ep['type'] ?? 'extra') : 'extra';
+                if ($pPath && $pPath !== ($unboxRow['package_photo'] ?? '') && $pPath !== ($unboxRow['product_photo'] ?? '')) {
+                    $photosList[] = [
+                        'type'  => $pType,
+                        'badge' => 'Bukti Retur',
+                        'title' => 'Foto Tambahan Unboxing #' . ($idx + 1),
+                        'url'   => $pPath
+                    ];
+                }
+            }
+        }
+    }
+    // Foto Tiap Item Unboxing
+    if (!empty($items)) {
+        foreach ($items as $it) {
+            if (!empty($it['photo_path'])) {
+                $isDmg = ($it['condition'] === 'DAMAGED' || !empty($it['damage_reason']));
+                $photosList[] = [
+                    'type'  => 'item',
+                    'badge' => $isDmg ? 'Barang Rusak' : 'Foto Item',
+                    'title' => 'Foto Item: ' . ($it['product_name'] ?: $it['barcode']) . ($it['damage_reason'] ? ' (' . $it['damage_reason'] . ')' : ''),
+                    'url'   => $it['photo_path']
+                ];
+            }
+        }
+    }
+    // Foto Serah Terima Kurir Receiving
+    if (!empty($receptionRow['photo_path'])) {
+        $photosList[] = [
+            'type'  => 'reception',
+            'badge' => 'Kurir Receiving',
+            'title' => 'Foto Serah Terima Kurir: ' . ($receptionRow['courier_name'] ?: $receptionRow['expedition']),
+            'url'   => $receptionRow['photo_path']
+        ];
+    }
+    if (!empty($receptionRow['package_photos'])) {
+        $recExtra = is_array($receptionRow['package_photos']) ? $receptionRow['package_photos'] : json_decode($receptionRow['package_photos'], true);
+        if (is_array($recExtra)) {
+            foreach ($recExtra as $idx => $rp) {
+                if ($rp && $rp !== ($receptionRow['photo_path'] ?? '')) {
+                    $photosList[] = [
+                        'type'  => 'reception',
+                        'badge' => 'Serah Terima',
+                        'title' => 'Foto Paket Serah Terima Ekspedisi #' . ($idx + 1),
+                        'url'   => $rp
+                    ];
+                }
+            }
+        }
     }
 
-    // 5. EVALUASI KELAYAKAN KLAIM: HANYA PAKET DENGAN TYPE ATAU KONDISI BUKAN GOOD / BAGUS
+    // 6. JIKA ORDER DATA BELUM ADA DARI OCS, SINTESIS DATA DARI HASIL SCAN LOKAL (UNBOXING & RECEIVING)
+    if (!$orderData && ($unboxingData || $receptionData)) {
+        $prodSummary = 'Barang Retur';
+        if (!empty($items)) {
+            $names = array_filter(array_map(function($i) { return $i['product_name'] ?: $i['barcode']; }, $items));
+            if (!empty($names)) $prodSummary = implode(', ', array_slice($names, 0, 3));
+        }
+
+        $orderData = [
+            'Id'                     => $unboxingData['invoice_number'] ?? $query,
+            'TrackingNumber'         => $receptionData['package_barcode'] ?? $unboxingData['invoice_number'] ?? $query,
+            'PlatformId'             => null,
+            'CommercePlatform'       => 'Marketplace',
+            'ShopName'               => '-',
+            'ShippingProvider'       => $unboxingData['expedition'] ?? $receptionData['expedition'] ?? '-',
+            'StatusCode'             => null,
+            'ProductName'            => $prodSummary,
+            'TotalQtyOrder'          => $unboxingData['total_items'] ?? 1,
+            'PackagePrice'           => 0,
+            'PackagePriceFormatted'  => 'Rp -',
+            'ShippingFee'            => 0,
+            'ShippingFeeFormatted'   => 'Rp -',
+            'TotalClaimAmount'       => 0,
+            'TotalClaimAmountFormatted' => 'Rp -',
+            'GMV'                    => 0,
+            'NMV'                    => 0,
+            'CreatedAt'              => $unboxingData['created_at'] ?? $receptionData['created_at'] ?? date('Y-m-d H:i:s'),
+            '_source'                => 'local_database'
+        ];
+    }
+
+    if (!$orderData && !$receptionData && !$unboxingData) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Data nomor resi atau order tidak ditemukan di sistem OCS maupun gudang lokal.',
+            'query'   => $query
+        ]);
+        exit;
+    }
+
+    // 7. EVALUASI KELAYAKAN KLAIM: HANYA PAKET DENGAN TYPE ATAU KONDISI BUKAN GOOD / BAGUS
     $isClaimable = false;
     $claimEligibilityReason = '';
     $damagedCount = 0;
@@ -484,14 +583,14 @@ try {
         $claimEligibilityReason = "Paket belum di-unboxing di stasiun gudang.";
     }
 
-    // 6. EVALUASI KESIAPAN BERKAS KLAIM (Claim Dossier Readiness)
+    // 8. EVALUASI KESIAPAN BERKAS KLAIM (Claim Dossier Readiness)
     $readiness = [
         'has_order'       => !empty($orderData),
-        'has_tracking'    => !empty($orderData['TrackingNumber']),
+        'has_tracking'    => !empty($orderData['TrackingNumber']) || !empty($receptionData['package_barcode']),
         'has_reception'   => !empty($receptionData),
         'has_unboxing'    => !empty($unboxingData),
-        'has_unbox_video' => !empty($unboxingData['video_path']) && file_exists(__DIR__ . '/../' . ltrim($unboxingData['video_path'], '/')),
-        'has_pack_video'  => !empty($orderData['HasPackingVideo']),
+        'has_unbox_video' => !empty($unboxingData['video_path']),
+        'has_photos'      => count($photosList) > 0,
         'is_damaged'      => $isClaimable,
         'score_percent'   => 0
     ];
@@ -499,8 +598,8 @@ try {
     $score = 0;
     if ($readiness['has_order']) $score += 25;
     if ($readiness['has_reception']) $score += 25;
-    if ($readiness['has_unboxing']) $score += 25;
-    if ($readiness['has_pack_video'] || $readiness['has_unbox_video']) $score += 25;
+    if ($readiness['has_unbox_video']) $score += 25;
+    if ($readiness['has_photos']) $score += 25;
     $readiness['score_percent'] = $score;
 
     echo json_encode([
@@ -511,13 +610,9 @@ try {
         'damaged_count'            => $damagedCount,
         'damage_details'           => $damageDetails,
         'order'                    => $orderData,
-        'packing_video'            => [
-            'has_video'            => !empty($orderData['HasPackingVideo']),
-            'stream_url'           => $orderData['PackingVideoUrl'] ?? null,
-            'proxy_url'            => $packingProxyUrl
-        ],
         'reception'                => $receptionData,
         'unboxing'                 => $unboxingData,
+        'photos'                   => $photosList,
         'claim_readiness'          => $readiness,
         'timestamp'                => date('Y-m-d H:i:s')
     ]);

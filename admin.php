@@ -582,6 +582,9 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                     <span id="claimPriceBadge" class="px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-bold text-xs border border-emerald-400/30 flex items-center gap-1.5 shadow-xs">
                                         <i class="fa-solid fa-money-bill-wave text-emerald-400 text-xs"></i> Nilai Paket: <span id="claimPriceText" class="font-black text-white">Rp -</span>
                                     </span>
+                                    <span id="claimTotalClaimBadge" class="px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-400/30 flex items-center gap-1.5 shadow-xs">
+                                        <i class="fa-solid fa-shield-halved text-amber-400 text-xs"></i> Tuntutan Klaim: <span id="claimTotalClaimText" class="font-black text-white">Rp -</span>
+                                    </span>
                                 </div>
                                 <h4 id="claimOrderTitle" class="text-lg font-black tracking-tight">Order # - Resi #</h4>
                                 <p id="claimShopSubtitle" class="text-xs text-slate-300">Toko: - | Ekspedisi: -</p>
@@ -602,15 +605,8 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             <div id="checkOrder" class="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 border border-white/10">
                                 <i class="fa-solid fa-circle-check text-emerald-400 text-base" id="iconCheckOrder"></i>
                                 <div>
-                                    <span class="font-bold block text-white text-[11px]">Invoice & Resi OCS</span>
+                                    <span class="font-bold block text-white text-[11px]">Invoice & Resi</span>
                                     <span id="labelCheckOrder" class="text-[10px] text-slate-300">Terverifikasi</span>
-                                </div>
-                            </div>
-                            <div id="checkPackVideo" class="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 border border-white/10">
-                                <i class="fa-solid fa-circle-check text-emerald-400 text-base" id="iconCheckPack"></i>
-                                <div>
-                                    <span class="font-bold block text-white text-[11px]">Video Packing OCS</span>
-                                    <span id="labelCheckPack" class="text-[10px] text-slate-300">Tersedia</span>
                                 </div>
                             </div>
                             <div id="checkReception" class="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 border border-white/10">
@@ -625,6 +621,13 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 <div>
                                     <span class="font-bold block text-white text-[11px]">Video Unboxing Retur</span>
                                     <span id="labelCheckUnbox" class="text-[10px] text-slate-300">Terekam Lengkap</span>
+                                </div>
+                            </div>
+                            <div id="checkPhotos" class="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 border border-white/10">
+                                <i class="fa-solid fa-circle-check text-emerald-400 text-base" id="iconCheckPhotos"></i>
+                                <div>
+                                    <span class="font-bold block text-white text-[11px]">Foto Bukti Barang</span>
+                                    <span id="labelCheckPhotos" class="text-[10px] text-slate-300">Tersedia</span>
                                 </div>
                             </div>
                         </div>
@@ -644,38 +647,14 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                         <span id="claimEligibilityTag" class="px-3 py-1 rounded-lg text-white font-black text-[10px] uppercase tracking-wider shrink-0 self-start sm:self-center">Status</span>
                     </div>
 
-                    <!-- Dual Video Player: Side-by-Side Comparison -->
+                    <!-- Media Bukti: Video Unboxing & Galeri Foto Bukti (Tanpa Video Packing) -->
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        <!-- Video Packing OCS (Saat Kirim) -->
-                        <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden flex flex-col">
-                            <div class="p-3 bg-slate-900 text-white flex items-center justify-between text-xs">
-                                <div class="flex items-center gap-2">
-                                    <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
-                                    <span class="font-bold">1. Video Packing (Gudang Saat Kirim)</span>
-                                </div>
-                                <span class="text-[10px] text-slate-400">Sumber: OCS IEG System</span>
-                            </div>
-                            <div class="relative bg-black aspect-video flex items-center justify-center">
-                                <video id="playerPackingVideo" controls class="w-full h-full object-contain hidden"></video>
-                                <div id="noPackingVideoPlaceholder" class="text-center p-6 text-slate-400">
-                                    <i class="fa-solid fa-video-slash text-3xl mb-2 text-slate-600 block"></i>
-                                    <span class="text-xs">Video packing belum tersedia di OCS untuk order ini.</span>
-                                </div>
-                            </div>
-                            <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-600">
-                                <span>Status: <b id="packingVideoStatusText" class="text-slate-800">-</b></span>
-                                <a id="btnOpenPackingVideoNewTab" href="#" target="_blank" class="text-indigo-600 hover:text-indigo-800 font-bold hidden">
-                                    Buka Video OCS <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                                </a>
-                            </div>
-                        </div>
-
                         <!-- Video Unboxing Retur (Saat Diterima Kembali) -->
                         <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden flex flex-col">
                             <div class="p-3 bg-slate-900 text-white flex items-center justify-between text-xs">
                                 <div class="flex items-center gap-2">
                                     <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                    <span class="font-bold">2. Video Unboxing (Gudang Saat Retur)</span>
+                                    <span class="font-bold">1. Rekaman Video Unboxing (Retur di Gudang)</span>
                                 </div>
                                 <span class="text-[10px] text-slate-400">Stasiun Inbound Unboxing</span>
                             </div>
@@ -683,7 +662,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 <video id="playerUnboxingVideo" controls class="w-full h-full object-contain hidden"></video>
                                 <div id="noUnboxingVideoPlaceholder" class="text-center p-6 text-slate-400">
                                     <i class="fa-solid fa-video-slash text-3xl mb-2 text-slate-600 block"></i>
-                                    <span class="text-xs">Video unboxing stasiun retur belum tersedia / belum di-unboxing.</span>
+                                    <span class="text-xs">Video unboxing belum tersedia atau belum direkam di stasiun retur.</span>
                                 </div>
                             </div>
                             <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-600">
@@ -691,81 +670,119 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 <span id="unboxingTimestampText" class="text-slate-500">-</span>
                             </div>
                         </div>
+
+                        <!-- Galeri Foto Bukti Retur & Serah Terima -->
+                        <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden flex flex-col">
+                            <div class="p-3 bg-slate-900 text-white flex items-center justify-between text-xs">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+                                    <span class="font-bold">2. Galeri Foto Bukti (Paket, Produk & Serah Terima)</span>
+                                </div>
+                                <span id="claimPhotoCountBadge" class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold">0 Foto</span>
+                            </div>
+                            <div class="flex-1 p-3 bg-slate-950/5 flex flex-col justify-center min-h-[220px]">
+                                <div id="claimPhotoGallery" class="hidden grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[280px] overflow-y-auto pr-1">
+                                    <!-- Thumbnail foto bukti diinject via JS -->
+                                </div>
+                                <div id="noPhotosPlaceholder" class="text-center p-6 text-slate-400">
+                                    <i class="fa-solid fa-images text-3xl mb-2 text-slate-300 block"></i>
+                                    <span class="text-xs">Belum ada foto bukti tersimpan untuk paket / resi ini.</span>
+                                </div>
+                            </div>
+                            <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-600">
+                                <span><i class="fa-solid fa-circle-info text-indigo-500 mr-1"></i> Klik foto untuk memperbesar & unduh</span>
+                                <span id="claimPhotoTotalText" class="text-slate-500 font-semibold">-</span>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Rincian Data Komparasi -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <!-- Data Pengiriman Asal (OCS) -->
-                        <div class="bg-white rounded-2xl shadow-xs border border-slate-200 p-4 space-y-3">
+                    <!-- Rincian Data Komparasi Klaim -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- 1. BIAYA & FINANSIAL KLAIM -->
+                        <div class="bg-white rounded-2xl shadow-xs border border-slate-200 p-4 space-y-3 flex flex-col justify-between">
                             <div class="flex items-center gap-2 pb-2 border-b border-slate-100 text-xs font-bold text-slate-800">
-                                <i class="fa-solid fa-paper-plane text-indigo-600"></i>
-                                <span>Rincian Pengiriman Asal (OCS IEG System)</span>
+                                <i class="fa-solid fa-money-bill-transfer text-emerald-600"></i>
+                                <span>Rincian Biaya & Tuntutan Klaim</span>
                             </div>
-                            <div class="grid grid-cols-2 gap-3 text-xs">
+                            <div class="space-y-2.5 text-xs">
                                 <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Nomor Order / Invoice</span>
-                                    <span id="detailOrderId" class="font-bold text-slate-800">-</span>
-                                </div>
-                                <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Nomor Resi (AWB)</span>
-                                    <span id="detailTrackingNumber" class="font-mono font-bold text-indigo-600">-</span>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Nilai / Harga Barang (NMV OCS)</span>
+                                    <span id="detailPackagePrice" class="font-black text-emerald-700 text-base">Rp -</span>
                                 </div>
                                 <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Platform / Marketplace</span>
-                                    <span id="detailPlatform" class="font-semibold text-slate-700">-</span>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Biaya Kirim / Ongkos Ekspedisi</span>
+                                    <span id="detailShippingFee" class="font-bold text-slate-800">Rp -</span>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                                    <span class="text-[10px] text-emerald-800 uppercase font-black block">Total Estimasi Tuntutan Ganti Rugi</span>
+                                    <span id="detailTotalClaim" class="font-black text-emerald-700 text-base">Rp -</span>
+                                    <span class="text-[10px] text-emerald-600 block mt-0.5">Nilai barang yang diajukan banding ke ekspedisi</span>
                                 </div>
                                 <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Toko / Official Shop</span>
-                                    <span id="detailShopName" class="font-semibold text-slate-700">-</span>
-                                </div>
-                                <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Ekspedisi Pengiriman</span>
-                                    <span id="detailShippingProvider" class="font-semibold text-slate-700">-</span>
-                                </div>
-                                <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Waktu Pesanan</span>
-                                    <span id="detailOrderCreatedAt" class="text-slate-600">-</span>
-                                </div>
-                                <div class="col-span-2 p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 flex items-center justify-between">
-                                    <div>
-                                        <span class="text-[10px] text-emerald-800 uppercase font-black block">Nilai / Harga Paket (Tuntutan Klaim)</span>
-                                        <span id="detailPackagePrice" class="font-black text-emerald-700 text-sm">Rp -</span>
-                                    </div>
-                                    <span class="text-[10px] text-emerald-600 font-semibold bg-white px-2 py-1 rounded-md border border-emerald-200">Berdasarkan NMV OCS</span>
-                                </div>
-                                <div class="col-span-2">
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Produk / Keterangan</span>
-                                    <span id="detailOrderProductName" class="text-slate-700 font-medium block bg-slate-50 p-2 rounded-lg border border-slate-200">-</span>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Nilai Gross GMV</span>
+                                    <span id="detailGmvPrice" class="text-slate-600 font-medium">Rp -</span>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Data Penerimaan & Unboxing Fisik -->
-                        <div class="bg-white rounded-2xl shadow-xs border border-slate-200 p-4 space-y-3">
+                        <!-- 2. DETAIL EKSPEDISI -->
+                        <div class="bg-white rounded-2xl shadow-xs border border-slate-200 p-4 space-y-3 flex flex-col justify-between">
                             <div class="flex items-center gap-2 pb-2 border-b border-slate-100 text-xs font-bold text-slate-800">
-                                <i class="fa-solid fa-boxes-packing text-emerald-600"></i>
-                                <span>Rincian Penerimaan & Unboxing Fisik di Gudang</span>
+                                <i class="fa-solid fa-truck-fast text-indigo-600"></i>
+                                <span>Detail Ekspedisi & Serah Terima</span>
                             </div>
-                            <div class="grid grid-cols-2 gap-3 text-xs">
+                            <div class="grid grid-cols-1 gap-2.5 text-xs">
+                                <div>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Jasa Ekspedisi Pengiriman</span>
+                                    <span id="detailShippingProvider" class="font-bold text-indigo-700 text-sm">-</span>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Nomor Resi Paket (AWB)</span>
+                                    <span id="detailTrackingNumber" class="font-mono font-bold text-slate-800 text-xs bg-slate-100 px-2 py-1 rounded inline-block">-</span>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Kurir / Driver Pengantar (Receiving)</span>
+                                    <span id="detailCourier" class="font-semibold text-slate-700">-</span>
+                                </div>
                                 <div>
                                     <span class="text-[10px] text-slate-400 uppercase font-bold block">No. Tanda Terima Ekspedisi</span>
                                     <span id="detailReceiptNo" class="font-mono font-bold text-emerald-700">-</span>
                                 </div>
                                 <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Kurir Pengantar Fisik</span>
-                                    <span id="detailCourier" class="font-semibold text-slate-700">-</span>
-                                </div>
-                                <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Waktu Diterima di Gudang</span>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Waktu Fisik Diterima di Gudang</span>
                                     <span id="detailReceivedAt" class="text-slate-600">-</span>
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- 3. DETAIL PAKET & UNBOXING -->
+                        <div class="bg-white rounded-2xl shadow-xs border border-slate-200 p-4 space-y-3 flex flex-col justify-between">
+                            <div class="flex items-center gap-2 pb-2 border-b border-slate-100 text-xs font-bold text-slate-800">
+                                <i class="fa-solid fa-boxes-packing text-amber-600"></i>
+                                <span>Detail Paket & Hasil Unboxing</span>
+                            </div>
+                            <div class="space-y-2.5 text-xs">
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <span class="text-[10px] text-slate-400 uppercase font-bold block">No. Order / Invoice</span>
+                                        <span id="detailOrderId" class="font-bold text-slate-800 text-xs">-</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-[10px] text-slate-400 uppercase font-bold block">Marketplace / Toko</span>
+                                        <span id="detailShopName" class="font-semibold text-slate-700 text-xs truncate block">-</span>
+                                    </div>
+                                </div>
                                 <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Status Hasil Unboxing</span>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Status Unboxing Retur</span>
                                     <span id="detailUnboxStatus" class="font-bold text-slate-800">-</span>
                                 </div>
-                                <div class="col-span-2">
+                                <div>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Rincian Produk di Paket</span>
+                                    <span id="detailOrderProductName" class="text-slate-700 font-medium block bg-slate-50 p-2 rounded-lg border border-slate-200 text-xs max-h-16 overflow-y-auto">-</span>
+                                </div>
+                                <div>
                                     <span class="text-[10px] text-slate-400 uppercase font-bold block">Kondisi Barang & Alasan Retur</span>
-                                    <span id="detailConditionNotes" class="font-semibold text-slate-800 bg-amber-50 p-2.5 rounded-lg border border-amber-200 block text-xs">-</span>
+                                    <div id="detailConditionNotes" class="font-semibold text-slate-800 bg-amber-50 p-2 rounded-lg border border-amber-200 text-xs max-h-20 overflow-y-auto">-</div>
                                 </div>
                             </div>
                         </div>
@@ -1641,6 +1658,32 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
             </div>
             <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end">
                 <button onclick="closeReceivingPackagesModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PREVIEW FOTO BUKTI KLAIM (LIGHTBOX) -->
+    <div id="claimPhotoModal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="relative bg-slate-900 border border-white/10 rounded-3xl max-w-4xl w-full p-4 flex flex-col max-h-[92vh] shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-white/10 text-white">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                    <h3 id="claimPhotoModalTitle" class="text-xs font-bold font-mono tracking-wide">Foto Bukti Retur</h3>
+                </div>
+                <button onclick="closeClaimPhotoModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+            <div class="flex-1 flex items-center justify-center p-2 min-h-0 overflow-hidden my-2">
+                <img id="claimPhotoModalImg" src="" alt="Preview Bukti Paket" class="max-h-[70vh] w-auto max-w-full object-contain rounded-xl shadow-2xl border border-white/10">
+            </div>
+            <div class="flex items-center justify-between pt-3 border-t border-white/10">
+                <a id="btnDownloadClaimPhoto" href="#" download="foto_bukti_klaim.jpg" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition shadow-sm">
+                    <i class="fa-solid fa-download"></i> Unduh Foto Bukti
+                </a>
+                <button onclick="closeClaimPhotoModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-xs transition">
                     Tutup
                 </button>
             </div>

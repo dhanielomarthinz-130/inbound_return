@@ -2391,15 +2391,15 @@ function renderClaimDossier(data) {
     if (resultContainer) resultContainer.classList.remove('hidden');
 
     const order = data.order || {};
-    const packVid = data.packing_video || {};
     const reception = data.reception || null;
     const unboxing = data.unboxing || null;
     const readiness = data.claim_readiness || {};
+    const photos = data.photos || [];
 
     // Header Title
     const orderTitle = document.getElementById('claimOrderTitle');
     if (orderTitle) {
-        orderTitle.innerText = `Order #${order.Id || '-'}  •  Resi #${order.TrackingNumber || data.query}`;
+        orderTitle.innerText = `Order #${order.Id || '-'}  •  Resi #${order.TrackingNumber || reception?.package_barcode || data.query}`;
     }
 
     const shopSub = document.getElementById('claimShopSubtitle');
@@ -2413,10 +2413,10 @@ function renderClaimDossier(data) {
     }
 
     // Checklist Badges
-    updateChecklistBadge('iconCheckOrder', 'labelCheckOrder', readiness.has_order, 'Terverifikasi OCS', 'Tidak Ditemukan');
-    updateChecklistBadge('iconCheckPack', 'labelCheckPack', readiness.has_pack_video, 'Tersedia di OCS', 'Belum Ada Video');
+    updateChecklistBadge('iconCheckOrder', 'labelCheckOrder', readiness.has_order || readiness.has_tracking, 'Terverifikasi', 'Tidak Ditemukan');
     updateChecklistBadge('iconCheckRec', 'labelCheckRec', readiness.has_reception, 'Diterima di Gudang', 'Belum Ada Tanda Terima');
     updateChecklistBadge('iconCheckUnbox', 'labelCheckUnbox', readiness.has_unbox_video, 'Terekam Lengkap', 'Belum Di-unboxing');
+    updateChecklistBadge('iconCheckPhotos', 'labelCheckPhotos', photos.length > 0, `${photos.length} Foto Tersedia`, 'Belum Ada Foto');
 
     // Banner Status Kelayakan Klaim: HANYA PAKET DENGAN KONDISI BUKAN GOOD / BAGUS
     const eligBanner = document.getElementById('claimEligibilityBanner');
@@ -2449,33 +2449,7 @@ function renderClaimDossier(data) {
         }
     }
 
-    // Video 1: Packing OCS
-    const packVideoEl = document.getElementById('playerPackingVideo');
-    const noPackPlaceholder = document.getElementById('noPackingVideoPlaceholder');
-    const packStatusText = document.getElementById('packingVideoStatusText');
-    const btnOpenPackTab = document.getElementById('btnOpenPackingVideoNewTab');
-
-    if (packVid.has_video && packVid.proxy_url) {
-        packVideoEl.src = packVid.proxy_url;
-        packVideoEl.classList.remove('hidden');
-        noPackPlaceholder.classList.add('hidden');
-        packStatusText.innerText = 'Video Packing Siap Diputar';
-        packStatusText.className = 'text-emerald-600 font-bold';
-        if (btnOpenPackTab) {
-            btnOpenPackTab.href = packVid.proxy_url;
-            btnOpenPackTab.classList.remove('hidden');
-        }
-    } else {
-        packVideoEl.pause();
-        packVideoEl.removeAttribute('src');
-        packVideoEl.classList.add('hidden');
-        noPackPlaceholder.classList.remove('hidden');
-        packStatusText.innerText = 'Tidak Tersedia di OCS';
-        packStatusText.className = 'text-slate-400 font-medium';
-        if (btnOpenPackTab) btnOpenPackTab.classList.add('hidden');
-    }
-
-    // Video 2: Unboxing Retur Lokal
+    // Media 1: Video Unboxing Retur
     const unboxVideoEl = document.getElementById('playerUnboxingVideo');
     const noUnboxPlaceholder = document.getElementById('noUnboxingVideoPlaceholder');
     const unboxOpText = document.getElementById('unboxingOperatorText');
@@ -2484,45 +2458,90 @@ function renderClaimDossier(data) {
     if (unboxing && unboxing.video_path) {
         unboxVideoEl.src = unboxing.video_path;
         unboxVideoEl.classList.remove('hidden');
-        noUnboxPlaceholder.classList.add('hidden');
+        if (noUnboxPlaceholder) noUnboxPlaceholder.classList.add('hidden');
         if (unboxOpText) unboxOpText.innerText = unboxing.operator_name || 'Operator';
         if (unboxTimeText) unboxTimeText.innerText = unboxing.created_at || '-';
     } else {
-        unboxVideoEl.pause();
-        unboxVideoEl.removeAttribute('src');
-        unboxVideoEl.classList.add('hidden');
-        noUnboxPlaceholder.classList.remove('hidden');
+        if (unboxVideoEl) {
+            unboxVideoEl.pause();
+            unboxVideoEl.removeAttribute('src');
+            unboxVideoEl.classList.add('hidden');
+        }
+        if (noUnboxPlaceholder) noUnboxPlaceholder.classList.remove('hidden');
         if (unboxOpText) unboxOpText.innerText = '-';
         if (unboxTimeText) unboxTimeText.innerText = 'Belum ada rekaman';
     }
 
-    // Detail Grid OCS
-    setElText('detailOrderId', order.Id || '-');
-    setElText('detailTrackingNumber', order.TrackingNumber || data.query || '-');
-    setElText('detailPlatform', order.CommercePlatform || '-');
-    setElText('detailShopName', order.ShopName || '-');
-    setElText('detailShippingProvider', order.ShippingProvider || '-');
-    setElText('detailOrderCreatedAt', order.CreatedAt || '-');
-    setElText('detailPackagePrice', order.PackagePriceFormatted || (order.PackagePrice ? 'Rp ' + Number(order.PackagePrice).toLocaleString('id-ID') : 'Rp -'));
-    setElText('detailOrderProductName', order.ProductName || '-');
+    // Media 2: Galeri Foto Bukti Retur & Serah Terima
+    const galleryEl = document.getElementById('claimPhotoGallery');
+    const noPhotosEl = document.getElementById('noPhotosPlaceholder');
+    const countBadge = document.getElementById('claimPhotoCountBadge');
+    const totalText = document.getElementById('claimPhotoTotalText');
 
-    // Header Price Badge
+    if (countBadge) countBadge.innerText = `${photos.length} Foto`;
+    if (totalText) totalText.innerText = `${photos.length} Foto Bukti Tersimpan`;
+
+    if (photos.length > 0 && galleryEl) {
+        galleryEl.innerHTML = photos.map((p, idx) => `
+            <div class="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-video cursor-pointer shadow-2xs hover:shadow-md transition" onclick="openClaimPhotoModal('${encodeURI(p.url)}', '${encodeURIComponent(p.title || 'Foto Bukti')}')">
+                <img src="${p.url}" alt="${p.title || 'Foto'}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition flex items-end p-2">
+                    <span class="text-[10px] text-white font-semibold truncate"><i class="fa-solid fa-magnifying-glass-plus mr-1"></i>${p.title || 'Perbesar'}</span>
+                </div>
+                <span class="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-slate-900/80 text-white font-bold text-[9px] uppercase tracking-wider backdrop-blur-xs">
+                    ${p.badge || 'Bukti'}
+                </span>
+            </div>
+        `).join('');
+        galleryEl.classList.remove('hidden');
+        if (noPhotosEl) noPhotosEl.classList.add('hidden');
+    } else {
+        if (galleryEl) {
+            galleryEl.innerHTML = '';
+            galleryEl.classList.add('hidden');
+        }
+        if (noPhotosEl) noPhotosEl.classList.remove('hidden');
+    }
+
+    // Header Badges Biaya
     const priceBadgeText = document.getElementById('claimPriceText');
     if (priceBadgeText) {
         priceBadgeText.innerText = order.PackagePriceFormatted || (order.PackagePrice ? 'Rp ' + Number(order.PackagePrice).toLocaleString('id-ID') : 'Rp -');
     }
+    const totalClaimBadge = document.getElementById('claimTotalClaimText');
+    if (totalClaimBadge) {
+        totalClaimBadge.innerText = order.TotalClaimAmountFormatted || (order.TotalClaimAmount ? 'Rp ' + Number(order.TotalClaimAmount).toLocaleString('id-ID') : (order.PackagePriceFormatted || 'Rp -'));
+    }
 
-    // Detail Grid Gudang
-    setElText('detailReceiptNo', reception?.receipt_number || '- (Belum discan di Receiving)');
-    setElText('detailCourier', reception ? `${reception.courier_name || '-'} (${reception.expedition || ''})` : '-');
+    // Card 1: Rincian Biaya & Tuntutan Klaim
+    setElText('detailPackagePrice', order.PackagePriceFormatted || (order.PackagePrice ? 'Rp ' + Number(order.PackagePrice).toLocaleString('id-ID') : 'Rp -'));
+    setElText('detailShippingFee', order.ShippingFeeFormatted || (order.ShippingFee ? 'Rp ' + Number(order.ShippingFee).toLocaleString('id-ID') : 'Rp 0'));
+    setElText('detailTotalClaim', order.TotalClaimAmountFormatted || (order.TotalClaimAmount ? 'Rp ' + Number(order.TotalClaimAmount).toLocaleString('id-ID') : (order.PackagePriceFormatted || 'Rp -')));
+    setElText('detailGmvPrice', order.GMV ? 'Rp ' + Number(order.GMV).toLocaleString('id-ID') : (order.PackagePriceFormatted || '-'));
+
+    // Card 2: Detail Ekspedisi & Serah Terima Kurir
+    setElText('detailShippingProvider', order.ShippingProvider || reception?.expedition || '-');
+    setElText('detailTrackingNumber', order.TrackingNumber || reception?.package_barcode || data.query || '-');
+    setElText('detailCourier', reception ? `${reception.courier_name || '-'} (${reception.expedition || ''})` : '- (Belum discan serah terima)');
+    setElText('detailReceiptNo', reception?.receipt_number || '- (Belum ada surat jalan)');
     setElText('detailReceivedAt', reception?.scanned_at || reception?.created_at || '-');
+
+    // Card 3: Detail Paket & Hasil Unboxing
+    setElText('detailOrderId', order.Id || '-');
+    setElText('detailShopName', `${order.CommercePlatform || 'Marketplace'} • ${order.ShopName || '-'}`);
     setElText('detailUnboxStatus', unboxing ? `${unboxing.status} (${unboxing.total_damaged || 0} Rusak, ${unboxing.total_good || 0} Bagus)` : '- (Belum di-unboxing)');
+
+    let prodNames = order.ProductName || '';
+    if (!prodNames && unboxing?.items && unboxing.items.length > 0) {
+        prodNames = unboxing.items.map(i => `${i.product_name || i.barcode} (x${i.qty || 1})`).join(', ');
+    }
+    setElText('detailOrderProductName', prodNames || '-');
 
     let notes = '-';
     if (unboxing) {
         const damageItems = (unboxing.items || []).filter(i => i.condition === 'DAMAGED' || i.damage_reason);
         if (damageItems.length > 0) {
-            notes = damageItems.map(i => `• ${i.product_name}: ${i.damage_reason || 'Rusak'}`).join('<br>');
+            notes = damageItems.map(i => `• ${i.product_name || i.barcode}: ${i.damage_reason || 'Rusak'}`).join('<br>');
         } else if (unboxing.notes) {
             notes = unboxing.notes;
         } else {
@@ -2534,6 +2553,28 @@ function renderClaimDossier(data) {
     const notesEl = document.getElementById('detailConditionNotes');
     if (notesEl) notesEl.innerHTML = notes;
 }
+
+window.openClaimPhotoModal = function(url, encodedTitle) {
+    const modal = document.getElementById('claimPhotoModal');
+    const img = document.getElementById('claimPhotoModalImg');
+    const titleEl = document.getElementById('claimPhotoModalTitle');
+    const dlBtn = document.getElementById('btnDownloadClaimPhoto');
+    if (!modal || !img) return;
+
+    const title = decodeURIComponent(encodedTitle || 'Foto Bukti Retur');
+    img.src = url;
+    if (titleEl) titleEl.innerText = title;
+    if (dlBtn) {
+        dlBtn.href = url;
+        dlBtn.setAttribute('download', title.replace(/[^a-zA-Z0-9_-]/g, '_') + '.jpg');
+    }
+    modal.classList.remove('hidden');
+};
+
+window.closeClaimPhotoModal = function() {
+    const modal = document.getElementById('claimPhotoModal');
+    if (modal) modal.classList.add('hidden');
+};
 
 function updateChecklistBadge(iconId, labelId, isOk, textOk, textFail) {
     const icon = document.getElementById(iconId);
@@ -2565,21 +2606,31 @@ window.copyClaimPacketSummary = function() {
     const ord = d.order || {};
     const rec = d.reception || {};
     const unb = d.unboxing || {};
+    const photos = d.photos || [];
 
-    const summary = `=== BERKAS KLAIM & BANDING RETUR ===\n` +
-        `Order ID / No. Pesanan : ${ord.Id || '-'}\n` +
-        `No. Resi Pengiriman (AWB): ${ord.TrackingNumber || d.query}\n` +
-        `Nilai / Harga Paket   : ${ord.PackagePriceFormatted || '-'}\n` +
-        `Platform / Marketplace : ${ord.CommercePlatform || '-'}\n` +
-        `Nama Toko             : ${ord.ShopName || '-'}\n` +
-        `Ekspedisi Pengiriman   : ${ord.ShippingProvider || rec.expedition || '-'}\n` +
-        `No. Tanda Terima Gudang: ${rec.receipt_number || '-'}\n` +
-        `Kurir Pengantar        : ${rec.courier_name || '-'}\n` +
-        `Hasil Unboxing         : ${unb.status || '-'} (${unb.total_damaged || 0} Rusak, ${unb.total_good || 0} Bagus)\n` +
-        `Video Packing OCS      : ${d.packing_video?.has_video ? 'TERSEDIA' : 'TIDAK TERSEDIA'}\n` +
-        `Video Unboxing Retur   : ${unb.video_path ? 'TEREKAM LENGKAP' : 'BELUM ADA'}\n` +
-        `Waktu Generate         : ${new Date().toLocaleString('id-ID')}\n` +
-        `====================================`;
+    const summary = `=== BERKAS KLAIM & BANDING EKSPEDISI ===\n` +
+        `No. Resi Pengiriman (AWB): ${ord.TrackingNumber || rec.package_barcode || d.query}\n` +
+        `No. Order / Invoice      : ${ord.Id || '-'}\n` +
+        `Platform / Toko          : ${ord.CommercePlatform || '-'} • ${ord.ShopName || '-'}\n` +
+        `----------------------------------------\n` +
+        `RINCIAN BIAYA & TUNTUTAN:\n` +
+        `• Nilai / Harga Barang   : ${ord.PackagePriceFormatted || '-'}\n` +
+        `• Biaya Kirim Ekspedisi  : ${ord.ShippingFeeFormatted || '-'}\n` +
+        `• Total Estimasi Tuntutan: ${ord.TotalClaimAmountFormatted || ord.PackagePriceFormatted || '-'}\n` +
+        `----------------------------------------\n` +
+        `DETAIL EKSPEDISI & SERAH TERIMA:\n` +
+        `• Jasa Ekspedisi         : ${ord.ShippingProvider || rec.expedition || '-'}\n` +
+        `• Kurir / Driver         : ${rec.courier_name || '-'} (${rec.expedition || ''})\n` +
+        `• No. Tanda Terima       : ${rec.receipt_number || '-'}\n` +
+        `• Waktu Diterima Fisik   : ${rec.scanned_at || rec.created_at || '-'}\n` +
+        `----------------------------------------\n` +
+        `DETAIL PAKET & UNBOXING:\n` +
+        `• Produk                 : ${ord.ProductName || '-'}\n` +
+        `• Status Unboxing        : ${unb.status || '-'} (${unb.total_damaged || 0} Rusak, ${unb.total_good || 0} Bagus)\n` +
+        `• Video Unboxing Retur   : ${unb.video_path ? 'TEREKAM LENGKAP' : 'BELUM ADA'}\n` +
+        `• Foto Bukti Fisik       : ${photos.length} foto tersedia\n` +
+        `Waktu Generate           : ${new Date().toLocaleString('id-ID')}\n` +
+        `========================================`;
 
     navigator.clipboard.writeText(summary).then(() => {
         showToast('success', 'Ringkasan bukti klaim berhasil disalin ke clipboard!', 'Tersalin');
@@ -2597,8 +2648,9 @@ window.printClaimDossier = function() {
     const ord = d.order || {};
     const rec = d.reception || {};
     const unb = d.unboxing || {};
+    const photos = d.photos || [];
 
-    const printWin = window.open('', '_blank', 'width=900,height=750');
+    const printWin = window.open('', '_blank', 'width=950,height=800');
     if (!printWin) {
         showToast('error', 'Popup diblokir oleh browser. Izinkan popup untuk mencetak.', 'Popup Diblokir');
         return;
@@ -2610,32 +2662,36 @@ window.printClaimDossier = function() {
         <meta charset="UTF-8">
         <title>Berkas Klaim - ${ord.TrackingNumber || ord.Id || 'Dossier'}</title>
         <style>
-            @page { size: A4 portrait; margin: 15mm; }
-            body { font-family: Arial, sans-serif; font-size: 11pt; color: #1e293b; margin: 0; padding: 20px; line-height: 1.4; }
-            .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px; }
-            .title { text-align: center; margin-bottom: 16px; }
-            .title h2 { margin: 0; font-size: 15pt; text-transform: uppercase; color: #0f172a; }
-            .title p { margin: 4px 0 0 0; font-size: 9pt; color: #64748b; }
-            .box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 14px; }
-            .box-title { font-weight: bold; font-size: 10pt; text-transform: uppercase; color: #334155; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px; }
-            table { width: 100%; border-collapse: collapse; font-size: 10pt; }
-            td { padding: 4px 6px; vertical-align: top; }
+            @page { size: A4 portrait; margin: 12mm; }
+            body { font-family: Arial, sans-serif; font-size: 10pt; color: #1e293b; margin: 0; padding: 15px; line-height: 1.35; }
+            .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 12px; }
+            .title { text-align: center; margin-bottom: 14px; }
+            .title h2 { margin: 0; font-size: 14pt; text-transform: uppercase; color: #0f172a; }
+            .title p { margin: 3px 0 0 0; font-size: 8.5pt; color: #64748b; }
+            .box { border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; margin-bottom: 10px; }
+            .box-title { font-weight: bold; font-size: 9.5pt; text-transform: uppercase; color: #334155; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 6px; }
+            table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+            td { padding: 3px 5px; vertical-align: top; }
             .label { width: 35%; color: #64748b; font-weight: normal; }
             .val { font-weight: bold; color: #0f172a; }
-            .badge-ok { background: #dcfce7; color: #15803d; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 9pt; display: inline-block; }
-            .badge-no { background: #fee2e2; color: #b91c1c; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 9pt; display: inline-block; }
-            .signatures { display: flex; justify-content: space-between; margin-top: 40px; text-align: center; }
+            .badge-ok { background: #dcfce7; color: #15803d; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 8.5pt; display: inline-block; }
+            .badge-no { background: #fee2e2; color: #b91c1c; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 8.5pt; display: inline-block; }
+            .photos-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+            .photo-item { width: 31%; border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px; text-align: center; box-sizing: border-box; }
+            .photo-item img { width: 100%; height: 110px; object-fit: cover; border-radius: 3px; }
+            .photo-item span { display: block; font-size: 7.5pt; color: #475569; margin-top: 3px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .signatures { display: flex; justify-content: space-between; margin-top: 30px; text-align: center; }
             .sig-box { width: 45%; }
-            .sig-line { margin-top: 60px; border-bottom: 1px solid #0f172a; font-weight: bold; }
+            .sig-line { margin-top: 50px; border-bottom: 1px solid #0f172a; font-weight: bold; }
         </style>
     </head>
     <body>
         <div class="header">
             <div>
-                <b style="font-size: 13pt;">IEG RETURN INBOUND & CLAIMS</b><br>
-                <span style="font-size: 9pt; color: #64748b;">Warehouse Management & Expedition Dispute Department</span>
+                <b style="font-size: 12pt;">IEG RETURN INBOUND & CLAIMS</b><br>
+                <span style="font-size: 8.5pt; color: #64748b;">Warehouse Management & Expedition Dispute Department</span>
             </div>
-            <div style="text-align: right; font-size: 9pt; color: #64748b;">
+            <div style="text-align: right; font-size: 8.5pt; color: #64748b;">
                 Tanggal: <b>${new Date().toLocaleDateString('id-ID')}</b><br>
                 Status: <span class="badge-ok">VERIFIKASI SISTEM</span>
             </div>
@@ -2643,36 +2699,44 @@ window.printClaimDossier = function() {
 
         <div class="title">
             <h2>BERITA ACARA BUKTI BANDING / KLAIM EKSPEDISI</h2>
-            <p>Lampiran Resmi Bukti Cross-Lookup OCS WMS & Rekaman Inbound Warehouse</p>
+            <p>Lampiran Resmi Bukti Cross-Lookup Ekspedisi, Biaya & Rekaman Inbound Warehouse</p>
         </div>
 
         ${d.is_claimable ? `
-        <div style="background: #fee2e2; border: 2px solid #ef4444; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; color: #991b1b;">
-            <b style="font-size: 11pt;">⚠️ STATUS: PAKET LAYAK KLAIM / BANDING EKSPEDISI (Kondisi Bukan Good / Cacat)</b><br>
-            <span style="font-size: 9.5pt;">${d.claim_eligibility_reason || 'Kondisi barang tercatat cacat/rusak saat unboxing retur.'}</span>
+        <div style="background: #fee2e2; border: 1.5px solid #ef4444; border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; color: #991b1b;">
+            <b style="font-size: 10pt;">⚠️ STATUS: PAKET LAYAK KLAIM / BANDING EKSPEDISI (Kondisi Bukan Good / Cacat)</b><br>
+            <span style="font-size: 8.5pt;">${d.claim_eligibility_reason || 'Kondisi barang tercatat cacat/rusak saat unboxing retur.'}</span>
         </div>
         ` : `
-        <div style="background: #dcfce7; border: 2px solid #22c55e; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; color: #166534;">
-            <b style="font-size: 11pt;">✓ STATUS: BUKAN PAKET KLAIM (Kondisi Good / Retur Normal)</b><br>
-            <span style="font-size: 9.5pt;">${d.claim_eligibility_reason || 'Barang diterima dalam kondisi baik. Tidak memenuhi syarat klaim kerusakan.'}</span>
+        <div style="background: #dcfce7; border: 1.5px solid #22c55e; border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; color: #166534;">
+            <b style="font-size: 10pt;">✓ STATUS: BUKAN PAKET KLAIM (Kondisi Good / Retur Normal)</b><br>
+            <span style="font-size: 8.5pt;">${d.claim_eligibility_reason || 'Barang diterima dalam kondisi baik. Tidak memenuhi syarat klaim kerusakan.'}</span>
         </div>
         `}
 
         <div class="box">
-            <div class="box-title">I. IDENTITAS PESANAN & PENGIRIMAN ASAL (OCS IEG SYSTEM)</div>
+            <div class="box-title">I. IDENTITAS PESANAN & DETAIL EKSPEDISI</div>
             <table>
+                <tr><td class="label">Nomor Resi Paket (AWB):</td><td class="val" style="font-size: 11pt; font-family: monospace;">${ord.TrackingNumber || rec.package_barcode || d.query}</td></tr>
                 <tr><td class="label">Nomor Order / Invoice:</td><td class="val">${ord.Id || '-'}</td></tr>
-                <tr><td class="label">Nomor Resi Paket (AWB):</td><td class="val">${ord.TrackingNumber || d.query}</td></tr>
-                <tr><td class="label">Nilai / Harga Paket (Klaim):</td><td class="val" style="color: #047857; font-size: 11pt; font-weight: 900;">${ord.PackagePriceFormatted || '-'}</td></tr>
+                <tr><td class="label">Jasa Ekspedisi Pengiriman:</td><td class="val" style="color: #4338ca;">${ord.ShippingProvider || rec.expedition || '-'}</td></tr>
                 <tr><td class="label">Marketplace / Platform:</td><td class="val">${ord.CommercePlatform || '-'}</td></tr>
                 <tr><td class="label">Nama Official Shop / Toko:</td><td class="val">${ord.ShopName || '-'}</td></tr>
-                <tr><td class="label">Jasa Ekspedisi Kirim:</td><td class="val">${ord.ShippingProvider || '-'}</td></tr>
                 <tr><td class="label">Keterangan Produk:</td><td class="val">${ord.ProductName || '-'}</td></tr>
             </table>
         </div>
 
         <div class="box">
-            <div class="box-title">II. BUKTI FISIK SERAH TERIMA DARI EKSPEDISI (RECEIVING INBOUND)</div>
+            <div class="box-title">II. RINCIAN BIAYA & ESTIMASI TUNTUTAN GANTI RUGI</div>
+            <table>
+                <tr><td class="label">Nilai / Harga Barang (NMV):</td><td class="val" style="color: #047857; font-size: 10.5pt; font-weight: 900;">${ord.PackagePriceFormatted || '-'}</td></tr>
+                <tr><td class="label">Biaya / Ongkos Kirim:</td><td class="val">${ord.ShippingFeeFormatted || 'Rp 0'}</td></tr>
+                <tr><td class="label">Total Estimasi Tuntutan Klaim:</td><td class="val" style="color: #b91c1c; font-size: 11pt; font-weight: 900;">${ord.TotalClaimAmountFormatted || ord.PackagePriceFormatted || '-'}</td></tr>
+            </table>
+        </div>
+
+        <div class="box">
+            <div class="box-title">III. BUKTI FISIK SERAH TERIMA DARI EKSPEDISI (RECEIVING INBOUND)</div>
             <table>
                 <tr><td class="label">No. Tanda Terima Ekspedisi:</td><td class="val">${rec.receipt_number || '-'}</td></tr>
                 <tr><td class="label">Kurir / Driver Pengantar:</td><td class="val">${rec.courier_name || '-'} (${rec.expedition || ''})</td></tr>
@@ -2682,28 +2746,29 @@ window.printClaimDossier = function() {
         </div>
 
         <div class="box">
-            <div class="box-title">III. HASIL PEMERIKSAAN & UNBOXING RETUR DI GUDANG</div>
+            <div class="box-title">IV. HASIL PEMERIKSAAN & UNBOXING RETUR DI GUDANG</div>
             <table>
                 <tr><td class="label">Status Hasil Unboxing:</td><td class="val">${unb.status || '-'} (${unb.total_damaged || 0} Rusak, ${unb.total_good || 0} Bagus)</td></tr>
                 <tr><td class="label">Waktu Unboxing:</td><td class="val">${unb.created_at || '-'}</td></tr>
                 <tr><td class="label">Operator Pemeriksa:</td><td class="val">${unb.operator_name || '-'}</td></tr>
                 <tr><td class="label">Catatan Kerusakan:</td><td class="val">${unb.notes || (ord.ReturnReasonText ? '[' + ord.ReturnReason + '] ' + ord.ReturnReasonText : 'Lihat rincian fisik')}</td></tr>
+                <tr><td class="label">Video Unboxing Retur:</td><td class="val">${unb.video_path ? '<span class="badge-ok">✓ TEREKAM LENGKAP</span>' : '<span class="badge-no">✕ BELUM DIREKAM</span>'}</td></tr>
             </table>
         </div>
 
+        ${photos.length > 0 ? `
         <div class="box">
-            <div class="box-title">IV. STATUS VERIFIKASI VIDEO DIGITAL</div>
-            <table>
-                <tr>
-                    <td class="label">1. Video Rekaman Packing (Saat Kirim dari Gudang):</td>
-                    <td class="val">${d.packing_video?.has_video ? '<span class="badge-ok">✓ TERSEDIA DI OCS</span>' : '<span class="badge-no">✕ BELUM TERSEDIA</span>'}</td>
-                </tr>
-                <tr>
-                    <td class="label">2. Video Rekaman Unboxing (Saat Retur Kembali):</td>
-                    <td class="val">${unb.video_path ? '<span class="badge-ok">✓ TEREKAM LENGKAP</span>' : '<span class="badge-no">✕ BELUM DIREKAM</span>'}</td>
-                </tr>
-            </table>
+            <div class="box-title">V. DOKUMENTASI FOTO BUKTI FISIK (${photos.length} FOTO)</div>
+            <div class="photos-grid">
+                ${photos.slice(0, 6).map(p => `
+                    <div class="photo-item">
+                        <img src="${p.url}" alt="${p.title || 'Foto Bukti'}">
+                        <span>${p.title || p.badge || 'Bukti Retur'}</span>
+                    </div>
+                `).join('')}
+            </div>
         </div>
+        ` : ''}
 
         <div class="signatures">
             <div class="sig-box">
@@ -2813,11 +2878,17 @@ window.loadClaimCandidates = async function(force = false) {
     }
 };
 
+window.searchClaimDossier = function(e) {
+    if (window.executeClaimLookup) return window.executeClaimLookup(e);
+};
+
 window.lookupClaimCandidate = function(identifier) {
     const input = document.getElementById('claimSearchInput');
     if (input) {
         input.value = identifier;
-        searchClaimDossier();
+        if (window.executeClaimLookup) {
+            window.executeClaimLookup();
+        }
         const resEl = document.getElementById('claimResultContainer');
         if (resEl) {
             resEl.scrollIntoView({ behavior: 'smooth', block: 'start' });

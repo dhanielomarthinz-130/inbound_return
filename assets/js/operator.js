@@ -4,6 +4,7 @@ let activeInvoice = null;
 let activeExpedition = null;
 let cachedExpeditionsList = [];
 let scannedProductsList = [];
+let currentDetectedProduct = null;
 let capturedPackagePhoto = null;
 let capturedProductPhoto = null;
 
@@ -1406,21 +1407,30 @@ function getNowFormattedWIB() {
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())} WIB`;
 }
 
-function generateWatermarkedPhoto({ badgeText, badgeColor = '#4f46e5', fields = [] }) {
-    const videoElement = document.getElementById('liveVideoFeed');
-    if (!videoElement || videoElement.readyState < 2) {
-        throw new Error("Kamera belum aktif atau belum siap");
+function generateWatermarkedPhoto({ badgeText, badgeColor = '#4f46e5', fields = [], sourceImage = null }) {
+    let source = sourceImage;
+    if (!source) {
+        const videoElement = document.getElementById('liveVideoFeed');
+        if (!videoElement || videoElement.readyState < 2) {
+            throw new Error("Kamera belum aktif atau belum siap menerima gambar.");
+        }
+        source = videoElement;
     }
 
     const canvas = document.createElement('canvas');
-    const width = videoElement.videoWidth || 1280;
-    const height = videoElement.videoHeight || 720;
+    const width = source.videoWidth || source.naturalWidth || source.width || 1280;
+    const height = source.videoHeight || source.naturalHeight || source.height || 720;
+    
+    if (!width || !height || width === 0 || height === 0) {
+        throw new Error("Ukuran frame gambar kamera tidak valid.");
+    }
+
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
 
-    // 1. Gambar frame video langsung dari webcam
-    ctx.drawImage(videoElement, 0, 0, width, height);
+    // 1. Gambar frame langsung dari webcam / gambar
+    ctx.drawImage(source, 0, 0, width, height);
 
     // 2. Bar Atas (Header Branding & Badge)
     const topBarHeight = Math.max(48, Math.round(height * 0.075));
@@ -1497,17 +1507,19 @@ function generateWatermarkedPhoto({ badgeText, badgeColor = '#4f46e5', fields = 
     return canvas.toDataURL('image/jpeg', 0.88);
 }
 
-window.capturePackagePhoto = function() {
+window.capturePackagePhoto = function(sourceImage = null) {
     const videoElement = document.getElementById('liveVideoFeed');
-    if (!isCameraActive || !videoElement || videoElement.readyState < 2) {
+    if (!sourceImage && (!isCameraActive || !videoElement || videoElement.readyState < 2)) {
         showToast('warning', 'Kamera belum aktif. Menghubungkan kamera...', 'Kamera Belum Aktif');
         startCamera();
         return;
     }
 
     try {
-        triggerCameraFlash();
-        playShutterSound();
+        if (!sourceImage) {
+            triggerCameraFlash();
+            playShutterSound();
+        }
 
         const displayOp = document.getElementById('displayOperator');
         const opName = (displayOp && displayOp.innerText.trim()) ? displayOp.innerText.trim() : 'Gudang 01';
@@ -1524,7 +1536,8 @@ window.capturePackagePhoto = function() {
         const dataUrl = generateWatermarkedPhoto({
             badgeText: '📦 FOTO PAKET UNBOXING',
             badgeColor: '#4f46e5',
-            fields: fields
+            fields: fields,
+            sourceImage: sourceImage
         });
 
         capturedPackagePhoto = dataUrl;
@@ -1542,41 +1555,48 @@ window.capturePackagePhoto = function() {
 
         showToast('success', 'Foto Paket dengan watermark berhasil diambil! [Tuts F2]', 'Foto Paket Siap');
     } catch (err) {
+        console.error("capturePackagePhoto error:", err);
         showToast('error', 'Gagal mengambil foto paket: ' + err.message, 'Gagal Foto');
     }
 };
 
-window.captureProductPhoto = function() {
+window.captureProductPhoto = function(sourceImage = null) {
     const videoElement = document.getElementById('liveVideoFeed');
-    if (!isCameraActive || !videoElement || videoElement.readyState < 2) {
+    if (!sourceImage && (!isCameraActive || !videoElement || videoElement.readyState < 2)) {
         showToast('warning', 'Kamera belum aktif. Menghubungkan kamera...', 'Kamera Belum Aktif');
         startCamera();
         return;
     }
 
     try {
-        triggerCameraFlash();
-        playShutterSound();
+        if (!sourceImage) {
+            triggerCameraFlash();
+            playShutterSound();
+        }
 
         const displayOp = document.getElementById('displayOperator');
         const opName = (displayOp && displayOp.innerText.trim()) ? displayOp.innerText.trim() : 'Gudang 01';
         const inv = activeInvoice || document.getElementById('inputInvoice')?.value?.trim() || 'MENUNGGU_SCAN';
 
-        // Ambil info produk yang sedang di-input atau item terakhir
+        // Ambil elemen form input secara aman
+        const batchEl = document.getElementById('inputBatch');
+        const expEl = document.getElementById('inputExpDate');
+        const typeEl = document.getElementById('inputType');
+
+        let pBatch = (batchEl && batchEl.value) ? batchEl.value.trim() : '-';
+        let pExp = (expEl && expEl.value) ? expEl.value.trim() : '-';
+        let pType = (typeEl && typeEl.value) ? typeEl.value : 'GOOD';
         let pName = 'Produk Return';
         let pSku = '-';
         let pSap = '-';
-        let pBatch = inputBatch ? inputBatch.value.trim() : '-';
-        let pExp = inputExpDate ? inputExpDate.value.trim() : '-';
-        let pType = inputType ? inputType.value : 'GOOD';
 
-        if (currentDetectedProduct) {
-            pName = currentDetectedProduct.name;
+        if (typeof currentDetectedProduct !== 'undefined' && currentDetectedProduct) {
+            pName = currentDetectedProduct.name || 'Produk Return';
             pSku = currentDetectedProduct.seller_sku || currentDetectedProduct.sku || '-';
             pSap = currentDetectedProduct.sap_code || '-';
-        } else if (scannedProductsList.length > 0) {
+        } else if (Array.isArray(scannedProductsList) && scannedProductsList.length > 0) {
             const last = scannedProductsList[scannedProductsList.length - 1];
-            pName = last.product_name;
+            pName = last.product_name || 'Produk Return';
             pSku = last.seller_sku || last.sku || '-';
             pSap = last.sap_code || '-';
             pBatch = last.batch_no || pBatch;
@@ -1596,7 +1616,8 @@ window.captureProductPhoto = function() {
         const dataUrl = generateWatermarkedPhoto({
             badgeText: '🏷️ FOTO PRODUK UNBOXING',
             badgeColor: '#059669',
-            fields: fields
+            fields: fields,
+            sourceImage: sourceImage
         });
 
         capturedProductPhoto = dataUrl;
@@ -1614,8 +1635,28 @@ window.captureProductPhoto = function() {
 
         showToast('success', 'Foto Produk dengan watermark berhasil diambil! [Tuts F4]', 'Foto Produk Siap');
     } catch (err) {
+        console.error("captureProductPhoto error:", err);
         showToast('error', 'Gagal mengambil foto produk: ' + err.message, 'Gagal Foto');
     }
+};
+
+window.handlePhotoUpload = function(target, inputElement) {
+    if (!inputElement || !inputElement.files || !inputElement.files[0]) return;
+    const file = inputElement.files[0];
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+            if (target === 'package') {
+                capturePackagePhoto(img);
+            } else {
+                captureProductPhoto(img);
+            }
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+    inputElement.value = '';
 };
 
 window.clearPackagePhoto = function() {
