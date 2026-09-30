@@ -106,7 +106,7 @@ if ($method === 'GET') {
     $whereSql = count($where) > 0 ? implode(' AND ', $where) : '1=1';
 
     $stmt = $pdo->prepare("
-        SELECT id, receipt_number, expedition, courier_name, vehicle_no, operator_name, total_packages, notes, status, created_at
+        SELECT id, receipt_number, expedition, courier_name, vehicle_no, operator_name, total_packages, notes, photo_path, package_photos, status, created_at
         FROM expedition_receptions
         WHERE {$whereSql}
         ORDER BY id DESC
@@ -209,6 +209,46 @@ if ($method === 'POST') {
         $receiptNo = $todayPrefix . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
     }
 
+    // Simpan Foto Bukti Paket Receiving jika ada
+    $photoPaths = [];
+    $photosInput = $input['photos'] ?? $input['package_photos'] ?? [];
+    if (is_string($photosInput) && !empty($photosInput)) {
+        $photosInput = [$photosInput];
+    }
+    if (!empty($input['photo_path']) && is_string($input['photo_path']) && !in_array($input['photo_path'], $photosInput)) {
+        $photosInput[] = $input['photo_path'];
+    }
+
+    $cleanRcpt = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $receiptNo);
+    $recUploadDir = __DIR__ . '/../uploads/reception';
+    if (!is_dir($recUploadDir)) {
+        @mkdir($recUploadDir, 0777, true);
+    }
+
+    foreach ($photosInput as $idx => $pData) {
+        if (is_string($pData) && strpos($pData, 'data:image') === 0) {
+            $ext = 'jpg';
+            if (preg_match('/^data:image\/(\w+);base64,/', $pData, $typeMatch)) {
+                $ext = strtolower($typeMatch[1]) === 'jpeg' ? 'jpg' : strtolower($typeMatch[1]);
+                $raw = substr($pData, strpos($pData, ',') + 1);
+            } else {
+                $raw = $pData;
+            }
+            $decoded = base64_decode($raw);
+            if ($decoded) {
+                $pName = 'rcv_' . $cleanRcpt . '_' . time() . "_{$idx}." . $ext;
+                if (file_put_contents($recUploadDir . '/' . $pName, $decoded)) {
+                    $photoPaths[] = 'uploads/reception/' . $pName;
+                }
+            }
+        } elseif (is_string($pData) && !empty($pData)) {
+            $photoPaths[] = $pData;
+        }
+    }
+
+    $mainPhotoPath = count($photoPaths) > 0 ? $photoPaths[0] : null;
+    $allPhotosJson = count($photoPaths) > 0 ? json_encode($photoPaths, JSON_UNESCAPED_SLASHES) : null;
+
     try {
         $pdo->beginTransaction();
 
@@ -218,9 +258,9 @@ if ($method === 'POST') {
         // 1. Simpan Header Penerimaan
         $stmtHead = $pdo->prepare("
             INSERT INTO expedition_receptions 
-                (receipt_number, expedition, courier_name, vehicle_no, operator_name, total_packages, notes, status, created_at)
+                (receipt_number, expedition, courier_name, vehicle_no, operator_name, total_packages, notes, photo_path, package_photos, status, created_at)
             VALUES 
-                (?, ?, ?, ?, ?, ?, ?, 'RECEIVED', NOW())
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED', NOW())
         ");
         $stmtHead->execute([
             $receiptNo,
@@ -229,7 +269,9 @@ if ($method === 'POST') {
             $vehicleNo ?: null,
             $operatorName,
             $totalCount,
-            $notes ?: null
+            $notes ?: null,
+            $mainPhotoPath,
+            $allPhotosJson
         ]);
         $receptionId = $pdo->lastInsertId();
 
@@ -253,6 +295,8 @@ if ($method === 'POST') {
             'expedition' => $expedition,
             'total_packages' => $totalCount,
             'operator_name' => $operatorName,
+            'photo_path' => $mainPhotoPath,
+            'photos' => $photoPaths,
             'created_at' => date('Y-m-d H:i:s')
         ]);
 

@@ -114,6 +114,8 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                 <!-- Video Viewport Bersih & Responsif (Panjang ke Bawah) -->
                 <div class="relative bg-slate-950 flex justify-center items-center w-full h-[520px] sm:h-[600px] lg:h-[680px] overflow-hidden">
                     <video id="liveVideoFeed" autoplay playsinline muted class="w-full h-full object-cover"></video>
+                    <!-- Visual Camera Flash Effect -->
+                    <div id="cameraFlashOverlay" class="absolute inset-0 bg-white pointer-events-none opacity-0 transition-opacity duration-150 z-20"></div>
                     <div id="cameraLoading" class="absolute inset-0 bg-slate-900/95 flex flex-col items-center justify-center text-white space-y-2.5">
                         <div class="traffic-loader py-2">
                             <div class="traffic-ball traffic-ball-red"></div>
@@ -132,6 +134,90 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                     <span id="scanModeIndicator" class="font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-xl text-[10px] tracking-wide uppercase">
                         LANGKAH 1: SCAN INVOICE
                     </span>
+                </div>
+            </div>
+
+            <!-- Card Ambil Foto Dokumentasi (Paket & Produk dengan Watermark) -->
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-200/90 p-4 space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center font-bold text-xs">
+                            <i class="fa-solid fa-camera"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-xs tracking-tight">Foto Unboxing (Watermark)</h3>
+                            <p class="text-[10px] text-slate-400">Jepret foto otomatis dengan watermark</p>
+                        </div>
+                    </div>
+                    <span class="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                        <i class="fa-regular fa-keyboard"></i> F2 & F4
+                    </span>
+                </div>
+
+                <!-- Tombol Shortcut Tuts Keyboard -->
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btnCapturePackagePhoto" onclick="capturePackagePhoto()" type="button" 
+                        class="flex items-center justify-center gap-2 py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-2xl font-bold text-xs transition shadow-sm shadow-indigo-600/25">
+                        <i class="fa-solid fa-box text-sm"></i>
+                        <div class="text-left leading-tight">
+                            <span class="block text-[10px] opacity-80 font-mono font-black">TUTS [F2]</span>
+                            <span>Foto Paket</span>
+                        </div>
+                    </button>
+
+                    <button id="btnCaptureProductPhoto" onclick="captureProductPhoto()" type="button" 
+                        class="flex items-center justify-center gap-2 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-2xl font-bold text-xs transition shadow-sm shadow-emerald-600/25">
+                        <i class="fa-solid fa-tag text-sm"></i>
+                        <div class="text-left leading-tight">
+                            <span class="block text-[10px] opacity-80 font-mono font-black">TUTS [F4]</span>
+                            <span>Foto Produk</span>
+                        </div>
+                    </button>
+                </div>
+
+                <!-- Preview Foto yang Diambil -->
+                <div class="grid grid-cols-2 gap-2 pt-1">
+                    <!-- Box Foto Paket -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-2.5 relative overflow-hidden flex flex-col justify-between min-h-[115px]">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-[10px] font-bold text-slate-700 flex items-center gap-1">
+                                <i class="fa-solid fa-box text-indigo-500"></i> Paket
+                            </span>
+                            <span id="badgePackagePhoto" class="hidden text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">SIAP</span>
+                        </div>
+                        <div id="previewPackagePhotoEmpty" class="flex-1 flex flex-col items-center justify-center text-center py-2 text-slate-300">
+                            <i class="fa-regular fa-image text-2xl mb-1 text-slate-300"></i>
+                            <span class="text-[10px] text-slate-400 font-medium">Tekan F2</span>
+                        </div>
+                        <div id="previewPackagePhotoFilled" class="hidden relative group rounded-xl overflow-hidden aspect-video bg-black flex items-center justify-center">
+                            <img id="imgPackagePhoto" src="" alt="Foto Paket" class="w-full h-full object-cover">
+                            <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5">
+                                <button type="button" onclick="previewImageModal('imgPackagePhoto', 'Foto Paket Unboxing')" title="Lihat Foto Full" class="p-1.5 bg-white/90 text-slate-800 rounded-lg text-xs hover:bg-white"><i class="fa-solid fa-expand"></i></button>
+                                <button type="button" onclick="clearPackagePhoto()" title="Hapus / Foto Ulang" class="p-1.5 bg-rose-600 text-white rounded-lg text-xs hover:bg-rose-700"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Box Foto Produk -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-2.5 relative overflow-hidden flex flex-col justify-between min-h-[115px]">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-[10px] font-bold text-slate-700 flex items-center gap-1">
+                                <i class="fa-solid fa-tag text-emerald-500"></i> Produk
+                            </span>
+                            <span id="badgeProductPhoto" class="hidden text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">SIAP</span>
+                        </div>
+                        <div id="previewProductPhotoEmpty" class="flex-1 flex flex-col items-center justify-center text-center py-2 text-slate-300">
+                            <i class="fa-regular fa-image text-2xl mb-1 text-slate-300"></i>
+                            <span class="text-[10px] text-slate-400 font-medium">Tekan F4</span>
+                        </div>
+                        <div id="previewProductPhotoFilled" class="hidden relative group rounded-xl overflow-hidden aspect-video bg-black flex items-center justify-center">
+                            <img id="imgProductPhoto" src="" alt="Foto Produk" class="w-full h-full object-cover">
+                            <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5">
+                                <button type="button" onclick="previewImageModal('imgProductPhoto', 'Foto Produk Unboxing')" title="Lihat Foto Full" class="p-1.5 bg-white/90 text-slate-800 rounded-lg text-xs hover:bg-white"><i class="fa-solid fa-expand"></i></button>
+                                <button type="button" onclick="clearProductPhoto()" title="Hapus / Foto Ulang" class="p-1.5 bg-rose-600 text-white rounded-lg text-xs hover:bg-rose-700"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -414,6 +500,24 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
     <footer class="bg-white border-t border-slate-200 py-3 px-4 md:px-8 text-center text-xs text-slate-400 w-full mt-auto">
         <span>&copy; <?= date('Y') ?> Inbound Return Station &bull; PT. Indo Express Global</span>
     </footer>
+
+    <!-- MODAL PREVIEW FOTO WATERMARK -->
+    <div id="photoPreviewModal" class="fixed inset-0 bg-black/85 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-4 space-y-3 shadow-2xl animate-in fade-in zoom-in duration-150">
+            <div class="flex justify-between items-center text-white px-1">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                    <h4 class="text-xs font-bold tracking-tight" id="photoPreviewModalTitle">Preview Foto Watermark</h4>
+                </div>
+                <button onclick="closePhotoPreviewModal()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-sm transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="rounded-2xl overflow-hidden bg-black flex items-center justify-center max-h-[75vh] border border-slate-800">
+                <img id="photoPreviewModalImg" src="" class="max-w-full max-h-[75vh] object-contain">
+            </div>
+        </div>
+    </div>
 
     <!-- MODAL KONFIRMASI / SUKSES -->
     <div id="successModal" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">

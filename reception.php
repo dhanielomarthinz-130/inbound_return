@@ -277,6 +277,90 @@ try {
                 </div>
             </div>
 
+            <!-- CARD 3: FOTO BUKTI PAKET SAAT RECEIVING (WATERMARK - TUTS TAB) -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-4 space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold text-xs">
+                            <i class="fa-solid fa-camera"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Foto Bukti Paket Ekspedisi</h2>
+                            <p class="text-[10px] text-slate-400">Jepret foto bukti fisik paket serah terima (Watermark otomatis)</p>
+                        </div>
+                    </div>
+
+                    <span class="text-[10px] font-mono font-black bg-emerald-500 text-white px-2.5 py-1 rounded-xl flex items-center gap-1.5 shadow-sm shadow-emerald-600/30 animate-pulse">
+                        <i class="fa-regular fa-keyboard"></i> TUTS [TAB]
+                    </span>
+                </div>
+
+                <!-- Live Camera Viewport & Controls -->
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
+                    <!-- Viewport Kamera Live Foto Paket -->
+                    <div class="md:col-span-6 bg-slate-950 rounded-2xl overflow-hidden relative aspect-video flex items-center justify-center border border-slate-800 shadow-inner">
+                        <video id="receptionLiveVideo" autoplay playsinline muted class="w-full h-full object-cover"></video>
+                        <!-- Visual Flash Shutter -->
+                        <div id="receptionFlashOverlay" class="absolute inset-0 bg-white pointer-events-none opacity-0 transition-opacity duration-150 z-20"></div>
+
+                        <!-- Placeholder / Tombol Start Kamera -->
+                        <div id="receptionCameraPlaceholder" class="absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center text-white space-y-2 p-3 text-center">
+                            <i class="fa-solid fa-camera text-2xl text-emerald-400"></i>
+                            <span class="text-xs font-semibold text-slate-300">Kamera Bukti Paket</span>
+                            <button onclick="startReceptionCamera()" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-3.5 py-1.5 rounded-xl transition shadow-sm flex items-center gap-1.5">
+                                <i class="fa-solid fa-power-off"></i> Nyalakan Kamera
+                            </button>
+                        </div>
+
+                        <!-- Status Badge Live -->
+                        <div class="absolute top-2 left-2 z-10 flex items-center gap-1.5">
+                            <span id="receptionCamBadge" class="hidden bg-black/60 backdrop-blur-xs text-white text-[10px] px-2 py-0.5 rounded-md font-mono flex items-center gap-1.5 border border-white/10">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> KAMERA READY
+                            </span>
+                        </div>
+
+                        <!-- Tombol Putar Kamera HP jika ada >1 kamera -->
+                        <button id="btnSwitchRecCam" onclick="switchReceptionCamera()" type="button" title="Ganti Kamera Depan/Belakang" class="absolute top-2 right-2 z-10 bg-black/50 hover:bg-black/80 text-white p-1.5 rounded-lg text-xs transition border border-white/10 hidden">
+                            <i class="fa-solid fa-arrows-rotate"></i>
+                        </button>
+                    </div>
+
+                    <!-- Tombol Shutter TAB & Galeri Foto Paket -->
+                    <div class="md:col-span-6 space-y-2.5">
+                        <!-- Tombol Shutter Utama (Bisa Klik atau Tekan Tuts TAB) -->
+                        <button id="btnCaptureReceptionPhoto" onclick="captureReceptionPhoto()" type="button" 
+                            class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-2xl font-black text-xs transition shadow-md shadow-emerald-600/30 flex items-center justify-center gap-2.5">
+                            <span class="bg-emerald-950/80 text-emerald-300 border border-emerald-400/40 text-[10px] font-mono px-2 py-0.5 rounded-lg shadow-inner font-black">
+                                TEKAN TAB
+                            </span>
+                            <span class="text-xs sm:text-sm">📸 AMBIL FOTO PAKET</span>
+                        </button>
+
+                        <!-- Keterangan Shortcut -->
+                        <p class="text-[10px] text-slate-500 text-center leading-tight">
+                            Tekan tombol <kbd class="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded font-mono font-bold text-slate-700 text-[9px]">TAB</kbd> di keyboard kapan saja untuk memotret bukti paket tanpa repot klik mouse.
+                        </p>
+
+                        <!-- Preview Galeri Foto Terkumpul -->
+                        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-2.5">
+                            <div class="flex justify-between items-center mb-1.5 px-0.5">
+                                <span class="text-[11px] font-bold text-slate-700">Foto Tersimpan (<span id="receptionPhotoCount">0</span>)</span>
+                                <button onclick="clearReceptionPhotos()" type="button" class="text-[10px] text-rose-500 hover:text-rose-700 font-semibold transition">Hapus Semua Foto</button>
+                            </div>
+                            
+                            <div id="receptionPhotoEmpty" class="text-center py-4 text-slate-300">
+                                <i class="fa-regular fa-images text-2xl mb-1 text-slate-300 block"></i>
+                                <span class="text-[10px] text-slate-400">Belum ada foto paket. Tekan TAB untuk jepret.</span>
+                            </div>
+
+                            <div id="receptionPhotoGallery" class="hidden grid grid-cols-3 gap-2 max-h-[140px] overflow-y-auto pr-0.5">
+                                <!-- Dynamic Thumbnails -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- TOMBOL SUBMIT PENERIMAAN (DESKTOP / INLINE) -->
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-4">
                 <button id="btnSubmitReception" onclick="submitCompleteReception()" type="button" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-2xl font-black text-sm transition shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2">
@@ -407,6 +491,17 @@ try {
                     </div>
                 </div>
 
+                <!-- Foto Bukti Paket di Slip Bukti -->
+                <div id="slipPhotoSection" class="hidden border-t border-dashed border-slate-200 pt-3">
+                    <h4 class="font-bold text-slate-700 mb-1.5 text-[11px] uppercase flex items-center justify-between">
+                        <span>Foto Bukti Paket (<span id="slipPhotoCount">0</span>)</span>
+                        <span class="text-[9px] text-slate-400 font-normal no-print">Klik foto untuk perbesar</span>
+                    </h4>
+                    <div id="slipPhotoContainer" class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                        <!-- Foto thumbnails -->
+                    </div>
+                </div>
+
                 <!-- Tanda Tangan Serah Terima (Untuk Cetak Fisik) -->
                 <div class="grid grid-cols-2 gap-4 text-center pt-4 border-t border-dashed border-slate-300">
                     <div>
@@ -432,9 +527,42 @@ try {
         </div>
     </div>
 
-    <!-- AUDIO BEEP SYNTHESIZER (Tanpa file eksternal, jalan offline/mobile 100%) -->
+    <!-- MODAL LIGHTBOX PREVIEW FOTO RECEIVING -->
+    <div id="receptionPhotoModal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="relative max-w-4xl w-full bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex flex-col max-h-[90vh]">
+            <div class="p-3.5 bg-slate-950/80 border-b border-white/10 flex items-center justify-between text-white shrink-0">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-camera text-emerald-400"></i>
+                    <h3 id="receptionPhotoModalTitle" class="text-xs font-bold font-mono tracking-wide">Foto Bukti Paket Receiving</h3>
+                </div>
+                <button onclick="closeReceptionPhotoModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-4 flex-1 flex items-center justify-center bg-black/95 overflow-hidden">
+                <img id="receptionPhotoModalImg" src="" alt="Preview Bukti Paket" class="max-h-[70vh] w-auto max-w-full object-contain rounded-xl shadow-2xl border border-white/10">
+            </div>
+            <div class="p-3 bg-slate-950/80 border-t border-white/10 flex justify-between items-center text-xs shrink-0">
+                <span class="text-slate-400 text-[11px]">Watermark otomatis tercantum pada foto fisik.</span>
+                <div class="flex gap-2">
+                    <a id="btnDownloadReceptionPhoto" href="#" download="foto_paket_receiving.jpg" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-download"></i> Unduh
+                    </a>
+                    <button onclick="closeReceptionPhotoModal()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-bold text-xs transition">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FLASH OVERLAY EFEK JEPRET KAMERA -->
+    <div id="cameraFlashOverlay" class="fixed inset-0 bg-white pointer-events-none opacity-0 z-[100] transition-opacity duration-150"></div>
+
+    <!-- AUDIO BEEP & SHUTTER SYNTHESIZER -->
     <script>
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
         function playBeep(type = 'success') {
             try {
                 if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -451,7 +579,6 @@ try {
                     osc.start();
                     osc.stop(audioCtx.currentTime + 0.12);
                 } else if (type === 'warning') {
-                    // Nada ganda peringatan duplikat
                     osc.type = 'sawtooth';
                     osc.frequency.setValueAtTime(320, audioCtx.currentTime);
                     gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
@@ -459,6 +586,37 @@ try {
                     osc.start();
                     osc.stop(audioCtx.currentTime + 0.25);
                 }
+            } catch (e) {}
+        }
+
+        // Suara Shutter Jepret Kamera Mekanis
+        function playShutterSound() {
+            try {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                
+                const bufferSize = audioCtx.sampleRate * 0.08;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.2));
+                }
+
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 1400;
+
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                noise.start();
             } catch (e) {}
         }
 
@@ -472,15 +630,24 @@ try {
 
     <!-- APPLICATION LOGIC SCRIPT -->
     <script>
-        // State Penerimaan
+        const CURRENT_OPERATOR_NAME = <?= json_encode($user['name'] ?? 'Operator') ?>;
+
+        // State Penerimaan & Foto
         let scannedPackages = [];
+        let capturedReceptionPhotos = []; // Menyimpan array Data URL foto ber-watermark
         let html5QrCode = null;
         let isCameraActive = false;
+
+        // State Kamera Receiving Live
+        let receptionMediaStream = null;
+        let availableVideoDevices = [];
+        let currentVideoDeviceIndex = 0;
 
         // Inisialisasi saat halaman selesai dimuat
         document.addEventListener('DOMContentLoaded', () => {
             generateReceiptId();
             loadHistoryData();
+            initReceptionLiveCamera();
 
             const inputPkg = document.getElementById('inputPackageBarcode');
             if (inputPkg) {
@@ -492,9 +659,301 @@ try {
                     }
                 });
             }
+
+            // Keyboard Shortcut TAB: Ambil Foto Paket Kapan Saja
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Tab') {
+                    // Mencegah navigasi focus default browser
+                    e.preventDefault();
+                    captureReceptionPhoto();
+                }
+            });
         });
 
-        // 1. Generate Receipt ID dari server
+        // ==============================================================
+        // KAMERA RECEIVING & WATERMARK ENGINE
+        // ==============================================================
+
+        // 1. Inisialisasi Kamera Live Receiving
+        async function initReceptionLiveCamera() {
+            const videoEl = document.getElementById('receptionLiveVideo');
+            const placeholder = document.getElementById('receptionCamPlaceholder');
+            const switchBtn = document.getElementById('btnSwitchRecCam');
+            if (!videoEl) return;
+
+            try {
+                // Deteksi daftar kamera
+                if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    availableVideoDevices = devices.filter(d => d.kind === 'videoinput');
+                    if (availableVideoDevices.length > 1 && switchBtn) {
+                        switchBtn.classList.remove('hidden');
+                    }
+                }
+
+                // Pengaturan stream (utamakan kamera belakang jika HP)
+                const constraints = {
+                    video: {
+                        facingMode: { ideal: "environment" },
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                };
+
+                receptionMediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+                videoEl.srcObject = receptionMediaStream;
+                videoEl.onloadedmetadata = () => {
+                    videoEl.play();
+                    if (placeholder) placeholder.classList.add('hidden');
+                };
+            } catch (err) {
+                console.warn('Tidak dapat memulai kamera live receiving otomatis:', err);
+                if (placeholder) {
+                    placeholder.innerHTML = `
+                        <i class="fa-solid fa-camera-slash text-2xl text-slate-500 mb-1"></i>
+                        <span class="text-[10px] text-slate-400">Kamera tidak aktif. Klik untuk coba nyalakan.</span>
+                        <button onclick="initReceptionLiveCamera()" type="button" class="mt-1 px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-[10px] font-bold">Aktifkan Kamera</button>
+                    `;
+                }
+            }
+        }
+
+        // 2. Ganti Kamera (Depan / Belakang jika ada >1 kamera)
+        async function switchReceptionCamera() {
+            if (availableVideoDevices.length <= 1) return;
+            currentVideoDeviceIndex = (currentVideoDeviceIndex + 1) % availableVideoDevices.length;
+            const targetDevice = availableVideoDevices[currentVideoDeviceIndex];
+
+            if (receptionMediaStream) {
+                receptionMediaStream.getTracks().forEach(track => track.stop());
+            }
+
+            const videoEl = document.getElementById('receptionLiveVideo');
+            try {
+                receptionMediaStream = await navigator.mediaDevices.getUserMedia({
+                    video: { deviceId: { exact: targetDevice.deviceId } },
+                    audio: false
+                });
+                videoEl.srcObject = receptionMediaStream;
+                videoEl.play();
+            } catch (e) {
+                console.error('Gagal beralih kamera:', e);
+            }
+        }
+
+        // 3. Efek Flash Kamera Putih
+        function triggerReceptionFlash() {
+            const flash = document.getElementById('cameraFlashOverlay');
+            if (!flash) return;
+            flash.classList.remove('opacity-0');
+            flash.classList.add('opacity-80');
+            setTimeout(() => {
+                flash.classList.remove('opacity-80');
+                flash.classList.add('opacity-0');
+            }, 120);
+        }
+
+        // 4. Generate Foto dengan Watermark Receiving
+        function generateReceptionWatermarkPhoto(sourceVideo) {
+            const canvas = document.createElement('canvas');
+            const w = sourceVideo.videoWidth || 1280;
+            const h = sourceVideo.videoHeight || 720;
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+
+            // Render gambar dari frame video
+            ctx.drawImage(sourceVideo, 0, 0, w, h);
+
+            // Buat banner watermark bawah (Semi-transparan elegan)
+            const barHeight = Math.max(80, Math.round(h * 0.15));
+            const grad = ctx.createLinearGradient(0, h - barHeight, 0, h);
+            grad.addColorStop(0, 'rgba(15, 23, 42, 0.90)');
+            grad.addColorStop(1, 'rgba(2, 6, 23, 0.98)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, h - barHeight, w, barHeight);
+
+            // Garis pembatas atas aksen hijau Emerald
+            ctx.fillStyle = '#10b981';
+            ctx.fillRect(0, h - barHeight, w, Math.max(3, Math.round(h * 0.006)));
+
+            // Waktu & Tanggal
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('id-ID', { year: 'numeric', month: '2-digit', day: '2-digit' });
+            const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
+
+            const receiptNo = document.getElementById('inputReceiptNo')?.value.trim() || 'RCV-PENDING';
+            const selectExp = document.getElementById('selectExpedition');
+            const expedition = selectExp?.value.trim() || 'UMUM';
+            const courier = document.getElementById('inputCourierName')?.value.trim() || '-';
+            const pkgCount = scannedPackages.length;
+
+            // Ukuran font proporsional terhadap resolusi canvas
+            const titleSize = Math.max(14, Math.round(w * 0.018));
+            const bodySize  = Math.max(11, Math.round(w * 0.013));
+            const subSize   = Math.max(10, Math.round(w * 0.011));
+
+            ctx.textBaseline = 'top';
+
+            // SISI KIRI: Branding & Data Penerimaan
+            ctx.textAlign = 'left';
+            ctx.fillStyle = '#10b981';
+            ctx.font = `900 ${titleSize}px monospace, sans-serif`;
+            ctx.fillText('PT. INDO EXPRESS GLOBAL • INBOUND RECEIVING', 16, h - barHeight + 10);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${bodySize}px monospace, sans-serif`;
+            ctx.fillText(`NO. TERIMA: ${receiptNo}  |  TOTAL SCAN: ${pkgCount} PAKET`, 16, h - barHeight + 10 + titleSize + 5);
+
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = `normal ${subSize}px monospace, sans-serif`;
+            ctx.fillText(`EKSPEDISI: ${expedition}  |  KURIR: ${courier}  |  OPERATOR: ${CURRENT_OPERATOR_NAME}`, 16, h - barHeight + 10 + titleSize + bodySize + 9);
+
+            // SISI KANAN: Waktu & Stempel Bukti
+            ctx.textAlign = 'right';
+            ctx.fillStyle = '#38bdf8';
+            ctx.font = `bold ${bodySize}px monospace, sans-serif`;
+            ctx.fillText(`${dateStr} ${timeStr}`, w - 16, h - barHeight + 10);
+
+            ctx.fillStyle = '#fbbf24';
+            ctx.font = `bold ${subSize}px monospace, sans-serif`;
+            ctx.fillText('📸 BUKTI SERAH TERIMA FISIK PAKET', w - 16, h - barHeight + 12 + bodySize);
+
+            ctx.textAlign = 'left'; // Reset alignment
+
+            return canvas.toDataURL('image/jpeg', 0.88);
+        }
+
+        // 5. Eksekusi Ambil Foto Paket (Dipanggil via Tombol atau Tuts TAB)
+        function captureReceptionPhoto() {
+            const videoEl = document.getElementById('receptionLiveVideo');
+            if (!videoEl || !videoEl.videoWidth) {
+                // Kamera belum siap, coba inisialisasi ulang
+                initReceptionLiveCamera();
+                showStatusMsg('Kamera sedang dipersiapkan, silakan tekan TAB sekali lagi...', 'warning');
+                return;
+            }
+
+            try {
+                // Buat foto dengan watermark
+                const photoDataUrl = generateReceptionWatermarkPhoto(videoEl);
+
+                // Tambahkan ke array state
+                capturedReceptionPhotos.push({
+                    dataUrl: photoDataUrl,
+                    timestamp: Date.now(),
+                    packageCount: scannedPackages.length
+                });
+
+                // Efek Audio & Flash
+                playShutterSound();
+                triggerReceptionFlash();
+                vibrateMobile(100);
+
+                // Update UI Galeri
+                renderReceptionPhotoGallery();
+
+                // Notifikasi sukses mini
+                showStatusMsg(`📸 Foto bukti paket ke-<b>${capturedReceptionPhotos.length}</b> berhasil diambil!`, 'success');
+
+                // Selalu kembalikan fokus ke barcode input agar alur scan tidak terganggu
+                const inputPkg = document.getElementById('inputPackageBarcode');
+                if (inputPkg) inputPkg.focus();
+
+            } catch (err) {
+                console.error('Gagal mengambil foto:', err);
+                alert('Gagal mengambil foto: ' + err.message);
+            }
+        }
+
+        // 6. Render Thumbnail Galeri Foto
+        function renderReceptionPhotoGallery() {
+            const count = capturedReceptionPhotos.length;
+            const countLabel = document.getElementById('receptionPhotoCount');
+            const emptyEl = document.getElementById('receptionPhotoEmpty');
+            const galleryEl = document.getElementById('receptionPhotoGallery');
+
+            if (countLabel) countLabel.innerText = count;
+
+            if (count === 0) {
+                if (emptyEl) emptyEl.classList.remove('hidden');
+                if (galleryEl) {
+                    galleryEl.classList.add('hidden');
+                    galleryEl.innerHTML = '';
+                }
+                return;
+            }
+
+            if (emptyEl) emptyEl.classList.add('hidden');
+            if (galleryEl) {
+                galleryEl.classList.remove('hidden');
+                let html = '';
+                capturedReceptionPhotos.forEach((item, idx) => {
+                    html += `
+                        <div class="relative group rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video shadow-sm">
+                            <img src="${item.dataUrl}" alt="Foto ${idx + 1}" class="w-full h-full object-cover cursor-pointer hover:opacity-90 transition" onclick="previewReceptionPhoto(${idx})">
+                            <span class="absolute bottom-1 left-1 bg-black/70 text-white font-mono text-[9px] px-1.5 py-0.5 rounded backdrop-blur-xs font-bold">#${idx + 1}</span>
+                            <button onclick="removeReceptionPhoto(${idx})" type="button" title="Hapus foto ini" class="absolute top-1 right-1 w-5 h-5 bg-rose-600/90 hover:bg-rose-700 text-white rounded-md flex items-center justify-center text-[10px] transition shadow">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    `;
+                });
+                galleryEl.innerHTML = html;
+            }
+        }
+
+        // 7. Hapus 1 Foto
+        function removeReceptionPhoto(index) {
+            if (index >= 0 && index < capturedReceptionPhotos.length) {
+                capturedReceptionPhotos.splice(index, 1);
+                renderReceptionPhotoGallery();
+                showStatusMsg('Foto dihapus dari daftar sementara.', 'info');
+                document.getElementById('inputPackageBarcode')?.focus();
+            }
+        }
+
+        // 8. Hapus Semua Foto
+        function clearReceptionPhotos() {
+            if (capturedReceptionPhotos.length === 0) return;
+            if (confirm(`Hapus semua ${capturedReceptionPhotos.length} foto paket dari sesi ini?`)) {
+                capturedReceptionPhotos = [];
+                renderReceptionPhotoGallery();
+                showStatusMsg('Semua foto paket telah dibersihkan.', 'info');
+                document.getElementById('inputPackageBarcode')?.focus();
+            }
+        }
+
+        // 9. Lightbox Preview Modal
+        function previewReceptionPhoto(index) {
+            const item = capturedReceptionPhotos[index];
+            if (!item) return;
+
+            const modal = document.getElementById('receptionPhotoModal');
+            const img = document.getElementById('receptionPhotoModalImg');
+            const title = document.getElementById('receptionPhotoModalTitle');
+            const dlBtn = document.getElementById('btnDownloadReceptionPhoto');
+
+            img.src = item.dataUrl;
+            title.innerText = `Bukti Foto Paket #${index + 1} • Inbound Receiving`;
+            dlBtn.href = item.dataUrl;
+            dlBtn.download = `rcv_foto_paket_${index + 1}_${Date.now()}.jpg`;
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeReceptionPhotoModal() {
+            const modal = document.getElementById('receptionPhotoModal');
+            if (modal) modal.classList.add('hidden');
+            document.getElementById('inputPackageBarcode')?.focus();
+        }
+
+        // ==============================================================
+        // LOGIKA PENERIMAAN PAKET & BARCODE
+        // ==============================================================
+
+        // Generate Receipt ID dari server
         async function generateReceiptId() {
             try {
                 const res = await fetch('api/reception.php?action=generate_id');
@@ -509,7 +968,7 @@ try {
             }
         }
 
-        // 2. Event perubahan Ekspedisi
+        // Event perubahan Ekspedisi
         function onExpeditionChanged() {
             const sel = document.getElementById('selectExpedition');
             const expName = sel.value;
@@ -518,7 +977,7 @@ try {
             document.getElementById('inputPackageBarcode').focus();
         }
 
-        // 3. Tambah Barcode Paket ke List
+        // Tambah Barcode Paket ke List
         function submitPackageBarcode() {
             const input = document.getElementById('inputPackageBarcode');
             const barcode = (input.value || '').trim();
@@ -560,11 +1019,11 @@ try {
 
             playBeep('success');
             vibrateMobile(60);
-            showStatusMsg(`Paket <b>${escapeHtml(cleanBarcode)}</b> berhasil ditambahkan.`, 'success');
+            showStatusMsg(`Paket <b>${escapeHtml(cleanBarcode)}</b> berhasil ditambahkan. (Tekan <b>TAB</b> untuk foto paket)`, 'success');
             renderPackageList();
         }
 
-        // 4. Deteksi otomatis ekspedisi dari barcode resi jika operator lupa pilih
+        // Deteksi otomatis ekspedisi dari barcode resi jika operator lupa pilih
         function detectExpeditionFromBarcode(code) {
             const upper = code.toUpperCase();
             const selectExp = document.getElementById('selectExpedition');
@@ -583,7 +1042,7 @@ try {
             }
         }
 
-        // 5. Render Daftar Paket di UI
+        // Render Daftar Paket di UI
         function renderPackageList() {
             const count = scannedPackages.length;
             document.getElementById('packageCountBadge').innerText = count;
@@ -645,9 +1104,8 @@ try {
             }
         }
 
-        // 6. Kamera Scanner Mobile (HTML5-QRCode)
+        // Kamera Scanner Mobile (HTML5-QRCode)
         function toggleCameraScanner() {
-            const container = document.getElementById('cameraScannerContainer');
             if (isCameraActive) {
                 stopCameraScanner();
             } else {
@@ -670,14 +1128,11 @@ try {
                 { facingMode: "environment" },
                 config,
                 (decodedText) => {
-                    // Berhasil scan barcode dari kamera
                     if (decodedText) {
                         addPackageToList(decodedText);
                     }
                 },
-                (errorMessage) => {
-                    // scan parse error, continue
-                }
+                (errorMessage) => {}
             ).then(() => {
                 isCameraActive = true;
                 document.getElementById('btnToggleCamera').innerHTML = '<i class="fa-solid fa-camera-rotate"></i> Matikan Kamera';
@@ -702,7 +1157,7 @@ try {
             }
         }
 
-        // 7. Notifikasi Pesan
+        // Notifikasi Status
         function showStatusMsg(msg, type = 'info') {
             const el = document.getElementById('scanStatusMsg');
             const text = document.getElementById('scanStatusText');
@@ -722,7 +1177,7 @@ try {
             document.getElementById('scanStatusMsg').classList.add('hidden');
         }
 
-        // 8. Submit Selesai Penerimaan (Multiple Packages -> 1 ID)
+        // Submit Selesai Penerimaan (Termasuk Foto-foto dengan Watermark)
         async function submitCompleteReception() {
             const expSelect = document.getElementById('selectExpedition');
             const expedition = expSelect.value.trim();
@@ -741,20 +1196,21 @@ try {
             const receiptNo = document.getElementById('inputReceiptNo').value.trim();
             const courierName = document.getElementById('inputCourierName').value.trim();
 
-            const confirmMsg = `Simpan serah terima ${scannedPackages.length} paket untuk Ekspedisi ${expedition}?`;
+            const confirmMsg = `Simpan serah terima ${scannedPackages.length} paket dan ${capturedReceptionPhotos.length} foto bukti untuk Ekspedisi ${expedition}?`;
             if (!confirm(confirmMsg)) return;
 
             const btn = document.getElementById('btnSubmitReception');
             const origText = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan Penerimaan...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan Penerimaan & Foto...';
 
             try {
                 const payload = {
                     receipt_number: receiptNo,
                     expedition: expedition,
                     courier_name: courierName,
-                    packages: scannedPackages.map(p => p.barcode)
+                    packages: scannedPackages.map(p => p.barcode),
+                    photos: capturedReceptionPhotos.map(p => p.dataUrl) // Kirim foto-foto ber-watermark
                 };
 
                 const res = await fetch('api/reception.php', {
@@ -766,8 +1222,19 @@ try {
 
                 if (data && data.success) {
                     showStatusMsg(`✅ Sukses! Penerimaan <b>${data.total_packages} paket</b> (${escapeHtml(data.expedition)}) berhasil disimpan! [${escapeHtml(data.receipt_number)}]`, 'success');
+                    
+                    // Tampilkan Slip Bukti Serah Terima langsung
+                    showReceiptModal({
+                        receipt_number: data.receipt_number,
+                        expedition: data.expedition,
+                        courier_name: courierName,
+                        total_packages: data.total_packages,
+                        created_at: new Date().toLocaleString('id-ID'),
+                        packages: scannedPackages.map(p => p.barcode),
+                        photos: data.photos || capturedReceptionPhotos.map(p => p.dataUrl)
+                    });
+
                     resetReceptionForm();
-                    // Muat ulang data riwayat
                     loadHistoryData();
                 } else {
                     alert('Gagal menyimpan: ' + (data.error || 'Terjadi kesalahan sistem'));
@@ -780,7 +1247,7 @@ try {
             }
         }
 
-        // 9. Tampilkan Modal Tanda Terima
+        // Tampilkan Modal Tanda Terima (Slip Cetak)
         function showReceiptModal(data) {
             document.getElementById('slipReceiptNo').innerText = data.receipt_number;
             document.getElementById('slipExpedition').innerText = data.expedition;
@@ -795,7 +1262,52 @@ try {
             });
             listEl.innerHTML = listHtml;
 
+            // Render Foto-foto Bukti Paket di Slip
+            const photoSection = document.getElementById('slipPhotoSection');
+            const photoContainer = document.getElementById('slipPhotoContainer');
+            const photoCountLabel = document.getElementById('slipPhotoCount');
+
+            let photosToDisplay = [];
+            if (Array.isArray(data.photos)) {
+                photosToDisplay = data.photos;
+            } else if (typeof data.photos === 'string' && data.photos.startsWith('[')) {
+                try { photosToDisplay = JSON.parse(data.photos); } catch (e) {}
+            } else if (data.photo_path) {
+                photosToDisplay = [data.photo_path];
+            }
+
+            if (photosToDisplay && photosToDisplay.length > 0) {
+                photoSection.classList.remove('hidden');
+                photoCountLabel.innerText = photosToDisplay.length;
+                let photoHtml = '';
+                photosToDisplay.forEach((pUrl, idx) => {
+                    photoHtml += `
+                        <div class="rounded-xl overflow-hidden border border-slate-200 aspect-video bg-black cursor-pointer shadow-sm" onclick="previewImageDirect('${escapeHtml(pUrl)}')">
+                            <img src="${escapeHtml(pUrl)}" alt="Foto Paket ${idx + 1}" class="w-full h-full object-cover hover:scale-105 transition">
+                        </div>
+                    `;
+                });
+                photoContainer.innerHTML = photoHtml;
+            } else {
+                photoSection.classList.add('hidden');
+                photoContainer.innerHTML = '';
+            }
+
             document.getElementById('receiptModal').classList.remove('hidden');
+        }
+
+        function previewImageDirect(url) {
+            const modal = document.getElementById('receptionPhotoModal');
+            const img = document.getElementById('receptionPhotoModalImg');
+            const title = document.getElementById('receptionPhotoModalTitle');
+            const dlBtn = document.getElementById('btnDownloadReceptionPhoto');
+
+            img.src = url;
+            title.innerText = 'Bukti Foto Serah Terima Paket';
+            dlBtn.href = url;
+            dlBtn.download = `rcv_foto_paket_${Date.now()}.jpg`;
+
+            modal.classList.remove('hidden');
         }
 
         function closeReceiptModal() {
@@ -809,15 +1321,17 @@ try {
 
         function resetReceptionForm() {
             scannedPackages = [];
+            capturedReceptionPhotos = [];
             document.getElementById('inputCourierName').value = '';
             document.getElementById('inputPackageBarcode').value = '';
             renderPackageList();
+            renderReceptionPhotoGallery();
             generateReceiptId();
             dismissStatusMsg();
             document.getElementById('inputPackageBarcode').focus();
         }
 
-        // 10. Tab Switcher
+        // Tab Switcher
         function switchTab(tab) {
             const btnScan = document.getElementById('tabBtnScan');
             const btnHist = document.getElementById('tabBtnHistory');
@@ -839,7 +1353,7 @@ try {
             }
         }
 
-        // 11. Muat Riwayat Penerimaan Hari Ini
+        // Muat Riwayat Penerimaan Hari Ini
         async function loadHistoryData() {
             const dateInput = document.getElementById('historyDateFilter');
             const selectedDate = dateInput.value || new Date().toISOString().slice(0, 10);
@@ -861,9 +1375,29 @@ try {
                     let rows = '';
                     data.data.forEach(item => {
                         const timeOnly = (item.created_at || '').split(' ')[1] || item.created_at;
+                        
+                        // Cek apakah ada foto
+                        let photoBadge = '';
+                        let photoCount = 0;
+                        if (item.package_photos) {
+                            try {
+                                const parsed = JSON.parse(item.package_photos);
+                                if (Array.isArray(parsed)) photoCount = parsed.length;
+                            } catch (e) {}
+                        } else if (item.photo_path) {
+                            photoCount = 1;
+                        }
+
+                        if (photoCount > 0) {
+                            photoBadge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200/80 ml-1.5"><i class="fa-solid fa-camera"></i> ${photoCount}</span>`;
+                        }
+
                         rows += `
                             <tr class="hover:bg-slate-50 transition">
-                                <td class="py-2.5 px-3 font-mono font-bold text-slate-800">${escapeHtml(item.receipt_number)}</td>
+                                <td class="py-2.5 px-3 font-mono font-bold text-slate-800">
+                                    ${escapeHtml(item.receipt_number)}
+                                    ${photoBadge}
+                                </td>
                                 <td class="py-2.5 px-3 font-semibold text-emerald-700">${escapeHtml(item.expedition)}</td>
                                 <td class="py-2.5 px-3 text-slate-600">${escapeHtml(item.courier_name || '-')}</td>
                                 <td class="py-2.5 px-3 text-center font-bold text-slate-900">
@@ -886,7 +1420,7 @@ try {
             }
         }
 
-        // 12. Lihat Detail Penerimaan Riwayat
+        // Lihat Detail Penerimaan Riwayat
         async function viewReceptionDetail(id) {
             try {
                 const res = await fetch(`api/reception.php?action=detail&id=${id}`);
@@ -899,7 +1433,8 @@ try {
                         vehicle_no: data.reception.vehicle_no,
                         total_packages: data.reception.total_packages,
                         packages: (data.packages || []).map(p => p.package_barcode),
-                        created_at: data.reception.created_at
+                        created_at: data.reception.created_at,
+                        photos: data.reception.package_photos || (data.reception.photo_path ? [data.reception.photo_path] : [])
                     });
                 }
             } catch (e) {

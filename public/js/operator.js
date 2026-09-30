@@ -3,8 +3,9 @@ let isCameraActive = false;
 let activeInvoice = null;
 let activeExpedition = null;
 let cachedExpeditionsList = [];
-let currentDetectedProduct = null;
 let scannedProductsList = [];
+let capturedPackagePhoto = null;
+let capturedProductPhoto = null;
 
 // Global Loading Overlay Controls (Bola-bola Merah, Kuning, Hijau)
 window.showGlobalLoading = function(title = 'Memproses...', desc = 'Mohon tunggu sebentar.') {
@@ -195,8 +196,9 @@ window.resetInvoiceSession = function() {
         scanMode.className = 'font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 text-[11px]';
     }
 
-    // Sembunyikan Modal Sukses jika ada
-    document.getElementById('successModal').classList.add('hidden');
+    // Reset Foto Dokumentasi
+    if (typeof clearPackagePhoto === 'function') clearPackagePhoto();
+    if (typeof clearProductPhoto === 'function') clearProductPhoto();
 
     renderItemsTable();
 
@@ -1006,12 +1008,17 @@ window.submitFinalSession = async function() {
         videoBlob = new Blob(recordedChunks, { type: 'video/webm' });
     }
 
+    const displayOp = document.getElementById('displayOperator');
+    const operatorName = (displayOp && displayOp.innerText.trim()) ? displayOp.innerText.trim() : 'Gudang 01';
+
     const payload = {
         invoice_number: activeInvoice,
         expedition: activeExpedition || 'Lainnya',
-        operator_name: 'Gudang 01',
+        operator_name: operatorName,
         customer_name: 'Pelanggan Return',
         notes: notes,
+        package_photo: capturedPackagePhoto,
+        product_photo: capturedProductPhoto,
         items: scannedProductsList
     };
 
@@ -1023,7 +1030,9 @@ window.submitFinalSession = async function() {
 
     try {
         let res;
+        let usedVideo = false;
         if (videoBlob && videoBlob.size > 0) {
+            usedVideo = true;
             const formData = new FormData();
             formData.append('data', JSON.stringify(payload));
             formData.append('video', videoBlob, `video_${activeInvoice}.webm`);
@@ -1038,13 +1047,50 @@ window.submitFinalSession = async function() {
                 body: JSON.stringify(payload)
             });
         }
-        const result = await res.json();
+
+        const rawText = await res.text();
+        let result;
+        try {
+            result = JSON.parse(rawText);
+        } catch (jsonErr) {
+            result = {
+                success: false,
+                error: `Respon server [HTTP ${res.status}]: ${rawText.replace(/<[^>]*>?/gm, '').trim().substring(0, 150)}`
+            };
+        }
+
+        // Jika upload dengan video gagal (misal ukuran video terlalu besar / limit hosting), coba fallback simpan data tanpa video
+        if (!result.success && usedVideo) {
+            console.warn("Upload dengan video gagal (" + (result.error || '') + "). Mencoba fallback simpan data transaksi tanpa video...");
+            try {
+                const retryRes = await fetch('api/returns.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const retryText = await retryRes.text();
+                const retryResult = JSON.parse(retryText);
+                if (retryResult.success) {
+                    result = retryResult;
+                    result.video_saved = false;
+                    result.video_error_note = true;
+                }
+            } catch (retryErr) {
+                console.warn("Fallback tanpa video juga gagal:", retryErr);
+            }
+        }
+
         hideGlobalLoading();
 
         if (result.success) {
-            const hasVideo = (videoBlob && videoBlob.size > 0 && result.video_saved !== false);
-            const videoNotice = hasVideo ? ' Rekaman video unboxing berhasil disimpan.' : (videoBlob ? ' (Catatan: File video sedang diproses/berukuran besar).' : '');
-            document.getElementById('modalSuccessDesc').innerText = `Invoice [${activeInvoice}] berhasil disimpan ke MySQL dengan ${scannedProductsList.length} jenis barang.${videoNotice}`;
+            const hasVideo = (videoBlob && videoBlob.size > 0 && result.video_saved !== false && !result.video_error_note);
+            let videoNotice = '';
+            if (hasVideo) {
+                videoNotice = ' Rekaman video unboxing berhasil disimpan.';
+            } else if (result.video_error_note) {
+                videoNotice = ' (Catatan: Video tidak tersimpan karena ukuran melebihi batas upload server, namun data transaksi berhasil disimpan).';
+            }
+            document.getElementById('modalSuccessDesc').innerText = `Invoice [${activeInvoice}] berhasil disimpan ke database dengan ${scannedProductsList.length} jenis barang.${videoNotice}`;
             document.getElementById('successModal').classList.remove('hidden');
         } else {
             showToast('error', result.error || 'Terjadi kesalahan saat menyimpan', "Gagal Menyimpan");
@@ -1305,6 +1351,325 @@ async function loadExpeditions() {
         console.warn('Gagal memuat master ekspedisi:', e);
     }
 }
+
+// -------------------------------------------------------------
+// 7. FOTO UNBOXING DOKUMENTASI (PAKET & PRODUK DENGAN WATERMARK)
+// -------------------------------------------------------------
+function playShutterSound() {
+    try {
+        const ctx = audioCtx;
+        if (ctx.state === 'suspended') ctx.resume();
+        const now = ctx.currentTime;
+
+        // Click 1 (shutter open)
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'triangle';
+        osc1.frequency.setValueAtTime(1400, now);
+        osc1.frequency.exponentialRampToValueAtTime(300, now + 0.04);
+        gain1.gain.setValueAtTime(0.3, now);
+        gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.04);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.04);
+
+        // Click 2 (shutter close)
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(1100, now + 0.06);
+        osc2.frequency.exponentialRampToValueAtTime(200, now + 0.12);
+        gain2.gain.setValueAtTime(0.35, now + 0.06);
+        gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now + 0.06);
+        osc2.stop(now + 0.12);
+    } catch (e) {}
+}
+
+function triggerCameraFlash() {
+    const flash = document.getElementById('cameraFlashOverlay');
+    if (!flash) return;
+    flash.classList.remove('opacity-0');
+    flash.classList.add('opacity-90');
+    setTimeout(() => {
+        flash.classList.remove('opacity-90');
+        flash.classList.add('opacity-0');
+    }, 120);
+}
+
+function getNowFormattedWIB() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())} WIB`;
+}
+
+function generateWatermarkedPhoto({ badgeText, badgeColor = '#4f46e5', fields = [] }) {
+    const videoElement = document.getElementById('liveVideoFeed');
+    if (!videoElement || videoElement.readyState < 2) {
+        throw new Error("Kamera belum aktif atau belum siap");
+    }
+
+    const canvas = document.createElement('canvas');
+    const width = videoElement.videoWidth || 1280;
+    const height = videoElement.videoHeight || 720;
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    // 1. Gambar frame video langsung dari webcam
+    ctx.drawImage(videoElement, 0, 0, width, height);
+
+    // 2. Bar Atas (Header Branding & Badge)
+    const topBarHeight = Math.max(48, Math.round(height * 0.075));
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+    ctx.fillRect(0, 0, width, topBarHeight);
+
+    // Garis aksen tipis di bawah bar atas
+    ctx.fillStyle = badgeColor;
+    ctx.fillRect(0, topBarHeight, width, 3);
+
+    // Judul Kiri Atas
+    const titleFontSize = Math.max(14, Math.round(topBarHeight * 0.40));
+    ctx.font = `bold ${titleFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText("PT. INDO EXPRESS GLOBAL • INBOUND RETURN STATION", 20, Math.round(topBarHeight * 0.65));
+
+    // Badge Kanan Atas
+    const badgeFontSize = Math.max(12, Math.round(topBarHeight * 0.36));
+    ctx.font = `bold ${badgeFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+    const badgeW = ctx.measureText(badgeText).width + 24;
+    const badgeH = Math.round(topBarHeight * 0.62);
+    const badgeX = width - badgeW - 20;
+    const badgeY = Math.round((topBarHeight - badgeH) / 2);
+
+    ctx.fillStyle = badgeColor;
+    ctx.beginPath();
+    if (ctx.roundRect) {
+        ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 6);
+    } else {
+        ctx.rect(badgeX, badgeY, badgeW, badgeH);
+    }
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(badgeText, badgeX + 12, badgeY + badgeH * 0.72);
+
+    // 3. Panel Watermark Bawah (Gradient hitam transparan dengan detail tajam)
+    const totalLines = Math.ceil(fields.length / 2);
+    const bottomH = Math.max(95, Math.round(height * (0.05 + totalLines * 0.04)));
+    const grad = ctx.createLinearGradient(0, height - bottomH - 35, 0, height);
+    grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    grad.addColorStop(0.25, 'rgba(15, 23, 42, 0.90)');
+    grad.addColorStop(1, 'rgba(15, 23, 42, 0.98)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, height - bottomH - 35, width, bottomH + 35);
+
+    // Garis aksen di atas panel bawah
+    ctx.fillStyle = badgeColor;
+    ctx.fillRect(0, height - bottomH - 2, width, 3);
+
+    // Render Fields Teks 2 Kolom
+    const fontSize = Math.max(13, Math.round(height * 0.024));
+    const col1X = 24;
+    const col2X = Math.round(width * 0.52);
+    let startY = height - bottomH + fontSize + 4;
+    const lineSpacing = Math.round(fontSize * 1.55);
+
+    fields.forEach((f, idx) => {
+        const isCol2 = (idx % 2 === 1);
+        const x = isCol2 ? col2X : col1X;
+        const y = startY + Math.floor(idx / 2) * lineSpacing;
+
+        ctx.font = `500 ${fontSize}px monospace, sans-serif`;
+        ctx.fillStyle = '#94a3b8';
+        const labelText = f.label + ': ';
+        ctx.fillText(labelText, x, y);
+        const lblW = ctx.measureText(labelText).width;
+
+        ctx.font = `bold ${fontSize}px monospace, sans-serif`;
+        ctx.fillStyle = f.highlight ? '#fde047' : '#ffffff';
+        ctx.fillText(f.val || '-', x + lblW, y);
+    });
+
+    return canvas.toDataURL('image/jpeg', 0.88);
+}
+
+window.capturePackagePhoto = function() {
+    const videoElement = document.getElementById('liveVideoFeed');
+    if (!isCameraActive || !videoElement || videoElement.readyState < 2) {
+        showToast('warning', 'Kamera belum aktif. Menghubungkan kamera...', 'Kamera Belum Aktif');
+        startCamera();
+        return;
+    }
+
+    try {
+        triggerCameraFlash();
+        playShutterSound();
+
+        const displayOp = document.getElementById('displayOperator');
+        const opName = (displayOp && displayOp.innerText.trim()) ? displayOp.innerText.trim() : 'Gudang 01';
+        const inv = activeInvoice || document.getElementById('inputInvoice')?.value?.trim() || 'MENUNGGU_SCAN';
+        const exp = activeExpedition || document.getElementById('selectExpedition')?.value || 'Reguler / Kurir';
+
+        const fields = [
+            { label: 'NO. INVOICE / RESI', val: inv, highlight: true },
+            { label: 'EKSPEDISI PENGANTAR', val: exp },
+            { label: 'PETUGAS OPERATOR', val: opName },
+            { label: 'WAKTU DOKUMENTASI', val: getNowFormattedWIB() }
+        ];
+
+        const dataUrl = generateWatermarkedPhoto({
+            badgeText: '📦 FOTO PAKET UNBOXING',
+            badgeColor: '#4f46e5',
+            fields: fields
+        });
+
+        capturedPackagePhoto = dataUrl;
+
+        // Update UI Box Paket
+        const imgEl = document.getElementById('imgPackagePhoto');
+        const emptyEl = document.getElementById('previewPackagePhotoEmpty');
+        const filledEl = document.getElementById('previewPackagePhotoFilled');
+        const badgeEl = document.getElementById('badgePackagePhoto');
+
+        if (imgEl) imgEl.src = dataUrl;
+        if (emptyEl) emptyEl.classList.add('hidden');
+        if (filledEl) filledEl.classList.remove('hidden');
+        if (badgeEl) badgeEl.classList.remove('hidden');
+
+        showToast('success', 'Foto Paket dengan watermark berhasil diambil! [Tuts F2]', 'Foto Paket Siap');
+    } catch (err) {
+        showToast('error', 'Gagal mengambil foto paket: ' + err.message, 'Gagal Foto');
+    }
+};
+
+window.captureProductPhoto = function() {
+    const videoElement = document.getElementById('liveVideoFeed');
+    if (!isCameraActive || !videoElement || videoElement.readyState < 2) {
+        showToast('warning', 'Kamera belum aktif. Menghubungkan kamera...', 'Kamera Belum Aktif');
+        startCamera();
+        return;
+    }
+
+    try {
+        triggerCameraFlash();
+        playShutterSound();
+
+        const displayOp = document.getElementById('displayOperator');
+        const opName = (displayOp && displayOp.innerText.trim()) ? displayOp.innerText.trim() : 'Gudang 01';
+        const inv = activeInvoice || document.getElementById('inputInvoice')?.value?.trim() || 'MENUNGGU_SCAN';
+
+        // Ambil info produk yang sedang di-input atau item terakhir
+        let pName = 'Produk Return';
+        let pSku = '-';
+        let pSap = '-';
+        let pBatch = inputBatch ? inputBatch.value.trim() : '-';
+        let pExp = inputExpDate ? inputExpDate.value.trim() : '-';
+        let pType = inputType ? inputType.value : 'GOOD';
+
+        if (currentDetectedProduct) {
+            pName = currentDetectedProduct.name;
+            pSku = currentDetectedProduct.seller_sku || currentDetectedProduct.sku || '-';
+            pSap = currentDetectedProduct.sap_code || '-';
+        } else if (scannedProductsList.length > 0) {
+            const last = scannedProductsList[scannedProductsList.length - 1];
+            pName = last.product_name;
+            pSku = last.seller_sku || last.sku || '-';
+            pSap = last.sap_code || '-';
+            pBatch = last.batch_no || pBatch;
+            pExp = last.exp_date || pExp;
+            pType = last.type || pType;
+        }
+
+        const fields = [
+            { label: 'NO. INVOICE', val: inv, highlight: true },
+            { label: 'KONDISI / TIPE', val: pType, highlight: (pType !== 'GOOD') },
+            { label: 'NAMA PRODUK', val: pName.length > 28 ? pName.substring(0, 28) + '...' : pName },
+            { label: 'SKU / SAP', val: `${pSku} | ${pSap}` },
+            { label: 'BATCH & EXP', val: `B:${pBatch || '-'} | Exp:${pExp || '-'}` },
+            { label: 'WAKTU & OPERATOR', val: `${getNowFormattedWIB()} (${opName})` }
+        ];
+
+        const dataUrl = generateWatermarkedPhoto({
+            badgeText: '🏷️ FOTO PRODUK UNBOXING',
+            badgeColor: '#059669',
+            fields: fields
+        });
+
+        capturedProductPhoto = dataUrl;
+
+        // Update UI Box Produk
+        const imgEl = document.getElementById('imgProductPhoto');
+        const emptyEl = document.getElementById('previewProductPhotoEmpty');
+        const filledEl = document.getElementById('previewProductPhotoFilled');
+        const badgeEl = document.getElementById('badgeProductPhoto');
+
+        if (imgEl) imgEl.src = dataUrl;
+        if (emptyEl) emptyEl.classList.add('hidden');
+        if (filledEl) filledEl.classList.remove('hidden');
+        if (badgeEl) badgeEl.classList.remove('hidden');
+
+        showToast('success', 'Foto Produk dengan watermark berhasil diambil! [Tuts F4]', 'Foto Produk Siap');
+    } catch (err) {
+        showToast('error', 'Gagal mengambil foto produk: ' + err.message, 'Gagal Foto');
+    }
+};
+
+window.clearPackagePhoto = function() {
+    capturedPackagePhoto = null;
+    const imgEl = document.getElementById('imgPackagePhoto');
+    const emptyEl = document.getElementById('previewPackagePhotoEmpty');
+    const filledEl = document.getElementById('previewPackagePhotoFilled');
+    const badgeEl = document.getElementById('badgePackagePhoto');
+
+    if (imgEl) imgEl.src = '';
+    if (emptyEl) emptyEl.classList.remove('hidden');
+    if (filledEl) filledEl.classList.add('hidden');
+    if (badgeEl) badgeEl.classList.add('hidden');
+};
+
+window.clearProductPhoto = function() {
+    capturedProductPhoto = null;
+    const imgEl = document.getElementById('imgProductPhoto');
+    const emptyEl = document.getElementById('previewProductPhotoEmpty');
+    const filledEl = document.getElementById('previewProductPhotoFilled');
+    const badgeEl = document.getElementById('badgeProductPhoto');
+
+    if (imgEl) imgEl.src = '';
+    if (emptyEl) emptyEl.classList.remove('hidden');
+    if (filledEl) filledEl.classList.add('hidden');
+    if (badgeEl) badgeEl.classList.add('hidden');
+};
+
+window.previewImageModal = function(imgElementId, title = 'Preview Foto Watermark') {
+    const srcEl = document.getElementById(imgElementId);
+    if (!srcEl || !srcEl.src) return;
+    const modalImg = document.getElementById('photoPreviewModalImg');
+    const modalTitle = document.getElementById('photoPreviewModalTitle');
+    const modal = document.getElementById('photoPreviewModal');
+    if (modalImg) modalImg.src = srcEl.src;
+    if (modalTitle) modalTitle.innerText = title;
+    if (modal) modal.classList.remove('hidden');
+};
+
+window.closePhotoPreviewModal = function() {
+    const modal = document.getElementById('photoPreviewModal');
+    if (modal) modal.classList.add('hidden');
+};
+
+// Global Keyboard Shortcut: F2 (Foto Paket), F4 (Foto Produk)
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'F2') {
+        e.preventDefault();
+        capturePackagePhoto();
+    } else if (e.key === 'F4') {
+        e.preventDefault();
+        captureProductPhoto();
+    }
+});
 
 // Inisialisasi Otomatis saat Halaman Dimuat
 window.addEventListener('DOMContentLoaded', () => {

@@ -17,16 +17,80 @@ if (!empty($_POST['data'])) {
 }
 
 if (!$body || !is_array($body)) {
+    if (empty($_POST) && empty($_FILES) && isset($_SERVER['CONTENT_LENGTH']) && (int)$_SERVER['CONTENT_LENGTH'] > 0) {
+        $maxSize = ini_get('post_max_size');
+        jsonResponse(['error' => "Ukuran file video melebihi batas upload server ($maxSize). Silakan rekam lebih singkat atau kurangi durasi."], 413);
+    }
     jsonResponse(['error' => 'Format input data tidak valid'], 400);
 }
 
+$sessionUser   = getSessionUser();
 $invoiceNumber = trim($body['invoice_number'] ?? '');
-$operatorName  = trim($body['operator_name'] ?? 'Gudang 01');
+$operatorName  = trim($body['operator_name'] ?? ($sessionUser['name'] ?? 'Gudang 01'));
+if (empty($operatorName)) $operatorName = $sessionUser['name'] ?? 'Gudang 01';
 $customerName  = trim($body['customer_name'] ?? 'Pelanggan Return');
 $expedition    = trim($body['expedition'] ?? '');
+if (empty($expedition)) $expedition = 'Lainnya';
 $notes         = trim($body['notes'] ?? '');
 $items         = $body['items'] ?? [];
-$videoPath     = trim($body['video_path'] ?? '');
+// Helper simpan Base64 Image
+function saveBase64Image($base64Data, $dir, $prefix) {
+    if (empty($base64Data) || !is_string($base64Data)) return '';
+    $ext = 'jpg';
+    if (preg_match('/^data:image\/(\w+);base64,/', $base64Data, $type)) {
+        $data = substr($base64Data, strpos($base64Data, ',') + 1);
+        $type = strtolower($type[1]);
+        if ($type === 'jpeg') $type = 'jpg';
+        $ext = $type;
+    } else {
+        $data = $base64Data;
+    }
+    $decoded = base64_decode($data);
+    if (!$decoded) return '';
+
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0777, true);
+    }
+    $fileName = $prefix . '_' . time() . '_' . substr(md5(uniqid(rand(), true)), 0, 6) . '.' . $ext;
+    $filePath = rtrim($dir, '/') . '/' . $fileName;
+    if (file_put_contents($filePath, $decoded)) {
+        return 'uploads/photos/' . $fileName;
+    }
+    return '';
+}
+
+$cleanInv = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $invoiceNumber);
+
+// Simpan Foto Paket Unboxing jika ada
+$packagePhoto = trim($body['package_photo'] ?? '');
+if (!empty($packagePhoto) && strpos($packagePhoto, 'data:image') === 0) {
+    $packagePhoto = saveBase64Image($packagePhoto, __DIR__ . '/../uploads/photos', 'pkg_' . $cleanInv);
+}
+
+// Simpan Foto Produk Unboxing jika ada
+$productPhoto = trim($body['product_photo'] ?? '');
+if (!empty($productPhoto) && strpos($productPhoto, 'data:image') === 0) {
+    $productPhoto = saveBase64Image($productPhoto, __DIR__ . '/../uploads/photos', 'prod_' . $cleanInv);
+}
+
+// Simpan array foto unboxing tambahan jika ada
+$photosArr = [];
+if (!empty($packagePhoto)) $photosArr[] = ['type' => 'package', 'path' => $packagePhoto];
+if (!empty($productPhoto)) $photosArr[] = ['type' => 'product', 'path' => $productPhoto];
+if (!empty($body['photos']) && is_array($body['photos'])) {
+    foreach ($body['photos'] as $idx => $extraP) {
+        $pStr = is_array($extraP) ? ($extraP['data'] ?? $extraP['path'] ?? '') : $extraP;
+        if (strpos($pStr, 'data:image') === 0) {
+            $savedP = saveBase64Image($pStr, __DIR__ . '/../uploads/photos', 'extra_' . $cleanInv . "_{$idx}");
+            if ($savedP) {
+                $photosArr[] = ['type' => ($extraP['type'] ?? 'extra'), 'path' => $savedP];
+            }
+        } elseif (!empty($pStr) && is_string($pStr)) {
+            $photosArr[] = ['type' => ($extraP['type'] ?? 'extra'), 'path' => $pStr];
+        }
+    }
+}
+$photosJson = count($photosArr) > 0 ? json_encode($photosArr, JSON_UNESCAPED_SLASHES) : null;
 
 // 2. Cek apakah ada file video yang di-upload via $_FILES
 $videoStatus = 'no_video';
@@ -37,7 +101,6 @@ if (isset($_FILES['video'])) {
             @mkdir($uploadDir, 0777, true);
         }
         
-        $cleanInv = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $invoiceNumber);
         $ext = pathinfo($_FILES['video']['name'], PATHINFO_EXTENSION);
         if (empty($ext)) $ext = 'webm';
         $fileName = 'video_' . $cleanInv . '_' . time() . '.' . $ext;
@@ -81,8 +144,8 @@ try {
     $pdo->beginTransaction();
 
     $stmtSession = $pdo->prepare("
-        INSERT INTO return_sessions (invoice_number, customer_name, expedition, operator_name, total_items, total_good, total_damaged, notes, video_path)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO return_sessions (invoice_number, customer_name, expedition, operator_name, total_items, total_good, total_damaged, notes, video_path, package_photo, product_photo, photos)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     $stmtSession->execute([
         $invoiceNumber,
@@ -93,14 +156,17 @@ try {
         $totalGood,
         $totalDamaged,
         $notes,
-        $videoPath
+        $videoPath,
+        $packagePhoto ?: null,
+        $productPhoto ?: null,
+        $photosJson
     ]);
 
     $sessionId = $pdo->lastInsertId();
 
     $stmtItem = $pdo->prepare("
-        INSERT INTO return_items (session_id, barcode, product_name, sku, seller_sku, sap_code, batch_no, exp_date, type, qty, `condition`, damage_reason)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO return_items (session_id, barcode, product_name, sku, seller_sku, sap_code, batch_no, exp_date, type, qty, `condition`, damage_reason, photo_path)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     foreach ($items as $item) {
@@ -115,6 +181,12 @@ try {
             $expDate = "{$m[3]}-{$m[2]}-{$m[1]}";
         }
 
+        $itemPhoto = trim($item['photo_path'] ?? $item['photo'] ?? '');
+        if (!empty($itemPhoto) && strpos($itemPhoto, 'data:image') === 0) {
+            $bCodeClean = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $item['barcode'] ?? 'item');
+            $itemPhoto = saveBase64Image($itemPhoto, __DIR__ . '/../uploads/photos', 'item_' . $cleanInv . '_' . $bCodeClean);
+        }
+
         $stmtItem->execute([
             $sessionId,
             $item['barcode'] ?? '',
@@ -127,7 +199,8 @@ try {
             $type,
             $qty,
             $cond,
-            $reason
+            $reason,
+            $itemPhoto ?: null
         ]);
     }
 

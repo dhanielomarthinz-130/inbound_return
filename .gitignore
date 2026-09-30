@@ -15,5 +15,11 @@ Thumbs.db
 # User Uploads
 uploads/videos/*.webm
 uploads/videos/*.mp4
+uploads/photos/*.jpg
+uploads/photos/*.jpeg
+uploads/photos/*.png
+uploads/reception/*.jpg
+uploads/reception/*.jpeg
+uploads/reception/*.png
 uploads/cache/
 uploads/.db_ready

@@ -107,6 +107,9 @@ try {
                 `total_damaged` INT DEFAULT 0,
                 `notes` TEXT NULL,
                 `video_path` VARCHAR(255) NULL,
+                `package_photo` VARCHAR(255) NULL,
+                `product_photo` VARCHAR(255) NULL,
+                `photos` TEXT NULL,
                 `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 INDEX idx_invoice (`invoice_number`),
                 INDEX idx_created (`created_at`)
@@ -126,6 +129,7 @@ try {
                 `qty` INT NOT NULL DEFAULT 1,
                 `condition` VARCHAR(20) NOT NULL DEFAULT 'GOOD',
                 `damage_reason` VARCHAR(255) NULL,
+                `photo_path` VARCHAR(255) NULL,
                 `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 INDEX idx_session (`session_id`),
                 INDEX idx_item_barcode (`barcode`),
@@ -171,6 +175,8 @@ try {
                 `operator_name` VARCHAR(100) NOT NULL,
                 `total_packages` INT DEFAULT 0,
                 `notes` TEXT NULL,
+                `photo_path` VARCHAR(255) NULL,
+                `package_photos` TEXT NULL,
                 `status` VARCHAR(50) DEFAULT 'RECEIVED',
                 `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 INDEX idx_receipt_number (`receipt_number`),
@@ -227,10 +233,20 @@ try {
             if (!in_array('type', $cols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN type VARCHAR(50) NULL DEFAULT 'GOOD' AFTER exp_date");
             if (!in_array('seller_sku', $cols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN seller_sku VARCHAR(150) NULL AFTER sku");
             if (!in_array('sap_code', $cols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN sap_code VARCHAR(100) NULL AFTER seller_sku");
+            if (!in_array('condition', $cols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN `condition` VARCHAR(20) NOT NULL DEFAULT 'GOOD' AFTER qty");
+            if (!in_array('damage_reason', $cols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN damage_reason VARCHAR(255) NULL AFTER `condition`");
+            if (!in_array('photo_path', $cols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN photo_path VARCHAR(255) NULL AFTER damage_reason");
 
             $colsSessions = $pdo->query("SHOW COLUMNS FROM return_sessions")->fetchAll(PDO::FETCH_COLUMN);
             if (!in_array('expedition', $colsSessions)) $pdo->exec("ALTER TABLE return_sessions ADD COLUMN expedition VARCHAR(100) NULL AFTER customer_name");
             if (!in_array('video_path', $colsSessions)) $pdo->exec("ALTER TABLE return_sessions ADD COLUMN video_path VARCHAR(255) NULL AFTER notes");
+            if (!in_array('package_photo', $colsSessions)) $pdo->exec("ALTER TABLE return_sessions ADD COLUMN package_photo VARCHAR(255) NULL AFTER video_path");
+            if (!in_array('product_photo', $colsSessions)) $pdo->exec("ALTER TABLE return_sessions ADD COLUMN product_photo VARCHAR(255) NULL AFTER package_photo");
+            if (!in_array('photos', $colsSessions)) $pdo->exec("ALTER TABLE return_sessions ADD COLUMN photos TEXT NULL AFTER product_photo");
+
+            $colsRecep = $pdo->query("SHOW COLUMNS FROM expedition_receptions")->fetchAll(PDO::FETCH_COLUMN);
+            if (!in_array('photo_path', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN photo_path VARCHAR(255) NULL AFTER notes");
+            if (!in_array('package_photos', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN package_photos TEXT NULL AFTER photo_path");
 
             $colsProd = $pdo->query("SHOW COLUMNS FROM master_products")->fetchAll(PDO::FETCH_COLUMN);
             if (!in_array('seller_sku', $colsProd)) $pdo->exec("ALTER TABLE master_products ADD COLUMN seller_sku VARCHAR(150) NULL AFTER sku");
@@ -321,9 +337,21 @@ try {
         @file_put_contents($lockFile, date('Y-m-d H:i:s'));
     }
 
-    // Jalankan migrasi HANYA jika file .db_ready belum ada atau diminta migrasi
+    // Jalankan migrasi jika tabel belum ada atau jika file .db_ready belum ada atau diminta migrasi
     $readyFlag = __DIR__ . '/uploads/.db_ready';
-    if (!file_exists($readyFlag) || isset($_GET['run_migration'])) {
+    $needsMigration = !file_exists($readyFlag) || isset($_GET['run_migration']);
+    if (!$needsMigration) {
+        try {
+            $chkTable = $pdo->query("SHOW TABLES LIKE 'return_sessions'");
+            if (!$chkTable || $chkTable->rowCount() === 0) {
+                $needsMigration = true;
+            }
+        } catch (Exception $e) {
+            $needsMigration = true;
+        }
+    }
+
+    if ($needsMigration) {
         $uploadDir = __DIR__ . '/uploads';
         if (!is_dir($uploadDir)) @mkdir($uploadDir, 0777, true);
         ensureDatabaseSchema($pdo);
