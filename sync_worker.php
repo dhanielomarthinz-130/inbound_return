@@ -38,6 +38,81 @@ function writeSyncLog($msg) {
 }
 
 /**
+ * Helper Request ke InfinityFree dengan Auto-Bypass Security Cookie __test
+ */
+function callInfinityFreeApi($url, $postPayload = null) {
+    static $solvedCookie = null;
+    $cookieFile = __DIR__ . '/uploads/logs/infinity_cookie.txt';
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 40);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    curl_setopt($ch, CURLOPT_COOKIEJAR, $cookieFile);
+    curl_setopt($ch, CURLOPT_COOKIEFILE, $cookieFile);
+
+    if ($solvedCookie) {
+        curl_setopt($ch, CURLOPT_COOKIE, "__test=$solvedCookie");
+    }
+
+    if ($postPayload !== null) {
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, is_array($postPayload) ? json_encode($postPayload) : $postPayload);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    }
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr = curl_error($ch);
+    curl_close($ch);
+
+    // Deteksi jika server InfinityFree menyodorkan proteksi AES slowAES.decrypt
+    if (strpos($response, 'slowAES.decrypt') !== false || strpos($response, 'toNumbers') !== false) {
+        if (preg_match('/a=toNumbers\("([a-f0-9]+)"\),b=toNumbers\("([a-f0-9]+)"\),c=toNumbers\("([a-f0-9]+)"\)/i', $response, $m)) {
+            $key = hex2bin($m[1]);
+            $iv  = hex2bin($m[2]);
+            $ct  = hex2bin($m[3]);
+            $decrypted = openssl_decrypt($ct, 'aes-128-cbc', $key, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING, $iv);
+            $solvedCookie = bin2hex($decrypted);
+
+            // Simpan cookie ke jar
+            $domain = parse_url($url, PHP_URL_HOST);
+            @file_put_contents($cookieFile, "$domain\tTRUE\t/\tFALSE\t2147483647\t__test\t$solvedCookie\n");
+
+            // Ulangi request langsung dengan cookie yang telah dipecahkan
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 40);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+            curl_setopt($ch, CURLOPT_COOKIE, "__test=$solvedCookie");
+            curl_setopt($ch, CURLOPT_COOKIEJAR, $cookieFile);
+            curl_setopt($ch, CURLOPT_COOKIEFILE, $cookieFile);
+
+            if ($postPayload !== null) {
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, is_array($postPayload) ? json_encode($postPayload) : $postPayload);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+            }
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlErr = curl_error($ch);
+            curl_close($ch);
+        }
+    }
+
+    return [
+        'code' => $httpCode,
+        'body' => $response,
+        'error' => $curlErr
+    ];
+}
+
+/**
  * Helper Download File Gambar dari Cloud ke Localhost
  */
 function downloadCloudPhoto($cloudUrl, $relPath) {
@@ -48,26 +123,15 @@ function downloadCloudPhoto($cloudUrl, $relPath) {
         @mkdir($targetDir, 0777, true);
     }
 
-    // Jika file sudah ada di lokal dengan ukuran valid, lewati download
     if (file_exists($targetPath) && filesize($targetPath) > 500) {
         return true;
     }
 
     $sourceUrl = rtrim($cloudUrl, '/') . '/' . ltrim($relPath, '/');
-    
-    // Download via cURL
-    $ch = curl_init($sourceUrl);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_USERAGENT, 'IEG-SyncWorker/1.0');
-    $data = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    $res = callInfinityFreeApi($sourceUrl);
 
-    if ($httpCode === 200 && !empty($data)) {
-        return file_put_contents($targetPath, $data) !== false;
+    if ($res['code'] === 200 && !empty($res['body']) && strpos($res['body'], 'slowAES.decrypt') === false) {
+        return file_put_contents($targetPath, $res['body']) !== false;
     }
     return false;
 }
@@ -81,23 +145,14 @@ function executeSyncRound($pdo) {
 
     // 1. Panggil API Sync Export dari Cloud
     $exportUrl = $cloudUrl . '/api/sync_export.php?key=' . urlencode($secretKey);
+    $apiRes = callInfinityFreeApi($exportUrl);
 
-    $ch = curl_init($exportUrl);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 45);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_USERAGENT, 'IEG-SyncWorker/1.0');
-    $response = curl_exec($ch);
-    $curlError = curl_error($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($httpCode !== 200 || empty($response)) {
-        $err = "Koneksi ke Cloud gagal [HTTP $httpCode]. " . ($curlError ?: substr($response, 0, 150));
+    if ($apiRes['code'] !== 200 || empty($apiRes['body'])) {
+        $err = "Koneksi ke Cloud gagal [HTTP {$apiRes['code']}]. " . ($apiRes['error'] ?: substr($apiRes['body'], 0, 150));
         return ['success' => false, 'error' => $err];
     }
 
-    $data = json_decode($response, true);
+    $data = json_decode($apiRes['body'], true);
     if (!$data || empty($data['success'])) {
         $err = $data['error'] ?? 'Respon JSON dari Cloud tidak valid';
         return ['success' => false, 'error' => $err];
@@ -263,17 +318,8 @@ function executeSyncRound($pdo) {
             'synced_reception_ids' => $syncedReceptionIds
         ]);
 
-        $chClean = curl_init($cleanupUrl);
-        curl_setopt($chClean, CURLOPT_POST, true);
-        curl_setopt($chClean, CURLOPT_POSTFIELDS, $payload);
-        curl_setopt($chClean, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-        curl_setopt($chClean, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($chClean, CURLOPT_TIMEOUT, 30);
-        curl_setopt($chClean, CURLOPT_SSL_VERIFYPEER, false);
-        $cleanResp = curl_exec($chClean);
-        curl_close($chClean);
-
-        $cleanupResult = json_decode($cleanResp, true);
+        $cleanResp = callInfinityFreeApi($cleanupUrl, $payload);
+        $cleanupResult = json_decode($cleanResp['body'] ?? '', true);
         writeSyncLog("Sync Berhasil: " . count($syncedReturnIds) . " return unboxing, " . count($syncedReceptionIds) . " receiving, $downloadedPhotosCount foto terunduh. InfinityFree dibersihkan.");
     }
 
