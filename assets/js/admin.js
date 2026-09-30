@@ -2896,3 +2896,46 @@ window.lookupClaimCandidate = function(identifier) {
     }
 };
 
+// -------------------------------------------------------------
+// AUTO-SYNC CLOUD (INFINITYFREE -> LOCALHOST) BACKGROUND POLLER
+// -------------------------------------------------------------
+let isSyncingBackground = false;
+async function triggerBackgroundCloudSync() {
+    // Hanya jalankan jika diakses di PC Localhost / server lokal
+    const isLocalhost = (location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname.endsWith('.test') || location.hostname.startsWith('192.168.'));
+    if (!isLocalhost || isSyncingBackground) return;
+
+    isSyncingBackground = true;
+    try {
+        const res = await fetch('sync_worker.php');
+        const data = await res.json();
+        if (data && data.success) {
+            const numRet = data.synced_returns || 0;
+            const numRec = data.synced_receptions || 0;
+            if (numRet > 0 || numRec > 0) {
+                if (typeof showToast === 'function') {
+                    showToast('info', `Tersinkron ${numRet} retur & ${numRec} receiving dari Cloud InfinityFree.`, 'Auto-Sync Berhasil');
+                }
+                // Refresh data dashboard / tabel aktif
+                if (typeof currentTab !== 'undefined') {
+                    if (currentTab === 'dashboard' && typeof loadMetrics === 'function') loadMetrics();
+                    if (currentTab === 'transactions' && typeof loadTransactions === 'function') loadTransactions();
+                    if (currentTab === 'receiving' && typeof loadReceivingData === 'function') loadReceivingData();
+                }
+            }
+        }
+    } catch (e) {
+        // Silent error agar tidak mengganggu operasional jika cloud offline
+        console.debug('Background sync status:', e.message);
+    } finally {
+        isSyncingBackground = false;
+    }
+}
+
+// Jalankan sync pertama 5 detik setelah admin terbuka, lalu ulang tiap 45 detik
+setTimeout(() => {
+    triggerBackgroundCloudSync();
+    setInterval(triggerBackgroundCloudSync, 45000);
+}, 5000);
+
+
