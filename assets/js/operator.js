@@ -7,6 +7,7 @@ let scannedProductsList = [];
 let currentDetectedProduct = null;
 let capturedPackagePhoto = null;
 let capturedProductPhoto = null;
+let capturedPhotosList = [];
 
 // Global Loading Overlay Controls (Bola-bola Merah, Kuning, Hijau)
 window.showGlobalLoading = function(title = 'Memproses...', desc = 'Mohon tunggu sebentar.') {
@@ -198,8 +199,10 @@ window.resetInvoiceSession = function() {
     }
 
     // Reset Foto Dokumentasi
-    if (typeof clearPackagePhoto === 'function') clearPackagePhoto();
-    if (typeof clearProductPhoto === 'function') clearProductPhoto();
+    capturedPhotosList = [];
+    capturedPackagePhoto = null;
+    capturedProductPhoto = null;
+    if (typeof renderPhotosGallery === 'function') renderPhotosGallery();
 
     renderItemsTable();
 
@@ -1020,6 +1023,11 @@ window.submitFinalSession = async function() {
         notes: notes,
         package_photo: capturedPackagePhoto,
         product_photo: capturedProductPhoto,
+        photos: capturedPhotosList.map(p => ({
+            type: p.type,
+            data: p.dataUrl,
+            title: p.title
+        })),
         items: scannedProductsList
     };
 
@@ -1507,6 +1515,111 @@ function generateWatermarkedPhoto({ badgeText, badgeColor = '#4f46e5', fields = 
     return canvas.toDataURL('image/jpeg', 0.88);
 }
 
+window.renderPhotosGallery = function() {
+    const listEl = document.getElementById('photosGridList');
+    const emptyEl = document.getElementById('photosEmptyState');
+    const badgeEl = document.getElementById('badgeTotalPhotos');
+    const btnClearEl = document.getElementById('btnClearAllPhotos');
+
+    const total = capturedPhotosList.length;
+    if (badgeEl) {
+        badgeEl.innerText = `${total} Foto`;
+        if (total > 0) {
+            badgeEl.className = 'text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300';
+        } else {
+            badgeEl.className = 'text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500';
+        }
+    }
+
+    if (btnClearEl) {
+        if (total > 0) btnClearEl.classList.remove('hidden');
+        else btnClearEl.classList.add('hidden');
+    }
+
+    // Perbarui legacy fallback
+    const pkgPhotos = capturedPhotosList.filter(p => p.type === 'package');
+    const prodPhotos = capturedPhotosList.filter(p => p.type === 'product');
+    capturedPackagePhoto = pkgPhotos.length > 0 ? pkgPhotos[pkgPhotos.length - 1].dataUrl : null;
+    capturedProductPhoto = prodPhotos.length > 0 ? prodPhotos[prodPhotos.length - 1].dataUrl : null;
+
+    if (!listEl) return;
+
+    if (total === 0) {
+        if (emptyEl) emptyEl.classList.remove('hidden');
+        listEl.innerHTML = '';
+        listEl.classList.add('hidden');
+        return;
+    }
+
+    if (emptyEl) emptyEl.classList.add('hidden');
+    listEl.classList.remove('hidden');
+    listEl.innerHTML = '';
+
+    capturedPhotosList.forEach((item, index) => {
+        const isPkg = (item.type === 'package');
+        const badgeColor = isPkg ? 'bg-indigo-600' : 'bg-emerald-600';
+        const badgeIcon = isPkg ? 'fa-box' : 'fa-tag';
+        const badgeText = isPkg ? 'Paket' : 'Produk';
+        const safeTitle = (item.title || 'Foto Unboxing').replace(/"/g, '&quot;');
+
+        const card = document.createElement('div');
+        card.className = 'relative group bg-slate-900 rounded-xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition';
+        card.innerHTML = `
+            <div class="aspect-video w-full overflow-hidden bg-slate-950 flex items-center justify-center cursor-pointer" onclick="previewImageDirect('${item.dataUrl}', '${safeTitle}')">
+                <img src="${item.dataUrl}" alt="${safeTitle}" class="w-full h-full object-cover transition duration-200 group-hover:scale-105">
+            </div>
+            <!-- Header Badges -->
+            <div class="absolute top-1.5 left-1.5 flex items-center gap-1 pointer-events-none">
+                <span class="${badgeColor} text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow">
+                    <i class="fa-solid ${badgeIcon} text-[9px] mr-0.5"></i>${badgeText} #${index + 1}
+                </span>
+            </div>
+            <!-- Action Buttons -->
+            <div class="absolute top-1.5 right-1.5 flex items-center gap-1">
+                <button type="button" onclick="previewImageDirect('${item.dataUrl}', '${safeTitle}')" class="w-6 h-6 rounded-full bg-slate-900/80 hover:bg-indigo-600 text-white flex items-center justify-center text-[10px] transition shadow" title="Perbesar Foto">
+                    <i class="fa-solid fa-expand"></i>
+                </button>
+                <button type="button" onclick="deletePhotoItem('${item.id}')" class="w-6 h-6 rounded-full bg-slate-900/80 hover:bg-rose-600 text-white flex items-center justify-center text-[10px] transition shadow" title="Hapus Foto">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </div>
+            <!-- Bottom Title Bar -->
+            <div class="p-1.5 bg-white border-t border-slate-100 flex items-center justify-between text-[11px]">
+                <span class="truncate font-semibold text-slate-700" title="${safeTitle}">${safeTitle}</span>
+                <span class="text-[9px] text-slate-400 font-mono flex-shrink-0 ml-1">${item.createdAt ? item.createdAt.split(' ')[1] : ''}</span>
+            </div>
+        `;
+        listEl.appendChild(card);
+    });
+};
+
+window.deletePhotoItem = function(id) {
+    capturedPhotosList = capturedPhotosList.filter(p => p.id !== id);
+    renderPhotosGallery();
+    showToast('info', 'Foto telah dihapus dari antrean unboxing.', 'Foto Dihapus');
+};
+
+window.clearAllPhotos = function() {
+    if (capturedPhotosList.length === 0) return;
+    if (confirm(`Hapus seluruh (${capturedPhotosList.length}) foto dokumentasi ini?`)) {
+        capturedPhotosList = [];
+        capturedPackagePhoto = null;
+        capturedProductPhoto = null;
+        renderPhotosGallery();
+        showToast('info', 'Semua foto dokumentasi telah dibersihkan.', 'Foto Dibersihkan');
+    }
+};
+
+window.previewImageDirect = function(src, title = 'Preview Foto Watermark') {
+    if (!src) return;
+    const modalImg = document.getElementById('photoPreviewModalImg');
+    const modalTitle = document.getElementById('photoPreviewModalTitle');
+    const modal = document.getElementById('photoPreviewModal');
+    if (modalImg) modalImg.src = src;
+    if (modalTitle) modalTitle.innerText = title;
+    if (modal) modal.classList.remove('hidden');
+};
+
 window.capturePackagePhoto = function(sourceImage = null) {
     const videoElement = document.getElementById('liveVideoFeed');
     if (!sourceImage && (!isCameraActive || !videoElement || videoElement.readyState < 2)) {
@@ -1540,20 +1653,18 @@ window.capturePackagePhoto = function(sourceImage = null) {
             sourceImage: sourceImage
         });
 
-        capturedPackagePhoto = dataUrl;
+        const pkgCount = capturedPhotosList.filter(p => p.type === 'package').length + 1;
+        const photoItem = {
+            id: 'pkg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+            type: 'package',
+            title: `Foto Paket #${pkgCount} (${inv})`,
+            dataUrl: dataUrl,
+            createdAt: getNowFormattedWIB()
+        };
+        capturedPhotosList.push(photoItem);
+        renderPhotosGallery();
 
-        // Update UI Box Paket
-        const imgEl = document.getElementById('imgPackagePhoto');
-        const emptyEl = document.getElementById('previewPackagePhotoEmpty');
-        const filledEl = document.getElementById('previewPackagePhotoFilled');
-        const badgeEl = document.getElementById('badgePackagePhoto');
-
-        if (imgEl) imgEl.src = dataUrl;
-        if (emptyEl) emptyEl.classList.add('hidden');
-        if (filledEl) filledEl.classList.remove('hidden');
-        if (badgeEl) badgeEl.classList.remove('hidden');
-
-        showToast('success', 'Foto Paket dengan watermark berhasil diambil! [Tuts F2]', 'Foto Paket Siap');
+        showToast('success', `Foto Paket #${pkgCount} berhasil disimpan! [Tuts F2]`, 'Foto Paket Siap');
     } catch (err) {
         console.error("capturePackagePhoto error:", err);
         showToast('error', 'Gagal mengambil foto paket: ' + err.message, 'Gagal Foto');
@@ -1578,7 +1689,6 @@ window.captureProductPhoto = function(sourceImage = null) {
         const opName = (displayOp && displayOp.innerText.trim()) ? displayOp.innerText.trim() : 'Gudang 01';
         const inv = activeInvoice || document.getElementById('inputInvoice')?.value?.trim() || 'MENUNGGU_SCAN';
 
-        // Ambil elemen form input secara aman
         const batchEl = document.getElementById('inputBatch');
         const expEl = document.getElementById('inputExpDate');
         const typeEl = document.getElementById('inputType');
@@ -1620,23 +1730,55 @@ window.captureProductPhoto = function(sourceImage = null) {
             sourceImage: sourceImage
         });
 
-        capturedProductPhoto = dataUrl;
+        const prodCount = capturedPhotosList.filter(p => p.type === 'product').length + 1;
+        const photoItem = {
+            id: 'prod_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+            type: 'product',
+            title: `Foto Produk #${prodCount} (${pName})`,
+            dataUrl: dataUrl,
+            createdAt: getNowFormattedWIB()
+        };
+        capturedPhotosList.push(photoItem);
+        renderPhotosGallery();
 
-        // Update UI Box Produk
-        const imgEl = document.getElementById('imgProductPhoto');
-        const emptyEl = document.getElementById('previewProductPhotoEmpty');
-        const filledEl = document.getElementById('previewProductPhotoFilled');
-        const badgeEl = document.getElementById('badgeProductPhoto');
-
-        if (imgEl) imgEl.src = dataUrl;
-        if (emptyEl) emptyEl.classList.add('hidden');
-        if (filledEl) filledEl.classList.remove('hidden');
-        if (badgeEl) badgeEl.classList.remove('hidden');
-
-        showToast('success', 'Foto Produk dengan watermark berhasil diambil! [Tuts F4]', 'Foto Produk Siap');
+        showToast('success', `Foto Produk #${prodCount} berhasil disimpan! [Tuts F4]`, 'Foto Produk Siap');
     } catch (err) {
         console.error("captureProductPhoto error:", err);
         showToast('error', 'Gagal mengambil foto produk: ' + err.message, 'Gagal Foto');
+    }
+};
+
+window.handlePhotosMultipleUpload = async function(inputElement) {
+    if (!inputElement || !inputElement.files || inputElement.files.length === 0) return;
+    const files = Array.from(inputElement.files);
+    
+    showGlobalLoading('Memproses Foto...', `Sedang menambahkan ${files.length} foto dengan watermark...`);
+    try {
+        for (const file of files) {
+            await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        // Tentukan otomatis apakah foto paket atau produk (default paket jika belum ada foto, atau produk jika sudah scan barcode)
+                        const hasProduct = Boolean(currentDetectedProduct || (scannedProductsList && scannedProductsList.length > 0));
+                        if (hasProduct && capturedPhotosList.filter(p => p.type === 'package').length > 0) {
+                            captureProductPhoto(img);
+                        } else {
+                            capturePackagePhoto(img);
+                        }
+                        resolve();
+                    };
+                    img.onerror = () => resolve();
+                    img.src = e.target.result;
+                };
+                reader.onerror = () => resolve();
+                reader.readAsDataURL(file);
+            });
+        }
+    } finally {
+        hideGlobalLoading();
+        inputElement.value = '';
     }
 };
 
@@ -1660,40 +1802,19 @@ window.handlePhotoUpload = function(target, inputElement) {
 };
 
 window.clearPackagePhoto = function() {
-    capturedPackagePhoto = null;
-    const imgEl = document.getElementById('imgPackagePhoto');
-    const emptyEl = document.getElementById('previewPackagePhotoEmpty');
-    const filledEl = document.getElementById('previewPackagePhotoFilled');
-    const badgeEl = document.getElementById('badgePackagePhoto');
-
-    if (imgEl) imgEl.src = '';
-    if (emptyEl) emptyEl.classList.remove('hidden');
-    if (filledEl) filledEl.classList.add('hidden');
-    if (badgeEl) badgeEl.classList.add('hidden');
+    capturedPhotosList = capturedPhotosList.filter(p => p.type !== 'package');
+    renderPhotosGallery();
 };
 
 window.clearProductPhoto = function() {
-    capturedProductPhoto = null;
-    const imgEl = document.getElementById('imgProductPhoto');
-    const emptyEl = document.getElementById('previewProductPhotoEmpty');
-    const filledEl = document.getElementById('previewProductPhotoFilled');
-    const badgeEl = document.getElementById('badgeProductPhoto');
-
-    if (imgEl) imgEl.src = '';
-    if (emptyEl) emptyEl.classList.remove('hidden');
-    if (filledEl) filledEl.classList.add('hidden');
-    if (badgeEl) badgeEl.classList.add('hidden');
+    capturedPhotosList = capturedPhotosList.filter(p => p.type !== 'product');
+    renderPhotosGallery();
 };
 
 window.previewImageModal = function(imgElementId, title = 'Preview Foto Watermark') {
     const srcEl = document.getElementById(imgElementId);
     if (!srcEl || !srcEl.src) return;
-    const modalImg = document.getElementById('photoPreviewModalImg');
-    const modalTitle = document.getElementById('photoPreviewModalTitle');
-    const modal = document.getElementById('photoPreviewModal');
-    if (modalImg) modalImg.src = srcEl.src;
-    if (modalTitle) modalTitle.innerText = title;
-    if (modal) modal.classList.remove('hidden');
+    previewImageDirect(srcEl.src, title);
 };
 
 window.closePhotoPreviewModal = function() {

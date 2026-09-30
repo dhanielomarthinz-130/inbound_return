@@ -117,8 +117,8 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                     </button>
                 </div>
 
-                <!-- Video Viewport Bersih & Responsif (Panjang ke Bawah) -->
-                <div class="relative bg-slate-950 flex justify-center items-center w-full h-[520px] sm:h-[600px] lg:h-[680px] overflow-hidden">
+                <!-- Video Viewport Bersih & Responsif (Tinggi Pas & Ergonomis di Desktop) -->
+                <div class="relative bg-slate-950 flex justify-center items-center w-full h-[220px] sm:h-[260px] lg:h-[280px] overflow-hidden">
                     <video id="liveVideoFeed" autoplay playsinline muted class="w-full h-full object-cover"></video>
                     <!-- Visual Camera Flash Effect -->
                     <div id="cameraFlashOverlay" class="absolute inset-0 bg-white pointer-events-none opacity-0 transition-opacity duration-150 z-20"></div>
@@ -133,111 +133,78 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                 </div>
 
                 <!-- Status Mode Scan & Gun Barcode -->
-                <div class="p-3.5 bg-slate-50 border-t border-slate-200 text-xs flex justify-between items-center text-slate-600">
+                <div class="p-3 bg-slate-50 border-t border-slate-200 text-xs flex justify-between items-center text-slate-600">
                     <span class="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
                         <i class="fa-solid fa-barcode text-indigo-600 text-sm"></i> Barcode Gun Aktif
                     </span>
-                    <span id="scanModeIndicator" class="font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-xl text-[10px] tracking-wide uppercase">
+                    <span id="scanModeIndicator" class="font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-lg text-[10px] tracking-wide uppercase">
                         LANGKAH 1: SCAN INVOICE
                     </span>
                 </div>
             </div>
 
-            <!-- Card Ambil Foto Dokumentasi (Paket & Produk dengan Watermark) -->
+            <!-- Card Ambil Foto Dokumentasi (Multiple Foto Paket & Produk dengan Watermark) -->
             <div class="bg-white rounded-3xl shadow-sm border border-slate-200/90 p-4 space-y-3">
-                <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
                     <div class="flex items-center gap-2">
                         <div class="w-7 h-7 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center font-bold text-xs">
                             <i class="fa-solid fa-camera"></i>
                         </div>
                         <div>
-                            <h3 class="font-bold text-slate-800 text-xs tracking-tight">Foto Unboxing (Watermark)</h3>
-                            <p class="text-[10px] text-slate-400">Jepret foto otomatis dengan watermark</p>
+                            <h3 class="font-bold text-slate-800 text-xs tracking-tight">Foto Bukti Unboxing</h3>
+                            <p class="text-[10px] text-slate-400">Bisa jepret lebih dari 1 foto (Paket & Produk)</p>
                         </div>
                     </div>
-                    <span class="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-lg flex items-center gap-1">
-                        <i class="fa-regular fa-keyboard"></i> F2 & F4
-                    </span>
+                    <div class="flex items-center gap-1.5">
+                        <span id="badgeTotalPhotos" class="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-lg">
+                            0 Foto
+                        </span>
+                        <button type="button" onclick="clearAllPhotos()" id="btnClearAllPhotos" title="Hapus semua foto" class="hidden text-[10px] text-rose-600 hover:text-rose-700 font-bold bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-lg transition flex items-center gap-1">
+                            <i class="fa-solid fa-trash-can"></i> Reset
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Input File Fallback Tersembunyi (jika kamera offline atau ingin upload file langsung) -->
-                <input type="file" id="filePackagePhoto" accept="image/*" class="hidden" onchange="handlePhotoUpload('package', this)">
-                <input type="file" id="fileProductPhoto" accept="image/*" class="hidden" onchange="handlePhotoUpload('product', this)">
+                <!-- Input File Multiple Fallback Tersembunyi -->
+                <input type="file" id="filePhotosUpload" accept="image/*" multiple class="hidden" onchange="handlePhotosMultipleUpload(this)">
 
                 <!-- Tombol Shortcut Tuts Keyboard -->
                 <div class="grid grid-cols-2 gap-2">
                     <button id="btnCapturePackagePhoto" onclick="capturePackagePhoto()" type="button" 
-                        class="flex items-center justify-center gap-2 py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-2xl font-bold text-xs transition shadow-sm shadow-indigo-600/25">
+                        class="flex items-center justify-center gap-2 py-2 px-3 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-2xl font-bold text-xs transition shadow-sm shadow-indigo-600/25">
                         <i class="fa-solid fa-box text-sm"></i>
                         <div class="text-left leading-tight">
                             <span class="block text-[10px] opacity-80 font-mono font-black">TUTS [F2]</span>
-                            <span>Foto Paket</span>
+                            <span>+ Foto Paket</span>
                         </div>
                     </button>
 
                     <button id="btnCaptureProductPhoto" onclick="captureProductPhoto()" type="button" 
-                        class="flex items-center justify-center gap-2 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-2xl font-bold text-xs transition shadow-sm shadow-emerald-600/25">
+                        class="flex items-center justify-center gap-2 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-2xl font-bold text-xs transition shadow-sm shadow-emerald-600/25">
                         <i class="fa-solid fa-tag text-sm"></i>
                         <div class="text-left leading-tight">
                             <span class="block text-[10px] opacity-80 font-mono font-black">TUTS [F4]</span>
-                            <span>Foto Produk</span>
+                            <span>+ Foto Produk</span>
                         </div>
                     </button>
                 </div>
 
-                <!-- Preview Foto yang Diambil -->
-                <div class="grid grid-cols-2 gap-2 pt-1">
-                    <!-- Box Foto Paket -->
-                    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-2.5 relative overflow-hidden flex flex-col justify-between min-h-[115px]">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="text-[10px] font-bold text-slate-700 flex items-center gap-1">
-                                <i class="fa-solid fa-box text-indigo-500"></i> Paket
-                            </span>
-                            <div class="flex items-center gap-1">
-                                <button type="button" onclick="document.getElementById('filePackagePhoto').click()" title="Pilih foto paket dari file / galeri" class="text-[10px] text-slate-400 hover:text-indigo-600 p-0.5 rounded transition">
-                                    <i class="fa-solid fa-upload"></i>
-                                </button>
-                                <span id="badgePackagePhoto" class="hidden text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">SIAP</span>
-                            </div>
-                        </div>
-                        <div id="previewPackagePhotoEmpty" class="flex-1 flex flex-col items-center justify-center text-center py-2 text-slate-300">
-                            <i class="fa-regular fa-image text-2xl mb-1 text-slate-300"></i>
-                            <span class="text-[10px] text-slate-400 font-medium">Tekan F2</span>
-                        </div>
-                        <div id="previewPackagePhotoFilled" class="hidden relative group rounded-xl overflow-hidden aspect-video bg-black flex items-center justify-center">
-                            <img id="imgPackagePhoto" src="" alt="Foto Paket" class="w-full h-full object-cover">
-                            <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5">
-                                <button type="button" onclick="previewImageModal('imgPackagePhoto', 'Foto Paket Unboxing')" title="Lihat Foto Full" class="p-1.5 bg-white/90 text-slate-800 rounded-lg text-xs hover:bg-white"><i class="fa-solid fa-expand"></i></button>
-                                <button type="button" onclick="clearPackagePhoto()" title="Hapus / Foto Ulang" class="p-1.5 bg-rose-600 text-white rounded-lg text-xs hover:bg-rose-700"><i class="fa-solid fa-trash"></i></button>
-                            </div>
-                        </div>
-                    </div>
+                <!-- Opsi Tambah dari File & Info -->
+                <div class="flex items-center justify-between text-[11px] px-0.5 text-slate-500">
+                    <span class="text-[10px] text-slate-400">Tekan F2/F4 berulang kali untuk foto lebih dari 1</span>
+                    <button type="button" onclick="document.getElementById('filePhotosUpload').click()" title="Unggah foto dari galeri / komputer" class="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 hover:underline">
+                        <i class="fa-solid fa-upload"></i> Upload File
+                    </button>
+                </div>
 
-                    <!-- Box Foto Produk -->
-                    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-2.5 relative overflow-hidden flex flex-col justify-between min-h-[115px]">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="text-[10px] font-bold text-slate-700 flex items-center gap-1">
-                                <i class="fa-solid fa-tag text-emerald-500"></i> Produk
-                            </span>
-                            <div class="flex items-center gap-1">
-                                <button type="button" onclick="document.getElementById('fileProductPhoto').click()" title="Pilih foto produk dari file / galeri" class="text-[10px] text-slate-400 hover:text-emerald-600 p-0.5 rounded transition">
-                                    <i class="fa-solid fa-upload"></i>
-                                </button>
-                                <span id="badgeProductPhoto" class="hidden text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">SIAP</span>
-                            </div>
-                        </div>
-                        <div id="previewProductPhotoEmpty" class="flex-1 flex flex-col items-center justify-center text-center py-2 text-slate-300">
-                            <i class="fa-regular fa-image text-2xl mb-1 text-slate-300"></i>
-                            <span class="text-[10px] text-slate-400 font-medium">Tekan F4</span>
-                        </div>
-                        <div id="previewProductPhotoFilled" class="hidden relative group rounded-xl overflow-hidden aspect-video bg-black flex items-center justify-center">
-                            <img id="imgProductPhoto" src="" alt="Foto Produk" class="w-full h-full object-cover">
-                            <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5">
-                                <button type="button" onclick="previewImageModal('imgProductPhoto', 'Foto Produk Unboxing')" title="Lihat Foto Full" class="p-1.5 bg-white/90 text-slate-800 rounded-lg text-xs hover:bg-white"><i class="fa-solid fa-expand"></i></button>
-                                <button type="button" onclick="clearProductPhoto()" title="Hapus / Foto Ulang" class="p-1.5 bg-rose-600 text-white rounded-lg text-xs hover:bg-rose-700"><i class="fa-solid fa-trash"></i></button>
-                            </div>
-                        </div>
+                <!-- Galeri Daftar Foto yang Sudah Diambil -->
+                <div id="photosGalleryContainer" class="pt-0.5">
+                    <div id="photosEmptyState" class="bg-slate-50 border border-slate-200/90 rounded-2xl p-3.5 text-center text-slate-400 flex flex-col items-center justify-center min-h-[85px]">
+                        <i class="fa-regular fa-images text-xl text-slate-300 mb-1"></i>
+                        <span class="text-[11px] font-medium text-slate-500">Belum ada foto yang diambil</span>
+                        <span class="text-[9px] text-slate-400 mt-0.5">Tekan [F2] untuk Paket &bull; Tekan [F4] untuk Produk</span>
                     </div>
+                    <div id="photosGridList" class="hidden grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[190px] overflow-y-auto p-0.5"></div>
                 </div>
             </div>
 

@@ -61,35 +61,69 @@ function saveBase64Image($base64Data, $dir, $prefix) {
 
 $cleanInv = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $invoiceNumber);
 
-// Simpan Foto Paket Unboxing jika ada
-$packagePhoto = trim($body['package_photo'] ?? '');
-if (!empty($packagePhoto) && strpos($packagePhoto, 'data:image') === 0) {
-    $packagePhoto = saveBase64Image($packagePhoto, __DIR__ . '/../uploads/photos', 'pkg_' . $cleanInv);
-}
-
-// Simpan Foto Produk Unboxing jika ada
-$productPhoto = trim($body['product_photo'] ?? '');
-if (!empty($productPhoto) && strpos($productPhoto, 'data:image') === 0) {
-    $productPhoto = saveBase64Image($productPhoto, __DIR__ . '/../uploads/photos', 'prod_' . $cleanInv);
-}
-
-// Simpan array foto unboxing tambahan jika ada
+// 1. Simpan semua foto unboxing (bisa multiple photos)
 $photosArr = [];
-if (!empty($packagePhoto)) $photosArr[] = ['type' => 'package', 'path' => $packagePhoto];
-if (!empty($productPhoto)) $photosArr[] = ['type' => 'product', 'path' => $productPhoto];
+$packagePhoto = '';
+$productPhoto = '';
+
 if (!empty($body['photos']) && is_array($body['photos'])) {
-    foreach ($body['photos'] as $idx => $extraP) {
-        $pStr = is_array($extraP) ? ($extraP['data'] ?? $extraP['path'] ?? '') : $extraP;
+    foreach ($body['photos'] as $idx => $itemP) {
+        $pStr = is_array($itemP) ? ($itemP['data'] ?? $itemP['path'] ?? '') : $itemP;
+        $pType = is_array($itemP) ? ($itemP['type'] ?? 'product') : 'product';
+        $pTitle = is_array($itemP) ? ($itemP['title'] ?? '') : '';
+        
+        $savedPath = '';
         if (strpos($pStr, 'data:image') === 0) {
-            $savedP = saveBase64Image($pStr, __DIR__ . '/../uploads/photos', 'extra_' . $cleanInv . "_{$idx}");
-            if ($savedP) {
-                $photosArr[] = ['type' => ($extraP['type'] ?? 'extra'), 'path' => $savedP];
-            }
+            $prefix = ($pType === 'package' ? 'pkg_' : 'prod_') . $cleanInv . "_{$idx}";
+            $savedPath = saveBase64Image($pStr, __DIR__ . '/../uploads/photos', $prefix);
         } elseif (!empty($pStr) && is_string($pStr)) {
-            $photosArr[] = ['type' => ($extraP['type'] ?? 'extra'), 'path' => $pStr];
+            $savedPath = $pStr;
+        }
+
+        if (!empty($savedPath)) {
+            $photosArr[] = [
+                'type' => $pType,
+                'path' => $savedPath,
+                'title' => $pTitle
+            ];
+            if ($pType === 'package' && empty($packagePhoto)) {
+                $packagePhoto = $savedPath;
+            } elseif ($pType === 'product' && empty($productPhoto)) {
+                $productPhoto = $savedPath;
+            }
         }
     }
 }
+
+// Fallback jika dikirim via package_photo & product_photo tunggal (legacy / direct)
+if (empty($packagePhoto) && !empty($body['package_photo'])) {
+    $rawPkg = trim($body['package_photo']);
+    if (strpos($rawPkg, 'data:image') === 0) {
+        $packagePhoto = saveBase64Image($rawPkg, __DIR__ . '/../uploads/photos', 'pkg_' . $cleanInv);
+    } else {
+        $packagePhoto = $rawPkg;
+    }
+    if (!empty($packagePhoto)) {
+        $found = false;
+        foreach ($photosArr as $p) { if ($p['path'] === $packagePhoto) { $found = true; break; } }
+        if (!$found) $photosArr[] = ['type' => 'package', 'path' => $packagePhoto];
+    }
+}
+
+if (empty($productPhoto) && !empty($body['product_photo'])) {
+    $rawProd = trim($body['product_photo']);
+    if (strpos($rawProd, 'data:image') === 0) {
+        $productPhoto = saveBase64Image($rawProd, __DIR__ . '/../uploads/photos', 'prod_' . $cleanInv);
+    } else {
+        $productPhoto = $rawProd;
+    }
+    if (!empty($productPhoto)) {
+        $found = false;
+        foreach ($photosArr as $p) { if ($p['path'] === $productPhoto) { $found = true; break; } }
+        if (!$found) $photosArr[] = ['type' => 'product', 'path' => $productPhoto];
+    }
+}
+
 $photosJson = count($photosArr) > 0 ? json_encode($photosArr, JSON_UNESCAPED_SLASHES) : null;
 
 // 2. Cek apakah ada file video yang di-upload via $_FILES
