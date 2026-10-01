@@ -550,28 +550,36 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 </span>
                                 <div>
                                     <h3 class="font-bold text-base text-slate-800">Pusat Klaim & Banding Ekspedisi</h3>
+                                    <p class="text-[11px] text-slate-500">Cross-reference bukti unboxing, resi & data order OCS lengkap</p>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Form Pencarian Resi / Order -->
-                        <form id="formClaimLookup" onsubmit="executeClaimLookup(event)" class="w-full lg:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                            <div class="relative flex-1 sm:w-80">
-                                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs">
-                                    <i class="fa-solid fa-magnifying-glass"></i>
-                                </span>
-                                <input type="text" id="claimSearchInput" placeholder="Masukkan / scan No. Resi atau No. Pesanan (Order ID)..." required
-                                    class="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 transition shadow-2xs">
-                                <span class="text-[10px] text-slate-400 mt-1.5 block leading-tight">
-                                    <i class="fa-solid fa-barcode text-amber-500 mr-1"></i>
-                                    Dapat scan <b>Barcode Resi Atas</b> (SPXID...) atau <b>Barcode No. Pesanan Tengah</b> (contoh: 261001F8TF1NF4).
-                                </span>
-                            </div>
-                            <button type="submit" id="btnClaimSearch" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm shadow-amber-500/20 shrink-0 self-start">
-                                <i class="fa-solid fa-search"></i>
-                                <span>Cari Bukti</span>
+                        <!-- Form Pencarian Resi / Order & Tombol Sync -->
+                        <div class="w-full lg:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <form id="formClaimLookup" onsubmit="executeClaimLookup(event)" class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                <div class="relative flex-1 sm:w-80">
+                                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs">
+                                        <i class="fa-solid fa-magnifying-glass"></i>
+                                    </span>
+                                    <input type="text" id="claimSearchInput" placeholder="Masukkan / scan No. Resi atau No. Pesanan (Order ID)..." required
+                                        class="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 transition shadow-2xs">
+                                    <span class="text-[10px] text-slate-400 mt-1.5 block leading-tight">
+                                        <i class="fa-solid fa-barcode text-amber-500 mr-1"></i>
+                                        Scan <b>Barcode Resi Atas</b> (SPXID...) atau <b>No. Pesanan Tengah</b> (261001F8TF1NF4).
+                                    </span>
+                                </div>
+                                <button type="submit" id="btnClaimSearch" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm shadow-amber-500/20 shrink-0 self-start">
+                                    <i class="fa-solid fa-search"></i>
+                                    <span>Cari Bukti</span>
+                                </button>
+                            </form>
+
+                            <button type="button" onclick="openOcsSyncModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm shadow-indigo-600/20 shrink-0 self-start">
+                                <i class="fa-solid fa-cloud-arrow-down text-sm"></i>
+                                <span>Sync Orders OCS</span>
                             </button>
-                        </form>
+                        </div>
                     </div>
                 </div>
 
@@ -1792,6 +1800,118 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                         <i class="fa-solid fa-floppy-disk"></i> Simpan & Hubungkan
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL SINKRONISASI ORDERS OCS (LENGKAP RESI, INVOICE, SKU, BIAYA & TOTAL KLAIM) -->
+    <div id="modalOcsSync" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-5 animate-in fade-in zoom-in duration-200">
+            <!-- Header Modal -->
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div class="flex items-center gap-3">
+                    <span class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg font-bold shadow-sm shadow-indigo-600/10">
+                        <i class="fa-solid fa-cloud-arrow-down"></i>
+                    </span>
+                    <div>
+                        <h3 class="font-black text-slate-800 text-base">Sinkronisasi Orders OCS</h3>
+                        <p class="text-[11px] text-slate-500">Sync No. Resi, Invoice, SKU & Biaya Klaim dari OCS IEG System</p>
+                    </div>
+                </div>
+                <button onclick="closeOcsSyncModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            <!-- Form Pilihan Rentang Waktu -->
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-2">Pilih Periode Sinkronisasi:</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <label class="cursor-pointer border-2 border-indigo-600 bg-indigo-50/50 rounded-2xl p-3 flex flex-col justify-between transition hover:border-indigo-600" id="labelSyncYesterday">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs font-black text-indigo-900">Hari Kemarin</span>
+                                <input type="radio" name="syncPeriodType" value="yesterday" checked onchange="toggleSyncDateInput()" class="text-indigo-600 focus:ring-indigo-500">
+                            </div>
+                            <span class="text-[10px] text-indigo-700 font-semibold leading-tight">00:00:00 s/d 23:59:59 WIB (Rekomendasi Klaim)</span>
+                        </label>
+
+                        <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-2xl p-3 flex flex-col justify-between transition hover:border-slate-300" id="labelSyncToday">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs font-bold text-slate-800">Hari Ini</span>
+                                <input type="radio" name="syncPeriodType" value="today" onchange="toggleSyncDateInput()" class="text-indigo-600 focus:ring-indigo-500">
+                            </div>
+                            <span class="text-[10px] text-slate-500 leading-tight">00:00 s/d Sekarang</span>
+                        </label>
+
+                        <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-2xl p-3 flex flex-col justify-between transition hover:border-slate-300" id="labelSyncCustom">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs font-bold text-slate-800">Pilih Tanggal</span>
+                                <input type="radio" name="syncPeriodType" value="custom" onchange="toggleSyncDateInput()" class="text-indigo-600 focus:ring-indigo-500">
+                            </div>
+                            <span class="text-[10px] text-slate-500 leading-tight">Tanggal Tertentu</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Input Tanggal Tertentu (Hidden by default) -->
+                <div id="syncCustomDateContainer" class="hidden">
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Tentukan Tanggal (WIB):</label>
+                    <input type="date" id="syncCustomDateInput" value="<?= date('Y-m-d', strtotime('-1 day')) ?>" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <!-- Info Box Kebutuhan Klaim -->
+                <div class="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-3 text-[11px] text-amber-800 flex items-start gap-2.5">
+                    <i class="fa-solid fa-circle-info text-amber-600 text-sm mt-0.5 shrink-0"></i>
+                    <div>
+                        <span class="font-bold">Informasi Klaim yang Disinkron:</span>
+                        <ul class="list-disc list-inside mt-0.5 text-[10px] text-amber-700 space-y-0.5">
+                            <li>Nomor Resi & Nomor Invoice lengkap dengan platform (Shopee, TikTok, Lazada, dll)</li>
+                            <li>Rincian SKU item, kuantiti, harga satuan, dan diskon per produk</li>
+                            <li>Biaya ongkir, biaya layanan (service fee), dan total tuntutan klaim</li>
+                            <li>Nama & nomor telepon pembeli untuk bukti banding</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Status & Hasil Sinkronisasi -->
+                <div id="syncProgressContainer" class="hidden bg-slate-900 text-white rounded-2xl p-4 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <span id="syncProgressTitle" class="text-xs font-bold text-indigo-300 flex items-center gap-2">
+                            <i class="fa-solid fa-circle-notch fa-spin"></i> Sedang Menghubungkan ke OCS IEG...
+                        </span>
+                        <span id="syncProgressBadge" class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 font-mono">PROSES</span>
+                    </div>
+                    <div id="syncProgressDetail" class="text-[11px] text-slate-300 font-mono">
+                        Menyiapkan kueri data order...
+                    </div>
+                    <!-- Statistik ringkas -->
+                    <div id="syncStatsBox" class="hidden grid grid-cols-3 gap-2 pt-2 border-t border-white/10 text-center">
+                        <div class="bg-white/5 rounded-xl p-2">
+                            <span class="block text-[10px] text-slate-400">Total Orders</span>
+                            <span id="statTotalOrders" class="text-sm font-black text-white">0</span>
+                        </div>
+                        <div class="bg-white/5 rounded-xl p-2">
+                            <span class="block text-[10px] text-slate-400">Dengan Resi</span>
+                            <span id="statWithResi" class="text-sm font-black text-emerald-400">0</span>
+                        </div>
+                        <div class="bg-white/5 rounded-xl p-2">
+                            <span class="block text-[10px] text-slate-400">Total Klaim</span>
+                            <span id="statTotalClaim" class="text-xs font-black text-amber-400 truncate">Rp 0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Action Buttons -->
+            <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                <button type="button" onclick="closeOcsSyncModal()" id="btnCancelOcsSync" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-xs transition">
+                    Tutup
+                </button>
+                <button type="button" onclick="executeOcsOrderSync()" id="btnStartOcsSync" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center gap-2 transition shadow-sm shadow-indigo-600/20">
+                    <i class="fa-solid fa-play"></i>
+                    <span>Mulai Sinkronisasi Sekarang</span>
+                </button>
             </div>
         </div>
     </div>

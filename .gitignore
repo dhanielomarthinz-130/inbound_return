@@ -22,4 +22,5 @@ uploads/reception/*.jpg
 uploads/reception/*.jpeg
 uploads/reception/*.png
 uploads/cache/
+uploads/logs/
 uploads/.db_ready

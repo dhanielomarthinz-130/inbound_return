@@ -3120,4 +3120,158 @@ setTimeout(() => {
     setInterval(triggerBackgroundCloudSync, 45000);
 }, 5000);
 
+// -------------------------------------------------------------
+// SINKRONISASI ORDERS OCS (RESI, INVOICE, SKU, BIAYA, KLAIM)
+// -------------------------------------------------------------
+window.openOcsSyncModal = function() {
+    const modal = document.getElementById('modalOcsSync');
+    if (modal) {
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+};
+
+window.closeOcsSyncModal = function() {
+    const modal = document.getElementById('modalOcsSync');
+    if (modal) {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+};
+
+window.toggleSyncDateInput = function() {
+    const radios = document.getElementsByName('syncPeriodType');
+    let selected = 'yesterday';
+    for (const r of radios) {
+        if (r.checked) selected = r.value;
+    }
+
+    const customContainer = document.getElementById('syncCustomDateContainer');
+    const labelYesterday = document.getElementById('labelSyncYesterday');
+    const labelToday = document.getElementById('labelSyncToday');
+    const labelCustom = document.getElementById('labelSyncCustom');
+
+    [labelYesterday, labelToday, labelCustom].forEach(l => {
+        if (l) {
+            l.classList.remove('border-indigo-600', 'bg-indigo-50/50');
+            l.classList.add('border-slate-200', 'bg-white');
+        }
+    });
+
+    if (selected === 'yesterday' && labelYesterday) {
+        labelYesterday.classList.add('border-indigo-600', 'bg-indigo-50/50');
+        labelYesterday.classList.remove('border-slate-200', 'bg-white');
+        if (customContainer) customContainer.classList.add('hidden');
+    } else if (selected === 'today' && labelToday) {
+        labelToday.classList.add('border-indigo-600', 'bg-indigo-50/50');
+        labelToday.classList.remove('border-slate-200', 'bg-white');
+        if (customContainer) customContainer.classList.add('hidden');
+    } else if (selected === 'custom' && labelCustom) {
+        labelCustom.classList.add('border-indigo-600', 'bg-indigo-50/50');
+        labelCustom.classList.remove('border-slate-200', 'bg-white');
+        if (customContainer) customContainer.classList.remove('hidden');
+    }
+};
+
+window.executeOcsOrderSync = async function() {
+    const btnStart = document.getElementById('btnStartOcsSync');
+    const btnCancel = document.getElementById('btnCancelOcsSync');
+    const progressContainer = document.getElementById('syncProgressContainer');
+    const progressTitle = document.getElementById('syncProgressTitle');
+    const progressBadge = document.getElementById('syncProgressBadge');
+    const progressDetail = document.getElementById('syncProgressDetail');
+    const statsBox = document.getElementById('syncStatsBox');
+    const statTotalOrders = document.getElementById('statTotalOrders');
+    const statWithResi = document.getElementById('statWithResi');
+    const statTotalClaim = document.getElementById('statTotalClaim');
+
+    const radios = document.getElementsByName('syncPeriodType');
+    let selected = 'yesterday';
+    for (const r of radios) {
+        if (r.checked) selected = r.value;
+    }
+
+    let dateParam = selected;
+    if (selected === 'custom') {
+        const customDateInput = document.getElementById('syncCustomDateInput');
+        dateParam = customDateInput ? customDateInput.value : '';
+        if (!dateParam) {
+            showToast('warning', 'Harap pilih tanggal sinkronisasi terlebih dahulu.', 'Peringatan');
+            return;
+        }
+    }
+
+    // Tampilkan progress UI
+    if (progressContainer) progressContainer.classList.remove('hidden');
+    if (statsBox) statsBox.classList.add('hidden');
+    if (progressBadge) {
+        progressBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 font-mono';
+        progressBadge.innerText = 'PROSES';
+    }
+    if (progressTitle) {
+        progressTitle.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin text-indigo-400"></i> Sinkronisasi Orders Sedang Berjalan...`;
+    }
+    if (progressDetail) {
+        progressDetail.innerText = `Menghubungkan ke OCS IEG System untuk mengambil data orders ${selected === 'yesterday' ? 'hari kemarin (00:00 - 23:59 WIB)' : (selected === 'today' ? 'hari ini' : dateParam)}...`;
+    }
+
+    if (btnStart) {
+        btnStart.disabled = true;
+        btnStart.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Menyinkron...`;
+        btnStart.classList.add('opacity-60', 'cursor-not-allowed');
+    }
+    if (btnCancel) btnCancel.disabled = true;
+
+    try {
+        const response = await fetch(`api/sync_ocs_orders.php?date=${encodeURIComponent(dateParam)}`);
+        const result = await response.json();
+
+        if (result && result.success) {
+            if (progressTitle) {
+                progressTitle.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> Sinkronisasi Berhasil Selesai!`;
+            }
+            if (progressBadge) {
+                progressBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-300 font-mono';
+                progressBadge.innerText = 'SELESAI';
+            }
+            if (progressDetail) {
+                progressDetail.innerHTML = `Periode: <b>${result.target_date || dateParam}</b> (${result.start_wib} s/d ${result.end_wib})<br>Semua invoice, resi, detail item SKU & biaya klaim telah tersimpan ke sistem.`;
+            }
+
+            if (statsBox) statsBox.classList.remove('hidden');
+            if (statTotalOrders) statTotalOrders.innerText = (result.total_synced || result.total_orders_found || 0).toLocaleString('id-ID');
+            if (statWithResi) statWithResi.innerText = (result.total_with_resi || 0).toLocaleString('id-ID');
+            if (statTotalClaim) statTotalClaim.innerText = result.total_claim_amount_fmt || `Rp ${(result.total_claim_amount || 0).toLocaleString('id-ID')}`;
+
+            showToast('success', `Berhasil menyinkron ${result.total_synced || 0} orders dengan total nilai klaim ${result.total_claim_amount_fmt || 'Rp 0'}!`, 'Sinkronisasi Selesai');
+
+            // Refresh kandidat klaim jika fungsi tersedia
+            if (typeof loadClaimCandidates === 'function') {
+                loadClaimCandidates(true);
+            }
+        } else {
+            throw new Error(result.error || result.message || 'Gagal menyinkron data orders dari OCS');
+        }
+    } catch (err) {
+        if (progressTitle) {
+            progressTitle.innerHTML = `<i class="fa-solid fa-circle-xmark text-rose-400"></i> Gagal Menyinkron Orders`;
+        }
+        if (progressBadge) {
+            progressBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-rose-500/30 text-rose-300 font-mono';
+            progressBadge.innerText = 'ERROR';
+        }
+        if (progressDetail) {
+            progressDetail.innerText = err.message;
+        }
+        showToast('error', err.message, 'Gagal Sinkronisasi');
+    } finally {
+        if (btnStart) {
+            btnStart.disabled = false;
+            btnStart.innerHTML = `<i class="fa-solid fa-rotate"></i> Sinkron Ulang`;
+            btnStart.classList.remove('opacity-60', 'cursor-not-allowed');
+        }
+        if (btnCancel) btnCancel.disabled = false;
+    }
+};
+
 

@@ -204,29 +204,59 @@ try {
                 `shop_name` VARCHAR(100) NULL,
                 `shipping_provider` VARCHAR(150) NULL,
                 `status_code` INT NULL,
+                `status_name` VARCHAR(100) NULL,
                 `product_name` TEXT NULL,
+                `seller_sku` VARCHAR(150) NULL,
                 `total_qty` INT DEFAULT 1,
                 `package_price` DECIMAL(15,2) DEFAULT 0.00,
+                `original_price` DECIMAL(15,2) DEFAULT 0.00,
+                `seller_discount` DECIMAL(15,2) DEFAULT 0.00,
+                `platform_discount` DECIMAL(15,2) DEFAULT 0.00,
+                `shipping_fee` DECIMAL(15,2) DEFAULT 0.00,
+                `service_fee` DECIMAL(15,2) DEFAULT 0.00,
+                `subtotal` DECIMAL(15,2) DEFAULT 0.00,
+                `total_amount` DECIMAL(15,2) DEFAULT 0.00,
                 `gmv` DECIMAL(15,2) DEFAULT 0.00,
                 `nmv` DECIMAL(15,2) DEFAULT 0.00,
+                `customer_name` VARCHAR(150) NULL,
+                `customer_phone` VARCHAR(100) NULL,
+                `customer_address` TEXT NULL,
+                `order_items_json` LONGTEXT NULL,
                 `has_packing_video` TINYINT(1) DEFAULT 0,
                 `packing_video_url` VARCHAR(255) NULL,
                 `order_created_at` VARCHAR(50) NULL,
                 `raw_payload` LONGTEXT NULL,
+                `is_synced_to_local` TINYINT(1) DEFAULT 0,
                 `synced_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 INDEX idx_ocs_order_id (`order_id`),
                 INDEX idx_ocs_tracking (`tracking_number`),
                 INDEX idx_ocs_platform (`commerce_platform`),
-                INDEX idx_ocs_shop (`shop_name`)
+                INDEX idx_ocs_shop (`shop_name`),
+                INDEX idx_ocs_created (`order_created_at`),
+                INDEX idx_ocs_sync_local (`is_synced_to_local`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
 
         // Auto-patch kolom jika sebelumnya belum ada
         try {
             $colsOcs = $pdo->query("SHOW COLUMNS FROM ocs_orders")->fetchAll(PDO::FETCH_COLUMN);
+            if (!in_array('status_name', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN status_name VARCHAR(100) NULL AFTER status_code");
+            if (!in_array('seller_sku', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN seller_sku VARCHAR(150) NULL AFTER product_name");
             if (!in_array('package_price', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN package_price DECIMAL(15,2) DEFAULT 0.00 AFTER total_qty");
-            if (!in_array('gmv', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN gmv DECIMAL(15,2) DEFAULT 0.00 AFTER package_price");
+            if (!in_array('original_price', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN original_price DECIMAL(15,2) DEFAULT 0.00 AFTER package_price");
+            if (!in_array('seller_discount', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN seller_discount DECIMAL(15,2) DEFAULT 0.00 AFTER original_price");
+            if (!in_array('platform_discount', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN platform_discount DECIMAL(15,2) DEFAULT 0.00 AFTER seller_discount");
+            if (!in_array('shipping_fee', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN shipping_fee DECIMAL(15,2) DEFAULT 0.00 AFTER platform_discount");
+            if (!in_array('service_fee', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN service_fee DECIMAL(15,2) DEFAULT 0.00 AFTER shipping_fee");
+            if (!in_array('subtotal', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN subtotal DECIMAL(15,2) DEFAULT 0.00 AFTER service_fee");
+            if (!in_array('total_amount', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN total_amount DECIMAL(15,2) DEFAULT 0.00 AFTER subtotal");
+            if (!in_array('gmv', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN gmv DECIMAL(15,2) DEFAULT 0.00 AFTER total_amount");
             if (!in_array('nmv', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN nmv DECIMAL(15,2) DEFAULT 0.00 AFTER gmv");
+            if (!in_array('customer_name', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN customer_name VARCHAR(150) NULL AFTER nmv");
+            if (!in_array('customer_phone', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN customer_phone VARCHAR(100) NULL AFTER customer_name");
+            if (!in_array('customer_address', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN customer_address TEXT NULL AFTER customer_phone");
+            if (!in_array('order_items_json', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN order_items_json LONGTEXT NULL AFTER customer_address");
+            if (!in_array('is_synced_to_local', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN is_synced_to_local TINYINT(1) DEFAULT 0 AFTER raw_payload");
 
             $colsRecPkgs = $pdo->query("SHOW COLUMNS FROM reception_packages")->fetchAll(PDO::FETCH_COLUMN);
             if (!in_array('photo_path', $colsRecPkgs)) $pdo->exec("ALTER TABLE reception_packages ADD COLUMN photo_path VARCHAR(255) NULL AFTER package_barcode");

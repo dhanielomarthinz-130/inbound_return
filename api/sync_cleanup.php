@@ -23,7 +23,7 @@ if (empty($authKey) || !hash_equals($secretKey, $authKey)) {
 $rawInput = file_get_contents('php://input');
 $body = json_decode($rawInput, true);
 
-if (empty($body) || (!isset($body['synced_return_session_ids']) && !isset($body['synced_reception_ids']))) {
+if (empty($body) || (!isset($body['synced_return_session_ids']) && !isset($body['synced_reception_ids']) && !isset($body['synced_ocs_order_ids']))) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Payload konfirmasi sync tidak valid.']);
     exit;
@@ -31,10 +31,12 @@ if (empty($body) || (!isset($body['synced_return_session_ids']) && !isset($body[
 
 $returnIds = array_filter(array_map('intval', (array)($body['synced_return_session_ids'] ?? [])));
 $receptionIds = array_filter(array_map('intval', (array)($body['synced_reception_ids'] ?? [])));
+$ocsOrderIds = array_filter(array_map('intval', (array)($body['synced_ocs_order_ids'] ?? [])));
 
 $deletedReturnsCount = 0;
 $deletedReceptionsCount = 0;
 $deletedFilesCount = 0;
+$syncedOrdersCount = 0;
 
 try {
     $pdo->beginTransaction();
@@ -130,6 +132,14 @@ try {
         $deletedReceptionsCount = $stmtDelRec->rowCount();
     }
 
+    // 4. Tandai OCS Orders yang telah berhasil ditarik ke PC Localhost (tidak dihapus agar web tetap memiliki cache)
+    if (!empty($ocsOrderIds)) {
+        $inOcsClause = implode(',', array_fill(0, count($ocsOrderIds), '?'));
+        $stmtOcsClean = $pdo->prepare("UPDATE ocs_orders SET is_synced_to_local = 1 WHERE id IN ($inOcsClause)");
+        $stmtOcsClean->execute($ocsOrderIds);
+        $syncedOrdersCount = $stmtOcsClean->rowCount();
+    }
+
     $pdo->commit();
 
     // Hapus cache metrik dashboard
@@ -147,6 +157,7 @@ try {
         'deleted_returns' => $deletedReturnsCount,
         'deleted_receptions' => $deletedReceptionsCount,
         'deleted_files' => $deletedFilesCount,
+        'marked_synced_orders' => $syncedOrdersCount,
         'timestamp' => date('Y-m-d H:i:s')
     ]);
 

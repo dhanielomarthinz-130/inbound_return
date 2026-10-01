@@ -128,16 +128,25 @@ try {
         }
     }
 
+    // 4. Ambil Data OCS Orders Lengkap untuk Klaim & Cross-Reference Localhost
+    $ordersLimit = 100;
+    $stmtOrders = $pdo->prepare("SELECT * FROM ocs_orders WHERE is_synced_to_local = 0 ORDER BY id ASC LIMIT ?");
+    $stmtOrders->bindValue(1, $ordersLimit, PDO::PARAM_INT);
+    $stmtOrders->execute();
+    $ordersData = $stmtOrders->fetchAll(PDO::FETCH_ASSOC);
+
     echo json_encode([
         'success' => true,
         'server_time' => date('Y-m-d H:i:s'),
         'counts' => [
             'returns' => count($returnsData),
-            'receptions' => count($receptionsData)
+            'receptions' => count($receptionsData),
+            'orders' => count($ordersData)
         ],
         'data' => [
             'returns' => $returnsData,
-            'receptions' => $receptionsData
+            'receptions' => $receptionsData,
+            'orders' => $ordersData
         ]
     ], JSON_UNESCAPED_SLASHES);
 

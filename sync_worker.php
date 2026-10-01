@@ -316,27 +316,121 @@ function executeSyncRound($pdo) {
         }
     }
 
-    // 4. Kirim Konfirmasi Cleanup ke InfinityFree jika ada yang berhasil disimpan
+    // 4. Proses OCS Orders Lengkap untuk Klaim
+    $orders = $data['data']['orders'] ?? [];
+    $syncedOrderIds = [];
+
+    if (!empty($orders)) {
+        $stmtUpsertOrd = $pdo->prepare("
+            INSERT INTO ocs_orders (
+                order_id, tracking_number, platform_id, commerce_platform, 
+                shop_name, shipping_provider, status_code, status_name, product_name, seller_sku,
+                total_qty, package_price, original_price, seller_discount, platform_discount,
+                shipping_fee, service_fee, subtotal, total_amount, gmv, nmv,
+                customer_name, customer_phone, customer_address, order_items_json,
+                has_packing_video, packing_video_url, order_created_at, raw_payload, is_synced_to_local
+            ) VALUES (
+                :order_id, :tracking_number, :platform_id, :commerce_platform, 
+                :shop_name, :shipping_provider, :status_code, :status_name, :product_name, :seller_sku,
+                :total_qty, :package_price, :original_price, :seller_discount, :platform_discount,
+                :shipping_fee, :service_fee, :subtotal, :total_amount, :gmv, :nmv,
+                :customer_name, :customer_phone, :customer_address, :order_items_json,
+                :has_packing_video, :packing_video_url, :order_created_at, :raw_payload, 1
+            )
+            ON DUPLICATE KEY UPDATE 
+                tracking_number   = VALUES(tracking_number),
+                platform_id       = VALUES(platform_id),
+                commerce_platform = VALUES(commerce_platform),
+                shop_name         = VALUES(shop_name),
+                shipping_provider = VALUES(shipping_provider),
+                status_code       = VALUES(status_code),
+                status_name       = VALUES(status_name),
+                product_name      = VALUES(product_name),
+                seller_sku        = VALUES(seller_sku),
+                total_qty         = VALUES(total_qty),
+                package_price     = VALUES(package_price),
+                original_price    = VALUES(original_price),
+                seller_discount   = VALUES(seller_discount),
+                platform_discount = VALUES(platform_discount),
+                shipping_fee      = VALUES(shipping_fee),
+                service_fee       = VALUES(service_fee),
+                subtotal          = VALUES(subtotal),
+                total_amount      = VALUES(total_amount),
+                gmv               = VALUES(gmv),
+                nmv               = VALUES(nmv),
+                customer_name     = VALUES(customer_name),
+                customer_phone    = VALUES(customer_phone),
+                customer_address  = VALUES(customer_address),
+                order_items_json  = VALUES(order_items_json),
+                order_created_at  = VALUES(order_created_at),
+                raw_payload       = VALUES(raw_payload),
+                is_synced_to_local = 1
+        ");
+
+        foreach ($orders as $ord) {
+            if (empty($ord['order_id'])) continue;
+            try {
+                $stmtUpsertOrd->execute([
+                    ':order_id'          => $ord['order_id'],
+                    ':tracking_number'   => $ord['tracking_number'] ?? null,
+                    ':platform_id'       => $ord['platform_id'] ?? null,
+                    ':commerce_platform' => $ord['commerce_platform'] ?? null,
+                    ':shop_name'         => $ord['shop_name'] ?? null,
+                    ':shipping_provider' => $ord['shipping_provider'] ?? null,
+                    ':status_code'       => $ord['status_code'] ?? null,
+                    ':status_name'       => $ord['status_name'] ?? null,
+                    ':product_name'      => $ord['product_name'] ?? null,
+                    ':seller_sku'        => $ord['seller_sku'] ?? null,
+                    ':total_qty'         => (int)($ord['total_qty'] ?? 1),
+                    ':package_price'     => (float)($ord['package_price'] ?? 0),
+                    ':original_price'    => (float)($ord['original_price'] ?? 0),
+                    ':seller_discount'   => (float)($ord['seller_discount'] ?? 0),
+                    ':platform_discount' => (float)($ord['platform_discount'] ?? 0),
+                    ':shipping_fee'      => (float)($ord['shipping_fee'] ?? 0),
+                    ':service_fee'       => (float)($ord['service_fee'] ?? 0),
+                    ':subtotal'          => (float)($ord['subtotal'] ?? 0),
+                    ':total_amount'      => (float)($ord['total_amount'] ?? 0),
+                    ':gmv'               => (float)($ord['gmv'] ?? 0),
+                    ':nmv'               => (float)($ord['nmv'] ?? 0),
+                    ':customer_name'     => $ord['customer_name'] ?? null,
+                    ':customer_phone'    => $ord['customer_phone'] ?? null,
+                    ':customer_address'  => $ord['customer_address'] ?? null,
+                    ':order_items_json'  => $ord['order_items_json'] ?? null,
+                    ':has_packing_video' => (int)($ord['has_packing_video'] ?? 0),
+                    ':packing_video_url' => $ord['packing_video_url'] ?? null,
+                    ':order_created_at'  => $ord['order_created_at'] ?? null,
+                    ':raw_payload'       => $ord['raw_payload'] ?? null
+                ]);
+                $syncedOrderIds[] = (int)$ord['id'];
+            } catch (Exception $eOrd) {
+                writeSyncLog("Error insert OCS Order [{$ord['order_id']}]: " . $eOrd->getMessage());
+            }
+        }
+    }
+
+    // 5. Kirim Konfirmasi Cleanup / Sync Status ke InfinityFree jika ada yang berhasil disimpan
     $cleanupResult = null;
-    if (!empty($syncedReturnIds) || !empty($syncedReceptionIds)) {
+    if (!empty($syncedReturnIds) || !empty($syncedReceptionIds) || !empty($syncedOrderIds)) {
         $cleanupUrl = $cloudUrl . '/api/sync_cleanup.php?key=' . urlencode($secretKey);
         $payload = json_encode([
             'synced_return_session_ids' => $syncedReturnIds,
-            'synced_reception_ids' => $syncedReceptionIds
+            'synced_reception_ids'      => $syncedReceptionIds,
+            'synced_ocs_order_ids'      => $syncedOrderIds
         ]);
 
         $cleanResp = callInfinityFreeApi($cleanupUrl, $payload);
         $cleanupResult = json_decode($cleanResp['body'] ?? '', true);
-        writeSyncLog("Sync Berhasil: " . count($syncedReturnIds) . " return unboxing, " . count($syncedReceptionIds) . " receiving, $downloadedPhotosCount foto terunduh. InfinityFree dibersihkan.");
+        writeSyncLog("Sync Berhasil: " . count($syncedReturnIds) . " return unboxing, " . count($syncedReceptionIds) . " receiving, " . count($syncedOrderIds) . " OCS orders, $downloadedPhotosCount foto terunduh.");
     }
 
     return [
-        'success' => true,
-        'synced_returns' => count($syncedReturnIds),
+        'success'           => true,
+        'synced_returns'    => count($syncedReturnIds),
         'synced_receptions' => count($syncedReceptionIds),
+        'synced_orders'     => count($syncedOrderIds),
         'downloaded_photos' => $downloadedPhotosCount,
-        'cloud_cleaned' => !empty($cleanupResult['success']),
-        'timestamp' => date('Y-m-d H:i:s')
+        'cloud_cleaned'     => !empty($cleanupResult['success']),
+        'timestamp'         => date('Y-m-d H:i:s')
     ];
 }
 
