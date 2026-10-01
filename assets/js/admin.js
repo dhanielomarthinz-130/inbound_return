@@ -2471,10 +2471,20 @@ function renderClaimDossier(data) {
                 eligIcon.className = 'w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 bg-rose-100 text-rose-600';
                 eligIcon.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
             }
-            eligTitle.innerText = '⚠️ PAKET LAYAK KLAIM (Kondisi Bukan Good / Cacat)';
+            eligTitle.innerText = '⚠️ PAKET LAYAK KLAIM (Kondisi Rusak / Cacat)';
             eligSubtitle.innerText = data.claim_eligibility_reason || 'Kondisi barang tercatat cacat/rusak saat unboxing retur. Memenuhi syarat untuk diajukan klaim atau banding ekspedisi.';
             eligTag.className = 'px-3 py-1 rounded-lg text-white font-black text-[10px] uppercase tracking-wider shrink-0 self-start sm:self-center bg-rose-600';
             eligTag.innerText = 'LAYAK KLAIM';
+        } else if (!data.unboxing) {
+            eligBanner.className = 'p-4 rounded-2xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition bg-amber-50 border-amber-200 text-amber-900 shadow-2xs';
+            if (eligIcon) {
+                eligIcon.className = 'w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 bg-amber-100 text-amber-600';
+                eligIcon.innerHTML = '<i class="fa-solid fa-box-open"></i>';
+            }
+            eligTitle.innerText = '⏳ BELUM DI-UNBOXING DI GUDANG';
+            eligSubtitle.innerText = data.claim_eligibility_reason || 'Pemeriksaan fisik barang belum dilakukan di stasiun unboxing retur, sehingga status kerusakan belum dapat diverifikasi.';
+            eligTag.className = 'px-3 py-1 rounded-lg text-white font-black text-[10px] uppercase tracking-wider shrink-0 self-start sm:self-center bg-amber-500';
+            eligTag.innerText = 'BELUM UNBOXING';
         } else {
             eligBanner.className = 'p-4 rounded-2xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition bg-emerald-50 border-emerald-200 text-emerald-900 shadow-2xs';
             if (eligIcon) {
@@ -2618,10 +2628,23 @@ function renderClaimDossier(data) {
 
     let notes = '-';
     if (unboxing) {
-        const damageItems = (unboxing.items || []).filter(i => i.condition === 'DAMAGED' || i.damage_reason);
+        const damageItems = (unboxing.items || []).filter(i => {
+            const cond = String(i.condition || '').toUpperCase().trim();
+            const typ = String(i.type || '').toUpperCase().trim();
+            const rsn = String(i.damage_reason || '').trim();
+            return (cond !== '' && cond !== 'GOOD' && cond !== 'BAGUS') ||
+                   (typ !== '' && typ !== 'GOOD' && typ !== 'BAGUS') ||
+                   rsn !== '';
+        });
         if (damageItems.length > 0) {
-            notes = damageItems.map(i => `• ${i.product_name || i.barcode}: ${i.damage_reason || 'Rusak'}`).join('<br>');
-        } else if (unboxing.notes) {
+            notes = damageItems.map(i => {
+                const label = i.product_name || i.barcode || 'Produk';
+                const detail = i.damage_reason || i.type || i.condition || 'Rusak';
+                return `• <b class="text-rose-700">${label}</b>: <span class="text-rose-600 font-semibold">${detail}</span>`;
+            }).join('<br>');
+        } else if ((unboxing.total_damaged || 0) > 0) {
+            notes = `• <b class="text-rose-700">${unboxing.total_damaged} item</b> tercatat RUSAK / CACAT saat unboxing.${unboxing.notes ? ' <br>Catatan: ' + unboxing.notes : ''}`;
+        } else if (unboxing.notes && unboxing.notes.trim() !== '') {
             notes = unboxing.notes;
         } else {
             notes = 'Semua barang dalam kondisi baik (GOOD).';
@@ -2630,7 +2653,14 @@ function renderClaimDossier(data) {
         notes = `Alasan Retur Marketplace: [${order.ReturnReason || ''}] ${order.ReturnReasonText || ''}`;
     }
     const notesEl = document.getElementById('detailConditionNotes');
-    if (notesEl) notesEl.innerHTML = notes;
+    if (notesEl) {
+        notesEl.innerHTML = notes;
+        if (data.is_claimable || (unboxing && (unboxing.total_damaged || 0) > 0)) {
+            notesEl.className = 'font-semibold text-rose-900 bg-rose-50 p-2.5 rounded-lg border border-rose-200 text-xs max-h-24 overflow-y-auto space-y-1';
+        } else {
+            notesEl.className = 'font-semibold text-slate-800 bg-amber-50 p-2 rounded-lg border border-amber-200 text-xs max-h-20 overflow-y-auto';
+        }
+    }
 }
 
 window.openClaimPhotoModal = function(url, encodedTitle) {
@@ -2851,15 +2881,20 @@ window.printClaimDossier = function() {
 
         ${d.is_claimable ? `
         <div style="background: #fee2e2; border: 1.5px solid #ef4444; border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; color: #991b1b;">
-            <b style="font-size: 10pt;">⚠️ STATUS: PAKET LAYAK KLAIM / BANDING EKSPEDISI (Kondisi Bukan Good / Cacat)</b><br>
+            <b style="font-size: 10pt;">⚠️ STATUS: PAKET LAYAK KLAIM / BANDING EKSPEDISI (Kondisi Rusak / Cacat)</b><br>
             <span style="font-size: 8.5pt;">${d.claim_eligibility_reason || 'Kondisi barang tercatat cacat/rusak saat unboxing retur.'}</span>
+        </div>
+        ` : (!unb ? `
+        <div style="background: #fef3c7; border: 1.5px solid #f59e0b; border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; color: #92400e;">
+            <b style="font-size: 10pt;">⏳ STATUS: BELUM DI-UNBOXING DI GUDANG</b><br>
+            <span style="font-size: 8.5pt;">${d.claim_eligibility_reason || 'Pemeriksaan fisik barang belum dilakukan di stasiun unboxing retur.'}</span>
         </div>
         ` : `
         <div style="background: #dcfce7; border: 1.5px solid #22c55e; border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; color: #166534;">
             <b style="font-size: 10pt;">✓ STATUS: BUKAN PAKET KLAIM (Kondisi Good / Retur Normal)</b><br>
             <span style="font-size: 8.5pt;">${d.claim_eligibility_reason || 'Barang diterima dalam kondisi baik. Tidak memenuhi syarat klaim kerusakan.'}</span>
         </div>
-        `}
+        `)}
 
         <div class="box">
             <div class="box-title">I. IDENTITAS PESANAN & DETAIL EKSPEDISI</div>

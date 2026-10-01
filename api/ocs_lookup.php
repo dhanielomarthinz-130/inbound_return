@@ -432,56 +432,96 @@ try {
         }
     }
 
-    // 3. CROSS-REFERENCE DATA LOKAL RECEIVING INBOUND (Tanda Terima Ekspedisi & Kurir)
-    $receptionData = null;
-    $searchResi = $orderData['TrackingNumber'] ?? $query;
-    $searchOrder = $orderData['Id'] ?? $query;
+    // 3. KUMPULKAN SEMUA KANDIDAT IDENTIFIER (Resi, Order ID, Barcode Paket, dsb)
+    $candidateIds = array_values(array_unique(array_filter([
+        trim($query),
+        !empty($orderData['TrackingNumber']) ? trim($orderData['TrackingNumber']) : null,
+        !empty($orderData['Id']) ? trim($orderData['Id']) : null,
+    ])));
 
-    $stmtRec = $pdo->prepare("
-        SELECT er.*, rp.package_barcode, rp.scanned_at AS package_scanned_at
-        FROM reception_packages rp
-        JOIN expedition_receptions er ON er.id = rp.reception_id
-        WHERE rp.package_barcode = :q1 OR rp.package_barcode = :q2 OR rp.package_barcode = :q3
-        ORDER BY rp.id DESC
-        LIMIT 1
-    ");
-    $stmtRec->execute([
-        ':q1' => $query,
-        ':q2' => $searchResi,
-        ':q3' => $searchOrder
-    ]);
-    $receptionRow = $stmtRec->fetch(PDO::FETCH_ASSOC);
-    if ($receptionRow) {
-        $receptionData = [
-            'id'             => $receptionRow['id'],
-            'receipt_number' => $receptionRow['receipt_number'],
-            'expedition'     => $receptionRow['expedition'],
-            'courier_name'   => $receptionRow['courier_name'],
-            'vehicle_no'     => $receptionRow['vehicle_no'] ?? null,
-            'operator_name'  => $receptionRow['operator_name'],
-            'package_barcode'=> $receptionRow['package_barcode'],
-            'photo_path'     => $receptionRow['photo_path'] ?? null,
-            'package_photos' => $receptionRow['package_photos'] ? json_decode($receptionRow['package_photos'], true) : [],
-            'scanned_at'     => $receptionRow['package_scanned_at'] ?: $receptionRow['created_at'],
-            'created_at'     => $receptionRow['created_at']
-        ];
+    // Cek juga dari tabel ocs_orders lokal apakah ada mapping order_id <-> tracking_number
+    if (!empty($candidateIds)) {
+        try {
+            $inPlaceholders = implode(',', array_fill(0, count($candidateIds), '?'));
+            $stmtMap = $pdo->prepare("SELECT order_id, tracking_number FROM ocs_orders WHERE order_id IN ($inPlaceholders) OR tracking_number IN ($inPlaceholders)");
+            $stmtMap->execute(array_merge($candidateIds, $candidateIds));
+            $mappedOrders = $stmtMap->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($mappedOrders as $m) {
+                if (!empty($m['order_id'])) $candidateIds[] = trim($m['order_id']);
+                if (!empty($m['tracking_number'])) $candidateIds[] = trim($m['tracking_number']);
+            }
+            $candidateIds = array_values(array_unique(array_filter($candidateIds)));
+        } catch (Exception $eMap) {}
+    }
+
+    // CROSS-REFERENCE DATA LOKAL RECEIVING INBOUND (Tanda Terima Ekspedisi & Kurir)
+    $receptionData = null;
+    if (!empty($candidateIds)) {
+        $recPlaceholders = implode(',', array_fill(0, count($candidateIds), '?'));
+        $stmtRec = $pdo->prepare("
+            SELECT er.*, rp.package_barcode, rp.scanned_at AS package_scanned_at
+            FROM reception_packages rp
+            JOIN expedition_receptions er ON er.id = rp.reception_id
+            WHERE rp.package_barcode IN ($recPlaceholders)
+               OR er.receipt_number IN ($recPlaceholders)
+            ORDER BY rp.id DESC
+            LIMIT 1
+        ");
+        $stmtRec->execute(array_merge($candidateIds, $candidateIds));
+        $receptionRow = $stmtRec->fetch(PDO::FETCH_ASSOC);
+        if ($receptionRow) {
+            $receptionData = [
+                'id'             => $receptionRow['id'],
+                'receipt_number' => $receptionRow['receipt_number'],
+                'expedition'     => $receptionRow['expedition'],
+                'courier_name'   => $receptionRow['courier_name'],
+                'vehicle_no'     => $receptionRow['vehicle_no'] ?? null,
+                'operator_name'  => $receptionRow['operator_name'],
+                'package_barcode'=> $receptionRow['package_barcode'],
+                'photo_path'     => $receptionRow['photo_path'] ?? null,
+                'package_photos' => $receptionRow['package_photos'] ? json_decode($receptionRow['package_photos'], true) : [],
+                'scanned_at'     => $receptionRow['package_scanned_at'] ?: $receptionRow['created_at'],
+                'created_at'     => $receptionRow['created_at']
+            ];
+            if (!empty($receptionRow['package_barcode'])) $candidateIds[] = trim($receptionRow['package_barcode']);
+            if (!empty($receptionRow['receipt_number'])) $candidateIds[] = trim($receptionRow['receipt_number']);
+            $candidateIds = array_values(array_unique(array_filter($candidateIds)));
+        }
     }
 
     // 4. CROSS-REFERENCE DATA LOKAL INBOUND UNBOXING (Rekaman Video Unboxing & Detail Barang)
     $unboxingData = null;
-    $stmtUnbox = $pdo->prepare("
-        SELECT rs.* 
-        FROM return_sessions rs
-        WHERE rs.invoice_number = :q1 OR rs.invoice_number = :q2 OR rs.invoice_number = :q3
-        ORDER BY rs.id DESC
-        LIMIT 1
-    ");
-    $stmtUnbox->execute([
-        ':q1' => $query,
-        ':q2' => $searchResi,
-        ':q3' => $searchOrder
-    ]);
-    $unboxRow = $stmtUnbox->fetch(PDO::FETCH_ASSOC);
+    $unboxRow = null;
+    if (!empty($candidateIds)) {
+        $unboxPlaceholders = implode(',', array_fill(0, count($candidateIds), '?'));
+        $stmtUnbox = $pdo->prepare("
+            SELECT rs.* 
+            FROM return_sessions rs
+            WHERE rs.invoice_number IN ($unboxPlaceholders)
+            ORDER BY rs.id DESC
+            LIMIT 1
+        ");
+        $stmtUnbox->execute($candidateIds);
+        $unboxRow = $stmtUnbox->fetch(PDO::FETCH_ASSOC);
+
+        // Jika belum ketemu dan ada receiving barcode, coba cari berdasarkan partial / like
+        if (!$unboxRow) {
+            foreach ($candidateIds as $cid) {
+                if (strlen($cid) >= 6) {
+                    $stmtUnboxLike = $pdo->prepare("
+                        SELECT rs.* 
+                        FROM return_sessions rs
+                        WHERE rs.invoice_number LIKE ?
+                        ORDER BY rs.id DESC
+                        LIMIT 1
+                    ");
+                    $stmtUnboxLike->execute(["%{$cid}%"]);
+                    $unboxRow = $stmtUnboxLike->fetch(PDO::FETCH_ASSOC);
+                    if ($unboxRow) break;
+                }
+            }
+        }
+    }
 
     $items = [];
     if ($unboxRow) {
@@ -646,10 +686,15 @@ try {
                 $damageDetails[] = $it['product_name'] . ($r ? " ({$r})" : " ({$c})");
             }
         }
+        $sessNotes = strtolower($unboxingData['notes'] ?? '');
+        if ($sessNotes && (strpos($sessNotes, 'rusak') !== false || strpos($sessNotes, 'pecah') !== false || strpos($sessNotes, 'bocor') !== false || strpos($sessNotes, 'cacat') !== false || strpos($sessNotes, 'hilang') !== false)) {
+            $isClaimable = true;
+            if (empty($damageDetails)) $damageDetails[] = $unboxingData['notes'];
+        }
         if ($damagedCount > 0) $isClaimable = true;
 
         if ($isClaimable) {
-            $cnt = $damagedCount > 0 ? $damagedCount : count($damageDetails);
+            $cnt = $damagedCount > 0 ? $damagedCount : (count($damageDetails) > 0 ? count($damageDetails) : 1);
             $claimEligibilityReason = "Kondisi unboxing tercatat RUSAK / CACAT ({$cnt} item). Memenuhi syarat untuk diajukan klaim / banding.";
         } else {
             $claimEligibilityReason = "Kondisi unboxing tercatat BAGUS (GOOD). Paket retur normal, BUKAN paket klaim kerusakan.";
