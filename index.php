@@ -338,12 +338,124 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
 
                         <!-- No. Batch (5 Kolom) -->
                         <div class="sm:col-span-5">
-                            <label class="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1">
-                                <i class="fa-solid fa-tag text-indigo-600"></i>
-                                <span>No. Batch</span>
-                            </label>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="block text-xs font-bold text-slate-700 flex items-center gap-1">
+                                    <i class="fa-solid fa-tag text-indigo-600"></i>
+                                    <span>No. Batch</span>
+                                </label>
+                                <button type="button" onclick="toggleVirtualKeyboard()" id="btnToggleVK"
+                                    title="Tampilkan / Sembunyikan Keyboard Touchscreen"
+                                    class="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded-lg border border-indigo-200 transition flex items-center gap-1 shadow-2xs cursor-pointer">
+                                    <i class="fa-solid fa-keyboard"></i>
+                                    <span id="btnToggleVKLabel">Tutup Keyboard</span>
+                                </button>
+                            </div>
                             <input type="text" id="inputBatch" placeholder="Contoh: B260901"
+                                autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false"
                                 class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-mono text-slate-800 focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition">
+                        </div>
+                    </div>
+
+                    <!-- VIRTUAL KEYBOARD TOUCHSCREEN KHUSUS NO. BATCH & TOMBOL ENTER TERPISAH -->
+                    <div id="virtualKeyboardContainer" class="bg-slate-900 text-white rounded-3xl p-3 sm:p-4 shadow-xl border border-slate-800 space-y-2.5 transition-all">
+                        <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="w-5 h-5 rounded-md bg-indigo-600 text-white flex items-center justify-center text-[11px]">
+                                    <i class="fa-solid fa-keyboard"></i>
+                                </span>
+                                <span class="text-xs font-bold text-slate-200 tracking-wide">Keyboard Virtual Touchscreen &bull; No. Batch</span>
+                            </div>
+                            
+                            <!-- Presets Cepat Format Batch -->
+                            <div class="flex items-center gap-1 flex-wrap">
+                                <span class="text-[10px] text-slate-400 font-semibold mr-1 hidden sm:inline">Preset:</span>
+                                <button type="button" onclick="vkPressChar('B')" class="px-2 py-0.5 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-200 hover:text-white rounded text-[11px] font-mono font-bold transition">B</button>
+                                <button type="button" onclick="vkPressChar('LOT')" class="px-2 py-0.5 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-200 hover:text-white rounded text-[11px] font-mono font-bold transition">LOT</button>
+                                <button type="button" onclick="vkPressChar('EXP')" class="px-2 py-0.5 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-200 hover:text-white rounded text-[11px] font-mono font-bold transition">EXP</button>
+                                <button type="button" onclick="vkPressChar('2025')" class="px-2 py-0.5 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-200 hover:text-white rounded text-[11px] font-mono font-bold transition">2025</button>
+                                <button type="button" onclick="vkPressChar('2026')" class="px-2 py-0.5 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-200 hover:text-white rounded text-[11px] font-mono font-bold transition">2026</button>
+                                <button type="button" onclick="vkPressChar('2027')" class="px-2 py-0.5 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-200 hover:text-white rounded text-[11px] font-mono font-bold transition">2027</button>
+                                <button type="button" onclick="toggleVirtualKeyboard(false)" class="text-slate-400 hover:text-rose-400 text-[11px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 transition ml-2 font-medium">✕ Tutup</button>
+                            </div>
+                        </div>
+
+                        <!-- Row 1: Angka 1-0 dan tanda hubung -->
+                        <div class="grid grid-cols-12 gap-1 sm:gap-1.5">
+                            <button type="button" onclick="vkPressChar('1')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">1</button>
+                            <button type="button" onclick="vkPressChar('2')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">2</button>
+                            <button type="button" onclick="vkPressChar('3')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">3</button>
+                            <button type="button" onclick="vkPressChar('4')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">4</button>
+                            <button type="button" onclick="vkPressChar('5')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">5</button>
+                            <button type="button" onclick="vkPressChar('6')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">6</button>
+                            <button type="button" onclick="vkPressChar('7')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">7</button>
+                            <button type="button" onclick="vkPressChar('8')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">8</button>
+                            <button type="button" onclick="vkPressChar('9')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">9</button>
+                            <button type="button" onclick="vkPressChar('0')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">0</button>
+                            <button type="button" onclick="vkPressChar('-')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-300 font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">-</button>
+                            <button type="button" onclick="vkPressChar('/')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-300 font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">/</button>
+                        </div>
+
+                        <!-- Row 2: Huruf Q - P -->
+                        <div class="grid grid-cols-10 gap-1 sm:gap-1.5">
+                            <button type="button" onclick="vkPressChar('Q')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">Q</button>
+                            <button type="button" onclick="vkPressChar('W')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">W</button>
+                            <button type="button" onclick="vkPressChar('E')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">E</button>
+                            <button type="button" onclick="vkPressChar('R')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">R</button>
+                            <button type="button" onclick="vkPressChar('T')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">T</button>
+                            <button type="button" onclick="vkPressChar('Y')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">Y</button>
+                            <button type="button" onclick="vkPressChar('U')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">U</button>
+                            <button type="button" onclick="vkPressChar('I')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">I</button>
+                            <button type="button" onclick="vkPressChar('O')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">O</button>
+                            <button type="button" onclick="vkPressChar('P')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">P</button>
+                        </div>
+
+                        <!-- Row 3: Huruf A - L -->
+                        <div class="grid grid-cols-9 gap-1 sm:gap-1.5 px-2 sm:px-4">
+                            <button type="button" onclick="vkPressChar('A')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">A</button>
+                            <button type="button" onclick="vkPressChar('S')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">S</button>
+                            <button type="button" onclick="vkPressChar('D')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">D</button>
+                            <button type="button" onclick="vkPressChar('F')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">F</button>
+                            <button type="button" onclick="vkPressChar('G')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">G</button>
+                            <button type="button" onclick="vkPressChar('H')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">H</button>
+                            <button type="button" onclick="vkPressChar('J')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">J</button>
+                            <button type="button" onclick="vkPressChar('K')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">K</button>
+                            <button type="button" onclick="vkPressChar('L')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">L</button>
+                        </div>
+
+                        <!-- Row 4: Huruf Z - M -->
+                        <div class="grid grid-cols-7 gap-1 sm:gap-1.5 px-6 sm:px-12">
+                            <button type="button" onclick="vkPressChar('Z')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">Z</button>
+                            <button type="button" onclick="vkPressChar('X')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">X</button>
+                            <button type="button" onclick="vkPressChar('C')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">C</button>
+                            <button type="button" onclick="vkPressChar('V')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">V</button>
+                            <button type="button" onclick="vkPressChar('B')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">B</button>
+                            <button type="button" onclick="vkPressChar('N')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">N</button>
+                            <button type="button" onclick="vkPressChar('M')" class="h-9 sm:h-10 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-sm rounded-lg flex items-center justify-center transition shadow-2xs select-none">M</button>
+                        </div>
+
+                        <!-- Row 5: Action Buttons (Backspace, Clear, Spasi, and PROMINENT SEPARATED ENTER BUTTON) -->
+                        <div class="flex flex-wrap sm:flex-nowrap items-center gap-1.5 sm:gap-2 pt-1">
+                            <button type="button" onclick="vkBackspace()" title="Hapus karakter terakhir"
+                                class="px-3 sm:px-4 h-10 bg-rose-950/70 hover:bg-rose-700 active:scale-95 text-rose-200 hover:text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition select-none cursor-pointer border border-rose-800/40">
+                                <i class="fa-solid fa-delete-left text-sm"></i>
+                                <span>Hapus</span>
+                            </button>
+                            <button type="button" onclick="vkClear()" title="Kosongkan seluruh kolom batch"
+                                class="px-3 sm:px-3.5 h-10 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition select-none cursor-pointer">
+                                <i class="fa-regular fa-trash-can"></i>
+                                <span>Clear</span>
+                            </button>
+                            <button type="button" onclick="vkPressChar(' ')" title="Tambah spasi"
+                                class="px-3 sm:px-4 h-10 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white font-bold text-xs rounded-xl flex items-center gap-1 transition select-none cursor-pointer">
+                                <span>Spasi</span>
+                            </button>
+                            
+                            <!-- TOMBOL ENTER TERPISAH (BESAR & SANGAT JELAS) -->
+                            <button type="button" onclick="vkEnter()" id="btnVkEnter"
+                                class="flex-1 min-w-[190px] h-10 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-950/50 select-none cursor-pointer border border-emerald-300/40">
+                                <kbd class="px-2 py-0.5 bg-emerald-800/90 border border-emerald-400/40 rounded font-mono font-black text-xs text-white shadow-xs">↵ ENTER</kbd>
+                                <span>PINDAH KE EXP DATE ➔</span>
+                            </button>
                         </div>
                     </div>
 

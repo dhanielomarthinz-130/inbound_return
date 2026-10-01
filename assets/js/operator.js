@@ -527,7 +527,61 @@ function updateVirtualEnterBadge(fieldId) {
     if (el) {
         el.addEventListener('focus', () => updateVirtualEnterBadge(id));
     }
-});
+// -------------------------------------------------------------
+// VIRTUAL KEYBOARD TOUCHSCREEN KHUSUS KOLOM BATCH
+// -------------------------------------------------------------
+window.toggleVirtualKeyboard = function(forceShow = null) {
+    const container = document.getElementById('virtualKeyboardContainer');
+    const toggleBtnLabel = document.getElementById('btnToggleVKLabel');
+    if (!container) return;
+
+    const isHidden = container.classList.contains('hidden');
+    const shouldShow = forceShow !== null ? forceShow : isHidden;
+
+    if (shouldShow) {
+        container.classList.remove('hidden');
+        if (toggleBtnLabel) toggleBtnLabel.innerText = 'Tutup Keyboard';
+    } else {
+        container.classList.add('hidden');
+        if (toggleBtnLabel) toggleBtnLabel.innerText = 'Buka Keyboard';
+    }
+};
+
+window.vkPressChar = function(char) {
+    if (!inputBatch) return;
+    inputBatch.value = (inputBatch.value || '') + char;
+    inputBatch.dispatchEvent(new Event('input', { bubbles: true }));
+    inputBatch.focus();
+};
+
+window.vkBackspace = function() {
+    if (!inputBatch) return;
+    inputBatch.value = (inputBatch.value || '').slice(0, -1);
+    inputBatch.dispatchEvent(new Event('input', { bubbles: true }));
+    inputBatch.focus();
+};
+
+window.vkClear = function() {
+    if (!inputBatch) return;
+    inputBatch.value = '';
+    inputBatch.dispatchEvent(new Event('input', { bubbles: true }));
+    inputBatch.focus();
+};
+
+window.vkEnter = function() {
+    // Tombol ENTER terpisah dari Virtual Keyboard: langsung pindah ke kolom Exp Date
+    if (inputExpDate) {
+        inputExpDate.focus();
+    }
+    updateVirtualEnterBadge('inputExpDate');
+};
+
+// Auto tampilkan keyboard saat kolom No. Batch difokuskan
+if (inputBatch) {
+    inputBatch.addEventListener('focus', () => {
+        toggleVirtualKeyboard(true);
+    });
+}
 
 window.triggerVirtualEnter = function() {
     if (currentActiveFieldId === 'inputBarcode') {
