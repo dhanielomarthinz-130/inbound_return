@@ -57,7 +57,7 @@ if ($method === 'GET') {
         }
 
         $stmtPkg = $pdo->prepare("
-            SELECT id, package_barcode, scanned_at 
+            SELECT id, package_barcode, photo_path, scanned_at 
             FROM reception_packages 
             WHERE reception_id = ? 
             ORDER BY id ASC
@@ -209,12 +209,26 @@ if ($method === 'POST') {
         jsonResponse(['error' => 'Minimal 1 barcode/resi paket harus di-scan sebelum submit!'], 400);
     }
 
-    // Bersihkan dan unikkan resi (jika ada barcode kosong atau spasi)
+    // Bersihkan dan proses paket (bisa string biasa atau object {barcode, photo})
     $cleanPackages = [];
     foreach ($packages as $pkg) {
-        $val = trim((string)$pkg);
-        if ($val !== '') {
-            $cleanPackages[] = $val;
+        if (is_array($pkg)) {
+            $b = trim((string)($pkg['barcode'] ?? ''));
+            $p = $pkg['photo'] ?? null;
+            if ($b !== '') {
+                $cleanPackages[] = [
+                    'barcode' => $b,
+                    'photo'   => $p
+                ];
+            }
+        } else {
+            $val = trim((string)$pkg);
+            if ($val !== '') {
+                $cleanPackages[] = [
+                    'barcode' => $val,
+                    'photo'   => null
+                ];
+            }
         }
     }
 
@@ -245,23 +259,14 @@ if ($method === 'POST') {
         $receiptNo = $todayPrefix . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
     }
 
-    // Simpan Foto Bukti Paket Receiving jika ada
-    $photoPaths = [];
-    $photosInput = $input['photos'] ?? $input['package_photos'] ?? [];
-    if (is_string($photosInput) && !empty($photosInput)) {
-        $photosInput = [$photosInput];
-    }
-    if (!empty($input['photo_path']) && is_string($input['photo_path']) && !in_array($input['photo_path'], $photosInput)) {
-        $photosInput[] = $input['photo_path'];
-    }
-
     $cleanRcpt = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $receiptNo);
     $recUploadDir = __DIR__ . '/../uploads/reception';
     if (!is_dir($recUploadDir)) {
         @mkdir($recUploadDir, 0777, true);
     }
 
-    foreach ($photosInput as $idx => $pData) {
+    // Helper simpan base64 image
+    $saveImgHelper = function($pData, $prefix) use ($recUploadDir) {
         if (is_string($pData) && strpos($pData, 'data:image') === 0) {
             $ext = 'jpg';
             if (preg_match('/^data:image\/(\w+);base64,/', $pData, $typeMatch)) {
@@ -272,13 +277,46 @@ if ($method === 'POST') {
             }
             $decoded = base64_decode($raw);
             if ($decoded) {
-                $pName = 'rcv_' . $cleanRcpt . '_' . time() . "_{$idx}." . $ext;
+                $pName = $prefix . '_' . time() . '_' . mt_rand(100, 999) . '.' . $ext;
                 if (file_put_contents($recUploadDir . '/' . $pName, $decoded)) {
-                    $photoPaths[] = 'uploads/reception/' . $pName;
+                    return 'uploads/reception/' . $pName;
                 }
             }
         } elseif (is_string($pData) && !empty($pData)) {
-            $photoPaths[] = $pData;
+            return $pData;
+        }
+        return null;
+    };
+
+    $photoPaths = [];
+
+    // 1. Simpan foto per-paket jika ada
+    foreach ($cleanPackages as &$cp) {
+        $savedPath = null;
+        if (!empty($cp['photo'])) {
+            $cleanB = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $cp['barcode']);
+            $savedPath = $saveImgHelper($cp['photo'], 'pkg_' . $cleanRcpt . '_' . $cleanB);
+            if ($savedPath) {
+                $photoPaths[] = $savedPath;
+            }
+        }
+        $cp['saved_photo'] = $savedPath;
+    }
+    unset($cp);
+
+    // 2. Simpan Foto Tambahan Umum (jika dikirim via photos / package_photos)
+    $photosInput = $input['photos'] ?? $input['package_photos'] ?? [];
+    if (is_string($photosInput) && !empty($photosInput)) {
+        $photosInput = [$photosInput];
+    }
+    if (!empty($input['photo_path']) && is_string($input['photo_path']) && !in_array($input['photo_path'], $photosInput)) {
+        $photosInput[] = $input['photo_path'];
+    }
+
+    foreach ($photosInput as $idx => $pData) {
+        $saved = $saveImgHelper($pData, 'rcv_' . $cleanRcpt . "_{$idx}");
+        if ($saved && !in_array($saved, $photoPaths)) {
+            $photoPaths[] = $saved;
         }
     }
 
@@ -311,14 +349,36 @@ if ($method === 'POST') {
         ]);
         $receptionId = $pdo->lastInsertId();
 
-        // 2. Simpan Detail Paket (Multiple Items)
-        $stmtItem = $pdo->prepare("
-            INSERT INTO reception_packages (reception_id, package_barcode, scanned_at)
-            VALUES (?, ?, NOW())
-        ");
+        // 2. Simpan Detail Paket (Multiple Items dengan kolom photo_path)
+        $hasItemPhotoCol = false;
+        try {
+            $chkCol = $pdo->query("SHOW COLUMNS FROM reception_packages LIKE 'photo_path'");
+            if ($chkCol && $chkCol->rowCount() > 0) {
+                $hasItemPhotoCol = true;
+            } else {
+                $pdo->exec("ALTER TABLE reception_packages ADD COLUMN photo_path VARCHAR(255) NULL AFTER package_barcode");
+                $hasItemPhotoCol = true;
+            }
+        } catch (Exception $eCol) {}
 
-        foreach ($cleanPackages as $pkgBarcode) {
-            $stmtItem->execute([$receptionId, $pkgBarcode]);
+        if ($hasItemPhotoCol) {
+            $stmtItem = $pdo->prepare("
+                INSERT INTO reception_packages (reception_id, package_barcode, photo_path, scanned_at)
+                VALUES (?, ?, ?, NOW())
+            ");
+        } else {
+            $stmtItem = $pdo->prepare("
+                INSERT INTO reception_packages (reception_id, package_barcode, scanned_at)
+                VALUES (?, ?, NOW())
+            ");
+        }
+
+        foreach ($cleanPackages as $pkg) {
+            if ($hasItemPhotoCol) {
+                $stmtItem->execute([$receptionId, $pkg['barcode'], $pkg['saved_photo']]);
+            } else {
+                $stmtItem->execute([$receptionId, $pkg['barcode']]);
+            }
         }
 
         $pdo->commit();

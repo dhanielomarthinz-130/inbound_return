@@ -188,6 +188,7 @@ try {
                 `id` INT AUTO_INCREMENT PRIMARY KEY,
                 `reception_id` INT NOT NULL,
                 `package_barcode` VARCHAR(100) NOT NULL,
+                `photo_path` VARCHAR(255) NULL,
                 `scanned_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 INDEX idx_reception_id (`reception_id`),
                 INDEX idx_package_barcode (`package_barcode`),
@@ -226,6 +227,9 @@ try {
             if (!in_array('package_price', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN package_price DECIMAL(15,2) DEFAULT 0.00 AFTER total_qty");
             if (!in_array('gmv', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN gmv DECIMAL(15,2) DEFAULT 0.00 AFTER package_price");
             if (!in_array('nmv', $colsOcs)) $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN nmv DECIMAL(15,2) DEFAULT 0.00 AFTER gmv");
+
+            $colsRecPkgs = $pdo->query("SHOW COLUMNS FROM reception_packages")->fetchAll(PDO::FETCH_COLUMN);
+            if (!in_array('photo_path', $colsRecPkgs)) $pdo->exec("ALTER TABLE reception_packages ADD COLUMN photo_path VARCHAR(255) NULL AFTER package_barcode");
 
             $cols = $pdo->query("SHOW COLUMNS FROM return_items")->fetchAll(PDO::FETCH_COLUMN);
             if (!in_array('batch_no', $cols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN batch_no VARCHAR(100) NULL AFTER sku");
