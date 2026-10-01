@@ -72,13 +72,122 @@ if ($method === 'GET') {
         ]);
     }
 
-    // C. List Riwayat Penerimaan (Mendukung rentang tanggal, ekspedisi, dan search)
+    // C. List Riwayat Penerimaan (Mendukung view=packages per-paket dan view=sessions)
+    $view       = trim($_GET['view'] ?? '');
     $startDate  = trim($_GET['start_date'] ?? '');
     $endDate    = trim($_GET['end_date'] ?? '');
     $date       = trim($_GET['date'] ?? '');
     $expedition = trim($_GET['expedition'] ?? '');
     $search     = trim($_GET['search'] ?? '');
 
+    // 1. Tampilan PER-PAKET (Individu Barcode / Resi)
+    if ($view === 'packages') {
+        $where = [];
+        $params = [];
+
+        if (!empty($startDate) && !empty($endDate)) {
+            $where[] = "DATE(COALESCE(p.scanned_at, r.created_at)) BETWEEN ? AND ?";
+            $params[] = $startDate;
+            $params[] = $endDate;
+        } elseif (!empty($date)) {
+            $where[] = "DATE(COALESCE(p.scanned_at, r.created_at)) = ?";
+            $params[] = $date;
+        }
+
+        if (!empty($expedition)) {
+            $where[] = "r.expedition = ?";
+            $params[] = $expedition;
+        }
+
+        if (!empty($search)) {
+            $where[] = "(p.package_barcode LIKE ? OR r.receipt_number LIKE ? OR r.courier_name LIKE ? OR r.operator_name LIKE ? OR r.expedition LIKE ?)";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+        }
+
+        $whereSql = count($where) > 0 ? implode(' AND ', $where) : '1=1';
+
+        try {
+            $stmtPkg = $pdo->prepare("
+                SELECT 
+                    p.id AS package_id,
+                    p.reception_id,
+                    p.package_barcode,
+                    p.photo_path AS package_photo,
+                    COALESCE(p.scanned_at, r.created_at) AS scanned_at,
+                    r.receipt_number,
+                    r.expedition,
+                    r.courier_name,
+                    r.courier_photo,
+                    r.vehicle_no,
+                    r.operator_name,
+                    r.total_packages,
+                    r.created_at AS reception_created_at
+                FROM reception_packages p
+                JOIN expedition_receptions r ON p.reception_id = r.id
+                WHERE {$whereSql}
+                ORDER BY p.id DESC
+            ");
+            $stmtPkg->execute($params);
+            $packageRows = $stmtPkg->fetchAll();
+        } catch (PDOException $e) {
+            // Auto-repair skema jika belum ada kolom
+            if (function_exists('ensureDatabaseSchema')) {
+                try { ensureDatabaseSchema($pdo); } catch (Exception $ign) {}
+            }
+            try {
+                $stmtPkg = $pdo->prepare("
+                    SELECT 
+                        p.id AS package_id,
+                        p.reception_id,
+                        p.package_barcode,
+                        p.photo_path AS package_photo,
+                        COALESCE(p.scanned_at, r.created_at) AS scanned_at,
+                        r.receipt_number,
+                        r.expedition,
+                        r.courier_name,
+                        r.courier_photo,
+                        r.vehicle_no,
+                        r.operator_name,
+                        r.total_packages,
+                        r.created_at AS reception_created_at
+                    FROM reception_packages p
+                    JOIN expedition_receptions r ON p.reception_id = r.id
+                    WHERE {$whereSql}
+                    ORDER BY p.id DESC
+                ");
+                $stmtPkg->execute($params);
+                $packageRows = $stmtPkg->fetchAll();
+            } catch (Exception $e2) {
+                $packageRows = [];
+            }
+        }
+
+        $totalPhotos = 0;
+        $uniqueExpeditions = [];
+        foreach ($packageRows as $pr) {
+            if (!empty($pr['package_photo'])) $totalPhotos++;
+            if (!empty($pr['expedition']) && !in_array($pr['expedition'], $uniqueExpeditions)) {
+                $uniqueExpeditions[] = $pr['expedition'];
+            }
+        }
+
+        jsonResponse([
+            'success' => true,
+            'view' => 'packages',
+            'date' => $date ?: "$startDate s/d $endDate",
+            'total' => count($packageRows),
+            'total_packages' => count($packageRows),
+            'total_photos' => $totalPhotos,
+            'total_expeditions' => count($uniqueExpeditions),
+            'data' => $packageRows
+        ]);
+    }
+
+    // 2. Tampilan DEFAULT (Sesi Header Penerimaan untuk Dashboard Admin)
     $where = [];
     $params = [];
 

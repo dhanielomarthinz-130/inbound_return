@@ -324,44 +324,91 @@ try {
         </div>
 
         <!-- ============================================================== -->
-        <!-- VIEW 2: RIWAYAT PENERIMAAN HARI INI                            -->
+        <!-- VIEW 2: RIWAYAT PENERIMAAN PER PAKET                           -->
         <!-- ============================================================== -->
         <div id="viewHistory" class="hidden space-y-3">
             <div class="bg-white rounded-2xl shadow-xs border border-slate-200/90 p-3 sm:p-4 space-y-3">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                
+                <!-- Header Toolbar & Metrics -->
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-3">
                     <div>
-                        <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Riwayat Penerimaan Ekspedisi</h2>
-                        <p class="text-[10px] text-slate-400">Daftar tanda terima paket yang telah diserahterimakan</p>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-xs sm:text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                                <span class="material-symbols-rounded text-emerald-600 text-lg">inventory_2</span>
+                                <span>Riwayat Paket Diterima (Per Resi)</span>
+                            </h2>
+                            <span id="historyCountBadge" class="bg-emerald-100 text-emerald-800 font-mono font-bold text-xs px-2.5 py-0.5 rounded-full">0 Paket</span>
+                        </div>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Daftar paket yang telah di-scan dan difoto secara terperinci per nomor resi</p>
                     </div>
+
+                    <!-- Counter Badges -->
                     <div class="flex items-center gap-2">
-                        <input type="date" id="historyDateFilter" onchange="loadHistoryData()" class="bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1 text-xs font-semibold text-slate-700">
-                        <button onclick="loadHistoryData()" class="bg-slate-800 text-white px-2.5 py-1 rounded-xl text-xs font-bold hover:bg-slate-700 transition">
+                        <div class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <span class="text-[11px] text-slate-500 font-medium">Foto Tersimpan:</span>
+                            <span id="historyPhotoCountBadge" class="font-mono font-bold text-xs text-slate-800">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter & Search Bar -->
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center">
+                    <!-- Search Input -->
+                    <div class="sm:col-span-5 relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="text" id="historySearchInput" oninput="debounceHistorySearch()" placeholder="Cari barcode resi / kurir / ref..." class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-800 focus:bg-white focus:border-emerald-500 transition outline-none">
+                        <button type="button" id="historyClearSearch" onclick="clearHistorySearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                            <i class="fa-solid fa-xmark text-xs"></i>
+                        </button>
+                    </div>
+
+                    <!-- Ekspedisi Filter -->
+                    <div class="sm:col-span-3">
+                        <select id="historyExpeditionFilter" onchange="loadHistoryData()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-700 outline-none">
+                            <option value="">Semua Ekspedisi</option>
+                        </select>
+                    </div>
+
+                    <!-- Date Filter -->
+                    <div class="sm:col-span-3">
+                        <input type="date" id="historyDateFilter" onchange="loadHistoryData()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none">
+                    </div>
+
+                    <!-- Refresh Button -->
+                    <div class="sm:col-span-1 flex justify-end">
+                        <button onclick="loadHistoryData()" title="Muat Ulang" class="w-full sm:w-auto h-9 px-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
                             <i class="fa-solid fa-arrows-rotate"></i>
                         </button>
                     </div>
                 </div>
 
-                <!-- Table Riwayat -->
-                <div class="overflow-x-auto">
+                <!-- Table Riwayat Per Paket -->
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
                     <table class="w-full text-left text-xs">
                         <thead>
-                            <tr class="bg-slate-50 text-slate-600 border-b border-slate-200 font-bold uppercase text-[10px]">
-                                <th class="py-2 px-2.5">No. Tanda Terima</th>
-                                <th class="py-2 px-2.5">Ekspedisi</th>
-                                <th class="py-2 px-2.5">Driver / Kurir</th>
-                                <th class="py-2 px-2.5 text-center">Total</th>
-                                <th class="py-2 px-2.5">Operator</th>
-                                <th class="py-2 px-2.5">Waktu</th>
-                                <th class="py-2 px-2.5 text-center">Aksi</th>
+                            <tr class="bg-slate-100/90 text-slate-700 border-b border-slate-200 font-extrabold uppercase text-[10px] tracking-wider">
+                                <th class="py-2.5 px-3 text-center w-12">#</th>
+                                <th class="py-2.5 px-3 text-center w-20">Foto Paket</th>
+                                <th class="py-2.5 px-3">No. Resi / Barcode</th>
+                                <th class="py-2.5 px-3">Ekspedisi</th>
+                                <th class="py-2.5 px-3">Driver / Kurir</th>
+                                <th class="py-2.5 px-3">Ref Serah Terima</th>
+                                <th class="py-2.5 px-3">Waktu Scan</th>
+                                <th class="py-2.5 px-3">Operator</th>
+                                <th class="py-2.5 px-3 text-center w-24">Aksi</th>
                             </tr>
                         </thead>
-                        <tbody id="historyTableBody" class="divide-y divide-slate-100">
+                        <tbody id="historyTableBody" class="divide-y divide-slate-100 bg-white">
                             <tr>
-                                <td colspan="7" class="text-center py-8 text-slate-400">Memuat riwayat...</td>
+                                <td colspan="9" class="text-center py-10 text-slate-400">
+                                    <i class="fa-solid fa-spinner fa-spin text-emerald-500 mr-2 text-base"></i> Memuat data paket...
+                                </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
+
             </div>
         </div>
 
@@ -1475,21 +1522,10 @@ try {
                 const data = await res.json();
 
                 if (data && data.success) {
-                    showStatusMsg(`✅ Sukses! Penerimaan <b>${data.total_packages} paket</b> (${escapeHtml(data.expedition)}) tersimpan! [${escapeHtml(data.receipt_number)}]`, 'success');
+                    showStatusMsg(`✅ <b>Sukses Tersimpan!</b> Penerimaan <b>${data.total_packages} paket</b> (${escapeHtml(data.expedition)}) berhasil disimpan ke sistem! [Ref: ${escapeHtml(data.receipt_number)}]`, 'success');
+                    playBeep('success');
 
-                    // Tampilkan Slip Bukti Serah Terima langsung
-                    showReceiptModal({
-                        receipt_number: data.receipt_number,
-                        expedition: data.expedition,
-                        courier_name: currentCourierName,
-                        courier_photo: currentCourierPhoto,
-                        total_packages: data.total_packages,
-                        created_at: new Date().toLocaleString('id-ID'),
-                        packages: draftPackages.map(p => ({ package_barcode: p.barcode, photo_path: p.photo })),
-                        photos: draftPackages.map(p => p.photo)
-                    });
-
-                    // Reset form untuk penerimaan baru
+                    // Reset form untuk penerimaan baru tanpa memunculkan modal bukti di layar
                     resetReceptionForm();
                     loadHistoryData();
                 } else {
@@ -1725,73 +1761,171 @@ try {
             }
         }
 
+        let historySearchTimeout = null;
+        function debounceHistorySearch() {
+            clearTimeout(historySearchTimeout);
+            const val = document.getElementById('historySearchInput')?.value.trim() || '';
+            const clearBtn = document.getElementById('historyClearSearch');
+            if (clearBtn) {
+                if (val) clearBtn.classList.remove('hidden');
+                else clearBtn.classList.add('hidden');
+            }
+            historySearchTimeout = setTimeout(() => {
+                loadHistoryData();
+            }, 300);
+        }
+
+        function clearHistorySearch() {
+            const input = document.getElementById('historySearchInput');
+            if (input) input.value = '';
+            const clearBtn = document.getElementById('historyClearSearch');
+            if (clearBtn) clearBtn.classList.add('hidden');
+            loadHistoryData();
+        }
+
         async function loadHistoryData() {
             const dateInput = document.getElementById('historyDateFilter');
+            const expSelect = document.getElementById('historyExpeditionFilter');
+            const searchInput = document.getElementById('historySearchInput');
+
             const selectedDate = (dateInput && dateInput.value) ? dateInput.value : new Date().toISOString().slice(0, 10);
             if (dateInput && !dateInput.value) dateInput.value = selectedDate;
 
+            const selectedExp = (expSelect && expSelect.value) ? expSelect.value : '';
+            const searchQuery = (searchInput && searchInput.value) ? searchInput.value.trim() : '';
+
+            const tbody = document.getElementById('historyTableBody');
+            const badge = document.getElementById('historyCountBadge');
+            const photoBadge = document.getElementById('historyPhotoCountBadge');
+
             try {
-                const res = await fetch(`api/reception.php?action=list&date=${selectedDate}`);
+                let url = `api/reception.php?action=list&view=packages&date=${encodeURIComponent(selectedDate)}`;
+                if (selectedExp) url += `&expedition=${encodeURIComponent(selectedExp)}`;
+                if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
+
+                const res = await fetch(url);
                 const data = await res.json();
-                const tbody = document.getElementById('historyTableBody');
-                const badge = document.getElementById('historyCountBadge');
 
                 if (data && data.success && Array.isArray(data.data)) {
-                    setText(badge, data.data.length);
-                    if (data.data.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-slate-400">Belum ada penerimaan ekspedisi pada tanggal ini.</td></tr>';
+                    const packages = data.data;
+                    const totalPkgs = data.total_packages || packages.length;
+                    const totalPhotos = data.total_photos || 0;
+
+                    setText(badge, `${totalPkgs} Paket`);
+                    setText(photoBadge, totalPhotos);
+
+                    // Populate dropdown ekspedisi jika masih hanya 1 opsi
+                    if (expSelect && expSelect.options.length <= 1) {
+                        const uniqueExps = [...new Set(packages.map(p => p.expedition).filter(Boolean))];
+                        uniqueExps.forEach(exp => {
+                            const opt = document.createElement('option');
+                            opt.value = exp;
+                            opt.textContent = exp;
+                            expSelect.appendChild(opt);
+                        });
+                    }
+
+                    if (packages.length === 0) {
+                        tbody.innerHTML = `
+                            <tr>
+                                <td colspan="9" class="text-center py-12 text-slate-400">
+                                    <div class="flex flex-col items-center justify-center gap-2">
+                                        <div class="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 text-xl">
+                                            <i class="fa-solid fa-box-open"></i>
+                                        </div>
+                                        <span class="font-bold text-slate-600 text-xs">Belum ada paket yang tercatat</span>
+                                        <span class="text-[11px] text-slate-400">Silakan scan paket pada tab "Scan Paket" atau ubah filter tanggal.</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
                         return;
                     }
 
                     let rows = '';
-                    data.data.forEach(item => {
-                        const timeOnly = (item.created_at || '').split(' ')[1] || item.created_at;
-                        
-                        let photoBadge = '';
-                        let photoCount = 0;
-                        if (item.package_photos) {
-                            try {
-                                const parsed = JSON.parse(item.package_photos);
-                                if (Array.isArray(parsed)) photoCount = parsed.length;
-                            } catch (e) {}
-                        } else if (item.photo_path) {
-                            photoCount = 1;
+                    packages.forEach((item, idx) => {
+                        const scanTime = item.scanned_at || item.reception_created_at || '-';
+                        const timeOnly = scanTime.includes(' ') ? scanTime.split(' ')[1] : scanTime;
+
+                        // Foto Paket Thumbnail
+                        let photoHtml = '';
+                        if (item.package_photo) {
+                            photoHtml = `
+                                <div class="relative group w-10 h-10 mx-auto cursor-pointer" onclick="previewImageDirect('${escapeHtml(item.package_photo)}')">
+                                    <img src="${escapeHtml(item.package_photo)}" alt="Foto Paket" class="w-10 h-10 rounded-lg object-cover border border-slate-200 shadow-2xs group-hover:scale-105 transition">
+                                    <span class="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] transition">
+                                        <i class="fa-solid fa-magnifying-glass"></i>
+                                    </span>
+                                </div>
+                            `;
+                        } else {
+                            photoHtml = `
+                                <div class="w-10 h-10 rounded-lg bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center text-slate-400 mx-auto" title="Tidak ada foto">
+                                    <i class="fa-solid fa-image-slash text-xs"></i>
+                                </div>
+                            `;
                         }
 
-                        if (photoCount > 0) {
-                            photoBadge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200/80 ml-1.5"><i class="fa-solid fa-camera"></i> ${photoCount}</span>`;
+                        // Courier & Avatar
+                        let courierHtml = '';
+                        if (item.courier_photo) {
+                            courierHtml = `
+                                <div class="flex items-center gap-2">
+                                    <img src="${escapeHtml(item.courier_photo)}" onclick="previewImageDirect('${escapeHtml(item.courier_photo)}')" class="w-7 h-7 rounded-full object-cover border border-indigo-200 cursor-pointer shadow-2xs shrink-0 hover:scale-110 transition" title="Klik foto kurir">
+                                    <span class="text-slate-800 font-semibold truncate max-w-[120px]">${escapeHtml(item.courier_name || '-')}</span>
+                                </div>
+                            `;
+                        } else {
+                            courierHtml = `<span class="text-slate-600 font-medium">${escapeHtml(item.courier_name || '-')}</span>`;
                         }
 
-                        let courierPhotoIcon = item.courier_photo ? `<i class="fa-solid fa-camera text-indigo-500 ml-1" title="Ada Foto Kurir"></i>` : '';
+                        // Action Buttons
+                        let actionBtns = `
+                            <div class="flex items-center justify-center gap-1.5">
+                                ${item.package_photo ? `
+                                <button onclick="previewImageDirect('${escapeHtml(item.package_photo)}')" class="w-7 h-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 flex items-center justify-center transition shadow-2xs" title="Lihat Foto Paket">
+                                    <i class="fa-solid fa-camera text-xs"></i>
+                                </button>` : ''}
+                                <button onclick="viewReceptionDetail(${item.reception_id})" class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 font-bold text-[11px] flex items-center gap-1 transition shadow-2xs" title="Buka Slip Serah Terima">
+                                    <i class="fa-solid fa-file-lines text-xs"></i>
+                                    <span>Slip</span>
+                                </button>
+                            </div>
+                        `;
 
                         rows += `
-                            <tr class="hover:bg-slate-50 transition">
-                                <td class="py-2.5 px-3 font-mono font-bold text-slate-800">
-                                    ${escapeHtml(item.receipt_number)}
-                                    ${photoBadge}
+                            <tr class="hover:bg-slate-50/80 transition">
+                                <td class="py-2.5 px-3 text-center font-mono text-[11px] text-slate-400 font-bold">${idx + 1}</td>
+                                <td class="py-2.5 px-3 text-center">${photoHtml}</td>
+                                <td class="py-2.5 px-3">
+                                    <div class="flex items-center gap-1.5 font-mono">
+                                        <span class="font-black text-slate-900 text-xs tracking-wider">${escapeHtml(item.package_barcode)}</span>
+                                        <button onclick="navigator.clipboard.writeText('${escapeHtml(item.package_barcode)}'); playBeep('success');" class="text-slate-400 hover:text-slate-600 p-0.5" title="Salin Barcode">
+                                            <i class="fa-regular fa-copy text-[11px]"></i>
+                                        </button>
+                                    </div>
                                 </td>
-                                <td class="py-2.5 px-3 font-semibold text-emerald-700">${escapeHtml(item.expedition)}</td>
-                                <td class="py-2.5 px-3 text-slate-600">
-                                    ${escapeHtml(item.courier_name || '-')}
-                                    ${courierPhotoIcon}
+                                <td class="py-2.5 px-3">
+                                    <span class="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 font-bold border border-emerald-200/80 text-[11px]">
+                                        ${escapeHtml(item.expedition)}
+                                    </span>
                                 </td>
-                                <td class="py-2.5 px-3 text-center font-bold text-slate-900">
-                                    <span class="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-lg text-xs">${item.total_packages}</span>
+                                <td class="py-2.5 px-3">${courierHtml}</td>
+                                <td class="py-2.5 px-3 font-mono text-[11px] text-slate-500">${escapeHtml(item.receipt_number)}</td>
+                                <td class="py-2.5 px-3 font-mono text-[11px] text-slate-600">
+                                    <span class="font-bold">${timeOnly}</span>
+                                    <span class="text-[10px] text-slate-400 block">${scanTime.includes(' ') ? scanTime.split(' ')[0] : ''}</span>
                                 </td>
-                                <td class="py-2.5 px-3 text-slate-600">${escapeHtml(item.operator_name)}</td>
-                                <td class="py-2.5 px-3 text-slate-500 font-mono text-[11px]">${timeOnly}</td>
-                                <td class="py-2.5 px-3 text-center">
-                                    <button onclick="viewReceptionDetail(${item.id})" class="text-indigo-600 hover:text-indigo-800 font-bold text-xs bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition">
-                                        <i class="fa-solid fa-eye"></i> Detail
-                                    </button>
-                                </td>
+                                <td class="py-2.5 px-3 text-slate-600 font-medium">${escapeHtml(item.operator_name || '-')}</td>
+                                <td class="py-2.5 px-3 text-center">${actionBtns}</td>
                             </tr>
                         `;
                     });
                     tbody.innerHTML = rows;
                 }
             } catch (e) {
-                console.error('Gagal memuat riwayat:', e);
+                console.error('Gagal memuat riwayat paket:', e);
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-rose-500 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1.5"></i>Gagal memuat riwayat: ${escapeHtml(e.message)}</td></tr>`;
             }
         }
 
