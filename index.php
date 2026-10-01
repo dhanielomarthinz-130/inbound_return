@@ -196,13 +196,13 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                     </button>
                 </div>
 
-                <!-- Galeri Daftar Foto yang Sudah Diambil -->
+                <!-- Galeri / List Bukti Foto yang Sudah Diambil (Mode Text List Compact) -->
                 <div id="photosGalleryContainer" class="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
-                    <div id="photosEmptyState" class="bg-slate-50 border border-slate-200/90 rounded-xl p-2.5 text-center text-slate-400 flex flex-col items-center justify-center h-full min-h-[60px]">
-                        <i class="fa-regular fa-images text-base text-slate-300 mb-0.5"></i>
-                        <span class="text-[10px] font-medium text-slate-500">Belum ada foto</span>
+                    <div id="photosEmptyState" class="bg-slate-50 border border-dashed border-slate-200/90 rounded-xl py-2 px-3 text-center text-slate-400 flex items-center justify-center gap-2">
+                        <i class="fa-regular fa-images text-slate-400 text-xs"></i>
+                        <span class="text-xs font-medium text-slate-500">Belum ada foto unboxing yang diambil</span>
                     </div>
-                    <div id="photosGridList" class="hidden grid grid-cols-2 sm:grid-cols-3 gap-1.5 p-0.5"></div>
+                    <div id="photosGridList" class="hidden flex flex-col gap-1.5 p-0.5"></div>
                 </div>
             </div>
 
@@ -478,8 +478,14 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                                     </button>
                                 </div>
                             </div>
-                            <input type="date" id="inputExpDate"
-                                class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-800 focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition">
+                            <div class="relative">
+                                <input type="text" id="inputExpDate" placeholder="dd-mm-yyyy"
+                                    maxlength="10" inputmode="numeric" autocomplete="off"
+                                    class="w-full pl-3 pr-8 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-800 focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition">
+                                <button type="button" onclick="toggleNumpadExpDate()" title="Buka Numpad Tanggal" class="absolute right-2.5 top-2 text-slate-400 hover:text-indigo-600 transition">
+                                    <i class="fa-regular fa-calendar-days text-xs"></i>
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Qty (3 Kolom) -->

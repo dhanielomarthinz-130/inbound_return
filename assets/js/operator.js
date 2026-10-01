@@ -405,12 +405,8 @@ async function checkAndApplyExpDateFromBatch(batchVal) {
     if (detected) {
         const expDateStr = typeof detected === 'object' ? detected.date : detected;
         const expLabel = typeof detected === 'object' && detected.label ? detected.label : 'Pola Batch Terdeteksi';
-        inputExpDate.value = expDateStr;
-        if (typeof updateNumpadDisplay === 'function') {
-            const p = expDateStr.split('-');
-            if (p.length === 3) npDateDigits = `${p[2]}${p[1]}${p[0]}`;
-            updateNumpadDisplay();
-        }
+        inputExpDate.value = formatExpDate(expDateStr);
+        updateNumpadDisplay();
         showAutoExpIndicator(expLabel);
     }
 
@@ -422,12 +418,8 @@ async function checkAndApplyExpDateFromBatch(batchVal) {
             const res = await fetch(`api/batch_lookup.php?barcode=${encodeURIComponent(currentBarcode)}&batch=${encodeURIComponent(val)}`);
             const data = await res.json();
             if (data && data.found && data.exp_date) {
-                inputExpDate.value = data.exp_date;
-                if (typeof updateNumpadDisplay === 'function') {
-                    const p = data.exp_date.split('-');
-                    if (p.length === 3) npDateDigits = `${p[2]}${p[1]}${p[0]}`;
-                    updateNumpadDisplay();
-                }
+                inputExpDate.value = formatExpDate(data.exp_date);
+                updateNumpadDisplay();
                 showAutoExpIndicator('Dari Riwayat Scan');
             } else if (!detected) {
                 clearAutoExpIndicator();
@@ -542,18 +534,11 @@ function updateVirtualEnterBadge(fieldId) {
 // -------------------------------------------------------------
 // VIRTUAL KEYBOARD & NUMPAD TOUCHSCREEN MANAGEMENT
 // -------------------------------------------------------------
-let npDateDigits = '';
-
 function updateNumpadDisplay() {
     const disp = document.getElementById('numpadDateDisplay');
     if (!disp) return;
-    if (npDateDigits) {
-        let d = npDateDigits.slice(0, 2);
-        let m = npDateDigits.slice(2, 4);
-        let y = npDateDigits.slice(4, 8);
-        disp.innerText = [d, m, y].filter(Boolean).join(' - ');
-    } else if (inputExpDate && inputExpDate.value) {
-        disp.innerText = inputExpDate.value;
+    if (inputExpDate && inputExpDate.value && inputExpDate.value.trim()) {
+        disp.innerText = inputExpDate.value.trim();
     } else {
         disp.innerText = 'dd - mm - yyyy';
     }
@@ -636,56 +621,60 @@ window.toggleNumpadExpDate = function(forceShow = null) {
     }
 };
 
-window.npDigit = function(digit) {
-    if (npDateDigits.length >= 8) return;
-    npDateDigits += digit;
-    updateNumpadDisplay();
-    applyBufferToExpDate();
-};
-
-window.npBackspace = function() {
-    npDateDigits = npDateDigits.slice(0, -1);
-    updateNumpadDisplay();
-    applyBufferToExpDate();
-};
-
-window.npClear = function() {
-    npDateDigits = '';
-    if (inputExpDate) inputExpDate.value = '';
-    updateNumpadDisplay();
-};
-
-function applyBufferToExpDate() {
-    if (!inputExpDate) return;
-    if (npDateDigits.length === 6) {
-        const dd = npDateDigits.slice(0, 2);
-        const mm = npDateDigits.slice(2, 4);
-        const yy = npDateDigits.slice(4, 6);
-        const dNum = parseInt(dd, 10);
-        const mNum = parseInt(mm, 10);
-        if (dNum >= 1 && dNum <= 31 && mNum >= 1 && mNum <= 12) {
-            inputExpDate.value = `20${yy}-${mm}-${dd}`;
-        }
-    } else if (npDateDigits.length === 8) {
-        const dd = npDateDigits.slice(0, 2);
-        const mm = npDateDigits.slice(2, 4);
-        const yyyy = npDateDigits.slice(4, 8);
-        const dNum = parseInt(dd, 10);
-        const mNum = parseInt(mm, 10);
-        if (dNum >= 1 && dNum <= 31 && mNum >= 1 && mNum <= 12) {
-            inputExpDate.value = `${yyyy}-${mm}-${dd}`;
-        }
+// Format string digit murni menjadi DD-MM-YYYY secara seketika
+function formatDigitsToDate(digits) {
+    if (!digits) return '';
+    const d = digits.slice(0, 8);
+    if (d.length <= 2) {
+        return d;
+    } else if (d.length <= 4) {
+        return d.slice(0, 2) + '-' + d.slice(2);
+    } else {
+        return d.slice(0, 2) + '-' + d.slice(2, 4) + '-' + d.slice(4);
     }
 }
 
-window.npSetYear = function(yearStr) {
-    let cur = inputExpDate && inputExpDate.value ? inputExpDate.value.split('-') : null;
-    let mm = cur && cur[1] ? cur[1] : '01';
-    let dd = cur && cur[2] ? cur[2] : '01';
+window.npDigit = function(digit) {
+    if (!inputExpDate) return;
+    let raw = (inputExpDate.value || '').replace(/\D/g, '');
+    if (raw.length >= 8) return;
+    raw += String(digit);
+    inputExpDate.value = formatDigitsToDate(raw);
+    inputExpDate.dispatchEvent(new Event('input', { bubbles: true }));
+    updateNumpadDisplay();
+};
+
+window.npBackspace = function() {
+    if (!inputExpDate) return;
+    let raw = (inputExpDate.value || '').replace(/\D/g, '');
+    raw = raw.slice(0, -1);
+    inputExpDate.value = formatDigitsToDate(raw);
+    inputExpDate.dispatchEvent(new Event('input', { bubbles: true }));
+    updateNumpadDisplay();
+};
+
+window.npClear = function() {
     if (inputExpDate) {
-        inputExpDate.value = `${yearStr}-${mm}-${dd}`;
+        inputExpDate.value = '';
+        inputExpDate.dispatchEvent(new Event('input', { bubbles: true }));
     }
-    npDateDigits = `${dd}${mm}${yearStr}`;
+    updateNumpadDisplay();
+};
+
+window.npSetYear = function(yearStr) {
+    if (!inputExpDate) return;
+    let raw = (inputExpDate.value || '').trim();
+    let parts = raw.split(/[-/]/);
+    let dd = '01';
+    let mm = '01';
+    if (parts.length >= 2 && parts[0] && parts[1]) {
+        dd = parts[0].replace(/\D/g, '').padStart(2, '0');
+        mm = parts[1].replace(/\D/g, '').padStart(2, '0');
+    } else if (parts.length === 1 && parts[0].length >= 2) {
+        dd = parts[0].slice(0, 2).replace(/\D/g, '').padStart(2, '0');
+    }
+    inputExpDate.value = `${dd}-${mm}-${yearStr}`;
+    inputExpDate.dispatchEvent(new Event('input', { bubbles: true }));
     updateNumpadDisplay();
 };
 
@@ -699,9 +688,9 @@ window.npSetPreset = function(type) {
     const mm = String(now.getMonth() + 1).padStart(2, '0');
     const dd = String(now.getDate()).padStart(2, '0');
     if (inputExpDate) {
-        inputExpDate.value = `${targetYear}-${mm}-${dd}`;
+        inputExpDate.value = `${dd}-${mm}-${targetYear}`;
+        inputExpDate.dispatchEvent(new Event('input', { bubbles: true }));
     }
-    npDateDigits = `${dd}${mm}${targetYear}`;
     updateNumpadDisplay();
 };
 
@@ -727,11 +716,16 @@ if (inputBatch) {
     });
 }
 
-// Kolom Exp Date -> Buka Numpad, Tutup Keyboard Batch
+// Kolom Exp Date -> Buka Numpad, Tutup Keyboard Batch, dan auto-format input manual
 if (inputExpDate) {
     inputExpDate.addEventListener('focus', () => {
         toggleVirtualKeyboard(false);
         toggleNumpadExpDate(true);
+    });
+    inputExpDate.addEventListener('input', () => {
+        const raw = inputExpDate.value.replace(/\D/g, '').slice(0, 8);
+        inputExpDate.value = formatDigitsToDate(raw);
+        updateNumpadDisplay();
     });
 }
 
@@ -1722,36 +1716,29 @@ window.renderPhotosGallery = function() {
         const badgeColor = isPkg ? 'bg-indigo-600' : 'bg-emerald-600';
         const badgeIcon = isPkg ? 'fa-box' : 'fa-tag';
         const badgeText = isPkg ? 'Paket' : 'Produk';
-        const safeTitle = (item.title || 'Foto Unboxing').replace(/"/g, '&quot;');
+        const safeTitle = (item.title || (isPkg ? 'Foto Bukti Paket' : 'Foto Bukti Produk')).replace(/"/g, '&quot;');
+        const timeStr = item.createdAt ? (item.createdAt.split(' ')[1] || item.createdAt) : '';
 
-        const card = document.createElement('div');
-        card.className = 'relative group bg-slate-900 rounded-xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition';
-        card.innerHTML = `
-            <div class="aspect-video w-full overflow-hidden bg-slate-950 flex items-center justify-center cursor-pointer" onclick="previewImageDirect('${item.dataUrl}', '${safeTitle}')">
-                <img src="${item.dataUrl}" alt="${safeTitle}" class="w-full h-full object-cover transition duration-200 group-hover:scale-105">
-            </div>
-            <!-- Header Badges -->
-            <div class="absolute top-1.5 left-1.5 flex items-center gap-1 pointer-events-none">
-                <span class="${badgeColor} text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow">
-                    <i class="fa-solid ${badgeIcon} text-[9px] mr-0.5"></i>${badgeText} #${index + 1}
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between py-1 px-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 transition text-xs group';
+        row.innerHTML = `
+            <div class="flex items-center gap-1.5 min-w-0 flex-1">
+                <span class="${badgeColor} text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1 shrink-0 shadow-2xs">
+                    <i class="fa-solid ${badgeIcon} text-[9px]"></i> ${badgeText} #${index + 1}
                 </span>
+                <span class="truncate font-semibold text-slate-800 text-xs" title="${safeTitle}">${safeTitle}</span>
+                ${timeStr ? `<span class="text-[10px] text-slate-400 font-mono shrink-0 hidden sm:inline">${timeStr}</span>` : ''}
             </div>
-            <!-- Action Buttons -->
-            <div class="absolute top-1.5 right-1.5 flex items-center gap-1">
-                <button type="button" onclick="previewImageDirect('${item.dataUrl}', '${safeTitle}')" class="w-6 h-6 rounded-full bg-slate-900/80 hover:bg-indigo-600 text-white flex items-center justify-center text-[10px] transition shadow" title="Perbesar Foto">
-                    <i class="fa-solid fa-expand"></i>
+            <div class="flex items-center gap-1 shrink-0 ml-1.5">
+                <button type="button" onclick="previewImageDirect('${item.dataUrl}', '${safeTitle}')" class="text-indigo-600 hover:text-indigo-800 bg-white hover:bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 shadow-2xs" title="Lihat Foto">
+                    <i class="fa-solid fa-eye text-[10px]"></i> <span>Lihat</span>
                 </button>
-                <button type="button" onclick="deletePhotoItem('${item.id}')" class="w-6 h-6 rounded-full bg-slate-900/80 hover:bg-rose-600 text-white flex items-center justify-center text-[10px] transition shadow" title="Hapus Foto">
-                    <i class="fa-solid fa-trash-can"></i>
+                <button type="button" onclick="deletePhotoItem('${item.id}')" class="text-rose-600 hover:text-rose-800 bg-white hover:bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 shadow-2xs" title="Hapus Foto">
+                    <i class="fa-solid fa-trash-can text-[10px]"></i>
                 </button>
-            </div>
-            <!-- Bottom Title Bar -->
-            <div class="p-1.5 bg-white border-t border-slate-100 flex items-center justify-between text-[11px]">
-                <span class="truncate font-semibold text-slate-700" title="${safeTitle}">${safeTitle}</span>
-                <span class="text-[9px] text-slate-400 font-mono flex-shrink-0 ml-1">${item.createdAt ? item.createdAt.split(' ')[1] : ''}</span>
             </div>
         `;
-        listEl.appendChild(card);
+        listEl.appendChild(row);
     });
 };
 
