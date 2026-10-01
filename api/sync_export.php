@@ -70,10 +70,17 @@ try {
                 }
             }
 
+            // Kumpulkan video unboxing jika ada
+            $videoFile = !empty($sess['video_path']) ? $sess['video_path'] : null;
+            if ($videoFile && !in_array($videoFile, $photosList)) {
+                $photosList[] = $videoFile;
+            }
+
             $returnsData[] = [
                 'session' => $sess,
                 'items' => $sessItems,
-                'photo_files' => $photosList
+                'photo_files' => $photosList,
+                'video_file' => $videoFile
             ];
         }
     }

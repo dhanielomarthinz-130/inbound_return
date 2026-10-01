@@ -2364,12 +2364,20 @@ window.executeClaimLookup = async function(e) {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mencari...';
 
     try {
-        const res = await fetch(`api/ocs_lookup.php?q=${encodeURIComponent(query)}`);
-        const data = await res.json();
+        const [ocsResult, nasResult] = await Promise.allSettled([
+            fetch(`api/ocs_lookup.php?q=${encodeURIComponent(query)}`).then(r => r.json()),
+            fetch(`api/nas_video.php?action=search&q=${encodeURIComponent(query)}`).then(r => r.json())
+        ]);
 
-        if (!data.success) {
-            showToast('error', data.message || 'Gagal mencari data bukti klaim', 'Pencarian Gagal');
+        const data = ocsResult.status === 'fulfilled' ? ocsResult.value : null;
+
+        if (!data || !data.success) {
+            showToast('error', data?.message || 'Gagal mencari data bukti klaim di OCS/Database', 'Pencarian Gagal');
             return;
+        }
+
+        if (nasResult.status === 'fulfilled' && nasResult.value) {
+            data.packing_video = nasResult.value;
         }
 
         window.currentClaimDossier = data;
@@ -2449,7 +2457,47 @@ function renderClaimDossier(data) {
         }
     }
 
-    // Media 1: Video Unboxing Retur
+    // Media 1: Video Packing Outbound (Synology NAS-IEG 192.168.30.5:5001 /PACKER)
+    const packVideoEl = document.getElementById('playerPackingVideo');
+    const noPackPlaceholder = document.getElementById('noPackingVideoPlaceholder');
+    const packStatusText = document.getElementById('packingVideoStatusText');
+    const packNameText = document.getElementById('packingFileNameText');
+    const packDateText = document.getElementById('packingFileDateText');
+    const packDirectBtn = document.getElementById('btnOpenNasStationDirect');
+
+    const packingData = data.packing_video || null;
+    if (packingData && packingData.has_video && packingData.primary_video) {
+        const primary = packingData.primary_video;
+        if (packVideoEl) {
+            packVideoEl.src = primary.stream_url;
+            packVideoEl.classList.remove('hidden');
+        }
+        if (noPackPlaceholder) noPackPlaceholder.classList.add('hidden');
+        if (packNameText) packNameText.innerText = primary.name || '-';
+        if (packDateText) packDateText.innerText = primary.size_formatted || 'NAS-IEG';
+        if (packDirectBtn) packDirectBtn.href = primary.direct_nas_url || 'https://192.168.30.5:5001/#/signin';
+    } else {
+        if (packVideoEl) {
+            packVideoEl.pause();
+            packVideoEl.removeAttribute('src');
+            packVideoEl.classList.add('hidden');
+        }
+        if (noPackPlaceholder) noPackPlaceholder.classList.remove('hidden');
+        if (packStatusText) {
+            if (packingData && packingData.requires_auth) {
+                packStatusText.innerText = 'Kredensial Synology NAS (192.168.30.5) belum disimpan. Klik tombol di bawah untuk mengisi akun NAS atau buka langsung File Station.';
+            } else if (packingData && packingData.message) {
+                packStatusText.innerText = packingData.message;
+            } else {
+                packStatusText.innerText = `Video packing tidak ditemukan di folder /PACKER untuk: ${data.query}`;
+            }
+        }
+        if (packNameText) packNameText.innerText = '-';
+        if (packDateText) packDateText.innerText = 'NAS 192.168.30.5:5001';
+        if (packDirectBtn) packDirectBtn.href = 'https://192.168.30.5:5001/#/signin';
+    }
+
+    // Media 2: Video Unboxing Retur
     const unboxVideoEl = document.getElementById('playerUnboxingVideo');
     const noUnboxPlaceholder = document.getElementById('noUnboxingVideoPlaceholder');
     const unboxOpText = document.getElementById('unboxingOperatorText');
@@ -2574,6 +2622,74 @@ window.openClaimPhotoModal = function(url, encodedTitle) {
 window.closeClaimPhotoModal = function() {
     const modal = document.getElementById('claimPhotoModal');
     if (modal) modal.classList.add('hidden');
+};
+
+window.openNasConfigModal = function() {
+    const modal = document.getElementById('modalNasConfig');
+    if (modal) modal.classList.remove('hidden');
+};
+
+window.closeNasConfigModal = function() {
+    const modal = document.getElementById('modalNasConfig');
+    if (modal) modal.classList.add('hidden');
+};
+
+window.saveNasConfig = async function() {
+    const user = document.getElementById('nasConfigUser')?.value || '';
+    const pass = document.getElementById('nasConfigPass')?.value || '';
+    const folder = document.getElementById('nasConfigFolder')?.value || '/PACKER';
+    const resultBox = document.getElementById('nasTestResultBox');
+    const btn = document.getElementById('btnSaveNasConfig');
+
+    if (!user || !pass) {
+        showToast('warning', 'Harap masukkan Username dan Password DSM Synology NAS', 'Input Kurang');
+        return;
+    }
+
+    if (btn) btn.disabled = true;
+    if (resultBox) {
+        resultBox.className = 'p-2.5 rounded-xl text-[11px] bg-slate-100 text-slate-700 block';
+        resultBox.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Menyimpan & menguji autentikasi NAS...';
+    }
+
+    try {
+        const formData = new FormData();
+        formData.append('action', 'save_config');
+        formData.append('nas_user', user);
+        formData.append('nas_pass', pass);
+        formData.append('nas_folder', folder);
+
+        const res = await fetch('api/nas_video.php', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.success && data.authenticated) {
+            if (resultBox) {
+                resultBox.className = 'p-2.5 rounded-xl text-[11px] bg-emerald-50 text-emerald-800 border border-emerald-200 block';
+                resultBox.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-600 mr-1"></i> Berhasil terhubung ke Synology NAS 192.168.30.5!';
+            }
+            showToast('success', 'Konfigurasi NAS berhasil disimpan & terhubung!', 'NAS Terhubung');
+            setTimeout(() => {
+                closeNasConfigModal();
+                if (window.currentClaimDossier) {
+                    executeClaimLookup();
+                }
+            }, 1200);
+        } else {
+            if (resultBox) {
+                resultBox.className = 'p-2.5 rounded-xl text-[11px] bg-rose-50 text-rose-800 border border-rose-200 block';
+                resultBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-rose-600 mr-1"></i> ${data.message || 'Login NAS ditolak. Periksa username & password.'}`;
+            }
+            showToast('error', data.message || 'Login NAS ditolak', 'Gagal Login NAS');
+        }
+    } catch (err) {
+        if (resultBox) {
+            resultBox.className = 'p-2.5 rounded-xl text-[11px] bg-rose-50 text-rose-800 border border-rose-200 block';
+            resultBox.innerHTML = `<i class="fa-solid fa-circle-xmark text-rose-600 mr-1"></i> Error: ${err.message}`;
+        }
+        showToast('error', err.message, 'Koneksi Error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
 };
 
 function updateChecklistBadge(iconId, labelId, isOk, textOk, textFail) {

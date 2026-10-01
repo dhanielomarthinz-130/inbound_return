@@ -43,8 +43,8 @@ try {
     if (!empty($returnIds)) {
         $inClause = implode(',', array_fill(0, count($returnIds), '?'));
 
-        // Kumpulkan file foto yang akan dihapus dari disk server online
-        $stmtPhotos = $pdo->prepare("SELECT package_photo, product_photo, photos FROM return_sessions WHERE id IN ($inClause)");
+        // Kumpulkan file foto & video yang akan dihapus dari disk server online
+        $stmtPhotos = $pdo->prepare("SELECT package_photo, product_photo, photos, video_path FROM return_sessions WHERE id IN ($inClause)");
         $stmtPhotos->execute($returnIds);
         $sessions = $stmtPhotos->fetchAll(PDO::FETCH_ASSOC);
 
@@ -54,6 +54,7 @@ try {
 
         $filesToDelete = [];
         foreach ($sessions as $s) {
+            if (!empty($s['video_path'])) $filesToDelete[] = $s['video_path'];
             if (!empty($s['package_photo'])) $filesToDelete[] = $s['package_photo'];
             if (!empty($s['product_photo'])) $filesToDelete[] = $s['product_photo'];
             if (!empty($s['photos'])) {

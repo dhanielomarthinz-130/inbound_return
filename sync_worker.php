@@ -113,9 +113,9 @@ function callInfinityFreeApi($url, $postPayload = null) {
 }
 
 /**
- * Helper Download File Gambar dari Cloud ke Localhost
+ * Helper Download File Media (Foto & Video) dari Cloud ke Localhost
  */
-function downloadCloudPhoto($cloudUrl, $relPath) {
+function downloadCloudFile($cloudUrl, $relPath) {
     if (empty($relPath) || empty($cloudUrl)) return false;
     $targetPath = __DIR__ . '/' . ltrim($relPath, '/');
     $targetDir = dirname($targetPath);
@@ -134,6 +134,10 @@ function downloadCloudPhoto($cloudUrl, $relPath) {
         return file_put_contents($targetPath, $res['body']) !== false;
     }
     return false;
+}
+
+function downloadCloudPhoto($cloudUrl, $relPath) {
+    return downloadCloudFile($cloudUrl, $relPath);
 }
 
 /**
@@ -173,11 +177,14 @@ function executeSyncRound($pdo) {
 
         if (empty($sess) || empty($sess['invoice_number'])) continue;
 
-        // Download semua file foto unboxing ke disk PC Localhost
+        // Download semua file foto & video unboxing ke disk PC Localhost
         foreach ($photoFiles as $pf) {
-            if (downloadCloudPhoto($cloudUrl, $pf)) {
+            if (downloadCloudFile($cloudUrl, $pf)) {
                 $downloadedPhotosCount++;
             }
+        }
+        if (!empty($sess['video_path'])) {
+            downloadCloudFile($cloudUrl, $sess['video_path']);
         }
 
         try {

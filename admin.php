@@ -648,20 +648,57 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                         <span id="claimEligibilityTag" class="px-3 py-1 rounded-lg text-white font-black text-[10px] uppercase tracking-wider shrink-0 self-start sm:self-center">Status</span>
                     </div>
 
-                    <!-- Media Bukti: Video Unboxing & Galeri Foto Bukti (Tanpa Video Packing) -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        <!-- Video Unboxing Retur (Saat Diterima Kembali) -->
+                    <!-- Media Bukti Lengkap: Video Packing (NAS-IEG) + Video Unboxing + Galeri Foto Bukti -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <!-- 1. Video Packing Outbound (Stasiun Packing / NAS-IEG File Station) -->
+                        <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden flex flex-col">
+                            <div class="p-3 bg-slate-900 text-white flex items-center justify-between text-xs">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+                                    <span class="font-bold">1. Video Packing Outbound</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <a id="btnLinkNasFileStation" href="https://192.168.30.5:5001/#/signin" target="_blank" title="Buka Synology NAS File Station" class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 hover:bg-amber-500 hover:text-white text-[10px] font-bold transition flex items-center gap-1">
+                                        <i class="fa-solid fa-server"></i> NAS: PACKER
+                                    </a>
+                                    <button type="button" onclick="openNasConfigModal()" title="Konfigurasi Akun Synology NAS" class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 hover:text-white text-[10px] transition">
+                                        <i class="fa-solid fa-gear"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="relative bg-black aspect-video flex items-center justify-center">
+                                <video id="playerPackingVideo" controls class="w-full h-full object-contain hidden"></video>
+                                <div id="noPackingVideoPlaceholder" class="text-center p-5 text-slate-400 space-y-2">
+                                    <i class="fa-solid fa-box-open text-3xl mb-1 text-amber-400/80 block"></i>
+                                    <span id="packingVideoStatusText" class="text-xs block text-slate-300">Mencari video packing di NAS 192.168.30.5...</span>
+                                    <div class="flex flex-wrap items-center justify-center gap-2 pt-1">
+                                        <a id="btnOpenNasStationDirect" href="https://192.168.30.5:5001/#/signin" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-[11px] rounded-lg shadow-sm transition">
+                                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Buka File Station (PACKER)
+                                        </a>
+                                        <button type="button" onclick="openNasConfigModal()" class="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white font-medium text-[11px] rounded-lg transition">
+                                            <i class="fa-solid fa-key"></i> Atur Login NAS
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-600">
+                                <span>File: <b id="packingFileNameText" class="text-slate-800 truncate max-w-[120px] inline-block align-bottom">-</b></span>
+                                <span id="packingFileDateText" class="text-slate-500">NAS 192.168.30.5:5001</span>
+                            </div>
+                        </div>
+
+                        <!-- 2. Video Unboxing Retur (Saat Diterima Kembali di Gudang) -->
                         <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden flex flex-col">
                             <div class="p-3 bg-slate-900 text-white flex items-center justify-between text-xs">
                                 <div class="flex items-center gap-2">
                                     <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                    <span class="font-bold">1. Rekaman Video Unboxing (Retur di Gudang)</span>
+                                    <span class="font-bold">2. Video Unboxing Retur</span>
                                 </div>
-                                <span class="text-[10px] text-slate-400">Stasiun Inbound Unboxing</span>
+                                <span class="text-[10px] text-slate-400">Stasiun Unboxing</span>
                             </div>
                             <div class="relative bg-black aspect-video flex items-center justify-center">
                                 <video id="playerUnboxingVideo" controls class="w-full h-full object-contain hidden"></video>
-                                <div id="noUnboxingVideoPlaceholder" class="text-center p-6 text-slate-400">
+                                <div id="noUnboxingVideoPlaceholder" class="text-center p-5 text-slate-400">
                                     <i class="fa-solid fa-video-slash text-3xl mb-2 text-slate-600 block"></i>
                                     <span class="text-xs">Video unboxing belum tersedia atau belum direkam di stasiun retur.</span>
                                 </div>
@@ -672,26 +709,26 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             </div>
                         </div>
 
-                        <!-- Galeri Foto Bukti Retur & Serah Terima -->
+                        <!-- 3. Galeri Foto Bukti Retur & Serah Terima -->
                         <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden flex flex-col">
                             <div class="p-3 bg-slate-900 text-white flex items-center justify-between text-xs">
                                 <div class="flex items-center gap-2">
                                     <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
-                                    <span class="font-bold">2. Galeri Foto Bukti (Paket, Produk & Serah Terima)</span>
+                                    <span class="font-bold">3. Galeri Foto Bukti</span>
                                 </div>
                                 <span id="claimPhotoCountBadge" class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold">0 Foto</span>
                             </div>
-                            <div class="flex-1 p-3 bg-slate-950/5 flex flex-col justify-center min-h-[220px]">
-                                <div id="claimPhotoGallery" class="hidden grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[280px] overflow-y-auto pr-1">
+                            <div class="flex-1 p-3 bg-slate-950/5 flex flex-col justify-center min-h-[200px]">
+                                <div id="claimPhotoGallery" class="hidden grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[240px] overflow-y-auto pr-1">
                                     <!-- Thumbnail foto bukti diinject via JS -->
                                 </div>
-                                <div id="noPhotosPlaceholder" class="text-center p-6 text-slate-400">
+                                <div id="noPhotosPlaceholder" class="text-center p-5 text-slate-400">
                                     <i class="fa-solid fa-images text-3xl mb-2 text-slate-300 block"></i>
                                     <span class="text-xs">Belum ada foto bukti tersimpan untuk paket / resi ini.</span>
                                 </div>
                             </div>
                             <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-600">
-                                <span><i class="fa-solid fa-circle-info text-indigo-500 mr-1"></i> Klik foto untuk memperbesar & unduh</span>
+                                <span><i class="fa-solid fa-circle-info text-indigo-500 mr-1"></i> Klik foto untuk perbesar</span>
                                 <span id="claimPhotoTotalText" class="text-slate-500 font-semibold">-</span>
                             </div>
                         </div>
@@ -1687,6 +1724,70 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 <button onclick="closeClaimPhotoModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-xs transition">
                     Tutup
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL KONFIGURASI SYNOLOGY NAS-IEG (192.168.30.5:5001) -->
+    <div id="modalNasConfig" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-sm font-bold">
+                        <i class="fa-solid fa-server"></i>
+                    </span>
+                    <div>
+                        <h3 class="text-sm font-black text-slate-800">Koneksi Synology NAS-IEG</h3>
+                        <p class="text-[11px] text-slate-400">File Station: Folder /PACKER</p>
+                    </div>
+                </div>
+                <button onclick="closeNasConfigModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <div class="p-3 bg-amber-50/70 border border-amber-200/80 rounded-2xl text-[11px] text-amber-900 leading-relaxed">
+                    <i class="fa-solid fa-circle-info text-amber-600 mr-1"></i>
+                    Video packing diambil langsung dari Synology NAS di <b>https://192.168.30.5:5001/</b> pada folder <b>/PACKER</b>.
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Alamat IP / Port NAS</label>
+                    <input type="text" id="nasConfigHost" value="https://192.168.30.5:5001" disabled class="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-slate-500 font-mono text-xs cursor-not-allowed">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Folder Video Packing</label>
+                    <input type="text" id="nasConfigFolder" value="/PACKER" placeholder="/PACKER" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-slate-700 font-mono text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Username DSM</label>
+                        <input type="text" id="nasConfigUser" placeholder="admin" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-slate-700 font-mono text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Password DSM</label>
+                        <input type="password" id="nasConfigPass" placeholder="••••••••" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-slate-700 font-mono text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div id="nasTestResultBox" class="hidden p-2.5 rounded-xl text-[11px]"></div>
+            </div>
+
+            <div class="pt-2 flex items-center justify-between gap-2">
+                <a href="https://192.168.30.5:5001/#/signin" target="_blank" class="px-3 py-2 text-[11px] text-amber-700 hover:text-amber-800 font-bold flex items-center gap-1">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Buka NAS
+                </a>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="closeNasConfigModal()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition">
+                        Batal
+                    </button>
+                    <button type="button" id="btnSaveNasConfig" onclick="saveNasConfig()" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs shadow-sm transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-floppy-disk"></i> Simpan & Hubungkan
+                    </button>
+                </div>
             </div>
         </div>
     </div>
