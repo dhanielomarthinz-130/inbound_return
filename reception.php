@@ -112,7 +112,7 @@ try {
     </header>
 
     <!-- WORKSPACE UTAMA -->
-    <main class="w-full max-w-5xl mx-auto px-3 md:px-6 py-4 space-y-4 flex-1 no-print">
+    <main class="w-full max-w-5xl mx-auto px-3 md:px-6 py-4 pb-12 space-y-4 flex-1 no-print">
 
         <!-- TAB MENU: 1. INPUT SCAN PENERIMAAN | 2. RIWAYAT HARI INI -->
         <div class="flex items-center justify-between bg-white p-1 rounded-2xl border border-slate-200 shadow-sm">
@@ -367,12 +367,27 @@ try {
                 </div>
             </div>
 
-            <!-- TOMBOL SUBMIT PENERIMAAN (DESKTOP / INLINE) -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-4">
-                <button id="btnSubmitReception" onclick="submitCompleteReception()" type="button" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-2xl font-black text-sm transition shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-check-double text-base"></i>
-                    <span>Simpan & Selesaikan Penerimaan (<span id="btnSubmitCount">0</span> Paket)</span>
-                </button>
+            <!-- TOMBOL SUBMIT PENERIMAAN (TUNGGAL, BERSIH & RESPONSIF) -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-4 sm:p-5">
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div class="flex items-center gap-3 w-full sm:w-auto">
+                        <div class="w-11 h-11 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-black text-lg shrink-0 border border-emerald-500/20">
+                            <i class="fa-solid fa-boxes-stacked"></i>
+                        </div>
+                        <div class="leading-tight">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-bold text-slate-800">Serah Terima Paket</span>
+                                <span id="submitExpeditionBadge" class="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">Semua Ekspedisi</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400 mt-0.5">Pastikan nomor resi dan foto bukti fisik telah lengkap</p>
+                        </div>
+                    </div>
+                    
+                    <button id="btnSubmitReception" onclick="submitCompleteReception()" type="button" class="w-full sm:w-auto px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-2xl font-black text-sm transition shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2.5">
+                        <i class="fa-solid fa-check-double text-base"></i>
+                        <span>Simpan & Selesaikan Penerimaan (<span id="btnSubmitCount">0</span> Paket)</span>
+                    </button>
+                </div>
             </div>
 
         </div>
@@ -420,24 +435,6 @@ try {
         </div>
 
     </main>
-
-    <!-- FLOATING BOTTOM BAR UNTUK MOBILE (STICKY ACTION) -->
-    <div class="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200 p-3 flex md:hidden items-center justify-between gap-2 z-20 shadow-lg no-print">
-        <div class="flex items-center gap-2">
-            <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-black text-base shrink-0">
-                <span id="mobileCountBadge">0</span>
-            </div>
-            <div class="leading-tight">
-                <p class="text-[10px] text-slate-400 font-semibold">Total Paket</p>
-                <p id="mobileExpBadge" class="text-xs font-bold text-slate-800 truncate max-w-[120px]">Pilih Ekspedisi</p>
-            </div>
-        </div>
-
-        <button onclick="submitCompleteReception()" type="button" class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl transition shadow-md shadow-emerald-600/30 flex items-center justify-center gap-2">
-            <i class="fa-solid fa-check"></i>
-            <span>Simpan (<span id="mobileBtnCount">0</span>)</span>
-        </button>
-    </div>
 
     <!-- MODAL DETAIL / BUKTI TANDA TERIMA CETAK -->
     <div id="receiptModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -567,6 +564,14 @@ try {
 
     <!-- AUDIO BEEP & SHUTTER SYNTHESIZER -->
     <script>
+        // Helper Safe Dom Text Setter
+        function setText(idOrEl, text) {
+            const el = (typeof idOrEl === 'string') ? document.getElementById(idOrEl) : idOrEl;
+            if (el) {
+                el.innerText = (text !== null && text !== undefined) ? text : '';
+            }
+        }
+
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         
         function playBeep(type = 'success') {
@@ -880,7 +885,7 @@ try {
             const emptyEl = document.getElementById('receptionPhotoEmpty');
             const galleryEl = document.getElementById('receptionPhotoGallery');
 
-            if (countLabel) countLabel.innerText = count;
+            setText(countLabel, count);
 
             if (count === 0) {
                 if (emptyEl) emptyEl.classList.remove('hidden');
@@ -941,12 +946,14 @@ try {
             const title = document.getElementById('receptionPhotoModalTitle');
             const dlBtn = document.getElementById('btnDownloadReceptionPhoto');
 
-            img.src = item.dataUrl;
-            title.innerText = `Bukti Foto Paket #${index + 1} • Inbound Receiving`;
-            dlBtn.href = item.dataUrl;
-            dlBtn.download = `rcv_foto_paket_${index + 1}_${Date.now()}.jpg`;
+            if (img) img.src = item.dataUrl;
+            setText(title, `Bukti Foto Paket #${index + 1} • Inbound Receiving`);
+            if (dlBtn) {
+                dlBtn.href = item.dataUrl;
+                dlBtn.download = `rcv_foto_paket_${index + 1}_${Date.now()}.jpg`;
+            }
 
-            modal.classList.remove('hidden');
+            if (modal) modal.classList.remove('hidden');
         }
 
         function closeReceptionPhotoModal() {
@@ -977,21 +984,23 @@ try {
         // Event perubahan Ekspedisi
         function onExpeditionChanged() {
             const sel = document.getElementById('selectExpedition');
-            const expName = sel.value;
-            const mobileExp = document.getElementById('mobileExpBadge');
-            if (mobileExp) mobileExp.innerText = expName || 'Pilih Ekspedisi';
-            document.getElementById('inputPackageBarcode').focus();
+            const expName = sel ? sel.value : '';
+            setText('mobileExpBadge', expName || 'Pilih Ekspedisi');
+            setText('submitExpeditionBadge', expName || 'Semua Ekspedisi');
+            document.getElementById('inputPackageBarcode')?.focus();
         }
 
         // Tambah Barcode Paket ke List
         function submitPackageBarcode() {
             const input = document.getElementById('inputPackageBarcode');
-            const barcode = (input.value || '').trim();
+            const barcode = (input ? input.value : '').trim();
             if (!barcode) return;
 
             addPackageToList(barcode);
-            input.value = '';
-            input.focus();
+            if (input) {
+                input.value = '';
+                input.focus();
+            }
         }
 
         function addPackageToList(barcode) {
@@ -1000,7 +1009,7 @@ try {
 
             // Auto-detect ekspedisi jika belum dipilih
             const selectExp = document.getElementById('selectExpedition');
-            if (!selectExp.value) {
+            if (selectExp && !selectExp.value) {
                 detectExpeditionFromBarcode(cleanBarcode);
             }
 
@@ -1033,6 +1042,7 @@ try {
         function detectExpeditionFromBarcode(code) {
             const upper = code.toUpperCase();
             const selectExp = document.getElementById('selectExpedition');
+            if (!selectExp) return;
             for (let i = 0; i < selectExp.options.length; i++) {
                 const opt = selectExp.options[i];
                 const prefixStr = opt.getAttribute('data-prefix') || '';
@@ -1051,11 +1061,11 @@ try {
         // Render Daftar Paket di UI
         function renderPackageList() {
             const count = scannedPackages.length;
-            document.getElementById('packageCountBadge').innerText = count;
-            document.getElementById('btnSubmitCount').innerText = count;
-            document.getElementById('listCountLabel').innerText = count;
-            document.getElementById('mobileCountBadge').innerText = count;
-            document.getElementById('mobileBtnCount').innerText = count;
+            setText('packageCountBadge', count);
+            setText('btnSubmitCount', count);
+            setText('listCountLabel', count);
+            setText('mobileCountBadge', count);
+            setText('mobileBtnCount', count);
 
             const emptyBox = document.getElementById('packageListEmpty');
             const container = document.getElementById('packageListContainer');
@@ -1206,9 +1216,11 @@ try {
             if (!confirm(confirmMsg)) return;
 
             const btn = document.getElementById('btnSubmitReception');
-            const origText = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan Penerimaan & Foto...';
+            const origText = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan Penerimaan & Foto...';
+            }
 
             try {
                 const payload = {
@@ -1246,32 +1258,36 @@ try {
                     alert('Gagal menyimpan: ' + (data.error || 'Terjadi kesalahan sistem'));
                 }
             } catch (err) {
-                alert('Terjadi kesalahan jaringan: ' + err.message);
+                console.error('Error submitCompleteReception:', err);
+                alert('Terjadi kesalahan saat memproses data: ' + err.message);
             } finally {
-                btn.disabled = false;
-                btn.innerHTML = origText;
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = origText;
+                }
             }
         }
 
         // Tampilkan Modal Tanda Terima (Slip Cetak)
         function showReceiptModal(data) {
-            document.getElementById('slipReceiptNo').innerText = data.receipt_number;
-            document.getElementById('slipExpedition').innerText = data.expedition;
-            document.getElementById('slipDateTime').innerText = data.created_at;
-            document.getElementById('slipCourier').innerText = data.courier_name || '-';
-            document.getElementById('slipTotalPackages').innerText = data.total_packages;
+            setText('slipReceiptNo', data.receipt_number || '-');
+            setText('slipExpedition', data.expedition || '-');
+            setText('slipDateTime', data.created_at || '-');
+            setText('slipCourier', data.courier_name || '-');
+            setText('slipTotalPackages', data.total_packages || 0);
 
             const listEl = document.getElementById('slipPackageList');
-            let listHtml = '';
-            (data.packages || []).forEach((bar, i) => {
-                listHtml += `<div class="flex justify-between border-b border-slate-100 py-0.5"><span>${i + 1}. ${escapeHtml(bar)}</span><span class="text-[9px] text-slate-400">OK</span></div>`;
-            });
-            listEl.innerHTML = listHtml;
+            if (listEl) {
+                let listHtml = '';
+                (data.packages || []).forEach((bar, i) => {
+                    listHtml += `<div class="flex justify-between border-b border-slate-100 py-0.5"><span>${i + 1}. ${escapeHtml(bar)}</span><span class="text-[9px] text-slate-400">OK</span></div>`;
+                });
+                listEl.innerHTML = listHtml;
+            }
 
             // Render Foto-foto Bukti Paket di Slip
             const photoSection = document.getElementById('slipPhotoSection');
             const photoContainer = document.getElementById('slipPhotoContainer');
-            const photoCountLabel = document.getElementById('slipPhotoCount');
 
             let photosToDisplay = [];
             if (Array.isArray(data.photos)) {
@@ -1283,8 +1299,8 @@ try {
             }
 
             if (photosToDisplay && photosToDisplay.length > 0) {
-                photoSection.classList.remove('hidden');
-                photoCountLabel.innerText = photosToDisplay.length;
+                if (photoSection) photoSection.classList.remove('hidden');
+                setText('slipPhotoCount', photosToDisplay.length);
                 let photoHtml = '';
                 photosToDisplay.forEach((pUrl, idx) => {
                     photoHtml += `
@@ -1293,13 +1309,14 @@ try {
                         </div>
                     `;
                 });
-                photoContainer.innerHTML = photoHtml;
+                if (photoContainer) photoContainer.innerHTML = photoHtml;
             } else {
-                photoSection.classList.add('hidden');
-                photoContainer.innerHTML = '';
+                if (photoSection) photoSection.classList.add('hidden');
+                if (photoContainer) photoContainer.innerHTML = '';
             }
 
-            document.getElementById('receiptModal').classList.remove('hidden');
+            const receiptModalEl = document.getElementById('receiptModal');
+            if (receiptModalEl) receiptModalEl.classList.remove('hidden');
         }
 
         function previewImageDirect(url) {
@@ -1308,16 +1325,19 @@ try {
             const title = document.getElementById('receptionPhotoModalTitle');
             const dlBtn = document.getElementById('btnDownloadReceptionPhoto');
 
-            img.src = url;
-            title.innerText = 'Bukti Foto Serah Terima Paket';
-            dlBtn.href = url;
-            dlBtn.download = `rcv_foto_paket_${Date.now()}.jpg`;
+            if (img) img.src = url;
+            setText(title, 'Bukti Foto Serah Terima Paket');
+            if (dlBtn) {
+                dlBtn.href = url;
+                dlBtn.download = `rcv_foto_paket_${Date.now()}.jpg`;
+            }
 
-            modal.classList.remove('hidden');
+            if (modal) modal.classList.remove('hidden');
         }
 
         function closeReceiptModal() {
-            document.getElementById('receiptModal').classList.add('hidden');
+            const el = document.getElementById('receiptModal');
+            if (el) el.classList.add('hidden');
         }
 
         function startNewReceptionAfterSave() {
@@ -1328,13 +1348,15 @@ try {
         function resetReceptionForm() {
             scannedPackages = [];
             capturedReceptionPhotos = [];
-            document.getElementById('inputCourierName').value = '';
-            document.getElementById('inputPackageBarcode').value = '';
+            const courierInput = document.getElementById('inputCourierName');
+            const pkgInput = document.getElementById('inputPackageBarcode');
+            if (courierInput) courierInput.value = '';
+            if (pkgInput) pkgInput.value = '';
             renderPackageList();
             renderReceptionPhotoGallery();
             generateReceiptId();
             dismissStatusMsg();
-            document.getElementById('inputPackageBarcode').focus();
+            pkgInput?.focus();
         }
 
         // Tab Switcher
@@ -1345,16 +1367,16 @@ try {
             const viewHist = document.getElementById('viewHistory');
 
             if (tab === 'scan') {
-                btnScan.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 bg-emerald-600 text-white shadow-sm';
-                btnHist.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900';
-                viewScan.classList.remove('hidden');
-                viewHist.classList.add('hidden');
-                document.getElementById('inputPackageBarcode').focus();
+                if (btnScan) btnScan.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 bg-emerald-600 text-white shadow-sm';
+                if (btnHist) btnHist.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900';
+                if (viewScan) viewScan.classList.remove('hidden');
+                if (viewHist) viewHist.classList.add('hidden');
+                document.getElementById('inputPackageBarcode')?.focus();
             } else {
-                btnHist.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 bg-emerald-600 text-white shadow-sm';
-                btnScan.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900';
-                viewScan.classList.add('hidden');
-                viewHist.classList.remove('hidden');
+                if (btnHist) btnHist.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 bg-emerald-600 text-white shadow-sm';
+                if (btnScan) btnScan.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900';
+                if (viewScan) viewScan.classList.add('hidden');
+                if (viewHist) viewHist.classList.remove('hidden');
                 loadHistoryData();
             }
         }
@@ -1362,8 +1384,8 @@ try {
         // Muat Riwayat Penerimaan Hari Ini
         async function loadHistoryData() {
             const dateInput = document.getElementById('historyDateFilter');
-            const selectedDate = dateInput.value || new Date().toISOString().slice(0, 10);
-            if (!dateInput.value) dateInput.value = selectedDate;
+            const selectedDate = (dateInput && dateInput.value) ? dateInput.value : new Date().toISOString().slice(0, 10);
+            if (dateInput && !dateInput.value) dateInput.value = selectedDate;
 
             try {
                 const res = await fetch(`api/reception.php?action=list&date=${selectedDate}`);
@@ -1372,7 +1394,7 @@ try {
                 const badge = document.getElementById('historyCountBadge');
 
                 if (data && data.success && Array.isArray(data.data)) {
-                    badge.innerText = data.data.length;
+                    setText(badge, data.data.length);
                     if (data.data.length === 0) {
                         tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-slate-400">Belum ada penerimaan ekspedisi pada tanggal ini.</td></tr>';
                         return;
