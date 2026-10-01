@@ -147,19 +147,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             transform: scale(0.92);
             background-color: #cbd5e1;
         }
+        /* Responsif Height & Multi-Screen Aware untuk Layar Laptop / Kiosk Touchscreen */
+        @media (max-height: 760px) {
+            body { padding: 0.5rem !important; }
+            .login-card { padding: 1.25rem 1.5rem !important; space-y: 0.75rem !important; }
+            .login-header-logo { width: 3rem !important; height: 3rem !important; margin-bottom: 0 !important; }
+            .login-header-title { font-size: 1.25rem !important; }
+            .login-header-desc { display: none !important; }
+            .numpad-btn { padding-top: 0.4rem !important; padding-bottom: 0.4rem !important; font-size: 0.875rem !important; }
+        }
+        @media (max-height: 640px) {
+            .login-header-logo { display: none !important; }
+            .login-card { padding: 0.75rem 1rem !important; }
+        }
     </style>
 </head>
-<body class="bg-gradient-to-br from-slate-100 via-indigo-50/50 to-slate-200 min-h-screen flex items-center justify-center p-4 font-sans text-slate-800">
+<body class="bg-gradient-to-br from-slate-100 via-indigo-50/50 to-slate-200 min-h-screen flex items-center justify-center p-3 sm:p-4 md:p-6 font-sans text-slate-800">
 
-    <div class="w-full max-w-md bg-white rounded-3xl shadow-2xl shadow-indigo-900/10 border border-slate-200/90 p-6 md:p-8 space-y-6">
+    <div id="loginCard" class="login-card w-full <?= $activeTab === 'operator' ? 'max-w-2xl' : 'max-w-md' ?> bg-white rounded-3xl shadow-2xl shadow-indigo-900/10 border border-slate-200/90 p-5 sm:p-6 md:p-8 space-y-4 md:space-y-5 transition-all duration-300 my-auto">
         
         <!-- Header & Logo -->
-        <div class="text-center space-y-2">
-            <div class="inline-flex items-center justify-center w-16 h-16 p-2 rounded-2xl bg-white border border-slate-200 shadow-md mb-1">
+        <div class="text-center space-y-1.5">
+            <div class="login-header-logo inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 p-2 rounded-2xl bg-white border border-slate-200 shadow-md mb-0.5">
                 <img src="assets/image/logo-IEG.png" alt="Logo IEG" class="w-full h-full object-contain">
             </div>
-            <h2 class="text-2xl font-black text-slate-900 tracking-tight">Inbound Return IEG</h2>
-            <p class="text-xs text-slate-400 font-medium">Sistem Verifikasi & Unboxing Pengembalian Barang</p>
+            <h2 class="login-header-title text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Inbound Return IEG</h2>
+            <p class="login-header-desc text-xs text-slate-400 font-medium">Sistem Verifikasi & Unboxing Pengembalian Barang</p>
         </div>
 
         <!-- 2 TAB SWITCHER: ADMIN (PASSWORD) & OPERATOR (PIN) -->
@@ -228,104 +241,129 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <!-- ======================================================== -->
         <!-- FORM 2: LOGIN OPERATOR (OPERATOR & PIN) -->
         <!-- ======================================================== -->
-        <div id="sectionOperator" class="<?= $activeTab === 'operator' ? '' : 'hidden' ?> space-y-4">
-            <form method="POST" action="login" id="formOperator" class="space-y-4">
+        <div id="sectionOperator" class="<?= $activeTab === 'operator' ? '' : 'hidden' ?>">
+            <form method="POST" action="login" id="formOperator">
                 <input type="hidden" name="tab" value="operator">
 
-                <!-- INFO LOGIN OPERATOR -->
-                <div class="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-3 flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm shadow-emerald-600/30">
-                        <i class="fa-solid fa-shapes"></i>
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 items-stretch">
+                    <!-- KOLOM KIRI: INFO, PILIH AKUN, INPUT PIN, & SUBMIT DESKTOP -->
+                    <div class="md:col-span-6 flex flex-col justify-between space-y-3.5">
+                        <div class="space-y-3.5">
+                            <!-- INFO LOGIN OPERATOR -->
+                            <div class="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-3 flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm shadow-emerald-600/30">
+                                    <i class="fa-solid fa-shapes"></i>
+                                </div>
+                                <div class="leading-tight">
+                                    <span class="text-xs font-bold text-emerald-900 block">Stasiun Operator Inbound</span>
+                                    <span class="text-[10px] text-emerald-700">Pilih akun & masukkan PIN untuk akses sistem</span>
+                                </div>
+                            </div>
+                            
+                            <!-- PILIH AKUN OPERATOR -->
+                            <div>
+                                <div class="flex items-center justify-between mb-1.5">
+                                    <label class="block text-xs font-bold text-slate-600">Pilih Akun Operator</label>
+                                    <button type="button" onclick="toggleManualOperatorInput()" id="btnToggleManualOp" class="text-[11px] text-emerald-600 hover:text-emerald-700 font-bold transition">
+                                        <i class="fa-solid fa-keyboard"></i> Ketik Manual
+                                    </button>
+                                </div>
+
+                                <!-- Dropdown Pilihan Operator Aktif -->
+                                <div id="containerOpSelect" class="relative">
+                                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
+                                        <i class="fa-solid fa-user-check"></i>
+                                    </span>
+                                    <select name="operator_username" id="operatorSelect" onchange="onOperatorSelected()"
+                                        class="w-full pl-10 pr-8 py-2.5 bg-slate-50 border border-slate-300 rounded-2xl text-xs font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition appearance-none">
+                                        <option value="">-- Pilih Operator Inbound --</option>
+                                        <?php foreach ($operators as $op): ?>
+                                            <option value="<?= htmlspecialchars($op['username']) ?>" <?= (isset($_POST['operator_username']) && $_POST['operator_username'] === $op['username']) ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars(!empty($op['name']) ? $op['name'] : $op['username']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <span class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400 text-xs">
+                                        <i class="fa-solid fa-chevron-down"></i>
+                                    </span>
+                                </div>
+
+                                <!-- Input Manual Alternatif -->
+                                <div id="containerOpInput" class="relative hidden">
+                                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
+                                        <i class="fa-solid fa-user-pen"></i>
+                                    </span>
+                                    <input type="text" id="operatorManualInput" placeholder="Masukkan username operator..."
+                                        class="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-2xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition">
+                                </div>
+                            </div>
+
+                            <!-- Input PIN Operator -->
+                            <div>
+                                <div class="mb-1.5 flex items-center justify-between">
+                                    <label class="block text-xs font-bold text-slate-600">PIN Keamanan (6 Digit)</label>
+                                    <span class="text-[10px] text-slate-400 font-medium">Numpad / Keyboard</span>
+                                </div>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
+                                        <i class="fa-solid fa-key"></i>
+                                    </span>
+                                    <input type="password" name="pin" id="operatorPin" required maxlength="10" inputmode="numeric" pattern="[0-9]*" placeholder="••••••"
+                                        class="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-mono tracking-widest text-center font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition">
+                                    <button type="button" onclick="toggleOperatorPin()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 text-sm">
+                                        <i class="fa-solid fa-eye" id="operatorEyeIcon"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SUBMIT BUTTON DESKTOP (tampil di bawah form kiri di layar laptop/desktop) -->
+                        <div class="hidden md:block pt-1">
+                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-2xl text-xs transition duration-200 flex items-center justify-center gap-2 shadow-md shadow-emerald-600/30">
+                                <span>Masuk sebagai Operator</span>
+                                <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                            </button>
+                        </div>
                     </div>
-                    <div class="leading-tight">
-                        <span class="text-xs font-bold text-emerald-900 block">Stasiun Operator Inbound</span>
-                        <span class="text-[10px] text-emerald-700">Pilih akun & masukkan PIN untuk mengakses Menu Portal</span>
+
+                    <!-- KOLOM KANAN: INTERACTIVE TOUCH NUMPAD & SUBMIT MOBILE -->
+                    <div class="md:col-span-6 flex flex-col justify-between">
+                        <div class="bg-slate-50/90 border border-slate-200/90 rounded-2xl p-2.5 sm:p-3 flex-1 flex flex-col justify-center">
+                            <div class="text-[11px] font-bold text-slate-500 text-center mb-2 flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-calculator text-emerald-600"></i> Numpad Sentuh Cepat
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 flex-1">
+                                <button type="button" onclick="appendPin('1')" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">1</button>
+                                <button type="button" onclick="appendPin('2')" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">2</button>
+                                <button type="button" onclick="appendPin('3')" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">3</button>
+                                
+                                <button type="button" onclick="appendPin('4')" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">4</button>
+                                <button type="button" onclick="appendPin('5')" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">5</button>
+                                <button type="button" onclick="appendPin('6')" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">6</button>
+                                
+                                <button type="button" onclick="appendPin('7')" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">7</button>
+                                <button type="button" onclick="appendPin('8')" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">8</button>
+                                <button type="button" onclick="appendPin('9')" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">9</button>
+                                
+                                <button type="button" onclick="clearPin()" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold shadow-sm hover:bg-rose-100 flex items-center justify-center">
+                                    <span>HAPUS</span>
+                                </button>
+                                <button type="button" onclick="appendPin('0')" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">0</button>
+                                <button type="button" onclick="backspacePin()" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm font-bold shadow-sm hover:bg-amber-100 flex items-center justify-center">
+                                    <i class="fa-solid fa-delete-left"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- SUBMIT BUTTON MOBILE (hanya tampil di layar ponsel/vertikal) -->
+                        <div class="block md:hidden mt-3">
+                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-2xl text-xs transition duration-200 flex items-center justify-center gap-2 shadow-md shadow-emerald-600/30">
+                                <span>Masuk sebagai Operator</span>
+                                <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
-                
-                <div>
-                    <div class="flex items-center justify-between mb-1.5">
-                        <label class="block text-xs font-bold text-slate-600">Pilih Akun Operator</label>
-                        <button type="button" onclick="toggleManualOperatorInput()" id="btnToggleManualOp" class="text-[11px] text-emerald-600 hover:text-emerald-700 font-bold transition">
-                            <i class="fa-solid fa-keyboard"></i> Ketik Manual
-                        </button>
-                    </div>
-
-                    <!-- Dropdown Pilihan Operator Aktif -->
-                    <div id="containerOpSelect" class="relative">
-                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
-                            <i class="fa-solid fa-user-check"></i>
-                        </span>
-                        <select name="operator_username" id="operatorSelect" onchange="onOperatorSelected()"
-                            class="w-full pl-10 pr-8 py-2.5 bg-slate-50 border border-slate-300 rounded-2xl text-xs font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition appearance-none">
-                            <option value="">-- Pilih Operator Inbound --</option>
-                            <?php foreach ($operators as $op): ?>
-                                <option value="<?= htmlspecialchars($op['username']) ?>" <?= (isset($_POST['operator_username']) && $_POST['operator_username'] === $op['username']) ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars(!empty($op['name']) ? $op['name'] : $op['username']) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <span class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400 text-xs">
-                            <i class="fa-solid fa-chevron-down"></i>
-                        </span>
-                    </div>
-
-                    <!-- Input Manual Alternatif -->
-                    <div id="containerOpInput" class="relative hidden">
-                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
-                            <i class="fa-solid fa-user-pen"></i>
-                        </span>
-                        <input type="text" id="operatorManualInput" placeholder="Masukkan username operator..."
-                            class="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-2xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition">
-                    </div>
-                </div>
-
-                <!-- Input PIN Operator -->
-                <div>
-                    <div class="mb-1.5">
-                        <label class="block text-xs font-bold text-slate-600">PIN Keamanan (6 Digit)</label>
-                    </div>
-                    <div class="relative">
-                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
-                            <i class="fa-solid fa-key"></i>
-                        </span>
-                        <input type="password" name="pin" id="operatorPin" required maxlength="10" inputmode="numeric" pattern="[0-9]*" placeholder="••••••"
-                            class="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-mono tracking-widest text-center font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition">
-                        <button type="button" onclick="toggleOperatorPin()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 text-sm">
-                            <i class="fa-solid fa-eye" id="operatorEyeIcon"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- INTERACTIVE TOUCH NUMPAD UNTUK OPERATOR -->
-                <div class="bg-slate-50/80 border border-slate-200/90 rounded-2xl p-2.5">
-                    <div class="grid grid-cols-3 gap-2">
-                        <button type="button" onclick="appendPin('1')" class="numpad-btn py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">1</button>
-                        <button type="button" onclick="appendPin('2')" class="numpad-btn py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">2</button>
-                        <button type="button" onclick="appendPin('3')" class="numpad-btn py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">3</button>
-                        
-                        <button type="button" onclick="appendPin('4')" class="numpad-btn py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">4</button>
-                        <button type="button" onclick="appendPin('5')" class="numpad-btn py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">5</button>
-                        <button type="button" onclick="appendPin('6')" class="numpad-btn py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">6</button>
-                        
-                        <button type="button" onclick="appendPin('7')" class="numpad-btn py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">7</button>
-                        <button type="button" onclick="appendPin('8')" class="numpad-btn py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">8</button>
-                        <button type="button" onclick="appendPin('9')" class="numpad-btn py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">9</button>
-                        
-                        <button type="button" onclick="clearPin()" class="numpad-btn py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold shadow-sm hover:bg-rose-100 flex items-center justify-center">
-                            <span>HAPUS</span>
-                        </button>
-                        <button type="button" onclick="appendPin('0')" class="numpad-btn py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">0</button>
-                        <button type="button" onclick="backspacePin()" class="numpad-btn py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm font-bold shadow-sm hover:bg-amber-100 flex items-center justify-center">
-                            <i class="fa-solid fa-delete-left"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-2xl text-xs transition duration-200 flex items-center justify-center gap-2 shadow-md shadow-emerald-600/30">
-                    <span>Masuk sebagai Operator</span>
-                    <i class="fa-solid fa-arrow-right-to-bracket"></i>
-                </button>
             </form>
         </div>
 
@@ -335,16 +373,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <script src="assets/js/toast.js?v=<?= file_exists(__DIR__ . '/assets/js/toast.js') ? filemtime(__DIR__ . '/assets/js/toast.js') : time() ?>"></script>
     <script>
-    // Tab switching logic
+    // Tab switching logic with automatic card resizing
     function switchLoginTab(tab) {
         const secAdmin = document.getElementById('sectionAdmin');
         const secOperator = document.getElementById('sectionOperator');
         const btnAdmin = document.getElementById('tabBtnAdmin');
         const btnOperator = document.getElementById('tabBtnOperator');
+        const loginCard = document.getElementById('loginCard');
 
         if (tab === 'operator') {
             secAdmin.classList.add('hidden');
             secOperator.classList.remove('hidden');
+
+            if (loginCard) {
+                loginCard.classList.remove('max-w-md');
+                loginCard.classList.add('max-w-2xl');
+            }
 
             btnAdmin.className = 'flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition duration-200 text-slate-500 hover:text-slate-800';
             btnAdmin.querySelector('span:last-child').className = 'text-[10px] px-1.5 py-0.5 rounded-md font-mono bg-slate-200 text-slate-500';
@@ -361,6 +405,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             secOperator.classList.add('hidden');
             secAdmin.classList.remove('hidden');
+
+            if (loginCard) {
+                loginCard.classList.remove('max-w-2xl');
+                loginCard.classList.add('max-w-md');
+            }
 
             btnOperator.className = 'flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition duration-200 text-slate-500 hover:text-slate-800';
             btnOperator.querySelector('span:last-child').className = 'text-[10px] px-1.5 py-0.5 rounded-md font-mono bg-slate-200 text-slate-500';
