@@ -25,6 +25,8 @@ const TAB_SLUG_MAP = {
     'dashboard': 'dashboard',
     'receiving': 'receiving-inbound',
     'transactions': 'inbound-unboxing',
+    'claims': 'klaim',
+    'orders': 'data-orders',
     'products': 'master-produk',
     'expeditions': 'master-ekspedisi',
     'conditions': 'master-kondisi',
@@ -38,6 +40,10 @@ const SLUG_TAB_MAP = {
     'receiving': 'receiving',
     'inbound-unboxing': 'transactions',
     'transactions': 'transactions',
+    'klaim': 'claims',
+    'claims': 'claims',
+    'data-orders': 'orders',
+    'orders': 'orders',
     'master-produk': 'products',
     'products': 'products',
     'master-ekspedisi': 'expeditions',
@@ -69,6 +75,19 @@ function updateBrowserUrl(pushHistory = false) {
         const searchInput = document.getElementById('filterSearch');
         if (searchInput && searchInput.value.trim()) {
             params.set('search', searchInput.value.trim());
+        }
+    } else if (currentTab === 'orders') {
+        const searchInput = document.getElementById('orderSearchInput');
+        const platformFilter = document.getElementById('orderPlatformFilter');
+        const dateFilter = document.getElementById('orderDateFilter');
+        if (searchInput && searchInput.value.trim()) {
+            params.set('search', searchInput.value.trim());
+        }
+        if (platformFilter && platformFilter.value !== 'ALL') {
+            params.set('platform', platformFilter.value);
+        }
+        if (dateFilter && dateFilter.value) {
+            params.set('period', dateFilter.value);
         }
     } else if (currentTab === 'products') {
         const shopFilter = document.getElementById('filterProductShop');
@@ -170,6 +189,7 @@ window.switchTab = function(tabName, updateUrl = true) {
         else if (tabName === 'receiving') titleEl.innerText = 'Receiving Inbound - Penerimaan Ekspedisi';
         else if (tabName === 'transactions') titleEl.innerText = 'Inbound Unboxing';
         else if (tabName === 'claims') titleEl.innerText = 'Pusat Klaim & Banding Ekspedisi';
+        else if (tabName === 'orders') titleEl.innerText = 'Data Orders OCS (Sinkronisasi Pesanan)';
         else if (tabName === 'products') titleEl.innerText = 'Master Data Produk & Barcode';
         else if (tabName === 'expeditions') titleEl.innerText = 'Master Data Ekspedisi & Kurir';
         else if (tabName === 'conditions') titleEl.innerText = 'Master Data Kondisi Produk';
@@ -188,6 +208,10 @@ window.switchTab = function(tabName, updateUrl = true) {
     if (tabName === 'products') loadProducts();
     if (tabName === 'transactions') loadTransactions();
     if (tabName === 'claims') loadClaimCandidates();
+    if (tabName === 'orders') {
+        if (typeof loadOrdersStats === 'function') loadOrdersStats();
+        if (typeof loadOrdersTable === 'function') loadOrdersTable(1);
+    }
     if (tabName === 'expeditions') loadExpeditions();
     if (tabName === 'conditions') loadConditions();
     if (tabName === 'users') loadUsers();
@@ -1761,6 +1785,21 @@ function initFromUrlParams() {
     if (targetTab === 'transactions' && searchParam) {
         const searchInput = document.getElementById('filterSearch');
         if (searchInput) searchInput.value = searchParam;
+    } else if (targetTab === 'orders') {
+        if (searchParam) {
+            const ordSearch = document.getElementById('orderSearchInput');
+            if (ordSearch) ordSearch.value = searchParam;
+        }
+        const platformParam = params.get('platform');
+        if (platformParam) {
+            const platSelect = document.getElementById('orderPlatformFilter');
+            if (platSelect) platSelect.value = platformParam;
+        }
+        const periodParam = params.get('period');
+        if (periodParam) {
+            const periodSelect = document.getElementById('orderDateFilter');
+            if (periodSelect) periodSelect.value = periodParam;
+        }
     } else if (targetTab === 'products') {
         if (searchParam) {
             const prodSearchInput = document.getElementById('filterProductSearch');
@@ -3245,9 +3284,15 @@ window.executeOcsOrderSync = async function() {
 
             showToast('success', `Berhasil menyinkron ${result.total_synced || 0} orders dengan total nilai klaim ${result.total_claim_amount_fmt || 'Rp 0'}!`, 'Sinkronisasi Selesai');
 
-            // Refresh kandidat klaim jika fungsi tersedia
+            // Refresh data setelah sync sukses
             if (typeof loadClaimCandidates === 'function') {
                 loadClaimCandidates(true);
+            }
+            if (typeof loadOrdersStats === 'function') {
+                loadOrdersStats();
+            }
+            if (typeof loadOrdersTable === 'function') {
+                loadOrdersTable(1);
             }
         } else {
             throw new Error(result.error || result.message || 'Gagal menyinkron data orders dari OCS');
@@ -3273,5 +3318,488 @@ window.executeOcsOrderSync = async function() {
         if (btnCancel) btnCancel.disabled = false;
     }
 };
+
+// =============================================================
+// MODUL DATA ORDERS OCS (SINKRONISASI PESANAN MARKETPLACE)
+// =============================================================
+let currentOrdersPage = 1;
+let orderSearchDebounceTimer = null;
+
+// 1. Memuat Statistik KPI Orders
+window.loadOrdersStats = async function() {
+    try {
+        const res = await fetch('api/orders.php?action=stats');
+        const data = await res.json();
+        if (data && data.success && data.stats) {
+            const s = data.stats;
+            const elTotal = document.getElementById('orderStatTotal');
+            const elResi = document.getElementById('orderStatWithResi');
+            const elClaim = document.getElementById('orderStatClaim');
+            const elLast = document.getElementById('orderStatLastSync');
+
+            if (elTotal) elTotal.innerText = Number(s.total_orders || 0).toLocaleString('id-ID');
+            if (elResi) elResi.innerText = Number(s.total_with_resi || 0).toLocaleString('id-ID');
+            if (elClaim) elClaim.innerText = s.total_claim_fmt || ('Rp ' + Number(s.total_claim || 0).toLocaleString('id-ID'));
+            if (elLast) elLast.innerText = s.last_sync || 'Belum Ada';
+        }
+    } catch (e) {
+        console.error('Gagal memuat statistik orders:', e);
+    }
+};
+
+// 2. Debounce Pencarian Orders
+window.debounceOrderSearch = function() {
+    clearTimeout(orderSearchDebounceTimer);
+    orderSearchDebounceTimer = setTimeout(() => {
+        loadOrdersTable(1);
+    }, 350);
+};
+
+// 3. Handler Perubahan Filter Tanggal
+window.onOrderDateFilterChanged = function() {
+    const filter = document.getElementById('orderDateFilter');
+    const customBox = document.getElementById('orderCustomDateBox');
+    if (!filter) return;
+
+    if (filter.value === 'custom') {
+        if (customBox) customBox.classList.remove('hidden');
+    } else {
+        if (customBox) customBox.classList.add('hidden');
+        loadOrdersTable(1);
+    }
+};
+
+// 4. Memuat Data Tabel Orders
+window.loadOrdersTable = async function(page = 1) {
+    currentOrdersPage = page;
+    const tbody = document.getElementById('ordersTableBody');
+    if (!tbody) return;
+
+    // Tampilkan Loader
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="8" class="text-center py-12 text-slate-400">
+                <div class="flex flex-col items-center justify-center space-y-3">
+                    <div class="traffic-loader">
+                        <div class="traffic-ball traffic-ball-red"></div>
+                        <div class="traffic-ball traffic-ball-yellow"></div>
+                        <div class="traffic-ball traffic-ball-green"></div>
+                    </div>
+                    <span class="text-xs font-semibold text-slate-500">Memuat data pesanan OCS...</span>
+                </div>
+            </td>
+        </tr>
+    `;
+
+    try {
+        const searchInput = document.getElementById('orderSearchInput');
+        const platformSelect = document.getElementById('orderPlatformFilter');
+        const dateSelect = document.getElementById('orderDateFilter');
+        const limitSelect = document.getElementById('orderLimitSelect');
+
+        const search = searchInput ? searchInput.value.trim() : '';
+        const platform = platformSelect ? platformSelect.value : 'ALL';
+        const dateType = dateSelect ? dateSelect.value : '';
+        const limit = limitSelect ? parseInt(limitSelect.value) || 25 : 25;
+
+        let url = `api/orders.php?action=list&page=${page}&limit=${limit}`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+        if (platform && platform !== 'ALL') url += `&platform=${encodeURIComponent(platform)}`;
+        if (dateType) url += `&date=${encodeURIComponent(dateType)}`;
+
+        if (dateType === 'custom') {
+            const startDate = document.getElementById('orderStartDate')?.value || '';
+            const endDate = document.getElementById('orderEndDate')?.value || '';
+            if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`;
+            if (endDate) url += `&end_date=${encodeURIComponent(endDate)}`;
+        }
+
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (!data || !data.success) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-rose-500 font-semibold">${data.message || 'Gagal mengambil data pesanan'}</td></tr>`;
+            return;
+        }
+
+        renderOrdersTable(data.orders || [], data.pagination || {});
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-rose-500 font-semibold">Terjadi kesalahan koneksi: ${err.message}</td></tr>`;
+    }
+};
+
+// 5. Render Tabel Data Orders
+window.renderOrdersTable = function(orders, pagination) {
+    const tbody = document.getElementById('ordersTableBody');
+    const infoEl = document.getElementById('orderPaginationInfo');
+    const controlsEl = document.getElementById('orderPaginationControls');
+    if (!tbody) return;
+
+    if (!orders || orders.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-12 text-slate-400">
+                    <i class="fa-solid fa-cart-flatbed text-3xl text-slate-300 mb-2 block"></i>
+                    <span class="font-semibold text-slate-600 block">Tidak ada pesanan yang sesuai</span>
+                    <span class="text-xs text-slate-400 mt-0.5">Coba ubah kata kunci pencarian atau filter platform / periode.</span>
+                </td>
+            </tr>
+        `;
+        if (infoEl) infoEl.innerText = 'Menampilkan 0 dari 0 data';
+        if (controlsEl) controlsEl.innerHTML = '';
+        return;
+    }
+
+    let html = '';
+    orders.forEach((o) => {
+        const orderId = o.order_id || '-';
+        const tracking = o.tracking_number || '-';
+        const platform = (o.platform || 'OTHER').toUpperCase();
+        const shop = o.shop_name || '-';
+        const shipping = o.shipping_provider || '-';
+        const claimFmt = o.total_claim_amount_fmt || ('Rp ' + Number(o.total_claim_amount || 0).toLocaleString('id-ID'));
+        const shipFeeFmt = o.shipping_fee_fmt || ('Rp ' + Number(o.shipping_fee || 0).toLocaleString('id-ID'));
+        const orderDate = o.order_date || '-';
+
+        // Badge Platform Warna-warni
+        let platBadge = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700">${platform}</span>`;
+        if (platform.includes('SHOPEE')) {
+            platBadge = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-orange-100 text-orange-700 border border-orange-200"><i class="fa-solid fa-bag-shopping mr-1"></i>Shopee</span>`;
+        } else if (platform.includes('TIKTOK')) {
+            platBadge = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900 text-white"><i class="fa-brands fa-tiktok mr-1"></i>TikTok</span>`;
+        } else if (platform.includes('TOKOPEDIA')) {
+            platBadge = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">Tokopedia</span>`;
+        } else if (platform.includes('LAZADA')) {
+            platBadge = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">Lazada</span>`;
+        }
+
+        // Preview Ringkasan SKU Produk
+        let skuSummary = '-';
+        if (Array.isArray(o.items_detail) && o.items_detail.length > 0) {
+            const first = o.items_detail[0];
+            const name = first.product_name || first.sku || 'Item';
+            const extra = o.items_detail.length > 1 ? ` <span class="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded ml-1">+${o.items_detail.length - 1} item</span>` : '';
+            skuSummary = `<div class="truncate text-slate-800 font-medium" title="${escapeHtml(name)}">${escapeHtml(name)}</div><div class="text-[10px] text-slate-400 font-mono">SKU: ${escapeHtml(first.sku || '-')} (x${first.quantity || 1})${extra}</div>`;
+        } else if (o.sku || o.product_name) {
+            skuSummary = `<div class="truncate text-slate-800 font-medium">${escapeHtml(o.product_name || o.sku)}</div><div class="text-[10px] text-slate-400 font-mono">SKU: ${escapeHtml(o.sku || '-')}</div>`;
+        }
+
+        html += `
+            <tr class="hover:bg-slate-50/80 transition border-b border-slate-100 text-xs">
+                <td class="p-3">
+                    <div class="flex items-center gap-1.5">
+                        <button type="button" onclick="openOrderDetailModal('${escapeHtml(orderId)}')" class="font-mono font-bold text-blue-600 hover:text-blue-800 hover:underline text-left">
+                            ${escapeHtml(orderId)}
+                        </button>
+                        <button type="button" onclick="copyOrderText('${escapeHtml(orderId)}', 'No. Pesanan')" class="text-slate-400 hover:text-slate-600 p-0.5" title="Salin No. Pesanan">
+                            <i class="fa-regular fa-copy text-[11px]"></i>
+                        </button>
+                    </div>
+                    <span class="text-[10px] text-slate-400 block">${o.customer_name ? escapeHtml(o.customer_name) : 'Customer'}</span>
+                </td>
+                <td class="p-3">
+                    ${tracking !== '-' ? `
+                        <div class="flex items-center gap-1.5">
+                            <span class="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">${escapeHtml(tracking)}</span>
+                            <button type="button" onclick="copyOrderText('${escapeHtml(tracking)}', 'No. Resi')" class="text-slate-400 hover:text-slate-600 p-0.5" title="Salin Resi">
+                                <i class="fa-regular fa-copy text-[11px]"></i>
+                            </button>
+                        </div>
+                    ` : `<span class="text-slate-400 font-mono text-[11px]">- Belum ada resi -</span>`}
+                </td>
+                <td class="p-3">
+                    <div class="space-y-0.5">
+                        <div class="flex items-center gap-1">${platBadge} <span class="font-bold text-slate-700 truncate max-w-[130px]">${escapeHtml(shop)}</span></div>
+                        <span class="text-[10px] text-slate-400 block"><i class="fa-solid fa-truck-fast text-[9px] mr-1"></i>${escapeHtml(shipping)}</span>
+                    </div>
+                </td>
+                <td class="p-3 min-w-[200px] max-w-[320px]">
+                    ${skuSummary}
+                </td>
+                <td class="p-3 text-right font-mono text-slate-600">
+                    ${shipFeeFmt}
+                </td>
+                <td class="p-3 text-right">
+                    <span class="font-mono font-black text-emerald-600 text-xs">${claimFmt}</span>
+                </td>
+                <td class="p-3 whitespace-nowrap text-slate-500 text-[11px]">
+                    ${orderDate}
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                    <div class="flex items-center justify-center gap-1.5">
+                        <button type="button" onclick="openOrderDetailModal('${escapeHtml(orderId)}')" class="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg text-[11px] transition flex items-center gap-1" title="Lihat Detail SKU & Biaya">
+                            <i class="fa-solid fa-eye"></i> Detail
+                        </button>
+                        ${tracking !== '-' ? `
+                            <button type="button" onclick="viewOrderInClaims('${escapeHtml(tracking)}')" class="px-2 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold rounded-lg text-[11px] transition flex items-center gap-1" title="Cek di Pusat Klaim">
+                                <i class="fa-solid fa-shield-halved"></i> Klaim
+                            </button>
+                        ` : ''}
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+
+    // Render Pagination Bar
+    const total = pagination.total || 0;
+    const page = pagination.page || 1;
+    const limit = pagination.limit || 25;
+    const totalPages = pagination.total_pages || 1;
+    const startIdx = total === 0 ? 0 : (page - 1) * limit + 1;
+    const endIdx = Math.min(page * limit, total);
+
+    if (infoEl) {
+        infoEl.innerText = `Menampilkan ${startIdx.toLocaleString('id-ID')} - ${endIdx.toLocaleString('id-ID')} dari ${total.toLocaleString('id-ID')} pesanan`;
+    }
+
+    if (controlsEl) {
+        let pageBtns = '';
+        pageBtns += `
+            <button onclick="loadOrdersTable(${page - 1})" ${page <= 1 ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition text-xs font-bold">
+                <i class="fa-solid fa-chevron-left"></i>
+            </button>
+        `;
+
+        // Range halaman
+        let startP = Math.max(1, page - 2);
+        let endP = Math.min(totalPages, page + 2);
+        if (startP > 1) {
+            pageBtns += `<button onclick="loadOrdersTable(1)" class="px-2.5 py-1 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 transition text-xs font-semibold">1</button>`;
+            if (startP > 2) pageBtns += `<span class="px-1 text-slate-400">...</span>`;
+        }
+
+        for (let p = startP; p <= endP; p++) {
+            if (p === page) {
+                pageBtns += `<button class="px-3 py-1 rounded-lg bg-blue-600 text-white font-bold text-xs shadow-xs">${p}</button>`;
+            } else {
+                pageBtns += `<button onclick="loadOrdersTable(${p})" class="px-2.5 py-1 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 transition text-xs font-semibold">${p}</button>`;
+            }
+        }
+
+        if (endP < totalPages) {
+            if (endP < totalPages - 1) pageBtns += `<span class="px-1 text-slate-400">...</span>`;
+            pageBtns += `<button onclick="loadOrdersTable(${totalPages})" class="px-2.5 py-1 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 transition text-xs font-semibold">${totalPages}</button>`;
+        }
+
+        pageBtns += `
+            <button onclick="loadOrdersTable(${page + 1})" ${page >= totalPages ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition text-xs font-bold">
+                <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        `;
+
+        controlsEl.innerHTML = pageBtns;
+    }
+};
+
+// 6. Modal Detail Order & SKU Breakdown
+window.openOrderDetailModal = async function(orderId) {
+    const modal = document.getElementById('modalOrderDetail');
+    if (!modal) return;
+
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+
+    // Reset isi modal
+    document.getElementById('dtlOrderId').innerText = orderId;
+    document.getElementById('dtlTrackingNo').innerText = 'Memuat...';
+    document.getElementById('dtlOrderDate').innerText = '-';
+    document.getElementById('dtlPlatform').innerText = '-';
+    document.getElementById('dtlShop').innerText = '-';
+    document.getElementById('dtlShipping').innerText = '-';
+    document.getElementById('dtlCustomer').innerText = '-';
+    document.getElementById('dtlSkuTableBody').innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat detail produk...</td></tr>`;
+
+    try {
+        const res = await fetch(`api/orders.php?action=detail&order_id=${encodeURIComponent(orderId)}`);
+        const data = await res.json();
+
+        if (!data || !data.success || !data.order) {
+            throw new Error(data.message || 'Data order tidak ditemukan');
+        }
+
+        const o = data.order;
+        document.getElementById('dtlOrderId').innerText = o.order_id || '-';
+        document.getElementById('dtlTrackingNo').innerText = o.tracking_number || '- Belum Ada -';
+        document.getElementById('dtlOrderDate').innerText = o.order_date || '-';
+        document.getElementById('dtlPlatform').innerText = o.platform || '-';
+        document.getElementById('dtlShop').innerText = o.shop_name || '-';
+        document.getElementById('dtlShipping').innerText = o.shipping_provider || '-';
+        document.getElementById('dtlCustomer').innerText = (o.customer_name || '-') + (o.customer_phone ? ` (${o.customer_phone})` : '');
+
+        // Render Finansial
+        document.getElementById('dtlOrigPrice').innerText = o.original_price_fmt || ('Rp ' + Number(o.original_price || 0).toLocaleString('id-ID'));
+        document.getElementById('dtlShipFee').innerText = o.shipping_fee_fmt || ('Rp ' + Number(o.shipping_fee || 0).toLocaleString('id-ID'));
+        document.getElementById('dtlDiscount').innerText = '- ' + (o.total_discount_fmt || ('Rp ' + Number(o.total_discount || 0).toLocaleString('id-ID')));
+        document.getElementById('dtlTotalClaim').innerText = o.total_claim_amount_fmt || ('Rp ' + Number(o.total_claim_amount || 0).toLocaleString('id-ID'));
+
+        // Render SKU Items Table
+        const skuTbody = document.getElementById('dtlSkuTableBody');
+        const items = o.items_detail || [];
+
+        if (items.length === 0) {
+            skuTbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">Tidak ada detail varian item terdaftar</td></tr>`;
+        } else {
+            let skuHtml = '';
+            items.forEach((it) => {
+                const subtotal = Number(it.subtotal || ((it.unit_price || 0) * (it.quantity || 1)));
+                skuHtml += `
+                    <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                        <td class="p-2.5">
+                            <div class="font-bold text-slate-800">${escapeHtml(it.product_name || '-')}</div>
+                            <div class="font-mono text-[10px] text-slate-500">SKU: ${escapeHtml(it.sku || '-')} ${it.barcode ? `&bull; Barcode: ${escapeHtml(it.barcode)}` : ''}</div>
+                        </td>
+                        <td class="p-2.5 text-center font-bold text-slate-700">${it.quantity || 1}</td>
+                        <td class="p-2.5 text-right font-mono text-slate-700">Rp ${Number(it.unit_price || 0).toLocaleString('id-ID')}</td>
+                        <td class="p-2.5 text-right font-mono text-rose-600">- Rp ${Number(it.discount || 0).toLocaleString('id-ID')}</td>
+                        <td class="p-2.5 text-right font-mono font-bold text-emerald-600">Rp ${subtotal.toLocaleString('id-ID')}</td>
+                    </tr>
+                `;
+            });
+            skuTbody.innerHTML = skuHtml;
+        }
+
+        // Setup Tombol Cek Bukti di Pusat Klaim
+        const btnClaim = document.getElementById('btnDtlCheckClaimDossier');
+        if (btnClaim) {
+            const resiToFind = o.tracking_number || o.order_id;
+            btnClaim.onclick = function() {
+                viewOrderInClaims(resiToFind);
+            };
+        }
+    } catch (err) {
+        showToast('error', err.message, 'Gagal Memuat Detail');
+    }
+};
+
+window.closeOrderDetailModal = function() {
+    const modal = document.getElementById('modalOrderDetail');
+    if (modal) {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+};
+
+// 7. Beralih ke Halaman Klaim & Cari Resi
+window.viewOrderInClaims = function(identifier) {
+    closeOrderDetailModal();
+    switchTab('claims');
+    const claimInput = document.getElementById('claimSearchInput');
+    if (claimInput) {
+        claimInput.value = identifier;
+        if (typeof executeClaimLookup === 'function') {
+            executeClaimLookup();
+        }
+        const resEl = document.getElementById('claimResultContainer');
+        if (resEl) {
+            resEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+};
+
+// 8. Salin Teks ke Clipboard
+window.copyOrderText = function(text, label = 'Teks') {
+    if (!text || text === '-') return;
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('info', `${label} "${text}" berhasil disalin ke clipboard!`, 'Disalin');
+    }).catch(() => {
+        // Fallback jika permission blocked
+        const input = document.createElement('input');
+        input.value = text;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+        showToast('info', `${label} disalin!`, 'Disalin');
+    });
+};
+
+// 9. Ekspor Data Orders ke Excel Native (.xlsx via SheetJS)
+window.exportOrdersExcel = async function() {
+    showGlobalLoading("Mengekspor Excel...", "Mengambil seluruh data pesanan tersinkron dari server...");
+    try {
+        const platform = document.getElementById('orderPlatformFilter')?.value || 'ALL';
+        const dateType = document.getElementById('orderDateFilter')?.value || '';
+        const search = document.getElementById('orderSearchInput')?.value.trim() || '';
+
+        let url = `api/orders.php?action=list&page=1&limit=10000`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+        if (platform && platform !== 'ALL') url += `&platform=${encodeURIComponent(platform)}`;
+        if (dateType) url += `&date=${encodeURIComponent(dateType)}`;
+
+        if (dateType === 'custom') {
+            const start = document.getElementById('orderStartDate')?.value || '';
+            const end = document.getElementById('orderEndDate')?.value || '';
+            if (start) url += `&start_date=${encodeURIComponent(start)}`;
+            if (end) url += `&end_date=${encodeURIComponent(end)}`;
+        }
+
+        const res = await fetch(url);
+        const json = await res.json();
+        hideGlobalLoading();
+
+        if (!json || !json.success || !json.orders || json.orders.length === 0) {
+            showToast('warning', 'Tidak ada data pesanan yang cocok untuk diekspor.', 'Data Kosong');
+            return;
+        }
+
+        const rows = json.orders.map((o, idx) => {
+            let skuDetail = '';
+            if (Array.isArray(o.items_detail) && o.items_detail.length > 0) {
+                skuDetail = o.items_detail.map(i => `${i.product_name || i.sku || 'Item'} (SKU: ${i.sku || '-'}, Qty: ${i.quantity || 1})`).join('; ');
+            } else {
+                skuDetail = o.product_name || o.sku || '-';
+            }
+
+            return {
+                "No": idx + 1,
+                "No. Pesanan": o.order_id,
+                "No. Resi": o.tracking_number || '-',
+                "Platform": o.platform || '-',
+                "Nama Toko": o.shop_name || '-',
+                "Jasa Ekspedisi": o.shipping_provider || '-',
+                "Nama Customer": o.customer_name || '-',
+                "Rincian Produk SKU": skuDetail,
+                "Total Qty Item": o.total_items || 1,
+                "Harga Asli Produk (Rp)": Number(o.original_price || 0),
+                "Ongkir Ekspedisi (Rp)": Number(o.shipping_fee || 0),
+                "Total Diskon (Rp)": Number(o.total_discount || 0),
+                "Total Nilai Klaim (Rp)": Number(o.total_claim_amount || 0),
+                "Tanggal Order": o.order_date || '-'
+            };
+        });
+
+        if (typeof XLSX === 'undefined') {
+            throw new Error('Pustaka SheetJS XLSX belum dimuat di halaman');
+        }
+
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Orders_OCS");
+
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const fileName = `Data_Orders_OCS_${todayStr}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+
+        showToast('success', `Berhasil mengekspor ${rows.length} data order ke file ${fileName}!`, 'Export Berhasil');
+    } catch (err) {
+        hideGlobalLoading();
+        showToast('error', 'Gagal mengekspor file Excel: ' + err.message, 'Gagal');
+    }
+};
+
+// Helper HTML escape
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 
 

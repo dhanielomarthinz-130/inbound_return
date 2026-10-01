@@ -95,6 +95,12 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 <span>Pusat Klaim & Banding</span>
             </button>
 
+            <!-- MENU BARU: DATA ORDERS OCS (SINKRONISASI PESANAN) -->
+            <button onclick="switchTab('orders')" id="nav-orders" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
+                <i class="fa-solid fa-cart-flatbed w-5 text-center text-blue-600"></i>
+                <span>Data Orders OCS</span>
+            </button>
+
             <button onclick="switchTab('products')" id="nav-products" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-tags w-5 text-center text-blue-500"></i>
                 <span>Master Produk</span>
@@ -569,16 +575,11 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                         Scan <b>Barcode Resi Atas</b> (SPXID...) atau <b>No. Pesanan Tengah</b> (261001F8TF1NF4).
                                     </span>
                                 </div>
-                                <button type="submit" id="btnClaimSearch" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm shadow-amber-500/20 shrink-0 self-start">
+                                <button type="submit" id="btnClaimSearch" class="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm shadow-amber-500/20 shrink-0 self-start">
                                     <i class="fa-solid fa-search"></i>
-                                    <span>Cari Bukti</span>
+                                    <span>Cari Bukti Klaim</span>
                                 </button>
                             </form>
-
-                            <button type="button" onclick="openOcsSyncModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm shadow-indigo-600/20 shrink-0 self-start">
-                                <i class="fa-solid fa-cloud-arrow-down text-sm"></i>
-                                <span>Sync Orders OCS</span>
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -885,6 +886,162 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB BARU: DATA ORDERS OCS (SINKRONISASI PESANAN) -->
+            <div id="tab-orders" class="tab-content hidden space-y-5">
+                <!-- Header Card & Quick Action -->
+                <div class="bg-white rounded-2xl shadow-xs border border-slate-200 p-4 sm:p-5">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div class="flex items-center gap-3">
+                            <span class="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg shadow-sm shadow-blue-600/10 shrink-0">
+                                <i class="fa-solid fa-cart-flatbed"></i>
+                            </span>
+                            <div>
+                                <h3 class="font-black text-slate-800 text-base">Data Orders OCS (Sinkronisasi Pesanan)</h3>
+                                <p class="text-xs text-slate-500">Database lengkap No. Resi, Invoice, Rincian SKU Produk, Biaya & Total Klaim tersinkron</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2 w-full sm:w-auto">
+                            <button onclick="exportOrdersExcel()" type="button" class="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2.5 rounded-xl font-bold transition flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/20">
+                                <i class="fa-solid fa-file-excel"></i>
+                                <span>Export Excel</span>
+                            </button>
+                            <button onclick="openOcsSyncModal()" type="button" class="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-2.5 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-sm shadow-indigo-600/25">
+                                <i class="fa-solid fa-cloud-arrow-down text-sm"></i>
+                                <span>Sinkronisasi OCS</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4 Statistik Ringkas Card -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg font-bold shrink-0">
+                            <i class="fa-solid fa-boxes-packing"></i>
+                        </div>
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Total Orders</span>
+                            <span id="orderStatTotal" class="text-lg font-black text-slate-800 font-mono">0</span>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg font-bold shrink-0">
+                            <i class="fa-solid fa-barcode"></i>
+                        </div>
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Dengan No. Resi</span>
+                            <span id="orderStatWithResi" class="text-lg font-black text-emerald-600 font-mono">0</span>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-lg font-bold shrink-0">
+                            <i class="fa-solid fa-shield-halved"></i>
+                        </div>
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Total Nilai Klaim</span>
+                            <span id="orderStatClaim" class="text-sm sm:text-base font-black text-amber-600 font-mono truncate">Rp 0</span>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center text-lg font-bold shrink-0">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                        </div>
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Sinkron Terakhir</span>
+                            <span id="orderStatLastSync" class="text-xs font-bold text-slate-700 block truncate">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table Data Orders Container -->
+                <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+                    <!-- Filter Toolbar -->
+                    <div class="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
+                        <div class="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
+                            <!-- Search -->
+                            <div class="relative flex-1 sm:max-w-xs">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+                                    <i class="fa-solid fa-magnifying-glass"></i>
+                                </span>
+                                <input type="text" id="orderSearchInput" onkeyup="debounceOrderSearch()" placeholder="Cari Resi / Invoice / SKU / Produk..." 
+                                    class="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs">
+                            </div>
+
+                            <!-- Filter Platform -->
+                            <select id="orderPlatformFilter" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs">
+                                <option value="ALL">Semua Platform</option>
+                                <option value="SHOPEE">Shopee</option>
+                                <option value="TIKTOK_SHOP">TikTok Shop</option>
+                                <option value="TOKOPEDIA">Tokopedia</option>
+                                <option value="LAZADA">Lazada</option>
+                            </select>
+
+                            <!-- Filter Tanggal -->
+                            <select id="orderDateFilter" onchange="onOrderDateFilterChanged()" class="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs">
+                                <option value="">Semua Periode</option>
+                                <option value="today">Hari Ini</option>
+                                <option value="yesterday">Hari Kemarin</option>
+                                <option value="last7">7 Hari Terakhir</option>
+                                <option value="last30">30 Hari Terakhir</option>
+                                <option value="custom">Pilih Tanggal...</option>
+                            </select>
+
+                            <div id="orderCustomDateBox" class="hidden flex items-center gap-1.5">
+                                <input type="date" id="orderStartDate" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs text-slate-700">
+                                <span class="text-xs text-slate-400">s/d</span>
+                                <input type="date" id="orderEndDate" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs text-slate-700">
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-slate-400">Tampilkan:</span>
+                            <select id="orderLimitSelect" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700">
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                            <button onclick="loadOrdersTable(1)" class="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs transition" title="Refresh Data">
+                                <i class="fa-solid fa-arrows-rotate"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Table Data -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead class="bg-slate-100 text-slate-600 uppercase font-semibold text-[10px] tracking-wider">
+                                <tr>
+                                    <th class="p-3 whitespace-nowrap">No. Pesanan (Order ID)</th>
+                                    <th class="p-3 whitespace-nowrap">No. Resi (Tracking)</th>
+                                    <th class="p-3 whitespace-nowrap">Toko & Ekspedisi</th>
+                                    <th class="p-3 min-w-[200px] max-w-[320px]">Produk & SKU</th>
+                                    <th class="p-3 whitespace-nowrap text-right">Ongkir</th>
+                                    <th class="p-3 whitespace-nowrap text-right">Total Klaim</th>
+                                    <th class="p-3 whitespace-nowrap">Tanggal Order</th>
+                                    <th class="p-3 whitespace-nowrap text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ordersTableBody" class="divide-y divide-slate-100">
+                                <tr>
+                                    <td colspan="8" class="text-center py-12 text-slate-400">
+                                        <i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat data orders...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination Footer -->
+                    <div class="p-3.5 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/50 text-xs">
+                        <span id="orderPaginationInfo" class="text-slate-500 font-medium">Menampilkan 0 dari 0 data</span>
+                        <div id="orderPaginationControls" class="flex items-center gap-1">
+                            <!-- Tombol Pagination -->
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1911,6 +2068,108 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 <button type="button" onclick="executeOcsOrderSync()" id="btnStartOcsSync" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center gap-2 transition shadow-sm shadow-indigo-600/20">
                     <i class="fa-solid fa-play"></i>
                     <span>Mulai Sinkronisasi Sekarang</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DETAIL ITEM ORDER OCS & BREAKDOWN BIAYA KLAIM -->
+    <div id="modalOrderDetail" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 space-y-4 max-h-[90vh] flex flex-col animate-in fade-in zoom-in duration-200">
+            <!-- Header Modal -->
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
+                <div class="flex items-center gap-3">
+                    <span class="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg font-bold">
+                        <i class="fa-solid fa-receipt"></i>
+                    </span>
+                    <div>
+                        <h3 class="font-black text-slate-800 text-base" id="detailOrderModalTitle">Detail Pesanan OCS</h3>
+                        <p class="text-[11px] text-slate-500" id="detailOrderModalSubtitle">-</p>
+                    </div>
+                </div>
+                <button onclick="closeOrderDetailModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            <!-- Scrollable Content -->
+            <div class="flex-1 overflow-y-auto space-y-4 pr-1 text-xs">
+                <!-- Info Ringkas Order -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                    <div>
+                        <span class="text-[10px] text-slate-400 font-bold uppercase block">Platform</span>
+                        <span id="dtlPlatform" class="font-bold text-slate-800">-</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 font-bold uppercase block">Toko / Shop</span>
+                        <span id="dtlShop" class="font-bold text-slate-800">-</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 font-bold uppercase block">Ekspedisi</span>
+                        <span id="dtlShipping" class="font-bold text-slate-800">-</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 font-bold uppercase block">Customer</span>
+                        <span id="dtlCustomer" class="font-bold text-slate-800">-</span>
+                    </div>
+                </div>
+
+                <!-- Rincian Item SKU Table -->
+                <div>
+                    <h4 class="font-bold text-slate-800 mb-2 uppercase text-[11px] flex items-center gap-1.5">
+                        <i class="fa-solid fa-list-check text-blue-600"></i>
+                        <span>Daftar Produk & Varian SKU</span>
+                    </h4>
+                    <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-100 text-slate-600 font-semibold text-[10px] uppercase">
+                                <tr>
+                                    <th class="p-2.5">Produk / SKU</th>
+                                    <th class="p-2.5 text-center">Qty</th>
+                                    <th class="p-2.5 text-right">Harga Asli</th>
+                                    <th class="p-2.5 text-right">Diskon</th>
+                                    <th class="p-2.5 text-right">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dtlSkuTableBody" class="divide-y divide-slate-100">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Breakdown Finansial & Klaim -->
+                <div class="bg-gradient-to-br from-slate-900 to-indigo-950 text-white p-4 rounded-2xl space-y-2">
+                    <span class="text-[10px] text-amber-300 font-bold uppercase tracking-wider block">Ringkasan Biaya & Nilai Klaim</span>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs pt-1 border-t border-white/10">
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">Total Harga Produk:</span>
+                            <span id="dtlOrigPrice" class="font-bold text-white">Rp 0</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">Ongkir (Shipping Fee):</span>
+                            <span id="dtlShipFee" class="font-bold text-white">Rp 0</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">Diskon Penjual & Platform:</span>
+                            <span id="dtlDiscount" class="font-bold text-rose-300">- Rp 0</span>
+                        </div>
+                    </div>
+                    <div class="pt-2 border-t border-white/10 flex items-center justify-between">
+                        <span class="font-bold text-xs text-amber-300">TOTAL TUNTUTAN KLAIM RESMI:</span>
+                        <span id="dtlTotalClaim" class="font-black text-lg text-emerald-400 font-mono">Rp 0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Action -->
+            <div class="pt-3 border-t border-slate-100 flex items-center justify-between shrink-0">
+                <button type="button" id="btnDtlCheckClaimDossier" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition shadow-sm">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>Cek Bukti di Pusat Klaim</span>
+                </button>
+                <button onclick="closeOrderDetailModal()" type="button" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition">
+                    Tutup
                 </button>
             </div>
         </div>

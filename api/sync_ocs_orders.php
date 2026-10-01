@@ -58,10 +58,10 @@ if ($isCli) {
 $dateParam      = trim($params['date'] ?? 'yesterday');
 $startParam     = trim($params['start'] ?? $params['start_date'] ?? '');
 $endParam       = trim($params['end'] ?? $params['end_date'] ?? '');
-$limitParam     = isset($params['limit']) ? (int)$params['limit'] : 0; // 0 = semua
+$limitParam     = isset($params['limit']) ? (int)$params['limit'] : ($isCli ? 0 : 500); // Default aman 500 untuk Web agar bebas timeout
 $dryRun         = !empty($params['dry_run']);
 $fetchDetails   = !isset($params['details']) || $params['details'] === '1' || $params['details'] === 'true' || $params['details'] === 'auto';
-$detailsLimit   = isset($params['details_limit']) ? (int)$params['details_limit'] : 300; // default perkaya 300 detail per run (atau 0 untuk semua)
+$detailsLimit   = isset($params['details_limit']) ? (int)$params['details_limit'] : 250; // default perkaya 250 detail per run
 
 date_default_timezone_set('Asia/Jakarta');
 
