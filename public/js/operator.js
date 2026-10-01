@@ -500,6 +500,62 @@ inputType.addEventListener('keypress', (e) => {
     }
 });
 
+// -------------------------------------------------------------
+// VIRTUAL ENTER BUTTON & INPUT FOCUS TRACKER
+// -------------------------------------------------------------
+let currentActiveFieldId = 'inputBarcode';
+
+function updateVirtualEnterBadge(fieldId) {
+    currentActiveFieldId = fieldId;
+    const labelEl = document.getElementById('virtualEnterTargetLabel');
+    if (!labelEl) return;
+    if (fieldId === 'inputBarcode') {
+        labelEl.innerText = 'Lanjut ke No. Batch ➔';
+    } else if (fieldId === 'inputBatch') {
+        labelEl.innerText = 'Lanjut ke Exp Date ➔';
+    } else if (fieldId === 'inputExpDate') {
+        labelEl.innerText = 'Lanjut ke Qty ➔';
+    } else if (fieldId === 'inputQty') {
+        labelEl.innerText = 'Lanjut ke Type ➔';
+    } else if (fieldId === 'inputType') {
+        labelEl.innerText = 'Submit Tambah Item ✓';
+    }
+}
+
+['inputBarcode', 'inputBatch', 'inputExpDate', 'inputQty', 'inputType'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener('focus', () => updateVirtualEnterBadge(id));
+    }
+});
+
+window.triggerVirtualEnter = function() {
+    if (currentActiveFieldId === 'inputBarcode') {
+        const barcodeVal = inputBarcode ? inputBarcode.value.trim() : '';
+        if (barcodeVal) {
+            lookupProduct(barcodeVal).then(() => {
+                if (inputBatch) inputBatch.focus();
+            });
+        } else {
+            if (inputBatch) inputBatch.focus();
+        }
+    } else if (currentActiveFieldId === 'inputBatch') {
+        if (inputExpDate) inputExpDate.focus();
+    } else if (currentActiveFieldId === 'inputExpDate') {
+        if (inputQty) {
+            inputQty.focus();
+            inputQty.select();
+        }
+    } else if (currentActiveFieldId === 'inputQty') {
+        if (inputType) inputType.focus();
+    } else if (currentActiveFieldId === 'inputType') {
+        const btnAdd = document.getElementById('btnSubmitItem');
+        if (btnAdd) btnAdd.click();
+    } else {
+        if (inputBarcode) inputBarcode.focus();
+    }
+};
+
 // Fungsi Lookup Produk dari Barcode ke Database MySQL
 async function lookupProduct(barcode) {
     const loading = document.getElementById('barcodeLoadingIcon');

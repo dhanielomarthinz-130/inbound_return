@@ -394,20 +394,37 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                         </div>
                     </div>
 
-                    <!-- Status Preview Produk Terdeteksi & Tombol Tambahkan Item -->
-                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-2 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
-                        <div class="text-xs min-w-0 flex-1">
+                    <!-- Action Bar: Tombol ENTER Terpisah & Tombol Tambah Item -->
+                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 pt-1">
+                        <!-- Tombol ENTER Terpisah (Besar & Responsif untuk Touchscreen / Tanpa Keyboard Fisik) -->
+                        <button type="button" onclick="triggerVirtualEnter()" id="btnVirtualEnter"
+                            class="sm:col-span-7 bg-slate-800 hover:bg-slate-900 active:scale-98 text-white font-bold py-3 px-4 rounded-2xl text-xs transition shadow-sm flex items-center justify-between group border border-slate-700 cursor-pointer">
+                            <span class="flex items-center gap-2">
+                                <kbd class="px-2 py-1 bg-slate-700 group-hover:bg-indigo-600 rounded-lg font-mono text-xs font-black tracking-wider text-white shadow-xs transition">↵ ENTER</kbd>
+                                <span class="font-bold">Pindah Kolom</span>
+                            </span>
+                            <span id="virtualEnterTargetLabel" class="text-[11px] font-mono text-slate-300 group-hover:text-indigo-200 transition">
+                                Lanjut ke No. Batch ➔
+                            </span>
+                        </button>
+
+                        <!-- Tombol Tambahkan Item -->
+                        <button type="submit" id="btnSubmitItem"
+                            class="sm:col-span-5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-bold py-3 px-4 rounded-2xl text-xs transition flex items-center justify-center gap-2 shadow-md shadow-indigo-600/30 cursor-pointer">
+                            <i class="fa-solid fa-plus-circle text-sm"></i>
+                            <span>Tambahkan Item</span>
+                        </button>
+                    </div>
+
+                    <!-- Status Preview Produk Terdeteksi -->
+                    <div class="text-xs bg-slate-50 p-3 rounded-2xl border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <div class="min-w-0 flex-1">
                             <span class="text-slate-400 font-bold uppercase text-[10px] tracking-wider block">Produk Terdeteksi:</span>
                             <div class="flex items-center gap-2 mt-0.5">
                                 <span id="detectedProductName" class="font-bold text-indigo-700 text-xs">Silakan scan / ketik barcode...</span>
                             </div>
                             <div id="detectedProductSku" class="mt-1"></div>
                         </div>
-
-                        <button type="submit" id="btnSubmitItem" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2.5 rounded-2xl text-xs transition flex items-center justify-center gap-2 shadow-md shadow-indigo-600/30 shrink-0">
-                            <i class="fa-solid fa-plus-circle"></i>
-                            <span>Tambahkan Item</span>
-                        </button>
                     </div>
 
                 </form>
