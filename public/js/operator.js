@@ -406,6 +406,11 @@ async function checkAndApplyExpDateFromBatch(batchVal) {
         const expDateStr = typeof detected === 'object' ? detected.date : detected;
         const expLabel = typeof detected === 'object' && detected.label ? detected.label : 'Pola Batch Terdeteksi';
         inputExpDate.value = expDateStr;
+        if (typeof updateNumpadDisplay === 'function') {
+            const p = expDateStr.split('-');
+            if (p.length === 3) npDateDigits = `${p[2]}${p[1]}${p[0]}`;
+            updateNumpadDisplay();
+        }
         showAutoExpIndicator(expLabel);
     }
 
@@ -418,6 +423,11 @@ async function checkAndApplyExpDateFromBatch(batchVal) {
             const data = await res.json();
             if (data && data.found && data.exp_date) {
                 inputExpDate.value = data.exp_date;
+                if (typeof updateNumpadDisplay === 'function') {
+                    const p = data.exp_date.split('-');
+                    if (p.length === 3) npDateDigits = `${p[2]}${p[1]}${p[0]}`;
+                    updateNumpadDisplay();
+                }
                 showAutoExpIndicator('Dari Riwayat Scan');
             } else if (!detected) {
                 clearAutoExpIndicator();
@@ -530,8 +540,26 @@ function updateVirtualEnterBadge(fieldId) {
 });
 
 // -------------------------------------------------------------
-// VIRTUAL KEYBOARD TOUCHSCREEN KHUSUS KOLOM BATCH
+// VIRTUAL KEYBOARD & NUMPAD TOUCHSCREEN MANAGEMENT
 // -------------------------------------------------------------
+let npDateDigits = '';
+
+function updateNumpadDisplay() {
+    const disp = document.getElementById('numpadDateDisplay');
+    if (!disp) return;
+    if (npDateDigits) {
+        let d = npDateDigits.slice(0, 2);
+        let m = npDateDigits.slice(2, 4);
+        let y = npDateDigits.slice(4, 8);
+        disp.innerText = [d, m, y].filter(Boolean).join(' - ');
+    } else if (inputExpDate && inputExpDate.value) {
+        disp.innerText = inputExpDate.value;
+    } else {
+        disp.innerText = 'dd - mm - yyyy';
+    }
+}
+
+// 1. Keyboard Touchscreen untuk No. Batch
 window.toggleVirtualKeyboard = function(forceShow = null) {
     const container = document.getElementById('virtualKeyboardContainer');
     const toggleBtnLabel = document.getElementById('btnToggleVKLabel');
@@ -543,6 +571,8 @@ window.toggleVirtualKeyboard = function(forceShow = null) {
     if (shouldShow) {
         container.classList.remove('hidden');
         if (toggleBtnLabel) toggleBtnLabel.innerText = 'Tutup Keyboard';
+        // Tutup Numpad Exp Date saat Keyboard Batch aktif
+        if (typeof toggleNumpadExpDate === 'function') toggleNumpadExpDate(false);
     } else {
         container.classList.add('hidden');
         if (toggleBtnLabel) toggleBtnLabel.innerText = 'Buka Keyboard';
@@ -571,20 +601,152 @@ window.vkClear = function() {
 };
 
 window.vkEnter = function() {
-    // Tombol ENTER terpisah dari Virtual Keyboard: langsung pindah ke kolom Exp Date
+    // Tombol ENTER di Keyboard Batch:
+    // 1. Otomatis sembunyikan Keyboard Batch!
+    toggleVirtualKeyboard(false);
+
+    // 2. Pindah fokus ke kolom Exp Date
     if (inputExpDate) {
         inputExpDate.focus();
     }
+
+    // 3. Tampilkan Numpad Exp Date
+    toggleNumpadExpDate(true);
     updateVirtualEnterBadge('inputExpDate');
 };
 
-// Auto tampilkan keyboard saat kolom No. Batch difokuskan
+// 2. Numpad Touchscreen untuk Exp Date
+window.toggleNumpadExpDate = function(forceShow = null) {
+    const container = document.getElementById('numpadExpDateContainer');
+    const toggleBtnLabel = document.getElementById('btnToggleNPLabel');
+    if (!container) return;
+
+    const isHidden = container.classList.contains('hidden');
+    const shouldShow = forceShow !== null ? forceShow : isHidden;
+
+    if (shouldShow) {
+        container.classList.remove('hidden');
+        if (toggleBtnLabel) toggleBtnLabel.innerText = 'Tutup Numpad';
+        // Tutup Keyboard Batch saat Numpad aktif
+        if (typeof toggleVirtualKeyboard === 'function') toggleVirtualKeyboard(false);
+        updateNumpadDisplay();
+    } else {
+        container.classList.add('hidden');
+        if (toggleBtnLabel) toggleBtnLabel.innerText = 'Numpad';
+    }
+};
+
+window.npDigit = function(digit) {
+    if (npDateDigits.length >= 8) return;
+    npDateDigits += digit;
+    updateNumpadDisplay();
+    applyBufferToExpDate();
+};
+
+window.npBackspace = function() {
+    npDateDigits = npDateDigits.slice(0, -1);
+    updateNumpadDisplay();
+    applyBufferToExpDate();
+};
+
+window.npClear = function() {
+    npDateDigits = '';
+    if (inputExpDate) inputExpDate.value = '';
+    updateNumpadDisplay();
+};
+
+function applyBufferToExpDate() {
+    if (!inputExpDate) return;
+    if (npDateDigits.length === 6) {
+        const dd = npDateDigits.slice(0, 2);
+        const mm = npDateDigits.slice(2, 4);
+        const yy = npDateDigits.slice(4, 6);
+        const dNum = parseInt(dd, 10);
+        const mNum = parseInt(mm, 10);
+        if (dNum >= 1 && dNum <= 31 && mNum >= 1 && mNum <= 12) {
+            inputExpDate.value = `20${yy}-${mm}-${dd}`;
+        }
+    } else if (npDateDigits.length === 8) {
+        const dd = npDateDigits.slice(0, 2);
+        const mm = npDateDigits.slice(2, 4);
+        const yyyy = npDateDigits.slice(4, 8);
+        const dNum = parseInt(dd, 10);
+        const mNum = parseInt(mm, 10);
+        if (dNum >= 1 && dNum <= 31 && mNum >= 1 && mNum <= 12) {
+            inputExpDate.value = `${yyyy}-${mm}-${dd}`;
+        }
+    }
+}
+
+window.npSetYear = function(yearStr) {
+    let cur = inputExpDate && inputExpDate.value ? inputExpDate.value.split('-') : null;
+    let mm = cur && cur[1] ? cur[1] : '01';
+    let dd = cur && cur[2] ? cur[2] : '01';
+    if (inputExpDate) {
+        inputExpDate.value = `${yearStr}-${mm}-${dd}`;
+    }
+    npDateDigits = `${dd}${mm}${yearStr}`;
+    updateNumpadDisplay();
+};
+
+window.npSetPreset = function(type) {
+    const now = new Date();
+    let targetYear = now.getFullYear();
+    if (type === '1Y') targetYear += 1;
+    else if (type === '2Y') targetYear += 2;
+    else if (type === '3Y') targetYear += 3;
+
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    if (inputExpDate) {
+        inputExpDate.value = `${targetYear}-${mm}-${dd}`;
+    }
+    npDateDigits = `${dd}${mm}${targetYear}`;
+    updateNumpadDisplay();
+};
+
+window.npEnter = function() {
+    // Tombol ENTER di Numpad:
+    // 1. Sembunyikan Numpad Exp Date
+    toggleNumpadExpDate(false);
+
+    // 2. Pindah ke kolom Qty dan seleksi teks
+    if (inputQty) {
+        inputQty.focus();
+        inputQty.select();
+    }
+    updateVirtualEnterBadge('inputQty');
+};
+
+// 3. Event Listener Fokus Kolom:
+// Kolom No. Batch -> Buka Keyboard Batch, Tutup Numpad
 if (inputBatch) {
     inputBatch.addEventListener('focus', () => {
         toggleVirtualKeyboard(true);
+        toggleNumpadExpDate(false);
     });
 }
 
+// Kolom Exp Date -> Buka Numpad, Tutup Keyboard Batch
+if (inputExpDate) {
+    inputExpDate.addEventListener('focus', () => {
+        toggleVirtualKeyboard(false);
+        toggleNumpadExpDate(true);
+    });
+}
+
+// Kolom Lain (Barcode, Qty, Type) -> Tutup Semua Keyboard & Numpad
+['inputBarcode', 'inputQty', 'inputType'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener('focus', () => {
+            toggleVirtualKeyboard(false);
+            toggleNumpadExpDate(false);
+        });
+    }
+});
+
+// 4. Tombol ENTER Navigasi Terpisah
 window.triggerVirtualEnter = function() {
     if (currentActiveFieldId === 'inputBarcode') {
         const barcodeVal = inputBarcode ? inputBarcode.value.trim() : '';
@@ -596,15 +758,22 @@ window.triggerVirtualEnter = function() {
             if (inputBatch) inputBatch.focus();
         }
     } else if (currentActiveFieldId === 'inputBatch') {
+        toggleVirtualKeyboard(false);
         if (inputExpDate) inputExpDate.focus();
+        toggleNumpadExpDate(true);
     } else if (currentActiveFieldId === 'inputExpDate') {
+        toggleNumpadExpDate(false);
         if (inputQty) {
             inputQty.focus();
             inputQty.select();
         }
     } else if (currentActiveFieldId === 'inputQty') {
+        toggleVirtualKeyboard(false);
+        toggleNumpadExpDate(false);
         if (inputType) inputType.focus();
     } else if (currentActiveFieldId === 'inputType') {
+        toggleVirtualKeyboard(false);
+        toggleNumpadExpDate(false);
         const btnAdd = document.getElementById('btnSubmitItem');
         if (btnAdd) btnAdd.click();
     } else {
@@ -750,7 +919,11 @@ function resetProductInputs() {
     inputExpDate.value = '';
     inputQty.value = 1;
     inputType.value = 'GOOD';
+    npDateDigits = '';
     clearAutoExpIndicator();
+    if (typeof updateNumpadDisplay === 'function') updateNumpadDisplay();
+    if (typeof toggleVirtualKeyboard === 'function') toggleVirtualKeyboard(false);
+    if (typeof toggleNumpadExpDate === 'function') toggleNumpadExpDate(false);
     document.getElementById('detectedProductName').innerText = "Silakan scan / ketik barcode...";
     document.getElementById('detectedProductName').className = "font-bold text-indigo-700 ml-1 text-sm";
     document.getElementById('detectedProductSku').innerText = "";

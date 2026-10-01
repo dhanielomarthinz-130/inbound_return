@@ -468,9 +468,17 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                                     <i class="fa-regular fa-calendar-days text-indigo-600"></i>
                                     <span>Exp Date (dd-mm-yyyy)</span>
                                 </label>
-                                <span id="autoExpBadge" class="hidden text-[10px] text-emerald-700 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                                    <i class="fa-solid fa-wand-magic-sparkles text-emerald-600"></i> <span id="autoExpLabel">Auto</span>
-                                </span>
+                                <div class="flex items-center gap-1">
+                                    <span id="autoExpBadge" class="hidden text-[10px] text-emerald-700 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                        <i class="fa-solid fa-wand-magic-sparkles text-emerald-600"></i> <span id="autoExpLabel">Auto</span>
+                                    </span>
+                                    <button type="button" onclick="toggleNumpadExpDate()" id="btnToggleNP"
+                                        title="Buka / Tutup Numpad Tanggal Touchscreen"
+                                        class="text-[10px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-200 transition flex items-center gap-1 shadow-2xs cursor-pointer">
+                                        <i class="fa-solid fa-calculator"></i>
+                                        <span id="btnToggleNPLabel">Numpad</span>
+                                    </button>
+                                </div>
                             </div>
                             <input type="date" id="inputExpDate"
                                 class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-2xl text-xs font-mono text-slate-800 focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition">
@@ -502,6 +510,69 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                                 <span class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400 text-xs">
                                     <i class="fa-solid fa-chevron-down"></i>
                                 </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- NUMPAD TOUCHSCREEN KHUSUS EXP DATE -->
+                    <div id="numpadExpDateContainer" class="hidden bg-slate-900 text-white rounded-3xl p-3 sm:p-4 shadow-xl border border-slate-800 space-y-3 transition-all">
+                        <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="w-5 h-5 rounded-md bg-emerald-600 text-white flex items-center justify-center text-[11px]">
+                                    <i class="fa-solid fa-calculator"></i>
+                                </span>
+                                <span class="text-xs font-bold text-slate-200 tracking-wide">Numpad Touchscreen &bull; Exp Date</span>
+                                <span id="numpadDateDisplay" class="ml-2 px-2.5 py-0.5 bg-slate-800 border border-slate-700 rounded-lg text-emerald-400 font-mono text-xs font-bold tracking-wider">dd - mm - yyyy</span>
+                            </div>
+                            
+                            <div class="flex items-center gap-1">
+                                <button type="button" onclick="toggleNumpadExpDate(false)" class="text-slate-400 hover:text-rose-400 text-[11px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 transition font-medium">✕ Tutup</button>
+                            </div>
+                        </div>
+
+                        <!-- Quick Year Shortcuts -->
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <span class="text-[10px] text-slate-400 font-semibold mr-1">Tahun Cepat:</span>
+                            <button type="button" onclick="npSetYear('2025')" class="px-2.5 py-1 bg-slate-800 hover:bg-emerald-600 active:scale-95 text-slate-200 hover:text-white rounded-lg text-xs font-mono font-bold transition">2025</button>
+                            <button type="button" onclick="npSetYear('2026')" class="px-2.5 py-1 bg-slate-800 hover:bg-emerald-600 active:scale-95 text-slate-200 hover:text-white rounded-lg text-xs font-mono font-bold transition">2026</button>
+                            <button type="button" onclick="npSetYear('2027')" class="px-2.5 py-1 bg-slate-800 hover:bg-emerald-600 active:scale-95 text-slate-200 hover:text-white rounded-lg text-xs font-mono font-bold transition">2027</button>
+                            <button type="button" onclick="npSetYear('2028')" class="px-2.5 py-1 bg-slate-800 hover:bg-emerald-600 active:scale-95 text-slate-200 hover:text-white rounded-lg text-xs font-mono font-bold transition">2028</button>
+                            <button type="button" onclick="npSetYear('2029')" class="px-2.5 py-1 bg-slate-800 hover:bg-emerald-600 active:scale-95 text-slate-200 hover:text-white rounded-lg text-xs font-mono font-bold transition">2029</button>
+                            <button type="button" onclick="npSetPreset('1Y')" class="px-2 py-1 bg-indigo-950/70 hover:bg-indigo-600 active:scale-95 text-indigo-300 hover:text-white rounded-lg text-xs font-bold transition border border-indigo-800/40">+1 Thn</button>
+                            <button type="button" onclick="npSetPreset('2Y')" class="px-2 py-1 bg-indigo-950/70 hover:bg-indigo-600 active:scale-95 text-indigo-300 hover:text-white rounded-lg text-xs font-bold transition border border-indigo-800/40">+2 Thn</button>
+                            <button type="button" onclick="npSetPreset('3Y')" class="px-2 py-1 bg-indigo-950/70 hover:bg-indigo-600 active:scale-95 text-indigo-300 hover:text-white rounded-lg text-xs font-bold transition border border-indigo-800/40">+3 Thn</button>
+                        </div>
+
+                        <!-- Numpad Grid & Controls -->
+                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                            <!-- Digit Buttons (1-9, Clear, 0, Backspace) - 7 Kolom -->
+                            <div class="sm:col-span-7 grid grid-cols-3 gap-1.5 sm:gap-2">
+                                <button type="button" onclick="npDigit('1')" class="h-10 bg-slate-800 hover:bg-emerald-600 active:scale-95 text-white font-mono font-bold text-base rounded-xl flex items-center justify-center transition shadow-2xs select-none">1</button>
+                                <button type="button" onclick="npDigit('2')" class="h-10 bg-slate-800 hover:bg-emerald-600 active:scale-95 text-white font-mono font-bold text-base rounded-xl flex items-center justify-center transition shadow-2xs select-none">2</button>
+                                <button type="button" onclick="npDigit('3')" class="h-10 bg-slate-800 hover:bg-emerald-600 active:scale-95 text-white font-mono font-bold text-base rounded-xl flex items-center justify-center transition shadow-2xs select-none">3</button>
+                                <button type="button" onclick="npDigit('4')" class="h-10 bg-slate-800 hover:bg-emerald-600 active:scale-95 text-white font-mono font-bold text-base rounded-xl flex items-center justify-center transition shadow-2xs select-none">4</button>
+                                <button type="button" onclick="npDigit('5')" class="h-10 bg-slate-800 hover:bg-emerald-600 active:scale-95 text-white font-mono font-bold text-base rounded-xl flex items-center justify-center transition shadow-2xs select-none">5</button>
+                                <button type="button" onclick="npDigit('6')" class="h-10 bg-slate-800 hover:bg-emerald-600 active:scale-95 text-white font-mono font-bold text-base rounded-xl flex items-center justify-center transition shadow-2xs select-none">6</button>
+                                <button type="button" onclick="npDigit('7')" class="h-10 bg-slate-800 hover:bg-emerald-600 active:scale-95 text-white font-mono font-bold text-base rounded-xl flex items-center justify-center transition shadow-2xs select-none">7</button>
+                                <button type="button" onclick="npDigit('8')" class="h-10 bg-slate-800 hover:bg-emerald-600 active:scale-95 text-white font-mono font-bold text-base rounded-xl flex items-center justify-center transition shadow-2xs select-none">8</button>
+                                <button type="button" onclick="npDigit('9')" class="h-10 bg-slate-800 hover:bg-emerald-600 active:scale-95 text-white font-mono font-bold text-base rounded-xl flex items-center justify-center transition shadow-2xs select-none">9</button>
+                                <button type="button" onclick="npClear()" class="h-10 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-bold text-xs rounded-xl flex items-center justify-center transition shadow-2xs select-none">Clear</button>
+                                <button type="button" onclick="npDigit('0')" class="h-10 bg-slate-800 hover:bg-emerald-600 active:scale-95 text-white font-mono font-bold text-base rounded-xl flex items-center justify-center transition shadow-2xs select-none">0</button>
+                                <button type="button" onclick="npBackspace()" class="h-10 bg-rose-950/70 hover:bg-rose-700 active:scale-95 text-rose-200 font-bold text-sm rounded-xl flex items-center justify-center transition shadow-2xs select-none border border-rose-800/40"><i class="fa-solid fa-delete-left"></i></button>
+                            </div>
+
+                            <!-- Tombol Lanjut / Enter Terpisah (5 Kolom) -->
+                            <div class="sm:col-span-5 flex flex-col gap-2">
+                                <div class="text-[11px] text-slate-400 bg-slate-800/60 p-2.5 rounded-xl border border-slate-800">
+                                    <div class="font-bold text-slate-300 mb-0.5">Petunjuk Numpad:</div>
+                                    Ketik tanggal (cth: <b class="text-emerald-400 font-mono">200926</b> atau <b class="text-emerald-400 font-mono">20092026</b>) atau pilih tombol tahun cepat di atas.
+                                </div>
+
+                                <button type="button" onclick="npEnter()" id="btnNpEnter"
+                                    class="w-full h-12 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-bold text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-950/50 select-none cursor-pointer border border-emerald-300/40">
+                                    <kbd class="px-2 py-0.5 bg-emerald-800/90 border border-emerald-400/40 rounded font-mono font-black text-xs text-white shadow-xs">↵ ENTER</kbd>
+                                    <span>PINDAH KE QTY ➔</span>
+                                </button>
                             </div>
                         </div>
                     </div>
