@@ -251,8 +251,8 @@ try {
                     $totalWithResi++;
                 }
 
-                // Kumpulkan pesanan yang memiliki resi untuk diperkaya detail finansial & klaim
-                if ($fetchDetails && !empty($tn) && ($detailsLimit === 0 || count($ordersForDetailEnrichment) < $detailsLimit)) {
+                // Kumpulkan pesanan untuk diperkaya detail finansial & klaim (termasuk yang belum terbit resi)
+                if ($fetchDetails && ($detailsLimit === 0 || count($ordersForDetailEnrichment) < $detailsLimit)) {
                     $ordersForDetailEnrichment[] = $it;
                 }
             }
@@ -364,10 +364,6 @@ try {
                 $subtotal         = (float)($payment['SubTotal'] ?? 0);
                 $totalAmount      = (float)($payment['TotalAmount'] ?? 0);
 
-                if ($totalAmount <= 0) {
-                    $totalAmount = $subtotal > 0 ? ($subtotal + $shippingFee + $serviceFee) : $origTotalProduct;
-                }
-
                 $customer = $detailData['Customer'] ?? [];
                 $custName    = trim($customer['Name'] ?? '');
                 $custPhone   = trim($customer['PhoneNumber'] ?? '');
@@ -376,23 +372,43 @@ try {
                 $rawItems = $detailData['Details'] ?? [];
                 $parsedItems = [];
                 $primarySellerSku = null;
+                $itemSaleSum = 0;
+                $itemOrigSum = 0;
 
                 foreach ($rawItems as $it) {
                     $sSku = trim($it['SellerSku'] ?? '');
                     if (!$primarySellerSku && !empty($sSku)) $primarySellerSku = $sSku;
+                    $qty = (int)($it['Qty'] ?? 1);
+                    $sPrice = (float)($it['SalePrice'] ?? 0);
+                    $oPrice = (float)($it['OriginalPrice'] ?? 0);
+                    $itemSaleSum += ($sPrice * $qty);
+                    $itemOrigSum += ($oPrice * $qty);
 
                     $parsedItems[] = [
                         'sku_id'            => trim($it['SkuId'] ?? ''),
                         'seller_sku'        => $sSku,
                         'product_name'      => trim($it['ProductName'] ?? ''),
                         'sku_name'          => trim($it['SkuName'] ?? ''),
-                        'qty'               => (int)($it['Qty'] ?? 1),
-                        'original_price'    => (float)($it['OriginalPrice'] ?? 0),
-                        'sale_price'        => (float)($it['SalePrice'] ?? 0),
+                        'qty'               => $qty,
+                        'original_price'    => $oPrice,
+                        'sale_price'        => $sPrice,
                         'seller_discount'   => (float)($it['SellerDiscount'] ?? 0),
                         'platform_discount' => (float)($it['PlatformDiscount'] ?? 0),
                         'subtotal'          => (float)($it['SubTotal'] ?? 0)
                     ];
+                }
+
+                // Kalkulasi total harga akurat dengan fallback jika OCS mengirim 0
+                if ($totalAmount <= 0) {
+                    if ($subtotal > 0) {
+                        $totalAmount = $subtotal;
+                    } elseif ($itemSaleSum > 0) {
+                        $totalAmount = $itemSaleSum;
+                    } elseif ($origTotalProduct > 0) {
+                        $totalAmount = $origTotalProduct;
+                    } elseif ($itemOrigSum > 0) {
+                        $totalAmount = $itemOrigSum;
+                    }
                 }
 
                 $orderItemsJson = !empty($parsedItems) ? json_encode($parsedItems, JSON_UNESCAPED_UNICODE) : null;

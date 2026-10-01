@@ -1020,7 +1020,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                     <th class="p-3 whitespace-nowrap">No. Resi (Tracking)</th>
                                     <th class="p-3 whitespace-nowrap">Toko & Ekspedisi</th>
                                     <th class="p-3 min-w-[200px] max-w-[320px]">Produk & SKU</th>
-                                    <th class="p-3 whitespace-nowrap text-right">Ongkir</th>
+                                    <th class="p-3 whitespace-nowrap text-right">Total Harga</th>
                                     <th class="p-3 whitespace-nowrap text-right">Total Klaim</th>
                                     <th class="p-3 whitespace-nowrap">Tanggal Order</th>
                                     <th class="p-3 whitespace-nowrap text-center">Aksi</th>

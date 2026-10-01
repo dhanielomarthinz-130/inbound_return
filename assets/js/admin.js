@@ -3458,7 +3458,7 @@ window.renderOrdersTable = function(orders, pagination) {
         const shop = o.shop_name || '-';
         const shipping = o.shipping_provider || '-';
         const claimFmt = o.total_claim_amount_fmt || ('Rp ' + Number(o.total_claim_amount || 0).toLocaleString('id-ID'));
-        const shipFeeFmt = o.shipping_fee_fmt || ('Rp ' + Number(o.shipping_fee || 0).toLocaleString('id-ID'));
+        const totalPriceFmt = o.total_price_fmt || o.total_amount_fmt || ('Rp ' + Number(o.total_price || o.total_amount || o.package_price || 0).toLocaleString('id-ID'));
         const orderDate = o.order_date || '-';
 
         // Badge Platform Warna-warni
@@ -3516,8 +3516,8 @@ window.renderOrdersTable = function(orders, pagination) {
                 <td class="p-3 min-w-[200px] max-w-[320px]">
                     ${skuSummary}
                 </td>
-                <td class="p-3 text-right font-mono text-slate-600">
-                    ${shipFeeFmt}
+                <td class="p-3 text-right font-mono font-bold text-slate-800 text-xs">
+                    ${totalPriceFmt}
                 </td>
                 <td class="p-3 text-right">
                     <span class="font-mono font-black text-emerald-600 text-xs">${claimFmt}</span>
