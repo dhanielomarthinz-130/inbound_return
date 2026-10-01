@@ -56,109 +56,113 @@ try {
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800 antialiased flex flex-col justify-between selection:bg-emerald-500 selection:text-white pb-24 md:pb-6">
 
-    <!-- TOP NAVBAR (RESPONSIVE & MOBILE FRIENDLY) -->
+    <!-- TOP NAVBAR (RESPONSIVE & MOBILE FIRST) -->
     <header class="bg-slate-900 border-b border-slate-800 text-white shadow-lg sticky top-0 z-30 w-full no-print">
-        <div class="w-full px-3 md:px-6 py-2.5 flex justify-between items-center gap-2">
+        <div class="w-full max-w-5xl mx-auto px-3 sm:px-4 py-2 flex justify-between items-center gap-2">
             
             <!-- Brand / Logo & Title -->
-            <div class="flex items-center space-x-2.5 shrink-0">
-                <div class="w-9 h-9 rounded-2xl bg-white p-1 flex items-center justify-center shadow-md shrink-0">
+            <div class="flex items-center space-x-2 shrink-0">
+                <div class="w-8 h-8 rounded-xl bg-white p-1 flex items-center justify-center shadow shrink-0">
                     <img src="assets/image/logo-IEG.png" alt="Logo IEG" class="w-full h-full object-contain">
                 </div>
                 <div>
                     <div class="flex items-center gap-1.5">
-                        <h1 class="font-black text-white text-sm md:text-base leading-tight">Penerimaan Ekspedisi</h1>
-                        <span class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-bold px-1.5 py-0.5 rounded-md">Mobile</span>
+                        <h1 class="font-black text-white text-xs sm:text-sm tracking-tight leading-none">Inbound Receiving</h1>
+                        <span class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-bold px-1.5 py-0.2 rounded leading-tight">Mobile</span>
                     </div>
                     <p class="text-[10px] text-slate-400 font-medium hidden sm:block">Serah Terima & Scan Barcode Paket Inbound</p>
                 </div>
             </div>
             
-            <!-- Navigation Switcher & User Profile -->
-            <div class="flex items-center space-x-1.5 md:space-x-3">
-                <!-- Tombol Kembali ke Menu Utama Operator (Hub) -->
-                <a href="menu" title="Kembali ke Menu Utama Portal" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-sm">
-                    <i class="fa-solid fa-shapes text-indigo-400"></i>
-                    <span class="hidden sm:inline">Menu Utama</span>
+            <!-- Navigation Switcher & User Actions -->
+            <div class="flex items-center space-x-1.5 sm:space-x-2">
+                <!-- Tombol Menu Utama Hub -->
+                <a href="menu" title="Menu Utama Portal" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-xs">
+                    <i class="fa-solid fa-shapes text-indigo-400 text-xs"></i>
+                    <span class="hidden md:inline">Menu</span>
                 </a>
 
-                <!-- Nav Switcher ke Unboxing Station -->
-                <a href="scanner" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-sm">
-                    <i class="fa-solid fa-box-open text-indigo-400"></i>
-                    <span class="hidden sm:inline">Unboxing Station</span>
+                <!-- Nav Unboxing Station -->
+                <a href="scanner" title="Unboxing Station" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-xs">
+                    <i class="fa-solid fa-box-open text-indigo-400 text-xs"></i>
+                    <span class="hidden md:inline">Unboxing</span>
                 </a>
 
                 <?php if (in_array($user['role'], ['admin', 'superadmin'])): ?>
-                <a href="admin" class="hidden md:flex bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-2.5 py-1.5 rounded-xl font-semibold transition items-center gap-1.5 shadow-sm">
-                    <i class="fa-solid fa-chart-pie"></i>
-                    <span>Admin</span>
+                <a href="admin" title="Panel Admin" class="hidden sm:flex bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-2.5 py-1.5 rounded-xl font-semibold transition items-center gap-1 shadow-xs">
+                    <i class="fa-solid fa-chart-pie text-xs"></i>
+                    <span class="hidden md:inline">Admin</span>
                 </a>
                 <?php endif; ?>
 
-                <!-- Operator Badge -->
-                <div class="flex items-center gap-1.5 bg-slate-800/90 border border-slate-700/80 px-2.5 py-1.5 rounded-xl text-xs">
-                    <div class="w-5 h-5 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs shrink-0">
-                        <i class="fa-solid fa-user-check text-[10px]"></i>
-                    </div>
-                    <span class="font-bold text-slate-100 text-xs truncate max-w-[100px]"><?= htmlspecialchars($user['name']) ?></span>
+                <!-- Operator Badge Ringkas -->
+                <div class="flex items-center gap-1.5 bg-slate-800/90 border border-slate-700 px-2 py-1.5 rounded-xl text-xs" title="Operator: <?= htmlspecialchars($user['name']) ?>">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span class="font-bold text-slate-200 text-[11px] truncate max-w-[85px] sm:max-w-[120px]"><?= htmlspecialchars($user['name']) ?></span>
                 </div>
 
                 <!-- Tombol Logout -->
-                <a href="logout" onclick="return confirm('Keluar dari sesi ini?')" title="Logout" class="w-8 h-8 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white flex items-center justify-center transition shadow-sm shrink-0">
-                    <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
+                <a href="logout" onclick="return confirm('Keluar dari sesi ini?')" title="Logout" class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white flex items-center justify-center transition shadow-xs shrink-0">
+                    <i class="fa-solid fa-arrow-right-from-bracket text-[11px]"></i>
                 </a>
             </div>
         </div>
     </header>
 
     <!-- WORKSPACE UTAMA -->
-    <main class="w-full max-w-5xl mx-auto px-3 md:px-6 py-4 pb-12 space-y-4 flex-1 no-print">
+    <main class="w-full max-w-5xl mx-auto px-2.5 sm:px-4 py-3 space-y-3 flex-1 no-print">
 
-        <!-- TAB MENU: 1. INPUT SCAN PENERIMAAN | 2. RIWAYAT HARI INI -->
-        <div class="flex items-center justify-between bg-white p-1 rounded-2xl border border-slate-200 shadow-sm">
-            <button id="tabBtnScan" onclick="switchTab('scan')" class="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 bg-emerald-600 text-white shadow-sm">
-                <i class="fa-solid fa-barcode"></i>
+        <!-- TAB MENU: 1. SCAN PENERIMAAN | 2. RIWAYAT HARI INI -->
+        <div class="flex items-center justify-between bg-white p-1 rounded-2xl border border-slate-200 shadow-xs">
+            <button id="tabBtnScan" onclick="switchTab('scan')" class="flex-1 py-1.5 sm:py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 bg-emerald-600 text-white shadow-xs">
+                <i class="fa-solid fa-barcode text-xs"></i>
                 <span>Scan Penerimaan</span>
             </button>
-            <button id="tabBtnHistory" onclick="switchTab('history')" class="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900">
-                <i class="fa-solid fa-clock-rotate-left"></i>
-                <span>Riwayat Hari Ini (<span id="historyCountBadge">0</span>)</span>
+            <button id="tabBtnHistory" onclick="switchTab('history')" class="flex-1 py-1.5 sm:py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-900">
+                <i class="fa-solid fa-clock-rotate-left text-xs"></i>
+                <span>Riwayat (<span id="historyCountBadge">0</span>)</span>
             </button>
         </div>
 
         <!-- ============================================================== -->
         <!-- VIEW 1: SCAN PENERIMAAN BARU                                   -->
         <!-- ============================================================== -->
-        <div id="viewScan" class="space-y-4">
+        <div id="viewScan" class="space-y-3">
 
-            <!-- CARD 1: INFORMASI EKSPEDISI & PENGATURAN -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-3.5 sm:p-4 space-y-3">
-                <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                    <div class="flex items-center gap-2">
-                        <div class="w-7 h-7 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold text-xs">
-                            <i class="fa-solid fa-truck-ramp-box"></i>
+            <!-- CARD 1: INFORMASI EKSPEDISI & DRIVER (COMPACT & RINGKAS) -->
+            <div class="bg-white rounded-2xl shadow-xs border border-slate-200/90 p-3 sm:p-3.5 space-y-2.5">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <div class="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold text-xs shrink-0">
+                            <i class="fa-solid fa-truck-fast text-[11px]"></i>
                         </div>
-                        <div>
-                            <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Ekspedisi Pengantar</h2>
-                            <p class="text-[10px] text-slate-400">Pilih ekspedisi dan isi identitas driver</p>
+                        <div class="min-w-0 flex items-center gap-2">
+                            <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Ekspedisi</h2>
+                            <!-- ID Penerimaan Otomatis Sebagai Badge Ringkas -->
+                            <span id="badgeReceiptDisplay" class="bg-slate-100 text-slate-600 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md border border-slate-200 truncate">
+                                Memuat ID...
+                            </span>
                         </div>
                     </div>
-                    <button onclick="resetReceptionForm()" type="button" class="text-[11px] text-amber-600 hover:text-amber-700 font-semibold flex items-center gap-1 transition">
-                        <i class="fa-solid fa-rotate"></i> <span class="hidden sm:inline">Reset Form</span>
-                    </button>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button onclick="resetReceptionForm()" type="button" class="text-[11px] text-amber-600 hover:text-amber-700 font-semibold flex items-center gap-1 transition" title="Reset Form">
+                            <i class="fa-solid fa-rotate text-xs"></i> <span class="hidden sm:inline">Reset</span>
+                        </button>
+                    </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-3">
+                <!-- Input Ekspedisi & Driver (Grid 2 Kolom Ringkas) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <!-- Dropdown Ekspedisi -->
                     <div>
-                        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">
                             Pilih Ekspedisi <span class="text-rose-500">*</span>
                         </label>
                         <div class="relative">
-                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
-                                <i class="fa-solid fa-truck-fast"></i>
+                            <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400 text-xs">
+                                <i class="fa-solid fa-truck-ramp-box"></i>
                             </span>
-                            <select id="selectExpedition" onchange="onExpeditionChanged()" class="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition appearance-none">
+                            <select id="selectExpedition" onchange="onExpeditionChanged()" class="w-full pl-8 pr-7 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition appearance-none">
                                 <option value="">-- Pilih Ekspedisi --</option>
                                 <?php foreach ($expeditions as $exp): ?>
                                     <option value="<?= htmlspecialchars($exp['name']) ?>" data-prefix="<?= htmlspecialchars($exp['prefix_pattern'] ?? '') ?>">
@@ -166,182 +170,166 @@ try {
                                     </option>
                                 <?php endforeach; ?>
                             </select>
-                            <span class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400 text-xs">
-                                <i class="fa-solid fa-chevron-down"></i>
+                            <span class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-slate-400 text-xs">
+                                <i class="fa-solid fa-chevron-down text-[10px]"></i>
                             </span>
                         </div>
                     </div>
 
-                    <!-- No. Tanda Terima / ID Penerimaan (Kunci & Readonly) -->
+                    <!-- Nama Kurir / Driver -->
                     <div>
-                        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1 flex justify-between">
-                            <span>ID Penerimaan</span>
-                            <span class="text-[10px] text-emerald-600 font-semibold flex items-center gap-1"><i class="fa-solid fa-lock text-[9px]"></i> Otomatis</span>
-                        </label>
-                        <div class="relative">
-                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
-                                <i class="fa-solid fa-receipt"></i>
-                            </span>
-                            <input type="text" id="inputReceiptNo" readonly placeholder="Membuat ID penerimaan..." class="w-full pl-9 pr-3 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-700 cursor-not-allowed select-none focus:outline-none transition">
-                        </div>
-                    </div>
-
-                    <!-- Nama Kurir / Driver (Opsional) -->
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">
                             Nama Driver / Kurir <span class="text-slate-400 font-normal">(Opsional)</span>
                         </label>
                         <div class="relative">
-                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+                            <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400 text-xs">
                                 <i class="fa-solid fa-id-card"></i>
                             </span>
-                            <input type="text" id="inputCourierName" placeholder="Contoh: Budi (Kurir SPX)" class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition">
+                            <input type="text" id="inputCourierName" placeholder="Nama kurir pengantar..." class="w-full pl-8 pr-2.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition">
                         </div>
                     </div>
                 </div>
 
-                <!-- Auto-Foto Setting Toggle Banner -->
-                <div class="flex items-center justify-between bg-emerald-50/60 border border-emerald-200/80 rounded-xl px-3 py-2">
-                    <div class="flex items-center gap-2">
-                        <div class="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-xs">
-                            <i class="fa-solid fa-bolt"></i>
-                        </div>
-                        <div>
-                            <span class="text-xs font-bold text-emerald-950">Auto-Jepret Foto Paket saat Scan</span>
-                            <p class="text-[10px] text-emerald-700 leading-tight">Saat barcode discan, kamera langsung memotret paket & masuk ke Draft</p>
-                        </div>
+                <!-- Hidden Input ID Penerimaan (Tetap ada untuk backend & JS) -->
+                <input type="hidden" id="inputReceiptNo" value="">
+
+                <!-- Auto-Foto Setting Toggle (Sangat Ringkas) -->
+                <div class="flex items-center justify-between bg-emerald-50/70 border border-emerald-200/70 rounded-xl px-2.5 py-1.5">
+                    <div class="flex items-center gap-1.5">
+                        <i class="fa-solid fa-bolt text-emerald-600 text-xs"></i>
+                        <span class="text-[11px] font-bold text-emerald-950">Auto-Foto Paket saat Scan</span>
+                        <span class="text-[10px] text-emerald-700 hidden sm:inline">• Memotret paket otomatis saat barcode di-scan</span>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer shrink-0 ml-2">
                         <input type="checkbox" id="toggleAutoPhoto" checked class="sr-only peer" onchange="onAutoPhotoToggle(this)">
-                        <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                        <div class="w-8 h-4.5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-emerald-600"></div>
                     </label>
                 </div>
             </div>
 
-            <!-- CARD 2: SCAN BARCODE & KAMERA VIEWPORT (MOBILE RESPONSIVE UNIFIED) -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-3.5 sm:p-4 space-y-3">
-                <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                    <div class="flex items-center gap-2">
-                        <div class="w-7 h-7 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center font-bold text-xs">
-                            <i class="fa-solid fa-camera"></i>
+            <!-- CARD 2: SCAN BARCODE & KAMERA VIEWPORT (MOBILE RESPONSIVE & SLEEK) -->
+            <div class="bg-white rounded-2xl shadow-xs border border-slate-200/90 p-3 sm:p-3.5 space-y-2.5">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <div class="flex items-center gap-1.5">
+                        <div class="w-6 h-6 rounded-lg bg-indigo-500/10 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">
+                            <i class="fa-solid fa-camera text-[11px]"></i>
                         </div>
-                        <div>
-                            <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Scan & Kamera Paket</h2>
-                            <p class="text-[10px] text-slate-400">Scan resi dan otomatis abadikan foto fisik paket</p>
-                        </div>
+                        <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Kamera & Scan Barcode</h2>
                     </div>
 
-                    <div class="flex items-center gap-1.5">
-                        <span class="text-[10px] font-mono font-bold bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-lg hidden sm:inline-flex items-center gap-1">
-                            <i class="fa-regular fa-keyboard"></i> TAB = Foto
-                        </span>
-                        <div class="bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl flex items-center gap-1.5">
-                            <span class="text-[10px] font-bold text-amber-800 uppercase">Draft:</span>
-                            <span id="draftCountBadgeTop" class="bg-amber-500 text-white font-black text-xs px-2 py-0.5 rounded-lg leading-none">0</span>
+                    <div class="flex items-center gap-2">
+                        <!-- Toggle Sembunyikan/Tampilkan Kamera agar Layar Luas -->
+                        <button onclick="toggleCameraVisibility()" type="button" id="btnToggleCamVisibility" class="text-[10px] text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-1 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded-lg transition">
+                            <i class="fa-solid fa-eye-slash" id="iconToggleCam"></i> <span id="textToggleCam">Kecilkan</span>
+                        </button>
+                        <div class="bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                            <span class="text-[9px] font-bold text-amber-800 uppercase">Draft:</span>
+                            <span id="draftCountBadgeTop" class="bg-amber-500 text-white font-black text-[11px] px-1.5 py-0.2 rounded-md leading-none">0</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Live Camera Viewport (Mobile Friendly Aspect Ratio) -->
-                <div class="relative bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 shadow-inner">
-                    <div class="aspect-video w-full max-h-[300px] flex items-center justify-center relative">
+                <!-- Live Camera Viewport (Mobile Friendly Aspect Ratio: Ramping & Tidak Menghalangi) -->
+                <div id="cameraViewportContainer" class="relative bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 shadow-inner transition-all duration-200">
+                    <div class="w-full h-36 sm:h-52 flex items-center justify-center relative">
                         <video id="receptionLiveVideo" autoplay playsinline muted class="w-full h-full object-cover"></video>
                         <!-- Visual Flash Shutter -->
                         <div id="receptionFlashOverlay" class="absolute inset-0 bg-white pointer-events-none opacity-0 transition-opacity duration-150 z-20"></div>
 
                         <!-- Placeholder / Tombol Start Kamera jika mati -->
-                        <div id="receptionCameraPlaceholder" class="absolute inset-0 bg-slate-900/95 flex flex-col items-center justify-center text-white space-y-2 p-3 text-center z-10">
-                            <i class="fa-solid fa-camera text-3xl text-emerald-400 mb-1"></i>
-                            <span class="text-xs font-bold text-slate-200">Kamera Live Paket Siap Digunakan</span>
-                            <p class="text-[10px] text-slate-400 max-w-xs">Nyalakan kamera live untuk memotret otomatis setiap paket saat barcode di-scan</p>
-                            <button onclick="startReceptionCamera()" type="button" class="mt-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-md flex items-center gap-1.5">
-                                <i class="fa-solid fa-power-off"></i> Nyalakan Kamera
+                        <div id="receptionCameraPlaceholder" class="absolute inset-0 bg-slate-900/95 flex flex-col items-center justify-center text-white space-y-1.5 p-3 text-center z-10">
+                            <i class="fa-solid fa-camera text-2xl text-emerald-400"></i>
+                            <span class="text-xs font-bold text-slate-200">Kamera Live Paket</span>
+                            <p class="text-[10px] text-slate-400 max-w-xs">Nyalakan kamera live untuk auto-foto paket saat scan</p>
+                            <button onclick="startReceptionCamera()" type="button" class="mt-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl transition shadow-xs flex items-center gap-1.5">
+                                <i class="fa-solid fa-power-off text-xs"></i> Nyalakan Kamera
                             </button>
                         </div>
 
                         <!-- Top Floating Overlay Controls on Camera -->
-                        <div class="absolute top-2 left-2 right-2 z-10 flex items-center justify-between pointer-events-none">
-                            <span id="receptionCamBadge" class="hidden pointer-events-auto bg-black/60 backdrop-blur-xs text-white text-[10px] px-2 py-0.5 rounded-md font-mono flex items-center gap-1.5 border border-white/10">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> KAMERA READY
+                        <div class="absolute top-1.5 left-2 right-2 z-10 flex items-center justify-between pointer-events-none">
+                            <span id="receptionCamBadge" class="hidden pointer-events-auto bg-black/60 backdrop-blur-xs text-white text-[9px] px-1.5 py-0.5 rounded font-mono flex items-center gap-1 border border-white/10">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> LIVE
                             </span>
 
-                            <div class="flex items-center gap-1.5 pointer-events-auto">
-                                <button id="btnSwitchRecCam" onclick="switchReceptionCamera()" type="button" title="Ganti Kamera Depan/Belakang" class="bg-black/50 hover:bg-black/80 text-white px-2 py-1 rounded-lg text-xs transition border border-white/10 hidden flex items-center gap-1">
-                                    <i class="fa-solid fa-arrows-rotate text-[11px]"></i>
-                                    <span class="text-[10px]">Putar</span>
+                            <div class="flex items-center gap-1 pointer-events-auto">
+                                <button id="btnSwitchRecCam" onclick="switchReceptionCamera()" type="button" title="Ganti Kamera Depan/Belakang" class="bg-black/60 hover:bg-black/80 text-white px-2 py-0.5 rounded text-[10px] transition border border-white/10 hidden flex items-center gap-1">
+                                    <i class="fa-solid fa-arrows-rotate text-[10px]"></i>
+                                    <span>Putar</span>
                                 </button>
-                                <button onclick="toggleReceptionCameraPower()" type="button" title="Matikan/Nyalakan Kamera" class="bg-black/50 hover:bg-black/80 text-white px-2 py-1 rounded-lg text-[10px] transition border border-white/10">
+                                <button onclick="toggleReceptionCameraPower()" type="button" title="Matikan/Nyalakan Kamera" class="bg-black/60 hover:bg-black/80 text-white px-2 py-0.5 rounded text-[10px] transition border border-white/10">
                                     <i class="fa-solid fa-video text-[10px]"></i>
                                 </button>
                             </div>
                         </div>
 
                         <!-- Bottom Floating Watermark Simulator Indicator -->
-                        <div class="absolute bottom-2 left-2 right-2 pointer-events-none z-10 flex items-center justify-between text-[10px] text-white/80 bg-black/50 backdrop-blur-xs px-2.5 py-1 rounded-lg border border-white/10">
-                            <span class="font-mono text-emerald-300 font-bold truncate max-w-[200px]" id="camOverlayExp">IEG INBOUND</span>
+                        <div class="absolute bottom-1.5 left-2 right-2 pointer-events-none z-10 flex items-center justify-between text-[9px] text-white/80 bg-black/60 backdrop-blur-xs px-2 py-0.5 rounded border border-white/10">
+                            <span class="font-mono text-emerald-300 font-bold truncate max-w-[150px]" id="camOverlayExp">IEG INBOUND</span>
                             <span class="font-mono text-slate-300" id="camOverlayTime">Auto Watermark ON</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Input Scanner Box & Mobile Actions -->
+                <!-- Input Scanner Box & Action Toolbar (App-Like Ergonomic) -->
                 <div class="space-y-2">
-                    <div class="flex flex-col sm:flex-row gap-2">
+                    <!-- Baris 1: Input Barcode Besar + Tombol Tambah (+) -->
+                    <div class="flex gap-1.5 items-stretch">
                         <div class="relative flex-1">
-                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-sm">
                                 <i class="fa-solid fa-barcode"></i>
                             </span>
-                            <input type="text" id="inputPackageBarcode" placeholder="Scan barcode resi di sini..." autocomplete="off" class="w-full pl-10 pr-3 py-3 bg-slate-50 border-2 border-slate-300 rounded-2xl text-sm font-mono font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition shadow-inner">
+                            <input type="text" id="inputPackageBarcode" placeholder="Scan resi di sini..." autocomplete="off" class="w-full pl-9 pr-2.5 py-2.5 sm:py-3 bg-slate-50 border-2 border-slate-300 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-mono font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition shadow-inner">
                         </div>
-                        
-                        <!-- Tombol Tambah Manual & Jepret -->
-                        <div class="flex items-center gap-1.5">
-                            <button onclick="submitPackageBarcode()" type="button" class="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white px-4 py-3 rounded-2xl font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 shrink-0">
-                                <i class="fa-solid fa-plus text-sm"></i>
-                                <span>Tambah Draft</span>
-                            </button>
+                        <button onclick="submitPackageBarcode()" type="button" class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 shrink-0">
+                            <i class="fa-solid fa-plus text-sm"></i>
+                            <span class="hidden sm:inline">Tambah Draft</span>
+                            <span class="sm:hidden font-bold">Draft</span>
+                        </button>
+                    </div>
 
-                            <!-- Tombol Jepret Manual / Tuts TAB -->
-                            <button id="btnCaptureReceptionPhoto" onclick="captureReceptionPhoto()" type="button" title="Jepret foto manual (TAB)" class="bg-slate-800 hover:bg-slate-900 active:scale-95 text-white px-3.5 py-3 rounded-2xl font-bold text-xs transition flex items-center justify-center gap-1 shrink-0 shadow-sm">
-                                <i class="fa-solid fa-camera"></i>
-                                <span class="hidden md:inline">Jepret</span>
-                            </button>
+                    <!-- Baris 2: Toolbar Tombol Kamera Cepat & Ergonomis di Mobile -->
+                    <div class="grid grid-cols-3 gap-1.5">
+                        <!-- 1. Tombol Jepret Manual / Tuts TAB -->
+                        <button id="btnCaptureReceptionPhoto" onclick="captureReceptionPhoto()" type="button" title="Jepret foto manual (TAB)" class="bg-slate-800 hover:bg-slate-900 active:scale-95 text-white py-2 px-1.5 rounded-xl font-bold text-[11px] transition flex items-center justify-center gap-1.5 shadow-xs">
+                            <i class="fa-solid fa-camera text-xs text-emerald-400"></i>
+                            <span>Jepret</span>
+                        </button>
 
-                            <!-- Tombol Buka Kamera Scanner Barcode HP -->
-                            <button id="btnToggleCamera" onclick="toggleCameraScanner()" type="button" title="Scan Barcode via Kamera HP" class="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white px-3.5 py-3 rounded-2xl font-bold text-xs transition flex items-center justify-center gap-1 shrink-0 shadow-sm shadow-indigo-600/20">
-                                <i class="fa-solid fa-qrcode"></i>
-                                <span class="hidden sm:inline">Barcode HP</span>
-                            </button>
+                        <!-- 2. Tombol Buka Kamera Scanner Barcode HP -->
+                        <button id="btnToggleCamera" onclick="toggleCameraScanner()" type="button" title="Scan Barcode via Kamera HP" class="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white py-2 px-1.5 rounded-xl font-bold text-[11px] transition flex items-center justify-center gap-1.5 shadow-xs shadow-indigo-600/20">
+                            <i class="fa-solid fa-qrcode text-xs"></i>
+                            <span>Barcode HP</span>
+                        </button>
 
-                            <!-- Tombol Jepret Kamera HP Asli (File Input Capture) -->
-                            <button onclick="triggerMobileCameraInput()" type="button" title="Ambil Foto langsung dari Kamera HP" class="bg-teal-600 hover:bg-teal-700 active:scale-95 text-white px-3.5 py-3 rounded-2xl font-bold text-xs transition flex items-center justify-center gap-1 shrink-0 shadow-sm shadow-teal-600/20">
-                                <i class="fa-solid fa-camera-retro"></i>
-                                <span class="hidden sm:inline">Foto HP</span>
-                            </button>
-                        </div>
+                        <!-- 3. Tombol Jepret Kamera HP Asli (File Input Capture) -->
+                        <button onclick="triggerMobileCameraInput()" type="button" title="Ambil Foto langsung dari Kamera HP" class="bg-teal-600 hover:bg-teal-700 active:scale-95 text-white py-2 px-1.5 rounded-xl font-bold text-[11px] transition flex items-center justify-center gap-1.5 shadow-xs shadow-teal-600/20">
+                            <i class="fa-solid fa-camera-retro text-xs"></i>
+                            <span>Foto HP</span>
+                        </button>
                     </div>
 
                     <!-- Hidden Native Mobile Camera Input -->
                     <input type="file" id="mobileCameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleMobileCameraFile(this)">
 
                     <!-- Viewport Kamera Barcode HP (HTML5-QRCode) -->
-                    <div id="cameraScannerContainer" class="hidden bg-slate-900 rounded-2xl p-3 border border-slate-800 relative transition-all">
+                    <div id="cameraScannerContainer" class="hidden bg-slate-900 rounded-2xl p-2.5 border border-slate-800 relative transition-all">
                         <div class="flex justify-between items-center text-white mb-2 px-1">
-                            <div class="flex items-center gap-2 text-xs font-bold">
+                            <div class="flex items-center gap-1.5 text-xs font-bold">
                                 <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
                                 <span>Arahkan Kamera ke Barcode Resi</span>
                             </div>
-                            <button onclick="toggleCameraScanner()" type="button" class="text-slate-400 hover:text-white text-xs bg-slate-800 px-2 py-1 rounded-lg">
+                            <button onclick="toggleCameraScanner()" type="button" class="text-slate-400 hover:text-white text-xs bg-slate-800 px-2 py-0.5 rounded-lg">
                                 <i class="fa-solid fa-xmark"></i> Tutup
                             </button>
                         </div>
-                        <div id="reader" class="w-full overflow-hidden rounded-xl bg-black min-h-[200px]"></div>
-                        <p class="text-[10px] text-center text-slate-400 mt-2">
+                        <div id="reader" class="w-full overflow-hidden rounded-xl bg-black min-h-[180px]"></div>
+                        <p class="text-[10px] text-center text-slate-400 mt-1.5">
                             Mode continuous scan: Barcode terdeteksi langsung otomatis difoto dan masuk ke Draft.
                         </p>
                     </div>
 
-                    <!-- Alert / Status Notifikasi -->
+                    <!-- Alert / Status Notifikasi Ramping -->
                     <div id="scanStatusMsg" class="hidden text-xs font-semibold px-3 py-2 rounded-xl flex items-center justify-between transition">
                         <span id="scanStatusText"></span>
                         <button onclick="dismissStatusMsg()" class="text-slate-400 hover:text-slate-600 text-xs ml-2"><i class="fa-solid fa-xmark"></i></button>
@@ -349,50 +337,47 @@ try {
                 </div>
             </div>
 
-            <!-- CARD 3: DAFTAR PAKET DRAFT (SIAP DI-SUBMIT KE SISTEM) -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-3.5 sm:p-4 space-y-3">
-                <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                    <div class="flex items-center gap-2">
-                        <div class="w-7 h-7 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold text-xs">
-                            <i class="fa-solid fa-boxes-stacked"></i>
+            <!-- CARD 3: DAFTAR PAKET DRAFT (MOBILE OPTIMIZED) -->
+            <div class="bg-white rounded-2xl shadow-xs border border-slate-200/90 p-3 sm:p-3.5 space-y-2.5">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <div class="flex items-center gap-1.5">
+                        <div class="w-6 h-6 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold text-xs shrink-0">
+                            <i class="fa-solid fa-boxes-stacked text-[11px]"></i>
                         </div>
-                        <div>
-                            <div class="flex items-center gap-1.5">
-                                <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Daftar Paket Draft</h2>
-                                <span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-300/80">Belum Disimpan</span>
-                            </div>
-                            <p class="text-[10px] text-slate-400">Total <span id="draftCountLabel" class="font-bold text-slate-700">0</span> paket siap di-submit ke sistem</p>
+                        <div class="flex items-center gap-1.5">
+                            <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Daftar Paket Draft</h2>
+                            <span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-amber-300">Belum Disimpan</span>
                         </div>
                     </div>
 
                     <button onclick="clearAllDrafts()" type="button" class="text-[11px] text-rose-500 hover:text-rose-700 font-semibold transition flex items-center gap-1">
                         <i class="fa-solid fa-trash-can text-xs"></i>
-                        <span>Hapus Semua Draft</span>
+                        <span class="hidden sm:inline">Hapus Semua</span>
                     </button>
                 </div>
 
                 <!-- Empty State Draft -->
-                <div id="draftListEmpty" class="border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center text-slate-400">
-                    <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2 text-xl">
+                <div id="draftListEmpty" class="border-2 border-dashed border-slate-200 rounded-2xl p-6 sm:p-8 text-center text-slate-400">
+                    <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-1.5 text-base">
                         <i class="fa-solid fa-box-open"></i>
                     </div>
                     <p class="text-xs font-bold text-slate-600">Belum Ada Paket di Draft</p>
                     <p class="text-[11px] text-slate-400 mt-0.5 max-w-sm mx-auto">
-                        Tembakkan barcode scanner atau ketik nomor resi di atas. Paket beserta fotonya akan otomatis terkumpul di sini sebagai draft.
+                        Scan barcode resi di atas. Paket beserta fotonya akan otomatis terkumpul di sini sebagai draft sebelum disimpan.
                     </p>
                 </div>
 
                 <!-- Non-Empty Draft Container (Mobile Friendly Cards) -->
-                <div id="draftPackagesContainer" class="hidden space-y-2 max-h-[460px] overflow-y-auto pr-1">
+                <div id="draftPackagesContainer" class="hidden space-y-1.5 max-h-[360px] sm:max-h-[460px] overflow-y-auto pr-0.5">
                     <!-- Dynamic Draft Item Cards -->
                 </div>
             </div>
 
-            <!-- CARD 4: SUBMIT PENERIMAAN DESKTOP & TABLET -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-4 sm:p-5">
+            <!-- CARD 4: SUBMIT PENERIMAAN DESKTOP & TABLET (HANYA MUNCUL DI DESKTOP/TABLET!) -->
+            <div class="hidden md:block bg-white rounded-2xl shadow-xs border border-slate-200/90 p-4 sm:p-5">
                 <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
                     <div class="flex items-center gap-3 w-full sm:w-auto">
-                        <div class="w-11 h-11 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-black text-lg shrink-0 border border-emerald-500/20">
+                        <div class="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-black text-base shrink-0 border border-emerald-500/20">
                             <i class="fa-solid fa-cloud-arrow-up"></i>
                         </div>
                         <div class="leading-tight">
@@ -404,8 +389,8 @@ try {
                         </div>
                     </div>
                     
-                    <button id="btnSubmitReception" onclick="submitCompleteReception()" type="button" class="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-[0.99] text-white rounded-2xl font-black text-sm transition shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2.5">
-                        <i class="fa-solid fa-check-double text-base"></i>
+                    <button id="btnSubmitReception" onclick="submitCompleteReception()" type="button" class="w-full sm:w-auto px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-[0.99] text-white rounded-xl font-bold text-xs sm:text-sm transition shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-check-double text-sm"></i>
                         <span>Simpan & Selesaikan Penerimaan (<span id="btnSubmitCount">0</span> Paket Draft)</span>
                     </button>
                 </div>
@@ -417,15 +402,15 @@ try {
         <!-- VIEW 2: RIWAYAT PENERIMAAN HARI INI                            -->
         <!-- ============================================================== -->
         <div id="viewHistory" class="hidden space-y-3">
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-4 space-y-3">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div class="bg-white rounded-2xl shadow-xs border border-slate-200/90 p-3 sm:p-4 space-y-3">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
                     <div>
                         <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Riwayat Penerimaan Ekspedisi</h2>
                         <p class="text-[10px] text-slate-400">Daftar tanda terima paket yang telah diserahterimakan</p>
                     </div>
                     <div class="flex items-center gap-2">
-                        <input type="date" id="historyDateFilter" onchange="loadHistoryData()" class="bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700">
-                        <button onclick="loadHistoryData()" class="bg-slate-800 text-white px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-slate-700 transition">
+                        <input type="date" id="historyDateFilter" onchange="loadHistoryData()" class="bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1 text-xs font-semibold text-slate-700">
+                        <button onclick="loadHistoryData()" class="bg-slate-800 text-white px-2.5 py-1 rounded-xl text-xs font-bold hover:bg-slate-700 transition">
                             <i class="fa-solid fa-arrows-rotate"></i>
                         </button>
                     </div>
@@ -436,13 +421,13 @@ try {
                     <table class="w-full text-left text-xs">
                         <thead>
                             <tr class="bg-slate-50 text-slate-600 border-b border-slate-200 font-bold uppercase text-[10px]">
-                                <th class="py-2.5 px-3">No. Tanda Terima</th>
-                                <th class="py-2.5 px-3">Ekspedisi</th>
-                                <th class="py-2.5 px-3">Driver / Kurir</th>
-                                <th class="py-2.5 px-3 text-center">Total Paket</th>
-                                <th class="py-2.5 px-3">Operator</th>
-                                <th class="py-2.5 px-3">Waktu</th>
-                                <th class="py-2.5 px-3 text-center">Aksi</th>
+                                <th class="py-2 px-2.5">No. Tanda Terima</th>
+                                <th class="py-2 px-2.5">Ekspedisi</th>
+                                <th class="py-2 px-2.5">Driver / Kurir</th>
+                                <th class="py-2 px-2.5 text-center">Total</th>
+                                <th class="py-2 px-2.5">Operator</th>
+                                <th class="py-2 px-2.5">Waktu</th>
+                                <th class="py-2 px-2.5 text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody id="historyTableBody" class="divide-y divide-slate-100">
@@ -457,25 +442,25 @@ try {
 
     </main>
 
-    <!-- MOBILE FLOATING STICKY BOTTOM BAR (TAMPILAN KHUSUS HP) -->
+    <!-- MOBILE FLOATING STICKY BOTTOM BAR (TUNGGAL & APP-LIKE KHUSUS HP) -->
     <div id="mobileStickyBar" class="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md px-3.5 py-2.5 border-t border-slate-800 flex justify-between items-center md:hidden shadow-2xl no-print">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 min-w-0">
             <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-black text-xs shrink-0 border border-amber-500/30">
                 <i class="fa-solid fa-boxes-stacked"></i>
             </div>
-            <div class="leading-tight">
+            <div class="leading-tight min-w-0">
                 <div class="flex items-center gap-1.5">
                     <span class="text-[10px] text-slate-400 font-bold uppercase">Draft:</span>
                     <span id="mobileDraftCount" class="font-mono font-black text-amber-400 text-sm">0</span>
                     <span class="text-[10px] text-slate-400">Paket</span>
                 </div>
-                <span id="mobileExpBadge" class="text-[10px] text-slate-300 font-semibold block truncate max-w-[130px]">Pilih Ekspedisi</span>
+                <span id="mobileExpBadge" class="text-[10px] text-slate-300 font-semibold block truncate max-w-[120px]">Pilih Ekspedisi</span>
             </div>
         </div>
 
-        <button onclick="submitCompleteReception()" type="button" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-900/40 flex items-center gap-2 transition">
+        <button onclick="submitCompleteReception()" type="button" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-900/40 flex items-center gap-2 transition shrink-0">
             <i class="fa-solid fa-paper-plane text-xs"></i>
-            <span>SUBMIT (<span id="mobileBtnCount">0</span>)</span>
+            <span>SIMPAN (<span id="mobileBtnCount">0</span>)</span>
         </button>
     </div>
 
@@ -940,19 +925,47 @@ try {
         // LOGIKA SCAN PAKET, FOTO INSTAN & DRAFT MANAGEMENT
         // ==============================================================
 
+        let isCameraMinimized = false;
+        function toggleCameraVisibility() {
+            isCameraMinimized = !isCameraMinimized;
+            const camBox = document.getElementById('cameraViewportContainer');
+            const icon = document.getElementById('iconToggleCam');
+            const text = document.getElementById('textToggleCam');
+            if (!camBox) return;
+
+            if (isCameraMinimized) {
+                camBox.classList.add('hidden');
+                if (icon) icon.className = 'fa-solid fa-eye';
+                if (text) text.innerText = 'Buka';
+            } else {
+                camBox.classList.remove('hidden');
+                if (icon) icon.className = 'fa-solid fa-eye-slash';
+                if (text) text.innerText = 'Kecilkan';
+            }
+        }
+
         // Generate Receipt ID dari server
         async function generateReceiptId() {
+            let rId = '';
             try {
                 const res = await fetch('api/reception.php?action=generate_id');
                 const data = await res.json();
                 if (data && data.success && data.receipt_number) {
-                    document.getElementById('inputReceiptNo').value = data.receipt_number;
+                    rId = data.receipt_number;
                 }
             } catch (e) {
                 const now = new Date();
                 const dStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-                document.getElementById('inputReceiptNo').value = `RCV-${dStr}-${Math.floor(1000 + Math.random() * 9000)}`;
+                rId = `RCV-${dStr}-${Math.floor(1000 + Math.random() * 9000)}`;
             }
+            if (!rId) {
+                const now = new Date();
+                const dStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+                rId = `RCV-${dStr}-${Math.floor(1000 + Math.random() * 9000)}`;
+            }
+            const inputNo = document.getElementById('inputReceiptNo');
+            if (inputNo) inputNo.value = rId;
+            setText('badgeReceiptDisplay', '#' + rId);
         }
 
         // Event perubahan Ekspedisi
