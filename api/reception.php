@@ -108,7 +108,7 @@ if ($method === 'GET') {
     $rows = [];
     try {
         $stmt = $pdo->prepare("
-            SELECT id, receipt_number, expedition, courier_name, vehicle_no, operator_name, total_packages, notes, photo_path, package_photos, status, created_at
+            SELECT id, receipt_number, expedition, courier_name, courier_photo, vehicle_no, operator_name, total_packages, notes, photo_path, package_photos, status, created_at
             FROM expedition_receptions
             WHERE {$whereSql}
             ORDER BY id DESC
@@ -126,7 +126,7 @@ if ($method === 'GET') {
         try {
             // Coba lagi dengan kolom foto
             $stmt = $pdo->prepare("
-                SELECT id, receipt_number, expedition, courier_name, vehicle_no, operator_name, total_packages, notes, photo_path, package_photos, status, created_at
+                SELECT id, receipt_number, expedition, courier_name, courier_photo, vehicle_no, operator_name, total_packages, notes, photo_path, package_photos, status, created_at
                 FROM expedition_receptions
                 WHERE {$whereSql}
                 ORDER BY id DESC
@@ -137,7 +137,7 @@ if ($method === 'GET') {
             try {
                 // Fallback jika hosting belum mengizinkan kolom photo_path / package_photos
                 $stmtFallback = $pdo->prepare("
-                    SELECT id, receipt_number, expedition, courier_name, vehicle_no, operator_name, total_packages, notes, NULL as photo_path, NULL as package_photos, status, created_at
+                    SELECT id, receipt_number, expedition, courier_name, NULL as courier_photo, vehicle_no, operator_name, total_packages, notes, NULL as photo_path, NULL as package_photos, status, created_at
                     FROM expedition_receptions
                     WHERE {$whereSql}
                     ORDER BY id DESC
@@ -320,6 +320,13 @@ if ($method === 'POST') {
         }
     }
 
+    // 2b. Simpan Foto Kurir jika ada
+    $courierPhotoData = $input['courier_photo'] ?? null;
+    $savedCourierPhoto = null;
+    if (!empty($courierPhotoData)) {
+        $savedCourierPhoto = $saveImgHelper($courierPhotoData, 'courier_' . $cleanRcpt);
+    }
+
     $mainPhotoPath = count($photoPaths) > 0 ? $photoPaths[0] : null;
     $allPhotosJson = count($photoPaths) > 0 ? json_encode($photoPaths, JSON_UNESCAPED_SLASHES) : null;
 
@@ -329,24 +336,56 @@ if ($method === 'POST') {
         $operatorName = $user['name'] ?? $user['username'] ?? 'Operator';
         $totalCount   = count($cleanPackages);
 
-        // 1. Simpan Header Penerimaan
-        $stmtHead = $pdo->prepare("
-            INSERT INTO expedition_receptions 
-                (receipt_number, expedition, courier_name, vehicle_no, operator_name, total_packages, notes, photo_path, package_photos, status, created_at)
-            VALUES 
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED', NOW())
-        ");
-        $stmtHead->execute([
-            $receiptNo,
-            $expedition,
-            $courierName ?: null,
-            $vehicleNo ?: null,
-            $operatorName,
-            $totalCount,
-            $notes ?: null,
-            $mainPhotoPath,
-            $allPhotosJson
-        ]);
+        // 1. Simpan Header Penerimaan (Dengan courier_photo)
+        $hasCourierPhotoCol = false;
+        try {
+            $chkCpCol = $pdo->query("SHOW COLUMNS FROM expedition_receptions LIKE 'courier_photo'");
+            if ($chkCpCol && $chkCpCol->rowCount() > 0) {
+                $hasCourierPhotoCol = true;
+            } else {
+                $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN courier_photo VARCHAR(255) NULL AFTER courier_name");
+                $hasCourierPhotoCol = true;
+            }
+        } catch (Exception $eCp) {}
+
+        if ($hasCourierPhotoCol) {
+            $stmtHead = $pdo->prepare("
+                INSERT INTO expedition_receptions 
+                    (receipt_number, expedition, courier_name, courier_photo, vehicle_no, operator_name, total_packages, notes, photo_path, package_photos, status, created_at)
+                VALUES 
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED', NOW())
+            ");
+            $stmtHead->execute([
+                $receiptNo,
+                $expedition,
+                $courierName ?: null,
+                $savedCourierPhoto ?: null,
+                $vehicleNo ?: null,
+                $operatorName,
+                $totalCount,
+                $notes ?: null,
+                $mainPhotoPath,
+                $allPhotosJson
+            ]);
+        } else {
+            $stmtHead = $pdo->prepare("
+                INSERT INTO expedition_receptions 
+                    (receipt_number, expedition, courier_name, vehicle_no, operator_name, total_packages, notes, photo_path, package_photos, status, created_at)
+                VALUES 
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED', NOW())
+            ");
+            $stmtHead->execute([
+                $receiptNo,
+                $expedition,
+                $courierName ?: null,
+                $vehicleNo ?: null,
+                $operatorName,
+                $totalCount,
+                $notes ?: null,
+                $mainPhotoPath,
+                $allPhotosJson
+            ]);
+        }
         $receptionId = $pdo->lastInsertId();
 
         // 2. Simpan Detail Paket (Multiple Items dengan kolom photo_path)
@@ -391,6 +430,7 @@ if ($method === 'POST') {
             'expedition' => $expedition,
             'total_packages' => $totalCount,
             'operator_name' => $operatorName,
+            'courier_photo' => $savedCourierPhoto,
             'photo_path' => $mainPhotoPath,
             'photos' => $photoPaths,
             'created_at' => date('Y-m-d H:i:s')
