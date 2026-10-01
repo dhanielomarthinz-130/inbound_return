@@ -144,6 +144,7 @@
     };
 
     window.showToast = showToast;
+    window.escapeHtml = escapeHtml;
 
     // INTERCEPT NATIVE WINDOW.ALERT SECARA OTOMATIS
     const _nativeAlert = window.alert;

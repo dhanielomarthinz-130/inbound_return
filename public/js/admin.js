@@ -1,3 +1,15 @@
+// Helper Sanitasi HTML Global
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+window.escapeHtml = escapeHtml;
+
 // State Management & Instances
 let ratioChartInstance = null;
 let currentTab = 'dashboard';
@@ -1993,6 +2005,7 @@ let receivingSearchDebounceTimer = null;
 function initReceivingDatepicker() {
     const el = document.getElementById('filterReceivingDate');
     if (!el || flatpickrReceivingInstance) return;
+    if (typeof flatpickr !== 'function') return;
 
     flatpickrReceivingInstance = flatpickr(el, {
         mode: "range",
@@ -2082,7 +2095,22 @@ window.loadReceivingData = async function(forceRefresh = false) {
         }
 
         const res = await fetch(url);
-        const json = await res.json();
+
+        if (res.status === 401) {
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-amber-600 font-bold"><i class="fa-solid fa-triangle-exclamation mr-1.5 text-lg"></i>Sesi login Anda telah berakhir. Silakan <a href="login" class="underline text-indigo-600 font-black">Login Kembali</a>.</td></tr>`;
+            }
+            return;
+        }
+
+        let json;
+        try {
+            json = await res.json();
+        } catch (jsonErr) {
+            const rawText = await res.text().catch(() => '');
+            console.error('Non-JSON response from reception.php:', rawText);
+            throw new Error(`Respon server tidak valid (${res.status}): ${rawText.slice(0, 100)}`);
+        }
 
         if (json && json.success) {
             cachedReceivingData = json.data || [];
@@ -2092,11 +2120,14 @@ window.loadReceivingData = async function(forceRefresh = false) {
                 showToast('success', 'Data receiving berhasil diperbarui.', 'Refresh Selesai');
             }
         } else {
-            if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-rose-500">Gagal memuat data: ${escapeHtml(json.error || 'Kesalahan server')}</td></tr>`;
+            const errMsg = json ? (json.error || 'Kesalahan server') : 'Respon kosong';
+            if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-rose-500 font-semibold"><i class="fa-solid fa-circle-exclamation mr-1.5"></i>Gagal memuat data: ${escapeHtml(errMsg)}</td></tr>`;
         }
     } catch (e) {
         console.error('Error loadReceivingData:', e);
-        if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-rose-500">Terjadi kesalahan koneksi saat memuat data receiving.</td></tr>`;
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-rose-500 font-semibold"><i class="fa-solid fa-circle-exclamation mr-1.5 text-lg block mb-1"></i>Terjadi kesalahan saat memuat data receiving.<br><span class="text-xs text-slate-500 font-normal mt-1 block">${escapeHtml(e.message || 'Kesalahan koneksi')}</span></td></tr>`;
+        }
     }
 };
 
