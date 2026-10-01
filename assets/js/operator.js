@@ -527,6 +527,8 @@ function updateVirtualEnterBadge(fieldId) {
     if (el) {
         el.addEventListener('focus', () => updateVirtualEnterBadge(id));
     }
+});
+
 // -------------------------------------------------------------
 // VIRTUAL KEYBOARD TOUCHSCREEN KHUSUS KOLOM BATCH
 // -------------------------------------------------------------
@@ -1175,9 +1177,23 @@ async function startCamera(deviceId = null) {
     try {
         stopCamera();
 
-        if (videoDevices.length === 0) {
-            await getAvailableVideoDevices();
-        }
+        // Pasang timer informatif jika izin kamera memakan waktu > 3.5 detik (menunggu operator klik 'Allow' di browser)
+        const permissionNoticeTimeout = setTimeout(() => {
+            if (loading && !isCameraActive) {
+                loading.innerHTML = `
+                    <div class="text-center p-4 max-w-xs space-y-2">
+                        <i class="fa-solid fa-camera text-indigo-400 text-2xl animate-pulse mb-1"></i>
+                        <p class="text-xs text-white font-bold">Menunggu Izin Kamera...</p>
+                        <p class="text-[11px] text-slate-300 leading-normal">
+                            Silakan klik <b>Izinkan (Allow)</b> pada notifikasi izin kamera browser di atas layar.
+                        </p>
+                        <button onclick="startCamera()" class="mt-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5">
+                            <i class="fa-solid fa-rotate-right"></i> Hubungkan Ulang
+                        </button>
+                    </div>
+                `;
+            }
+        }, 3500);
 
         let stream = null;
 
@@ -1199,8 +1215,11 @@ async function startCamera(deviceId = null) {
             });
         }
 
+        clearTimeout(permissionNoticeTimeout);
         mediaStream = stream;
-        await getAvailableVideoDevices();
+
+        // Ambil daftar perangkat kamera di background setelah izin didapat
+        getAvailableVideoDevices().catch(e => console.warn(e));
 
         if (videoElement) {
             videoElement.srcObject = mediaStream;
@@ -1210,8 +1229,8 @@ async function startCamera(deviceId = null) {
             } catch (playErr) {
                 console.warn("video.play error:", playErr);
             }
-            if (loading) loading.classList.add('hidden');
         }
+        if (loading) loading.classList.add('hidden');
 
         isCameraActive = true;
         if (badge) {
