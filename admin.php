@@ -560,10 +560,14 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs">
                                     <i class="fa-solid fa-magnifying-glass"></i>
                                 </span>
-                                <input type="text" id="claimSearchInput" placeholder="Masukkan No. Resi atau Order ID / Invoice..." required
+                                <input type="text" id="claimSearchInput" placeholder="Masukkan / scan No. Resi atau No. Pesanan (Order ID)..." required
                                     class="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 transition shadow-2xs">
+                                <span class="text-[10px] text-slate-400 mt-1.5 block leading-tight">
+                                    <i class="fa-solid fa-barcode text-amber-500 mr-1"></i>
+                                    Dapat scan <b>Barcode Resi Atas</b> (SPXID...) atau <b>Barcode No. Pesanan Tengah</b> (contoh: 261001F8TF1NF4).
+                                </span>
                             </div>
-                            <button type="submit" id="btnClaimSearch" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm shadow-amber-500/20 shrink-0">
+                            <button type="submit" id="btnClaimSearch" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm shadow-amber-500/20 shrink-0 self-start">
                                 <i class="fa-solid fa-search"></i>
                                 <span>Cari Bukti</span>
                             </button>
