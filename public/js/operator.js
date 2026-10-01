@@ -940,8 +940,11 @@ function renderItemsTable() {
     if (scannedProductsList.length === 0) {
         tbody.innerHTML = `
             <tr id="emptyTablePlaceholder">
-                <td colspan="8" class="text-center py-10 text-slate-400 italic">
-                    Belum ada produk yang dimasukkan untuk invoice ini. Silakan scan barcode di atas.
+                <td colspan="8" class="text-center py-6 text-slate-400 italic">
+                    <div class="flex flex-col items-center justify-center space-y-1">
+                        <i class="fa-solid fa-box-open text-xl text-slate-300"></i>
+                        <span class="text-xs">Belum ada produk yang dimasukkan untuk invoice ini. Silakan scan barcode di atas.</span>
+                    </div>
                 </td>
             </tr>`;
         document.getElementById('btnFinalizeSession').disabled = true;
@@ -956,35 +959,35 @@ function renderItemsTable() {
         totalUnits += item.qty;
 
         // Badge Tipe
-        let badge = `<span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold text-[10px]">GOOD</span>`;
+        let badge = `<span class="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold text-[10px]">GOOD</span>`;
         if (item.type === 'RUSAK') {
-            badge = `<span class="bg-rose-100 text-rose-800 px-2 py-0.5 rounded font-bold text-[10px]">RUSAK</span>`;
+            badge = `<span class="bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded font-bold text-[10px]">RUSAK</span>`;
         } else if (item.type === 'EXPIRED') {
-            badge = `<span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold text-[10px]">EXPIRED</span>`;
+            badge = `<span class="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold text-[10px]">EXPIRED</span>`;
         } else if (item.type === 'SALAH_KIRIM') {
-            badge = `<span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-bold text-[10px]">SALAH KIRIM</span>`;
+            badge = `<span class="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded font-bold text-[10px]">SALAH KIRIM</span>`;
         }
 
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
         tr.innerHTML = `
-            <td class="p-3 text-center text-slate-400 font-mono text-[11px]">${index + 1}</td>
-            <td class="p-3 font-mono font-bold text-indigo-700">${item.barcode}</td>
-            <td class="p-3">
-                <div class="font-bold text-slate-800">${item.product_name}</div>
-                <div class="text-[10px] text-slate-500 flex flex-wrap gap-1.5 mt-0.5">
-                    <span class="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-mono font-bold border border-indigo-200">SKU: ${item.seller_sku || item.sku}</span>
-                    <span class="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-mono font-bold border border-emerald-200">SAP: ${item.sap_code || '-'}</span>
-                    ${item.bin_code ? `<span class="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-mono text-[10px] border border-amber-200">Rak: ${item.bin_code}</span>` : ''}
+            <td class="py-1.5 px-2 text-center text-slate-400 font-mono text-[11px]">${index + 1}</td>
+            <td class="py-1.5 px-2 font-mono font-bold text-indigo-700 text-xs">${item.barcode}</td>
+            <td class="py-1.5 px-2">
+                <div class="font-bold text-slate-800 text-xs">${item.product_name}</div>
+                <div class="text-[9px] text-slate-500 flex flex-wrap gap-1 mt-0.5">
+                    <span class="bg-indigo-50 text-indigo-700 px-1.5 py-0.2 rounded font-mono font-bold border border-indigo-200">SKU: ${item.seller_sku || item.sku}</span>
+                    <span class="bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded font-mono font-bold border border-emerald-200">SAP: ${item.sap_code || '-'}</span>
+                    ${item.bin_code ? `<span class="bg-amber-50 text-amber-700 px-1.5 py-0.2 rounded font-mono text-[9px] border border-amber-200">Rak: ${item.bin_code}</span>` : ''}
                 </div>
             </td>
-            <td class="p-3 font-mono text-slate-600 whitespace-nowrap">${item.batch_no || '-'}</td>
-            <td class="p-3 font-mono text-slate-600 whitespace-nowrap font-medium">${formatExpDate(item.exp_date)}</td>
-            <td class="p-3 text-center font-bold text-slate-900 text-sm font-mono">${item.qty}</td>
-            <td class="p-3 text-center">${badge}</td>
-            <td class="p-3 text-center">
-                <button type="button" onclick="removeItem(${index})" title="Hapus Item" class="text-rose-500 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-50 transition">
-                    <i class="fa-solid fa-trash-can"></i>
+            <td class="py-1.5 px-2 font-mono text-slate-600 whitespace-nowrap text-xs">${item.batch_no || '-'}</td>
+            <td class="py-1.5 px-2 font-mono text-slate-600 whitespace-nowrap text-xs font-medium">${formatExpDate(item.exp_date)}</td>
+            <td class="py-1.5 px-2 text-center font-bold text-slate-900 text-xs font-mono">${item.qty}</td>
+            <td class="py-1.5 px-2 text-center">${badge}</td>
+            <td class="py-1.5 px-2 text-center">
+                <button type="button" onclick="removeItem(${index})" title="Hapus Item" class="text-rose-500 hover:text-rose-700 p-1 rounded-lg hover:bg-rose-50 transition">
+                    <i class="fa-solid fa-trash-can text-xs"></i>
                 </button>
             </td>
         `;
