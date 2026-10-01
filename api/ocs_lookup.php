@@ -172,9 +172,9 @@ try {
                 $loginJson = json_decode($loginRes, true);
                 $token = $loginJson['Token'] ?? null;
                 if ($token) {
-                    // 1. Coba cari di DTO_Orders berdasarkan Id
-                    $chOrd = curl_init("{$ocsBaseUrl}/odata/DTO_Orders?\$filter=" . urlencode("Id eq '{$query}'") . "&\$top=1");
-                    curl_setopt_array($chOrd, [
+                    // 1. Coba panggil langsung endpoint resmi detail order OCS: /Orders/GetOrderDetail
+                    $chDetail = curl_init("{$ocsBaseUrl}/Orders/GetOrderDetail?orderId=" . urlencode($query));
+                    curl_setopt_array($chDetail, [
                         CURLOPT_RETURNTRANSFER => true,
                         CURLOPT_HTTPGET        => true,
                         CURLOPT_HTTPHEADER     => [
@@ -183,90 +183,163 @@ try {
                         ],
                         CURLOPT_SSL_VERIFYPEER => false,
                         CURLOPT_SSL_VERIFYHOST => false,
-                        CURLOPT_TIMEOUT        => 5
+                        CURLOPT_TIMEOUT        => 6
                     ]);
-                    $ordRes = curl_exec($chOrd);
-                    curl_close($chOrd);
-                    $ordJson = json_decode($ordRes, true);
+                    $detailRes = curl_exec($chDetail);
+                    $detailHttp = curl_getinfo($chDetail, CURLINFO_HTTP_CODE);
+                    curl_close($chDetail);
 
-                    // 2. Jika tidak ditemukan berdasarkan Id, cari berdasarkan TrackingNumber
-                    if (empty($ordJson['value'][0])) {
-                        $chOrdTrack = curl_init("{$ocsBaseUrl}/odata/DTO_Orders?\$filter=" . urlencode("TrackingNumber eq '{$query}'") . "&\$top=1");
-                        curl_setopt_array($chOrdTrack, [
-                            CURLOPT_RETURNTRANSFER => true,
-                            CURLOPT_HTTPGET        => true,
-                            CURLOPT_HTTPHEADER     => [
-                                "Authorization: Bearer {$token}",
-                                "Accept: application/json"
-                            ],
-                            CURLOPT_SSL_VERIFYPEER => false,
-                            CURLOPT_SSL_VERIFYHOST => false,
-                            CURLOPT_TIMEOUT        => 5
-                        ]);
-                        $ordTrackRes = curl_exec($chOrdTrack);
-                        curl_close($chOrdTrack);
-                        $ordJson = json_decode($ordTrackRes, true);
-                    }
+                    if ($detailHttp === 200 && $detailRes) {
+                        $detailJson = json_decode($detailRes, true);
+                        $od = $detailJson['data']['Data'] ?? $detailJson['Data'] ?? null;
+                        if ($od) {
+                            $payment = $od['Payment'] ?? [];
+                            $origProdPrice = (float)($payment['OriginalTotalProductPrice'] ?? 0);
+                            $sellerDisc = (float)($payment['SellerDiscount'] ?? 0);
+                            $platformDisc = (float)($payment['PlatformDiscount'] ?? 0);
+                            $netProdPrice = (float)($payment['TotalProductPrice'] ?? ($origProdPrice - $sellerDisc));
+                            if ($netProdPrice <= 0 && $origProdPrice > 0) $netProdPrice = $origProdPrice;
 
-                    if (!empty($ordJson['value'][0])) {
-                        $raw = $ordJson['value'][0];
-                        $shipFee = (float)($raw['ShippingFee'] ?? $raw['ShippingCost'] ?? 0);
-                        $orderData = [
-                            'Id'                 => $raw['Id'] ?? '',
-                            'TrackingNumber'     => $raw['TrackingNumber'] ?? '',
-                            'PlatformId'         => $raw['PlatformId'] ?? null,
-                            'CommercePlatform'   => $raw['CommercePlatform'] ?? '',
-                            'ShopName'           => $raw['ShopName'] ?? '',
-                            'ShippingProvider'   => $raw['ShippingProvider'] ?? '',
-                            'StatusCode'         => $raw['StatusCode'] ?? null,
-                            'ProductName'        => $raw['ProductName'] ?? '',
-                            'TotalQtyOrder'      => $raw['TotalQtyOrder'] ?? 1,
-                            'ShippingFee'        => $shipFee,
-                            'CreatedAt'          => $raw['CreatedAt'] ?? '',
-                            '_source'            => 'ocs_api'
-                        ];
-                    } else {
-                        // Coba cari di DTO_ReturnOrder
-                        $filterRetUrl = "{$ocsBaseUrl}/odata/DTO_ReturnOrder?\$filter=" . urlencode("TrackingNumber eq '{$query}' or ReturnId eq '{$query}' or SalesOrderId eq '{$query}'") . "&\$top=1";
-                        $chRet = curl_init($filterRetUrl);
-                        curl_setopt_array($chRet, [
-                            CURLOPT_RETURNTRANSFER => true,
-                            CURLOPT_HTTPGET        => true,
-                            CURLOPT_HTTPHEADER     => [
-                                "Authorization: Bearer {$token}",
-                                "Accept: application/json"
-                            ],
-                            CURLOPT_SSL_VERIFYPEER => false,
-                            CURLOPT_SSL_VERIFYHOST => false,
-                            CURLOPT_TIMEOUT        => 8
-                        ]);
-                        $retRes = curl_exec($chRet);
-                        curl_close($chRet);
-                        $retJson = json_decode($retRes, true);
+                            $origShipFee = (float)($payment['OriginalShippingFee'] ?? 0);
+                            $shipDisc = (float)(($payment['ShippingFeePlatformDiscount'] ?? 0) + ($payment['ShippingFeeSellerDiscount'] ?? 0));
+                            $netShipFee = max(0, $origShipFee - $shipDisc);
+                            $serviceFee = (float)($payment['ServiceFee'] ?? 0);
+                            $totalAmount = (float)($payment['TotalAmount'] ?? ($netProdPrice + $netShipFee + $serviceFee));
 
-                        if (!empty($retJson['value'][0])) {
-                            $rawRet = $retJson['value'][0];
+                            // Nama & SKU Produk
+                            $itemNames = [];
+                            if (!empty($od['Items']) && is_array($od['Items'])) {
+                                foreach ($od['Items'] as $it) {
+                                    $pTitle = $it['ProductName'] ?? $it['ItemName'] ?? '';
+                                    $pSku = $it['Sku'] ?? $it['SellerSku'] ?? '';
+                                    $pQty = (int)($it['Qty'] ?? 1);
+                                    $itemNames[] = ($pSku ? "[{$pSku}] " : "") . $pTitle . " (x{$pQty})";
+                                }
+                            }
+                            $prodText = !empty($itemNames) ? implode(', ', $itemNames) : ($od['ProductName'] ?? '');
+
                             $orderData = [
-                                'Id'                 => $rawRet['SalesOrderId'] ?? $rawRet['ReturnId'],
-                                'TrackingNumber'     => $rawRet['TrackingNumber'] ?? '',
-                                'PlatformId'         => $rawRet['PlatformId'] ?? null,
-                                'CommercePlatform'   => $rawRet['CommercePlatform'] ?? '',
-                                'ShopName'           => $rawRet['ShopName'] ?? '',
-                                'ShippingProvider'   => 'Ekspedisi Marketplace',
-                                'StatusCode'         => 0,
-                                'ProductName'        => $rawRet['ReturnReasonText'] ?? 'Retur: ' . ($rawRet['ReturnReason'] ?? ''),
-                                'TotalQtyOrder'      => 1,
-                                'ShippingFee'        => 0,
-                                'CreatedAt'          => $rawRet['CreatedAt'] ?? '',
-                                'ReturnReason'       => $rawRet['ReturnReason'] ?? '',
-                                'ReturnReasonText'   => $rawRet['ReturnReasonText'] ?? '',
-                                '_source'            => 'ocs_return_order'
+                                'Id'                     => $od['Id'] ?? $query,
+                                'TrackingNumber'         => $od['TrackingNumber'] ?? '',
+                                'PlatformId'             => $od['PlatformId'] ?? null,
+                                'CommercePlatform'       => $od['CommercePlatform'] ?? '',
+                                'ShopName'               => $od['ShopName'] ?? '',
+                                'ShippingProvider'       => trim(($od['ShippingProvider'] ?? '') . ' ' . ($od['DeliveryOptionName'] ?? '')),
+                                'StatusCode'             => $od['StatusCode'] ?? null,
+                                'ProductName'            => $prodText,
+                                'TotalQtyOrder'          => $od['TotalQtyOrder'] ?? count($od['Items'] ?? [1]),
+                                'PackagePrice'           => $netProdPrice > 0 ? $netProdPrice : $origProdPrice,
+                                'PackagePriceFormatted'  => 'Rp ' . number_format($netProdPrice > 0 ? $netProdPrice : $origProdPrice, 0, ',', '.'),
+                                'ShippingFee'            => $origShipFee,
+                                'ShippingFeeFormatted'   => $origShipFee > 0 ? 'Rp ' . number_format($origShipFee, 0, ',', '.') : 'Rp 0',
+                                'TotalClaimAmount'       => $totalAmount,
+                                'TotalClaimAmountFormatted' => 'Rp ' . number_format($totalAmount, 0, ',', '.'),
+                                'GMV'                    => $origProdPrice,
+                                'NMV'                    => $netProdPrice,
+                                'Payment'                => $payment,
+                                'CreatedAt'              => $od['CreatedAt'] ?? '',
+                                '_source'                => 'ocs_order_detail'
                             ];
                         }
                     }
 
-                    // Ambil GMV & NMV Nilai Paket dari DTO_OrderGmv (TANPA CEK PACKING VIDEO)
-                    if ($orderData) {
+                    // 2. Jika belum ditemukan, coba cari di DTO_Orders berdasarkan Id
+                    if (!$orderData) {
+                        $chOrd = curl_init("{$ocsBaseUrl}/odata/DTO_Orders?\$filter=" . urlencode("Id eq '{$query}'") . "&\$top=1");
+                        curl_setopt_array($chOrd, [
+                            CURLOPT_RETURNTRANSFER => true,
+                            CURLOPT_HTTPGET        => true,
+                            CURLOPT_HTTPHEADER     => [
+                                "Authorization: Bearer {$token}",
+                                "Accept: application/json"
+                            ],
+                            CURLOPT_SSL_VERIFYPEER => false,
+                            CURLOPT_SSL_VERIFYHOST => false,
+                            CURLOPT_TIMEOUT        => 6
+                        ]);
+                        $ordRes = curl_exec($chOrd);
+                        curl_close($chOrd);
+                        $ordJson = json_decode($ordRes, true);
+
+                        // 3. Jika tidak ditemukan berdasarkan Id, cari berdasarkan TrackingNumber
+                        if (empty($ordJson['value'][0])) {
+                            $chOrdTrack = curl_init("{$ocsBaseUrl}/odata/DTO_Orders?\$filter=" . urlencode("TrackingNumber eq '{$query}'") . "&\$top=1");
+                            curl_setopt_array($chOrdTrack, [
+                                CURLOPT_RETURNTRANSFER => true,
+                                CURLOPT_HTTPGET        => true,
+                                CURLOPT_HTTPHEADER     => [
+                                    "Authorization: Bearer {$token}",
+                                    "Accept: application/json"
+                                ],
+                                CURLOPT_SSL_VERIFYPEER => false,
+                                CURLOPT_SSL_VERIFYHOST => false,
+                                CURLOPT_TIMEOUT        => 8
+                            ]);
+                            $ordTrackRes = curl_exec($chOrdTrack);
+                            curl_close($chOrdTrack);
+                            $ordJson = json_decode($ordTrackRes, true);
+                        }
+
+                        if (!empty($ordJson['value'][0])) {
+                            $raw = $ordJson['value'][0];
+                            $shipFee = (float)($raw['ShippingFee'] ?? $raw['ShippingCost'] ?? 0);
+                            $orderData = [
+                                'Id'                 => $raw['Id'] ?? '',
+                                'TrackingNumber'     => $raw['TrackingNumber'] ?? '',
+                                'PlatformId'         => $raw['PlatformId'] ?? null,
+                                'CommercePlatform'   => $raw['CommercePlatform'] ?? '',
+                                'ShopName'           => $raw['ShopName'] ?? '',
+                                'ShippingProvider'   => $raw['ShippingProvider'] ?? '',
+                                'StatusCode'         => $raw['StatusCode'] ?? null,
+                                'ProductName'        => $raw['ProductName'] ?? '',
+                                'TotalQtyOrder'      => $raw['TotalQtyOrder'] ?? 1,
+                                'ShippingFee'        => $shipFee,
+                                'CreatedAt'          => $raw['CreatedAt'] ?? '',
+                                '_source'            => 'ocs_api'
+                            ];
+                        } else {
+                            // Coba cari di DTO_ReturnOrder
+                            $filterRetUrl = "{$ocsBaseUrl}/odata/DTO_ReturnOrder?\$filter=" . urlencode("TrackingNumber eq '{$query}' or ReturnId eq '{$query}' or SalesOrderId eq '{$query}'") . "&\$top=1";
+                            $chRet = curl_init($filterRetUrl);
+                            curl_setopt_array($chRet, [
+                                CURLOPT_RETURNTRANSFER => true,
+                                CURLOPT_HTTPGET        => true,
+                                CURLOPT_HTTPHEADER     => [
+                                    "Authorization: Bearer {$token}",
+                                    "Accept: application/json"
+                                ],
+                                CURLOPT_SSL_VERIFYPEER => false,
+                                CURLOPT_SSL_VERIFYHOST => false,
+                                CURLOPT_TIMEOUT        => 8
+                            ]);
+                            $retRes = curl_exec($chRet);
+                            curl_close($chRet);
+                            $retJson = json_decode($retRes, true);
+
+                            if (!empty($retJson['value'][0])) {
+                                $rawRet = $retJson['value'][0];
+                                $orderData = [
+                                    'Id'                 => $rawRet['SalesOrderId'] ?? $rawRet['ReturnId'],
+                                    'TrackingNumber'     => $rawRet['TrackingNumber'] ?? '',
+                                    'PlatformId'         => $rawRet['PlatformId'] ?? null,
+                                    'CommercePlatform'   => $rawRet['CommercePlatform'] ?? '',
+                                    'ShopName'           => $rawRet['ShopName'] ?? '',
+                                    'ShippingProvider'   => 'Ekspedisi Marketplace',
+                                    'StatusCode'         => 0,
+                                    'ProductName'        => $rawRet['ReturnReasonText'] ?? 'Retur: ' . ($rawRet['ReturnReason'] ?? ''),
+                                    'TotalQtyOrder'      => 1,
+                                    'ShippingFee'        => 0,
+                                    'CreatedAt'          => $rawRet['CreatedAt'] ?? '',
+                                    'ReturnReason'       => $rawRet['ReturnReason'] ?? '',
+                                    'ReturnReasonText'   => $rawRet['ReturnReasonText'] ?? '',
+                                    '_source'            => 'ocs_return_order'
+                                ];
+                            }
+                        }
+                    }
+
+                    // Ambil GMV & NMV Nilai Paket dari DTO_OrderGmv jika belum ada
+                    if ($orderData && empty($orderData['PackagePrice'])) {
                         $orderId = $orderData['Id'];
                         $pkgPrice = 0.0;
                         $gmv = 0.0;
@@ -304,7 +377,9 @@ try {
                         $orderData['TotalClaimAmountFormatted'] = $totalClaim > 0 ? 'Rp ' . number_format($totalClaim, 0, ',', '.') : 'Rp ' . number_format($pkgPrice, 0, ',', '.');
                         $orderData['GMV'] = $gmv;
                         $orderData['NMV'] = $nmv;
+                    }
 
+                    if ($orderData) {
                         // Simpan atau perbarui cache di tabel ocs_orders
                         try {
                             $stmtUpsert = $pdo->prepare("
