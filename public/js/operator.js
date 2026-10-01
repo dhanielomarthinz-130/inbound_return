@@ -461,18 +461,13 @@ inputBatch.addEventListener('paste', () => {
     }, 50);
 });
 
-// Deteksi Enter berpindah kolom secara natural:
-// Barcode -> Batch -> ExpDate (atau langsung Qty jika Exp Date sudah otomatis terisi) -> Qty -> Type -> Submit
+// Deteksi Enter berpindah kolom secara terpisah & berurutan:
+// Barcode -> (Enter) -> Batch -> (Enter) -> Exp Date -> (Enter) -> Qty -> (Enter) -> Type -> (Enter) -> Submit
 inputBatch.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         e.preventDefault();
-        const hasDate = Boolean(inputExpDate && inputExpDate.value);
-        if (hasDate) {
-            // Exp Date sudah terisi otomatis! Langsung lompat ke Qty agar operator cepat
-            inputQty.focus();
-            inputQty.select();
-        } else {
-            // Jika belum terisi, arahkan kursor ke Exp Date agar operator bisa isi manual
+        // Tombol Enter terpisah: selalu arahkan ke kolom Exp Date
+        if (inputExpDate) {
             inputExpDate.focus();
         }
     }
@@ -481,22 +476,27 @@ inputBatch.addEventListener('keypress', (e) => {
 inputExpDate.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         e.preventDefault();
-        inputQty.focus();
-        inputQty.select();
+        if (inputQty) {
+            inputQty.focus();
+            inputQty.select();
+        }
     }
 });
 
 inputQty.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         e.preventDefault();
-        inputType.focus();
+        if (inputType) {
+            inputType.focus();
+        }
     }
 });
 
 inputType.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         e.preventDefault();
-        document.getElementById('btnSubmitItem').click();
+        const btnAdd = document.getElementById('btnSubmitItem');
+        if (btnAdd) btnAdd.click();
     }
 });
 
@@ -731,14 +731,144 @@ let isVideoRecordingActive = false;
 let pendingVideoRecord = false;
 
 function startVideoRecording() {
-    // Mode super cepat: Video recording dinonaktifkan agar penyimpanan instan (<200ms)
-    // Kamera tetap aktif sebagai live feed jernih untuk foto unboxing dengan watermark resmi IEG
-    isVideoRecordingActive = false;
+    if (!mediaStream) {
+        console.warn("mediaStream belum aktif, perekaman video ditunda hingga kamera siap.");
+        pendingVideoRecord = true;
+        return;
+    }
     pendingVideoRecord = false;
+
+    try {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            try { mediaRecorder.stop(); } catch(e){}
+        }
+        recordedChunks = [];
+
+        let mime = '';
+        const candidateTypes = [
+            'video/webm;codecs=vp8,opus',
+            'video/webm;codecs=vp8',
+            'video/webm',
+            'video/mp4;codecs=avc1',
+            'video/mp4'
+        ];
+        if (window.MediaRecorder) {
+            for (const t of candidateTypes) {
+                if (MediaRecorder.isTypeSupported(t)) {
+                    mime = t;
+                    break;
+                }
+            }
+        }
+
+        // Gunakan bitrate hemat 800 kbps agar file sangat ringan & cepat diunggah
+        const options = {
+            mimeType: mime || 'video/webm',
+            videoBitsPerSecond: 800000
+        };
+
+        try {
+            mediaRecorder = new MediaRecorder(mediaStream, options);
+        } catch (recErr) {
+            console.warn("MediaRecorder dengan options gagal, fallback:", recErr);
+            mediaRecorder = new MediaRecorder(mediaStream);
+        }
+
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) {
+                recordedChunks.push(e.data);
+            }
+        };
+
+        mediaRecorder.onerror = (err) => {
+            console.error("MediaRecorder runtime error:", err);
+        };
+
+        mediaRecorder.start(1000); // kumpulkan chunk tiap 1 detik
+
+        isVideoRecordingActive = true;
+        recordingSeconds = 0;
+        const recBadge = document.getElementById('cameraRecBadge');
+        if (recBadge) recBadge.classList.remove('hidden');
+
+        if (recordingTimerInterval) clearInterval(recordingTimerInterval);
+        recordingTimerInterval = setInterval(() => {
+            recordingSeconds++;
+            const mins = String(Math.floor(recordingSeconds / 60)).padStart(2, '0');
+            const secs = String(recordingSeconds % 60).padStart(2, '0');
+            const timeEl = document.getElementById('cameraRecTime');
+            if (timeEl) timeEl.innerText = `${mins}:${secs}`;
+        }, 1000);
+
+        console.log("Perekaman video unboxing aktif dimulai untuk invoice:", activeInvoice);
+    } catch (e) {
+        console.warn("Gagal start recording video:", e);
+    }
 }
 
 function stopVideoRecording() {
-    return Promise.resolve(null);
+    return new Promise((resolve) => {
+        isVideoRecordingActive = false;
+        pendingVideoRecord = false;
+
+        if (recordingTimerInterval) {
+            clearInterval(recordingTimerInterval);
+            recordingTimerInterval = null;
+        }
+        const recBadge = document.getElementById('cameraRecBadge');
+        if (recBadge) recBadge.classList.add('hidden');
+
+        if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+            if (recordedChunks.length > 0) {
+                resolve(new Blob(recordedChunks, { type: 'video/webm' }));
+            } else {
+                resolve(null);
+            }
+            return;
+        }
+
+        let resolved = false;
+        const safetyTimeout = setTimeout(() => {
+            if (!resolved) {
+                resolved = true;
+                if (recordedChunks.length > 0) {
+                    resolve(new Blob(recordedChunks, { type: 'video/webm' }));
+                } else {
+                    resolve(null);
+                }
+            }
+        }, 1200);
+
+        mediaRecorder.onstop = () => {
+            if (!resolved) {
+                resolved = true;
+                clearTimeout(safetyTimeout);
+                if (recordedChunks.length > 0) {
+                    resolve(new Blob(recordedChunks, { type: 'video/webm' }));
+                } else {
+                    resolve(null);
+                }
+            }
+        };
+
+        try {
+            if (mediaRecorder.state === 'recording' && typeof mediaRecorder.requestData === 'function') {
+                mediaRecorder.requestData();
+            }
+            mediaRecorder.stop();
+        } catch (e) {
+            console.warn("mediaRecorder.stop error:", e);
+            if (!resolved) {
+                resolved = true;
+                clearTimeout(safetyTimeout);
+                if (recordedChunks.length > 0) {
+                    resolve(new Blob(recordedChunks, { type: 'video/webm' }));
+                } else {
+                    resolve(null);
+                }
+            }
+        }
+    });
 }
 
 window.submitFinalSession = async function() {
@@ -747,7 +877,15 @@ window.submitFinalSession = async function() {
     const notes = document.getElementById('sessionNotesInput').value.trim();
     const btn = document.getElementById('btnFinalizeSession');
     btn.disabled = true;
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...`;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan Sesi & Video...`;
+
+    // Ambil rekaman video unboxing dari sesi ini
+    let videoBlob = null;
+    if (mediaRecorder && (mediaRecorder.state === 'recording' || mediaRecorder.state === 'paused')) {
+        videoBlob = await stopVideoRecording();
+    } else if (recordedChunks.length > 0) {
+        videoBlob = new Blob(recordedChunks, { type: 'video/webm' });
+    }
 
     const displayOp = document.getElementById('displayOperator');
     const operatorName = (displayOp && displayOp.innerText.trim()) ? displayOp.innerText.trim() : 'Gudang 01';
@@ -771,18 +909,28 @@ window.submitFinalSession = async function() {
         items: scannedProductsList
     };
 
-    // Tampilkan indikator proses singkat
     showGlobalLoading(
         'Menyimpan Transaksi...',
-        'Sedang mencatat data produk dan foto dokumentasi...'
+        'Sedang mencatat data produk' + (videoBlob ? ' dan rekaman video unboxing' : '') + '...'
     );
 
     try {
-        const res = await fetch('api/returns.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        let res;
+        if (videoBlob && videoBlob.size > 0) {
+            const formData = new FormData();
+            formData.append('data', JSON.stringify(payload));
+            formData.append('video', videoBlob, `video_${savedInv}.webm`);
+            res = await fetch('api/returns.php', {
+                method: 'POST',
+                body: formData
+            });
+        } else {
+            res = await fetch('api/returns.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        }
 
         const rawText = await res.text();
         let result;
@@ -800,15 +948,16 @@ window.submitFinalSession = async function() {
         if (result.success) {
             playBeep('success');
 
-            // 1. Popup modal sukses dihilangkan sepenuhnya sesuai permintaan
+            // 1. Popup modal sukses dihilangkan sepenuhnya
             const successModal = document.getElementById('successModal');
             if (successModal) successModal.classList.add('hidden');
 
-            // 2. Langsung reset sesi dan mulai scan baru secara instan tanpa konfirmasi
+            // 2. Langsung reset sesi dan mulai scan baru secara instan
             resetInvoiceSession(true);
 
             // 3. Tampilkan toast notifikasi cepat dan elegan
-            showToast('success', `Invoice [${savedInv}] berhasil disimpan (${totalItemsCount} barang). Silakan scan invoice baru!`, "Inbound Selesai");
+            const vidNote = (videoBlob && videoBlob.size > 0) ? ' & video rekaman' : '';
+            showToast('success', `Invoice [${savedInv}]${vidNote} berhasil disimpan (${totalItemsCount} barang). Silakan scan invoice baru!`, "Inbound Selesai");
         } else {
             showToast('error', result.error || 'Terjadi kesalahan saat menyimpan', "Gagal Menyimpan");
         }
@@ -957,7 +1106,7 @@ async function startCamera(deviceId = null) {
         isCameraActive = true;
         if (badge) {
             badge.className = "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5";
-            badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Kamera Live Siap`;
+            badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Video Record Siap`;
         }
 
         // Jika invoice sudah aktif/terkunci (atau tertunda menunggu kamera siap), otomatis mulai rekam sekarang!
