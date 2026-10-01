@@ -141,18 +141,54 @@
     background: #94a3b8;
 }
 
-/* Adaptasi Layar Laptop (Tinggi <= 850px) */
-@media (min-width: 1024px) and (max-height: 850px) {
+/* ========================================================
+   WORKSTATION VIDEO BOX & ALPHABET WHEEL STYLING
+   ======================================================== */
+.ws-video-box {
+    aspect-ratio: 16 / 9;
+    width: 100%;
+    min-height: 220px;
+}
+
+@media (min-width: 640px) {
     .ws-video-box {
-        height: 145px !important;
+        min-height: 250px;
     }
 }
 
-/* Adaptasi Layar Laptop Kecil / Zoom 125% (Tinggi <= 768px) */
-@media (min-width: 1024px) and (max-height: 768px) {
+@media (min-width: 1280px) {
     .ws-video-box {
-        height: 125px !important;
+        min-height: 280px;
     }
 }
+
+@media (min-width: 1536px) {
+    .ws-video-box {
+        min-height: 320px;
+    }
+}
+
+/* Hide scrollbar untuk Wheel Roller */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Wheel Item 3D Depth effect */
+.wheel-char-item {
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+}
+.wheel-char-item.active-wheel-char {
+    color: #fde047 !important; /* Yellow-300 */
+    font-size: 1.5rem !important; /* 24px */
+    font-weight: 900 !important;
+    transform: scale(1.25);
+    text-shadow: 0 0 16px rgba(250, 204, 21, 0.6);
+}
+
 
 

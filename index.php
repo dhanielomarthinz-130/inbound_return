@@ -95,34 +95,65 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
     <main class="flex-1 w-full max-w-[1750px] mx-auto p-2.5 sm:p-3.5 grid grid-cols-1 lg:grid-cols-12 gap-3 min-h-0 overflow-hidden items-stretch">
 
         <!-- ============================================================== -->
-        <!-- KOLOM KIRI (4-5 KOLOM): VIDEO KAMERA DOKUMENTASI UNBOXING      -->
+        <!-- KOLOM KIRI (5 KOLOM): VIDEO KAMERA DOKUMENTASI UNBOXING        -->
         <!-- ============================================================== -->
-        <div class="lg:col-span-5 xl:col-span-4 flex flex-col gap-2.5 min-h-0 h-full overflow-hidden">
+        <div class="lg:col-span-5 xl:col-span-5 flex flex-col gap-2.5 min-h-0 h-full overflow-y-auto custom-scrollbar">
 
-            <!-- Card Live Video Dokumentasi / Record -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 overflow-hidden shrink-0">
+            <!-- Card Live Video Dokumentasi / Record (Proporsional, Gagah & Premium) -->
+            <div class="bg-white rounded-2xl shadow-md border border-slate-200/90 overflow-hidden shrink-0 flex flex-col">
                 <!-- Header Live Video Card -->
                 <div class="p-2.5 bg-slate-900 text-white flex justify-between items-center border-b border-slate-800">
                     <div class="flex items-center space-x-2 text-xs font-bold">
-                        <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse shadow-sm shadow-rose-500/50"></span>
                         <i class="fa-solid fa-video text-rose-400"></i>
-                        <span>Live Video Record</span>
+                        <span class="tracking-wide">Live Video Record</span>
                         <span id="cameraRecBadge" class="hidden bg-rose-600 text-white font-mono text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
                             <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span> REC <span id="cameraRecTime">00:00</span>
                         </span>
                     </div>
-                    <button id="btnSwitchCamera" onclick="switchCamera()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2 py-1 rounded-lg border border-slate-700 transition flex items-center gap-1">
+                    <button id="btnSwitchCamera" onclick="switchCamera()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1 rounded-lg border border-slate-700 transition flex items-center gap-1.5 shadow-2xs">
                         <i class="fa-solid fa-arrows-rotate text-[11px]"></i>
                         <span>Putar</span>
                     </button>
                 </div>
 
-                <!-- Video Viewport Bersih & Responsif (Tinggi Pas & Ergonomis di Desktop) -->
-                <div class="relative bg-slate-950 flex justify-center items-center w-full h-[155px] sm:h-[185px] xl:h-[210px] 2xl:h-[240px] ws-video-box overflow-hidden">
+                <!-- Video Viewport Gagah, Responsif & Ber-Rasio Aspek 16:9 Natural -->
+                <div class="relative bg-slate-950 flex justify-center items-center w-full ws-video-box overflow-hidden group">
                     <video id="liveVideoFeed" autoplay playsinline muted class="w-full h-full object-cover"></video>
+                    
+                    <!-- HUD Viewfinder Reticle Corners (Efek Kamera Studio Premium) -->
+                    <div class="pointer-events-none absolute inset-3 sm:inset-4 flex flex-col justify-between z-10 opacity-70 group-hover:opacity-100 transition">
+                        <div class="flex justify-between items-start">
+                            <div class="w-4 h-4 border-t-2 border-l-2 border-rose-500 rounded-tl-sm"></div>
+                            <div class="w-4 h-4 border-t-2 border-r-2 border-rose-500 rounded-tr-sm"></div>
+                        </div>
+                        <!-- Center Crosshair Target -->
+                        <div class="self-center flex items-center justify-center opacity-40">
+                            <div class="w-3.5 h-0.5 bg-white/70"></div>
+                            <div class="w-2 h-2 rounded-full border border-white/80 mx-1"></div>
+                            <div class="w-3.5 h-0.5 bg-white/70"></div>
+                        </div>
+                        <div class="flex justify-between items-end">
+                            <div class="w-4 h-4 border-b-2 border-l-2 border-rose-500 rounded-bl-sm"></div>
+                            <div class="w-4 h-4 border-b-2 border-r-2 border-rose-500 rounded-br-sm"></div>
+                        </div>
+                    </div>
+
+                    <!-- Overlay Info Status Live & Waktu Feed -->
+                    <div class="pointer-events-none absolute bottom-2 left-2.5 right-2.5 flex items-center justify-between text-[10px] font-mono text-white/90 bg-slate-950/70 backdrop-blur-xs px-2.5 py-1 rounded-lg border border-white/10 z-10 shadow-sm">
+                        <span class="flex items-center gap-1.5 text-emerald-400 font-bold">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            HD RECORDING
+                        </span>
+                        <span class="text-slate-300 font-semibold" id="cameraFeedTimeDisplay">LIVE DOKUMENTASI</span>
+                        <span class="flex items-center gap-1 text-slate-300">
+                            <i class="fa-solid fa-camera text-[9px] text-indigo-400"></i> UNBOXING
+                        </span>
+                    </div>
+
                     <!-- Visual Camera Flash Effect -->
                     <div id="cameraFlashOverlay" class="absolute inset-0 bg-white pointer-events-none opacity-0 transition-opacity duration-150 z-20"></div>
-                    <div id="cameraLoading" class="absolute inset-0 bg-slate-900/95 flex flex-col items-center justify-center text-white space-y-2">
+                    <div id="cameraLoading" class="absolute inset-0 bg-slate-900/95 flex flex-col items-center justify-center text-white space-y-2 z-30">
                         <div class="traffic-loader py-1.5">
                             <div class="traffic-ball traffic-ball-red"></div>
                             <div class="traffic-ball traffic-ball-yellow"></div>
@@ -209,9 +240,9 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
         </div>
 
         <!-- ============================================================== -->
-        <!-- KOLOM KANAN (7-8 KOLOM): FORM INPUT & TABEL ITEM              -->
+        <!-- KOLOM KANAN (7 KOLOM): FORM INPUT & TABEL ITEM                 -->
         <!-- ============================================================== -->
-        <div class="lg:col-span-7 xl:col-span-8 flex flex-col gap-2.5 sm:gap-3 min-h-0 h-full overflow-hidden">
+        <div class="lg:col-span-7 xl:col-span-7 flex flex-col gap-2.5 sm:gap-3 min-h-0 h-full overflow-y-auto custom-scrollbar">
 
             <!-- 1. INPUT NOMOR INVOICE & EKSPEDISI -->
             <div id="sectionInvoice" class="bg-white rounded-2xl p-2.5 sm:p-3 shadow-sm border border-slate-200/90 shrink-0 transition-all">
@@ -354,104 +385,149 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                         </div>
                     </div>
 
-                    <!-- VIRTUAL KEYBOARD TOUCHSCREEN KHUSUS NO. BATCH & TOMBOL ENTER TERPISAH -->
-                    <div id="virtualKeyboardContainer" class="bg-slate-900 text-white rounded-2xl p-2.5 sm:p-3 shadow-lg border border-slate-800 space-y-2 transition-all">
-                        <div class="flex items-center justify-between border-b border-slate-800/80 pb-1.5">
-                            <div class="flex items-center gap-1.5">
-                                <span class="w-4 h-4 rounded-md bg-indigo-600 text-white flex items-center justify-center text-[10px]">
+                    <!-- VIRTUAL KEYBOARD TOUCHSCREEN: MODEL RODA ABJAD & NUMPAD TERPADU -->
+                    <div id="virtualKeyboardContainer" class="bg-slate-900 text-white rounded-2xl p-2.5 sm:p-3.5 shadow-2xl border border-slate-700/80 space-y-2.5 transition-all">
+                        
+                        <!-- Header Keyboard & Live Preview Display -->
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="w-5 h-5 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs shadow-xs">
                                     <i class="fa-solid fa-keyboard"></i>
                                 </span>
-                                <span class="text-[11px] font-bold text-slate-200 tracking-wide">Keyboard Touchscreen &bull; Batch</span>
+                                <div>
+                                    <span class="text-xs font-bold text-slate-100 tracking-wide block leading-none">Keyboard Touchscreen • Batch</span>
+                                    <span class="text-[9px] text-slate-400 font-medium">Putar roda abjad di kiri &amp; sentuh numpad di kanan</span>
+                                </div>
                             </div>
                             
-                            <!-- Presets Cepat Format Batch -->
+                            <!-- Live Preview Display Nilai Batch -->
+                            <div class="flex items-center gap-1.5">
+                                <div class="flex items-center gap-1 bg-slate-950 px-2.5 py-1 rounded-xl border border-indigo-500/40 shadow-inner">
+                                    <span class="text-[9px] uppercase font-bold text-indigo-400">Batch:</span>
+                                    <span id="vkBatchPreviewDisplay" class="font-mono font-black text-xs sm:text-sm text-emerald-400 tracking-wider">-</span>
+                                </div>
+                                <button type="button" onclick="toggleVirtualKeyboard(false)" class="text-slate-400 hover:text-rose-400 text-xs px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition font-medium" title="Tutup Keyboard">
+                                    ✕ Tutup
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Presets Cepat Format Batch -->
+                        <div class="flex items-center justify-between gap-1 flex-wrap bg-slate-950/70 p-1.5 rounded-xl border border-slate-800">
                             <div class="flex items-center gap-1 flex-wrap">
-                                <span class="text-[9px] text-slate-400 font-semibold mr-0.5 hidden sm:inline">Preset:</span>
-                                <button type="button" onclick="vkPressChar('B')" class="px-1.5 py-0.5 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-200 hover:text-white rounded text-[10px] font-mono font-bold transition">B</button>
-                                <button type="button" onclick="vkPressChar('LOT')" class="px-1.5 py-0.5 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-200 hover:text-white rounded text-[10px] font-mono font-bold transition">LOT</button>
-                                <button type="button" onclick="vkPressChar('EXP')" class="px-1.5 py-0.5 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-200 hover:text-white rounded text-[10px] font-mono font-bold transition">EXP</button>
-                                <button type="button" onclick="vkPressChar('2025')" class="px-1.5 py-0.5 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-200 hover:text-white rounded text-[10px] font-mono font-bold transition">2025</button>
-                                <button type="button" onclick="vkPressChar('2026')" class="px-1.5 py-0.5 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-200 hover:text-white rounded text-[10px] font-mono font-bold transition">2026</button>
-                                <button type="button" onclick="vkPressChar('2027')" class="px-1.5 py-0.5 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-200 hover:text-white rounded text-[10px] font-mono font-bold transition">2027</button>
-                                <button type="button" onclick="toggleVirtualKeyboard(false)" class="text-slate-400 hover:text-rose-400 text-[10px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 transition ml-1 font-medium">✕ Tutup</button>
+                                <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider mr-1">Preset:</span>
+                                <button type="button" onclick="vkPressChar('B')" class="px-2 py-0.5 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-200 hover:text-white rounded-lg text-xs font-mono font-bold transition shadow-xs">B</button>
+                                <button type="button" onclick="vkPressChar('LOT')" class="px-2 py-0.5 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-200 hover:text-white rounded-lg text-xs font-mono font-bold transition shadow-xs">LOT</button>
+                                <button type="button" onclick="vkPressChar('EXP')" class="px-2 py-0.5 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-200 hover:text-white rounded-lg text-xs font-mono font-bold transition shadow-xs">EXP</button>
+                                <button type="button" onclick="vkPressChar('2025')" class="px-2 py-0.5 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-200 hover:text-white rounded-lg text-xs font-mono font-bold transition shadow-xs">2025</button>
+                                <button type="button" onclick="vkPressChar('2026')" class="px-2 py-0.5 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-200 hover:text-white rounded-lg text-xs font-mono font-bold transition shadow-xs">2026</button>
+                                <button type="button" onclick="vkPressChar('2027')" class="px-2 py-0.5 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-200 hover:text-white rounded-lg text-xs font-mono font-bold transition shadow-xs">2027</button>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <button type="button" onclick="vkPressChar('-')" class="px-2 py-0.5 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-300 hover:text-white rounded-lg text-xs font-mono font-bold transition shadow-xs">-</button>
+                                <button type="button" onclick="vkPressChar('/')" class="px-2 py-0.5 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-300 hover:text-white rounded-lg text-xs font-mono font-bold transition shadow-xs">/</button>
                             </div>
                         </div>
 
-                        <!-- Row 1: Angka 1-0 dan tanda hubung -->
-                        <div class="grid grid-cols-12 gap-1">
-                            <button type="button" onclick="vkPressChar('1')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">1</button>
-                            <button type="button" onclick="vkPressChar('2')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">2</button>
-                            <button type="button" onclick="vkPressChar('3')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">3</button>
-                            <button type="button" onclick="vkPressChar('4')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">4</button>
-                            <button type="button" onclick="vkPressChar('5')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">5</button>
-                            <button type="button" onclick="vkPressChar('6')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">6</button>
-                            <button type="button" onclick="vkPressChar('7')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">7</button>
-                            <button type="button" onclick="vkPressChar('8')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">8</button>
-                            <button type="button" onclick="vkPressChar('9')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">9</button>
-                            <button type="button" onclick="vkPressChar('0')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">0</button>
-                            <button type="button" onclick="vkPressChar('-')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-300 font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">-</button>
-                            <button type="button" onclick="vkPressChar('/')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-slate-300 font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">/</button>
-                        </div>
-
-                        <!-- Row 2: Huruf Q - P -->
-                        <div class="grid grid-cols-10 gap-1">
-                            <button type="button" onclick="vkPressChar('Q')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">Q</button>
-                            <button type="button" onclick="vkPressChar('W')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">W</button>
-                            <button type="button" onclick="vkPressChar('E')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">E</button>
-                            <button type="button" onclick="vkPressChar('R')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">R</button>
-                            <button type="button" onclick="vkPressChar('T')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">T</button>
-                            <button type="button" onclick="vkPressChar('Y')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">Y</button>
-                            <button type="button" onclick="vkPressChar('U')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">U</button>
-                            <button type="button" onclick="vkPressChar('I')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">I</button>
-                            <button type="button" onclick="vkPressChar('O')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">O</button>
-                            <button type="button" onclick="vkPressChar('P')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">P</button>
-                        </div>
-
-                        <!-- Row 3: Huruf A - L -->
-                        <div class="grid grid-cols-9 gap-1 px-2 sm:px-4">
-                            <button type="button" onclick="vkPressChar('A')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">A</button>
-                            <button type="button" onclick="vkPressChar('S')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">S</button>
-                            <button type="button" onclick="vkPressChar('D')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">D</button>
-                            <button type="button" onclick="vkPressChar('F')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">F</button>
-                            <button type="button" onclick="vkPressChar('G')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">G</button>
-                            <button type="button" onclick="vkPressChar('H')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">H</button>
-                            <button type="button" onclick="vkPressChar('J')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">J</button>
-                            <button type="button" onclick="vkPressChar('K')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">K</button>
-                            <button type="button" onclick="vkPressChar('L')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">L</button>
-                        </div>
-
-                        <!-- Row 4: Huruf Z - M -->
-                        <div class="grid grid-cols-7 gap-1 px-4 sm:px-8">
-                            <button type="button" onclick="vkPressChar('Z')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">Z</button>
-                            <button type="button" onclick="vkPressChar('X')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">X</button>
-                            <button type="button" onclick="vkPressChar('C')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">C</button>
-                            <button type="button" onclick="vkPressChar('V')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">V</button>
-                            <button type="button" onclick="vkPressChar('B')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">B</button>
-                            <button type="button" onclick="vkPressChar('N')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">N</button>
-                            <button type="button" onclick="vkPressChar('M')" class="h-8 bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white font-mono font-bold text-xs rounded-lg flex items-center justify-center transition shadow-2xs select-none">M</button>
-                        </div>
-
-                        <!-- Row 5: Action Buttons (Backspace, Clear, Spasi, and PROMINENT SEPARATED ENTER BUTTON) -->
-                        <div class="flex flex-wrap sm:flex-nowrap items-center gap-1.5 pt-0.5">
-                            <button type="button" onclick="vkBackspace()" title="Hapus karakter terakhir"
-                                class="px-2.5 sm:px-3 h-8.5 bg-rose-950/70 hover:bg-rose-700 active:scale-95 text-rose-200 hover:text-white font-bold text-[11px] rounded-xl flex items-center gap-1 transition select-none cursor-pointer border border-rose-800/40">
-                                <i class="fa-solid fa-delete-left text-xs"></i>
-                                <span>Hapus</span>
-                            </button>
-                            <button type="button" onclick="vkClear()" title="Kosongkan seluruh kolom batch"
-                                class="px-2.5 sm:px-3 h-8.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white font-bold text-[11px] rounded-xl flex items-center gap-1 transition select-none cursor-pointer">
-                                <i class="fa-regular fa-trash-can"></i>
-                                <span>Clear</span>
-                            </button>
-                            <button type="button" onclick="vkPressChar(' ')" title="Tambah spasi"
-                                class="px-2.5 sm:px-3 h-8.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white font-bold text-[11px] rounded-xl flex items-center gap-1 transition select-none cursor-pointer">
-                                <span>Spasi</span>
-                            </button>
+                        <!-- MAIN INTERACTIVE BODY: RODA ABJAD & NUMPAD ANGKA BERDAMPINGAN -->
+                        <div class="grid grid-cols-12 gap-2.5 items-stretch">
                             
-                            <!-- TOMBOL ENTER TERPISAH (BESAR & SANGAT JELAS) -->
+                            <!-- ============================================== -->
+                            <!-- SISI KIRI (5 KOLOM): RODA ABJAD (DRUM ROLLER)  -->
+                            <!-- ============================================== -->
+                            <div class="col-span-12 sm:col-span-5 bg-slate-950/80 rounded-2xl p-2 border border-slate-800 flex flex-col justify-between items-center relative overflow-hidden shadow-inner">
+                                
+                                <div class="w-full flex items-center justify-between text-[10px] text-slate-400 font-bold px-1 pb-1 border-b border-slate-800/80">
+                                    <span class="flex items-center gap-1 text-indigo-400"><i class="fa-solid fa-arrows-up-down"></i> RODA ABJAD (A-Z)</span>
+                                    <span class="text-[9px] text-slate-500">Gulir / Sentuh</span>
+                                </div>
+
+                                <!-- Tombol Panah Gulir Atas ▲ -->
+                                <button type="button" onclick="wheelStepChar(-1)" class="w-full py-1 text-slate-400 hover:text-white hover:bg-slate-800 active:scale-95 rounded-lg text-xs transition flex items-center justify-center gap-1 font-bold z-10" title="Huruf Sebelumnya">
+                                    <i class="fa-solid fa-chevron-up"></i>
+                                </button>
+
+                                <!-- WHEEL ROLLER VIEWPORT (CYLINDER DRUM 3D) -->
+                                <div class="relative w-full h-36 sm:h-40 overflow-hidden flex items-center justify-center my-1 select-none">
+                                    
+                                    <!-- Center Target Selector Lens (Glow Box) -->
+                                    <div class="pointer-events-none absolute inset-x-1 top-1/2 -translate-y-1/2 h-10 bg-indigo-600/30 border-y-2 border-indigo-400 rounded-xl shadow-lg shadow-indigo-500/25 z-10 flex items-center justify-between px-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                                    </div>
+
+                                    <!-- Gradient Fade Atas & Bawah untuk Efek Roda Drum 3D -->
+                                    <div class="pointer-events-none absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-slate-950 via-slate-950/80 to-transparent z-10"></div>
+                                    <div class="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent z-10"></div>
+
+                                    <!-- Scrollable Wheel List (A - Z) -->
+                                    <div id="alphabetWheelList" class="w-full h-full overflow-y-scroll snap-y snap-mandatory no-scrollbar text-center py-14 space-y-0.5 cursor-grab active:cursor-grabbing">
+                                        <!-- Dynamic rendered by JS initAlphabetWheel() -->
+                                    </div>
+                                </div>
+
+                                <!-- Tombol Panah Gulir Bawah ▼ -->
+                                <button type="button" onclick="wheelStepChar(1)" class="w-full py-1 text-slate-400 hover:text-white hover:bg-slate-800 active:scale-95 rounded-lg text-xs transition flex items-center justify-center gap-1 font-bold z-10" title="Huruf Berikutnya">
+                                    <i class="fa-solid fa-chevron-down"></i>
+                                </button>
+
+                                <!-- Tombol Aksi Input Huruf Terpilih -->
+                                <button type="button" onclick="insertActiveWheelChar()" id="btnInsertWheelChar" class="w-full mt-1.5 py-2 px-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 active:scale-95 text-white rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition shadow-md shadow-indigo-600/30 border border-indigo-400/40">
+                                    <i class="fa-solid fa-arrow-right-to-bracket text-xs"></i>
+                                    <span>INPUT HURUF [<b id="labelActiveWheelChar" class="font-mono text-sm text-yellow-300">A</b>]</span>
+                                </button>
+                            </div>
+
+                            <!-- ============================================== -->
+                            <!-- SISI KANAN (7 KOLOM): NUMPAD NUMERIK TOUCH     -->
+                            <!-- ============================================== -->
+                            <div class="col-span-12 sm:col-span-7 bg-slate-950/80 rounded-2xl p-2.5 border border-slate-800 flex flex-col justify-between space-y-2 shadow-inner">
+                                
+                                <div class="flex items-center justify-between text-[10px] text-slate-400 font-bold px-1 border-b border-slate-800/80 pb-1">
+                                    <span class="flex items-center gap-1 text-emerald-400"><i class="fa-solid fa-calculator"></i> NUMPAD ANGKA</span>
+                                    <span class="text-[9px] text-slate-500">Sentuh Digit</span>
+                                </div>
+
+                                <!-- Grid Tombol Numpad 4 Baris x 4 Kolom -->
+                                <div class="grid grid-cols-4 gap-1.5">
+                                    <!-- Baris 1: 7, 8, 9, Hapus -->
+                                    <button type="button" onclick="vkPressChar('7')" class="h-10 sm:h-11 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-mono font-black text-base rounded-xl flex items-center justify-center transition shadow-xs border border-slate-700/60 select-none">7</button>
+                                    <button type="button" onclick="vkPressChar('8')" class="h-10 sm:h-11 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-mono font-black text-base rounded-xl flex items-center justify-center transition shadow-xs border border-slate-700/60 select-none">8</button>
+                                    <button type="button" onclick="vkPressChar('9')" class="h-10 sm:h-11 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-mono font-black text-base rounded-xl flex items-center justify-center transition shadow-xs border border-slate-700/60 select-none">9</button>
+                                    <button type="button" onclick="vkBackspace()" class="h-10 sm:h-11 bg-rose-950/70 hover:bg-rose-700 active:scale-95 text-rose-200 hover:text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 transition shadow-xs border border-rose-800/50 select-none" title="Hapus karakter terakhir">
+                                        <i class="fa-solid fa-delete-left text-sm"></i>
+                                    </button>
+
+                                    <!-- Baris 2: 4, 5, 6, Clear -->
+                                    <button type="button" onclick="vkPressChar('4')" class="h-10 sm:h-11 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-mono font-black text-base rounded-xl flex items-center justify-center transition shadow-xs border border-slate-700/60 select-none">4</button>
+                                    <button type="button" onclick="vkPressChar('5')" class="h-10 sm:h-11 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-mono font-black text-base rounded-xl flex items-center justify-center transition shadow-xs border border-slate-700/60 select-none">5</button>
+                                    <button type="button" onclick="vkPressChar('6')" class="h-10 sm:h-11 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-mono font-black text-base rounded-xl flex items-center justify-center transition shadow-xs border border-slate-700/60 select-none">6</button>
+                                    <button type="button" onclick="vkClear()" class="h-10 sm:h-11 bg-slate-800/90 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white font-bold text-xs rounded-xl flex items-center justify-center transition shadow-xs border border-slate-700/60 select-none" title="Kosongkan kolom">
+                                        <span>Clear</span>
+                                    </button>
+
+                                    <!-- Baris 3: 1, 2, 3, Spasi -->
+                                    <button type="button" onclick="vkPressChar('1')" class="h-10 sm:h-11 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-mono font-black text-base rounded-xl flex items-center justify-center transition shadow-xs border border-slate-700/60 select-none">1</button>
+                                    <button type="button" onclick="vkPressChar('2')" class="h-10 sm:h-11 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-mono font-black text-base rounded-xl flex items-center justify-center transition shadow-xs border border-slate-700/60 select-none">2</button>
+                                    <button type="button" onclick="vkPressChar('3')" class="h-10 sm:h-11 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-mono font-black text-base rounded-xl flex items-center justify-center transition shadow-xs border border-slate-700/60 select-none">3</button>
+                                    <button type="button" onclick="vkPressChar(' ')" class="h-10 sm:h-11 bg-slate-800/90 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white font-bold text-xs rounded-xl flex items-center justify-center transition shadow-xs border border-slate-700/60 select-none" title="Spasi">
+                                        <span>Spasi</span>
+                                    </button>
+
+                                    <!-- Baris 4: -, 0, /, Titik -->
+                                    <button type="button" onclick="vkPressChar('-')" class="h-10 sm:h-11 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-mono font-black text-base rounded-xl flex items-center justify-center transition shadow-xs border border-slate-700/60 select-none">-</button>
+                                    <button type="button" onclick="vkPressChar('0')" class="h-10 sm:h-11 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-mono font-black text-base rounded-xl flex items-center justify-center transition shadow-xs border border-slate-700/60 select-none">0</button>
+                                    <button type="button" onclick="vkPressChar('/')" class="h-10 sm:h-11 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-mono font-black text-base rounded-xl flex items-center justify-center transition shadow-xs border border-slate-700/60 select-none">/</button>
+                                    <button type="button" onclick="vkPressChar('.')" class="h-10 sm:h-11 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-mono font-black text-base rounded-xl flex items-center justify-center transition shadow-xs border border-slate-700/60 select-none">.</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- FOOTER ACTION BAR: TOMBOL ENTER LEBAR MENUJU EXP DATE -->
+                        <div class="pt-1">
                             <button type="button" onclick="vkEnter()" id="btnVkEnter"
-                                class="flex-1 min-w-[170px] h-8.5 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition shadow-md shadow-emerald-950/40 select-none cursor-pointer border border-emerald-300/40">
-                                <kbd class="px-1.5 py-0.5 bg-emerald-800/90 border border-emerald-400/40 rounded font-mono font-black text-[10px] text-white shadow-xs">↵ ENTER</kbd>
+                                class="w-full h-11 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-98 text-white font-black text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-950/40 select-none cursor-pointer border border-emerald-400/40">
+                                <kbd class="px-2 py-0.5 bg-emerald-800/90 border border-emerald-300/40 rounded font-mono font-black text-xs text-white shadow-xs">↵ ENTER</kbd>
                                 <span>PINDAH KE EXP DATE ➔</span>
                             </button>
                         </div>

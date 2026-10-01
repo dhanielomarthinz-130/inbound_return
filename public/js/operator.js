@@ -544,7 +544,146 @@ function updateNumpadDisplay() {
     }
 }
 
-// 1. Keyboard Touchscreen untuk No. Batch
+// ========================================================
+// 1. KEYBOARD TOUCHSCREEN: RODA ABJAD & NUMPAD UNTUK BATCH
+// ========================================================
+const ALPHABET_LIST = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
+let currentWheelIndex = 1; // Default 'B' (index 1)
+let currentWheelChar = 'B';
+let isAlphabetWheelInitialized = false;
+
+window.initAlphabetWheel = function() {
+    const listEl = document.getElementById('alphabetWheelList');
+    if (!listEl) return;
+    
+    // Render list abjad A sampai Z
+    let html = '';
+    ALPHABET_LIST.forEach((ch, idx) => {
+        html += `<div class="wheel-char-item h-10 flex items-center justify-center font-mono font-bold text-slate-400 text-base transition-all cursor-pointer snap-center rounded-lg hover:text-white" 
+            data-index="${idx}" 
+            data-char="${ch}" 
+            onclick="selectWheelChar('${ch}', true)">
+            ${ch}
+        </div>`;
+    });
+    listEl.innerHTML = html;
+
+    // Listener scroll untuk deteksi huruf aktif di tengah roda
+    let scrollTimeout = null;
+    listEl.addEventListener('scroll', () => {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(updateActiveWheelCharFromScroll, 30);
+    }, { passive: true });
+
+    isAlphabetWheelInitialized = true;
+
+    // Scroll default ke huruf 'B'
+    setTimeout(() => {
+        selectWheelChar('B', false);
+        updateBatchPreviewDisplay();
+    }, 120);
+};
+
+function updateActiveWheelCharFromScroll() {
+    const listEl = document.getElementById('alphabetWheelList');
+    if (!listEl) return;
+
+    const items = listEl.querySelectorAll('.wheel-char-item');
+    if (!items || items.length === 0) return;
+
+    const containerRect = listEl.getBoundingClientRect();
+    const centerY = containerRect.top + containerRect.height / 2;
+
+    let closestItem = null;
+    let minDistance = Infinity;
+
+    items.forEach(item => {
+        const itemRect = item.getBoundingClientRect();
+        const itemCenterY = itemRect.top + itemRect.height / 2;
+        const dist = Math.abs(centerY - itemCenterY);
+        if (dist < minDistance) {
+            minDistance = dist;
+            closestItem = item;
+        }
+    });
+
+    if (closestItem) {
+        const char = closestItem.getAttribute('data-char') || 'A';
+        const idx = parseInt(closestItem.getAttribute('data-index') || '0', 10);
+        applyActiveWheelStyle(char, idx);
+    }
+}
+
+function applyActiveWheelStyle(char, idx) {
+    currentWheelChar = char;
+    currentWheelIndex = idx;
+
+    const listEl = document.getElementById('alphabetWheelList');
+    if (listEl) {
+        listEl.querySelectorAll('.wheel-char-item').forEach(el => {
+            if (el.getAttribute('data-char') === char) {
+                el.classList.add('active-wheel-char');
+            } else {
+                el.classList.remove('active-wheel-char');
+            }
+        });
+    }
+
+    const labelEl = document.getElementById('labelActiveWheelChar');
+    if (labelEl) labelEl.innerText = char;
+}
+
+window.selectWheelChar = function(char, andAppend = false) {
+    const listEl = document.getElementById('alphabetWheelList');
+    if (!listEl) return;
+
+    const idx = ALPHABET_LIST.indexOf(char.toUpperCase());
+    if (idx === -1) return;
+
+    const items = listEl.querySelectorAll('.wheel-char-item');
+    if (items[idx]) {
+        const itemTop = items[idx].offsetTop;
+        const itemHeight = items[idx].offsetHeight;
+        const containerHeight = listEl.clientHeight;
+        const targetScrollTop = itemTop - (containerHeight / 2) + (itemHeight / 2);
+
+        listEl.scrollTo({
+            top: targetScrollTop,
+            behavior: 'smooth'
+        });
+
+        applyActiveWheelStyle(char.toUpperCase(), idx);
+    }
+
+    if (andAppend) {
+        vkPressChar(char.toUpperCase());
+    }
+};
+
+window.wheelStepChar = function(direction) {
+    let nextIdx = currentWheelIndex + direction;
+    if (nextIdx < 0) nextIdx = 0;
+    if (nextIdx >= ALPHABET_LIST.length) nextIdx = ALPHABET_LIST.length - 1;
+
+    const targetChar = ALPHABET_LIST[nextIdx];
+    selectWheelChar(targetChar, false);
+};
+
+window.insertActiveWheelChar = function() {
+    if (currentWheelChar) {
+        vkPressChar(currentWheelChar);
+    }
+};
+
+window.updateBatchPreviewDisplay = function() {
+    const disp = document.getElementById('vkBatchPreviewDisplay');
+    const input = document.getElementById('inputBatch');
+    if (disp) {
+        const val = (input && input.value) ? input.value.trim() : '';
+        disp.innerText = val ? val : '-';
+    }
+};
+
 window.toggleVirtualKeyboard = function(forceShow = null) {
     const container = document.getElementById('virtualKeyboardContainer');
     const toggleBtnLabel = document.getElementById('btnToggleVKLabel');
@@ -556,6 +695,12 @@ window.toggleVirtualKeyboard = function(forceShow = null) {
     if (shouldShow) {
         container.classList.remove('hidden');
         if (toggleBtnLabel) toggleBtnLabel.innerText = 'Tutup Keyboard';
+        // Inisialisasi roda abjad jika belum
+        if (!isAlphabetWheelInitialized) {
+            initAlphabetWheel();
+        } else {
+            updateBatchPreviewDisplay();
+        }
         // Tutup Numpad Exp Date saat Keyboard Batch aktif
         if (typeof toggleNumpadExpDate === 'function') toggleNumpadExpDate(false);
     } else {
@@ -565,39 +710,42 @@ window.toggleVirtualKeyboard = function(forceShow = null) {
 };
 
 window.vkPressChar = function(char) {
-    if (!inputBatch) return;
-    inputBatch.value = (inputBatch.value || '') + char;
-    inputBatch.dispatchEvent(new Event('input', { bubbles: true }));
-    inputBatch.focus();
+    const input = document.getElementById('inputBatch');
+    if (!input) return;
+    input.value = (input.value || '') + char;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.focus();
+    updateBatchPreviewDisplay();
 };
 
 window.vkBackspace = function() {
-    if (!inputBatch) return;
-    inputBatch.value = (inputBatch.value || '').slice(0, -1);
-    inputBatch.dispatchEvent(new Event('input', { bubbles: true }));
-    inputBatch.focus();
+    const input = document.getElementById('inputBatch');
+    if (!input) return;
+    input.value = (input.value || '').slice(0, -1);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.focus();
+    updateBatchPreviewDisplay();
 };
 
 window.vkClear = function() {
-    if (!inputBatch) return;
-    inputBatch.value = '';
-    inputBatch.dispatchEvent(new Event('input', { bubbles: true }));
-    inputBatch.focus();
+    const input = document.getElementById('inputBatch');
+    if (!input) return;
+    input.value = '';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.focus();
+    updateBatchPreviewDisplay();
 };
 
 window.vkEnter = function() {
-    // Tombol ENTER di Keyboard Batch:
-    // 1. Otomatis sembunyikan Keyboard Batch!
     toggleVirtualKeyboard(false);
-
-    // 2. Pindah fokus ke kolom Exp Date
-    if (inputExpDate) {
-        inputExpDate.focus();
+    const inputExp = document.getElementById('inputExpDate');
+    if (inputExp) {
+        inputExp.focus();
     }
-
-    // 3. Tampilkan Numpad Exp Date
     toggleNumpadExpDate(true);
-    updateVirtualEnterBadge('inputExpDate');
+    if (typeof updateVirtualEnterBadge === 'function') {
+        updateVirtualEnterBadge('inputExpDate');
+    }
 };
 
 // 2. Numpad Touchscreen untuk Exp Date
