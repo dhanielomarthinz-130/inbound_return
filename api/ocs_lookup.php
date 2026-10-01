@@ -398,6 +398,18 @@ try {
 
                             // Simpan langsung ke database ocs_orders lokal
                             try {
+                                $hasIsSyncedCol = false;
+                                try {
+                                    $colsOcs = $pdo->query("SHOW COLUMNS FROM ocs_orders")->fetchAll(PDO::FETCH_COLUMN);
+                                    if (!in_array('is_synced_to_local', $colsOcs)) {
+                                        try { $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN is_synced_to_local TINYINT(1) DEFAULT 0 AFTER raw_payload"); $colsOcs[] = 'is_synced_to_local'; } catch (Exception $eCol) {}
+                                    }
+                                    $hasIsSyncedCol = in_array('is_synced_to_local', $colsOcs);
+                                } catch (Exception $eCols) {}
+
+                                $colSyncPart = $hasIsSyncedCol ? ", is_synced_to_local" : "";
+                                $valSyncPart = $hasIsSyncedCol ? ", 1" : "";
+
                                 $stmtUpsert = $pdo->prepare("
                                     INSERT INTO ocs_orders (
                                         order_id, tracking_number, platform_id, commerce_platform, 
@@ -405,14 +417,14 @@ try {
                                         total_qty, package_price, original_price, seller_discount, platform_discount,
                                         shipping_fee, service_fee, subtotal, total_amount, gmv, nmv,
                                         customer_name, customer_phone, customer_address, order_items_json,
-                                        has_packing_video, packing_video_url, order_created_at, raw_payload, is_synced_to_local
+                                        has_packing_video, packing_video_url, order_created_at, raw_payload{$colSyncPart}
                                     ) VALUES (
                                         :order_id, :tracking_number, :platform_id, :commerce_platform, 
                                         :shop_name, :shipping_provider, :status_code, :status_name, :product_name, :seller_sku,
                                         :total_qty, :package_price, :original_price, :seller_discount, :platform_discount,
                                         :shipping_fee, :service_fee, :subtotal, :total_amount, :gmv, :nmv,
                                         :customer_name, :customer_phone, :customer_address, :order_items_json,
-                                        0, NULL, :order_created_at, :raw_payload, 1
+                                        0, NULL, :order_created_at, :raw_payload{$valSyncPart}
                                     )
                                     ON DUPLICATE KEY UPDATE 
                                         tracking_number   = COALESCE(VALUES(tracking_number), tracking_number),

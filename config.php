@@ -279,8 +279,15 @@ try {
             if (!in_array('photos', $colsSessions)) $pdo->exec("ALTER TABLE return_sessions ADD COLUMN photos TEXT NULL AFTER product_photo");
 
             $colsRecep = $pdo->query("SHOW COLUMNS FROM expedition_receptions")->fetchAll(PDO::FETCH_COLUMN);
+            if (!in_array('courier_name', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN courier_name VARCHAR(150) NULL AFTER expedition");
+            if (!in_array('courier_photo', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN courier_photo VARCHAR(255) NULL AFTER courier_name");
+            if (!in_array('vehicle_no', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN vehicle_no VARCHAR(50) NULL AFTER courier_photo");
+            if (!in_array('operator_name', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN operator_name VARCHAR(100) DEFAULT 'Operator' AFTER vehicle_no");
+            if (!in_array('total_packages', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN total_packages INT DEFAULT 0 AFTER operator_name");
+            if (!in_array('notes', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN notes TEXT NULL AFTER total_packages");
             if (!in_array('photo_path', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN photo_path VARCHAR(255) NULL AFTER notes");
             if (!in_array('package_photos', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN package_photos TEXT NULL AFTER photo_path");
+            if (!in_array('status', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN status VARCHAR(50) DEFAULT 'RECEIVED' AFTER package_photos");
 
             $colsProd = $pdo->query("SHOW COLUMNS FROM master_products")->fetchAll(PDO::FETCH_COLUMN);
             if (!in_array('seller_sku', $colsProd)) $pdo->exec("ALTER TABLE master_products ADD COLUMN seller_sku VARCHAR(150) NULL AFTER sku");
@@ -384,10 +391,26 @@ try {
                 }
             }
 
-            // Verifikasi kolom foto receiving
+            // Verifikasi kolom receiving & kurir
             if (!$needsMigration && in_array('expedition_receptions', $existingTables)) {
                 $recCols = $pdo->query("SHOW COLUMNS FROM expedition_receptions")->fetchAll(PDO::FETCH_COLUMN);
-                if (!in_array('photo_path', $recCols) || !in_array('package_photos', $recCols)) {
+                if (!in_array('courier_photo', $recCols) || !in_array('photo_path', $recCols) || !in_array('package_photos', $recCols)) {
+                    $needsMigration = true;
+                }
+            }
+
+            // Verifikasi kolom foto per paket
+            if (!$needsMigration && in_array('reception_packages', $existingTables)) {
+                $recPkgCols = $pdo->query("SHOW COLUMNS FROM reception_packages")->fetchAll(PDO::FETCH_COLUMN);
+                if (!in_array('photo_path', $recPkgCols)) {
+                    $needsMigration = true;
+                }
+            }
+
+            // Verifikasi kolom ocs_orders sync
+            if (!$needsMigration && in_array('ocs_orders', $existingTables)) {
+                $ocsCols = $pdo->query("SHOW COLUMNS FROM ocs_orders")->fetchAll(PDO::FETCH_COLUMN);
+                if (!in_array('is_synced_to_local', $ocsCols) || !in_array('status_name', $ocsCols) || !in_array('total_amount', $ocsCols)) {
                     $needsMigration = true;
                 }
             }

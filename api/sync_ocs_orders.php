@@ -22,6 +22,12 @@ ini_set('memory_limit', '512M');
 
 require_once __DIR__ . '/../config.php';
 
+if (function_exists('ensureDatabaseSchema')) {
+    try {
+        ensureDatabaseSchema($pdo);
+    } catch (Exception $eSchema) {}
+}
+
 $isCli = (php_sapi_name() === 'cli');
 
 if (!$isCli) {
@@ -145,16 +151,28 @@ try {
     $totalWithResi = 0;
     $ordersForDetailEnrichment = [];
 
+    // Pastikan skema ocs_orders up to date
+    $hasIsSyncedCol = false;
+    try {
+        $colsOcs = $pdo->query("SHOW COLUMNS FROM ocs_orders")->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('is_synced_to_local', $colsOcs)) {
+            try {
+                $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN is_synced_to_local TINYINT(1) DEFAULT 0 AFTER raw_payload");
+                $colsOcs[] = 'is_synced_to_local';
+            } catch (Exception $eCol) {}
+        }
+        $hasIsSyncedCol = in_array('is_synced_to_local', $colsOcs);
+    } catch (Exception $eOcsCols) {}
+
+    $colSql = "order_id, tracking_number, platform_id, commerce_platform, shop_name, shipping_provider, status_code, product_name, total_qty, order_created_at, raw_payload" . ($hasIsSyncedCol ? ", is_synced_to_local" : "");
+    $valSql = ":order_id, :tracking_number, :platform_id, :commerce_platform, :shop_name, :shipping_provider, :status_code, :product_name, :total_qty, :order_created_at, :raw_payload" . ($hasIsSyncedCol ? ", 0" : "");
+
     // Statement stream-upsert header order
     $stmtStreamHeader = $pdo->prepare("
         INSERT INTO ocs_orders (
-            order_id, tracking_number, platform_id, commerce_platform, 
-            shop_name, shipping_provider, status_code, product_name,
-            total_qty, order_created_at, raw_payload, is_synced_to_local
+            {$colSql}
         ) VALUES (
-            :order_id, :tracking_number, :platform_id, :commerce_platform, 
-            :shop_name, :shipping_provider, :status_code, :product_name,
-            :total_qty, :order_created_at, :raw_payload, 0
+            {$valSql}
         )
         ON DUPLICATE KEY UPDATE 
             tracking_number   = COALESCE(VALUES(tracking_number), tracking_number),

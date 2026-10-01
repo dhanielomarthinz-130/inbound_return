@@ -330,76 +330,103 @@ if ($method === 'POST') {
     $mainPhotoPath = count($photoPaths) > 0 ? $photoPaths[0] : null;
     $allPhotosJson = count($photoPaths) > 0 ? json_encode($photoPaths, JSON_UNESCAPED_SLASHES) : null;
 
+    // Pastikan schema tabel dan kolom tersedia SEBELUM memulai transaksi (DDL inside transaction causes implicit commit in MySQL)
+    $recCols = [];
+    try {
+        $recCols = $pdo->query("SHOW COLUMNS FROM expedition_receptions")->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('courier_name', $recCols)) {
+            try { $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN courier_name VARCHAR(150) NULL AFTER expedition"); $recCols[] = 'courier_name'; } catch (Exception $e) {}
+        }
+        if (!in_array('courier_photo', $recCols)) {
+            try { $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN courier_photo VARCHAR(255) NULL AFTER courier_name"); $recCols[] = 'courier_photo'; } catch (Exception $e) {}
+        }
+        if (!in_array('vehicle_no', $recCols)) {
+            try { $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN vehicle_no VARCHAR(50) NULL AFTER courier_photo"); $recCols[] = 'vehicle_no'; } catch (Exception $e) {}
+        }
+        if (!in_array('notes', $recCols)) {
+            try { $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN notes TEXT NULL AFTER total_packages"); $recCols[] = 'notes'; } catch (Exception $e) {}
+        }
+        if (!in_array('photo_path', $recCols)) {
+            try { $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN photo_path VARCHAR(255) NULL AFTER notes"); $recCols[] = 'photo_path'; } catch (Exception $e) {}
+        }
+        if (!in_array('package_photos', $recCols)) {
+            try { $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN package_photos TEXT NULL AFTER photo_path"); $recCols[] = 'package_photos'; } catch (Exception $e) {}
+        }
+    } catch (Exception $eCols) {}
+
+    $pkgCols = [];
+    try {
+        $pkgCols = $pdo->query("SHOW COLUMNS FROM reception_packages")->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('photo_path', $pkgCols)) {
+            try { $pdo->exec("ALTER TABLE reception_packages ADD COLUMN photo_path VARCHAR(255) NULL AFTER package_barcode"); $pkgCols[] = 'photo_path'; } catch (Exception $e) {}
+        }
+    } catch (Exception $eCols2) {}
+
+    // Cek keunikan receipt_number agar tidak error Duplicate Entry
+    try {
+        $chkRcpt = $pdo->prepare("SELECT id FROM expedition_receptions WHERE receipt_number = ? LIMIT 1");
+        $chkRcpt->execute([$receiptNo]);
+        if ($chkRcpt->fetch()) {
+            $receiptNo .= '-' . strtoupper(substr(uniqid(), -4));
+        }
+    } catch (Exception $eRcpt) {}
+
+    $hasCourierNameCol   = in_array('courier_name', $recCols);
+    $hasCourierPhotoCol  = in_array('courier_photo', $recCols);
+    $hasVehicleNoCol     = in_array('vehicle_no', $recCols);
+    $hasNotesCol         = in_array('notes', $recCols);
+    $hasPhotoPathCol     = in_array('photo_path', $recCols);
+    $hasPackagePhotosCol = in_array('package_photos', $recCols);
+    $hasItemPhotoCol     = in_array('photo_path', $pkgCols);
+
     try {
         $pdo->beginTransaction();
 
         $operatorName = $user['name'] ?? $user['username'] ?? 'Operator';
         $totalCount   = count($cleanPackages);
 
-        // 1. Simpan Header Penerimaan (Dengan courier_photo)
-        $hasCourierPhotoCol = false;
-        try {
-            $chkCpCol = $pdo->query("SHOW COLUMNS FROM expedition_receptions LIKE 'courier_photo'");
-            if ($chkCpCol && $chkCpCol->rowCount() > 0) {
-                $hasCourierPhotoCol = true;
-            } else {
-                $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN courier_photo VARCHAR(255) NULL AFTER courier_name");
-                $hasCourierPhotoCol = true;
-            }
-        } catch (Exception $eCp) {}
+        // 1. Simpan Header Penerimaan secara dinamis sesuai kolom yang tersedia
+        $fields = ['receipt_number', 'expedition', 'operator_name', 'total_packages', 'status', 'created_at'];
+        $placeholders = ['?', '?', '?', '?', "'RECEIVED'", 'NOW()'];
+        $values = [$receiptNo, $expedition, $operatorName, $totalCount];
 
-        if ($hasCourierPhotoCol) {
-            $stmtHead = $pdo->prepare("
-                INSERT INTO expedition_receptions 
-                    (receipt_number, expedition, courier_name, courier_photo, vehicle_no, operator_name, total_packages, notes, photo_path, package_photos, status, created_at)
-                VALUES 
-                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED', NOW())
-            ");
-            $stmtHead->execute([
-                $receiptNo,
-                $expedition,
-                $courierName ?: null,
-                $savedCourierPhoto ?: null,
-                $vehicleNo ?: null,
-                $operatorName,
-                $totalCount,
-                $notes ?: null,
-                $mainPhotoPath,
-                $allPhotosJson
-            ]);
-        } else {
-            $stmtHead = $pdo->prepare("
-                INSERT INTO expedition_receptions 
-                    (receipt_number, expedition, courier_name, vehicle_no, operator_name, total_packages, notes, photo_path, package_photos, status, created_at)
-                VALUES 
-                    (?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED', NOW())
-            ");
-            $stmtHead->execute([
-                $receiptNo,
-                $expedition,
-                $courierName ?: null,
-                $vehicleNo ?: null,
-                $operatorName,
-                $totalCount,
-                $notes ?: null,
-                $mainPhotoPath,
-                $allPhotosJson
-            ]);
+        if ($hasCourierNameCol) {
+            $fields[] = 'courier_name';
+            $placeholders[] = '?';
+            $values[] = $courierName ?: null;
         }
+        if ($hasCourierPhotoCol) {
+            $fields[] = 'courier_photo';
+            $placeholders[] = '?';
+            $values[] = $savedCourierPhoto ?: null;
+        }
+        if ($hasVehicleNoCol) {
+            $fields[] = 'vehicle_no';
+            $placeholders[] = '?';
+            $values[] = $vehicleNo ?: null;
+        }
+        if ($hasNotesCol) {
+            $fields[] = 'notes';
+            $placeholders[] = '?';
+            $values[] = $notes ?: null;
+        }
+        if ($hasPhotoPathCol) {
+            $fields[] = 'photo_path';
+            $placeholders[] = '?';
+            $values[] = $mainPhotoPath;
+        }
+        if ($hasPackagePhotosCol) {
+            $fields[] = 'package_photos';
+            $placeholders[] = '?';
+            $values[] = $allPhotosJson;
+        }
+
+        $sqlHead = "INSERT INTO expedition_receptions (" . implode(', ', $fields) . ") VALUES (" . implode(', ', $placeholders) . ")";
+        $stmtHead = $pdo->prepare($sqlHead);
+        $stmtHead->execute($values);
         $receptionId = $pdo->lastInsertId();
 
-        // 2. Simpan Detail Paket (Multiple Items dengan kolom photo_path)
-        $hasItemPhotoCol = false;
-        try {
-            $chkCol = $pdo->query("SHOW COLUMNS FROM reception_packages LIKE 'photo_path'");
-            if ($chkCol && $chkCol->rowCount() > 0) {
-                $hasItemPhotoCol = true;
-            } else {
-                $pdo->exec("ALTER TABLE reception_packages ADD COLUMN photo_path VARCHAR(255) NULL AFTER package_barcode");
-                $hasItemPhotoCol = true;
-            }
-        } catch (Exception $eCol) {}
-
+        // 2. Simpan Detail Paket
         if ($hasItemPhotoCol) {
             $stmtItem = $pdo->prepare("
                 INSERT INTO reception_packages (reception_id, package_barcode, photo_path, scanned_at)
@@ -420,7 +447,9 @@ if ($method === 'POST') {
             }
         }
 
-        $pdo->commit();
+        if ($pdo->inTransaction()) {
+            $pdo->commit();
+        }
 
         jsonResponse([
             'success' => true,
@@ -437,7 +466,7 @@ if ($method === 'POST') {
         ]);
 
     } catch (Exception $e) {
-        if ($pdo->inTransaction()) {
+        if (isset($pdo) && $pdo->inTransaction()) {
             $pdo->rollBack();
         }
         jsonResponse([
