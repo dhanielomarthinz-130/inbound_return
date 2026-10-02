@@ -1895,6 +1895,10 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                         <span id="adminSlipCourier" class="font-semibold text-slate-700">-</span>
                     </div>
                     <div>
+                        <span class="text-slate-400 block text-[9px] uppercase font-bold">Nomor Karung / Bag</span>
+                        <span id="adminSlipSackNumber" class="font-bold text-amber-700 text-xs">-</span>
+                    </div>
+                    <div class="col-span-2 sm:col-span-1">
                         <span class="text-slate-400 block text-[9px] uppercase font-bold">Operator Penerima</span>
                         <span id="adminSlipOperator" class="font-bold text-slate-800">-</span>
                     </div>

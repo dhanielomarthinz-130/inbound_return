@@ -171,6 +171,7 @@ try {
                 `receipt_number` VARCHAR(100) NOT NULL UNIQUE,
                 `expedition` VARCHAR(100) NOT NULL,
                 `courier_name` VARCHAR(150) NULL,
+                `sack_number` VARCHAR(100) NULL,
                 `vehicle_no` VARCHAR(50) NULL,
                 `operator_name` VARCHAR(100) NOT NULL,
                 `total_packages` INT DEFAULT 0,
@@ -181,6 +182,7 @@ try {
                 `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 INDEX idx_receipt_number (`receipt_number`),
                 INDEX idx_reception_expedition (`expedition`),
+                INDEX idx_reception_sack (`sack_number`),
                 INDEX idx_reception_created (`created_at`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -188,10 +190,12 @@ try {
                 `id` INT AUTO_INCREMENT PRIMARY KEY,
                 `reception_id` INT NOT NULL,
                 `package_barcode` VARCHAR(100) NOT NULL,
+                `sack_number` VARCHAR(100) NULL,
                 `photo_path` VARCHAR(255) NULL,
                 `scanned_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 INDEX idx_reception_id (`reception_id`),
                 INDEX idx_package_barcode (`package_barcode`),
+                INDEX idx_pkg_sack (`sack_number`),
                 CONSTRAINT fk_reception_packages FOREIGN KEY (`reception_id`) REFERENCES `expedition_receptions`(`id`) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -280,6 +284,7 @@ try {
 
             $colsRecep = $pdo->query("SHOW COLUMNS FROM expedition_receptions")->fetchAll(PDO::FETCH_COLUMN);
             if (!in_array('courier_name', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN courier_name VARCHAR(150) NULL AFTER expedition");
+            if (!in_array('sack_number', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN sack_number VARCHAR(100) NULL AFTER courier_name");
             if (!in_array('courier_photo', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN courier_photo VARCHAR(255) NULL AFTER courier_name");
             if (!in_array('vehicle_no', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN vehicle_no VARCHAR(50) NULL AFTER courier_photo");
             if (!in_array('operator_name', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN operator_name VARCHAR(100) DEFAULT 'Operator' AFTER vehicle_no");
@@ -288,6 +293,9 @@ try {
             if (!in_array('photo_path', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN photo_path VARCHAR(255) NULL AFTER notes");
             if (!in_array('package_photos', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN package_photos TEXT NULL AFTER photo_path");
             if (!in_array('status', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN status VARCHAR(50) DEFAULT 'RECEIVED' AFTER package_photos");
+
+            $colsRecepPkg = $pdo->query("SHOW COLUMNS FROM reception_packages")->fetchAll(PDO::FETCH_COLUMN);
+            if (!in_array('sack_number', $colsRecepPkg)) $pdo->exec("ALTER TABLE reception_packages ADD COLUMN sack_number VARCHAR(100) NULL AFTER package_barcode");
 
             $colsProd = $pdo->query("SHOW COLUMNS FROM master_products")->fetchAll(PDO::FETCH_COLUMN);
             if (!in_array('seller_sku', $colsProd)) $pdo->exec("ALTER TABLE master_products ADD COLUMN seller_sku VARCHAR(150) NULL AFTER sku");
@@ -394,15 +402,15 @@ try {
             // Verifikasi kolom receiving & kurir
             if (!$needsMigration && in_array('expedition_receptions', $existingTables)) {
                 $recCols = $pdo->query("SHOW COLUMNS FROM expedition_receptions")->fetchAll(PDO::FETCH_COLUMN);
-                if (!in_array('courier_photo', $recCols) || !in_array('photo_path', $recCols) || !in_array('package_photos', $recCols)) {
+                if (!in_array('courier_photo', $recCols) || !in_array('photo_path', $recCols) || !in_array('package_photos', $recCols) || !in_array('sack_number', $recCols)) {
                     $needsMigration = true;
                 }
             }
 
-            // Verifikasi kolom foto per paket
+            // Verifikasi kolom foto per paket & karung
             if (!$needsMigration && in_array('reception_packages', $existingTables)) {
                 $recPkgCols = $pdo->query("SHOW COLUMNS FROM reception_packages")->fetchAll(PDO::FETCH_COLUMN);
-                if (!in_array('photo_path', $recPkgCols)) {
+                if (!in_array('photo_path', $recPkgCols) || !in_array('sack_number', $recPkgCols)) {
                     $needsMigration = true;
                 }
             }

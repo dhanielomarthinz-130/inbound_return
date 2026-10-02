@@ -2274,7 +2274,10 @@ function renderReceivingTable(data) {
                         ${escapeHtml(item.expedition)}
                     </span>
                 </td>
-                <td class="py-3 px-4 font-medium text-slate-700">${escapeHtml(item.courier_name || '-')}</td>
+                <td class="py-3 px-4 font-medium text-slate-700">
+                    <div>${escapeHtml(item.courier_name || '-')}</div>
+                    ${item.sack_number ? `<span class="bg-amber-50 text-amber-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-200 mt-1 inline-flex items-center gap-1"><i class="fa-solid fa-box-archive text-[9px]"></i>${escapeHtml(item.sack_number)}</span>` : ''}
+                </td>
                 <td class="py-3 px-4 text-center">
                     <span class="bg-indigo-50 text-indigo-700 font-black px-2.5 py-1 rounded-lg border border-indigo-200 text-xs inline-block">
                         ${item.total_packages} Paket
@@ -2317,6 +2320,8 @@ window.viewReceivingReceipt = async function(id) {
             document.getElementById('adminSlipExpedition').innerText = r.expedition || '-';
             document.getElementById('adminSlipDateTime').innerText = r.created_at || '-';
             document.getElementById('adminSlipCourier').innerText = r.courier_name || '-';
+            const elSack = document.getElementById('adminSlipSackNumber');
+            if (elSack) elSack.innerText = r.sack_number || '-';
             document.getElementById('adminSlipOperator').innerText = r.operator_name || '-';
             const actualTotal = (data.packages && data.packages.length > 0) ? data.packages.length : (r.total_packages || 0);
             document.getElementById('adminSlipTotalPackages').innerText = actualTotal;
@@ -2325,11 +2330,13 @@ window.viewReceivingReceipt = async function(id) {
             const listEl = document.getElementById('adminSlipPackageList');
             let listHtml = '';
             (data.packages || []).forEach((bar, i) => {
+                const sackTag = bar.sack_number ? `<span class="bg-amber-100 text-amber-800 text-[9px] font-bold px-1 py-0.2 rounded border border-amber-200 ml-1 shrink-0">${escapeHtml(bar.sack_number)}</span>` : '';
                 listHtml += `
                     <div class="flex items-center justify-between bg-white rounded-lg border border-slate-200/90 py-1.5 px-2 text-xs">
                         <div class="flex items-center gap-1.5 min-w-0 pr-1">
                             <span class="w-5 h-5 rounded bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">${i + 1}</span>
                             <span class="font-mono font-bold text-slate-800 text-xs tracking-tight truncate">${escapeHtml(bar.package_barcode)}</span>
+                            ${sackTag}
                         </div>
                         <span class="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-300 shrink-0">TERIMA OK</span>
                     </div>
@@ -2370,9 +2377,10 @@ window.viewReceivingPackagesList = async function(id) {
             const listEl = document.getElementById('pkgModalList');
             let html = '';
             (data.packages || []).forEach((p, idx) => {
+                const sackTag = p.sack_number ? `<span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-200 ml-1.5">${escapeHtml(p.sack_number)}</span>` : '';
                 html += `
                     <div class="py-1.5 px-2 flex justify-between items-center hover:bg-slate-100/80 transition">
-                        <span>${idx + 1}. <b class="text-slate-800">${escapeHtml(p.package_barcode)}</b></span>
+                        <span class="flex items-center gap-1">${idx + 1}. <b class="text-slate-800">${escapeHtml(p.package_barcode)}</b> ${sackTag}</span>
                         <span class="text-[10px] text-slate-400">${(p.scanned_at || '').split(' ')[1] || ''}</span>
                     </div>
                 `;

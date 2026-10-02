@@ -57,7 +57,7 @@ if ($method === 'GET') {
         }
 
         $stmtPkg = $pdo->prepare("
-            SELECT id, package_barcode, photo_path, scanned_at 
+            SELECT id, package_barcode, sack_number, photo_path, scanned_at 
             FROM reception_packages 
             WHERE reception_id = ? 
             ORDER BY id ASC
@@ -107,7 +107,9 @@ if ($method === 'GET') {
         }
 
         if (!empty($search)) {
-            $where[] = "(p.package_barcode LIKE ? OR r.receipt_number LIKE ? OR r.courier_name LIKE ? OR r.operator_name LIKE ? OR r.expedition LIKE ?)";
+            $where[] = "(p.package_barcode LIKE ? OR r.receipt_number LIKE ? OR r.courier_name LIKE ? OR r.operator_name LIKE ? OR r.expedition LIKE ? OR r.sack_number LIKE ? OR p.sack_number LIKE ?)";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
             $params[] = "%$search%";
             $params[] = "%$search%";
             $params[] = "%$search%";
@@ -123,6 +125,7 @@ if ($method === 'GET') {
                     p.id AS package_id,
                     p.reception_id,
                     p.package_barcode,
+                    COALESCE(p.sack_number, r.sack_number) AS sack_number,
                     p.photo_path AS package_photo,
                     COALESCE(p.scanned_at, r.created_at) AS scanned_at,
                     r.receipt_number,
@@ -213,7 +216,9 @@ if ($method === 'GET') {
     }
 
     if (!empty($search)) {
-        $where[] = "(receipt_number LIKE ? OR courier_name LIKE ? OR operator_name LIKE ?)";
+        $where[] = "(receipt_number LIKE ? OR courier_name LIKE ? OR operator_name LIKE ? OR expedition LIKE ? OR sack_number LIKE ?)";
+        $params[] = "%$search%";
+        $params[] = "%$search%";
         $params[] = "%$search%";
         $params[] = "%$search%";
         $params[] = "%$search%";
@@ -224,7 +229,7 @@ if ($method === 'GET') {
     $rows = [];
     try {
         $stmt = $pdo->prepare("
-            SELECT id, receipt_number, expedition, courier_name, courier_photo, vehicle_no, operator_name, total_packages, notes, photo_path, package_photos, status, created_at
+            SELECT id, receipt_number, expedition, courier_name, sack_number, courier_photo, vehicle_no, operator_name, total_packages, notes, photo_path, package_photos, status, created_at
             FROM expedition_receptions
             WHERE {$whereSql}
             ORDER BY id DESC
@@ -242,7 +247,7 @@ if ($method === 'GET') {
         try {
             // Coba lagi dengan kolom foto
             $stmt = $pdo->prepare("
-                SELECT id, receipt_number, expedition, courier_name, courier_photo, vehicle_no, operator_name, total_packages, notes, photo_path, package_photos, status, created_at
+                SELECT id, receipt_number, expedition, courier_name, sack_number, courier_photo, vehicle_no, operator_name, total_packages, notes, photo_path, package_photos, status, created_at
                 FROM expedition_receptions
                 WHERE {$whereSql}
                 ORDER BY id DESC
@@ -253,7 +258,7 @@ if ($method === 'GET') {
             try {
                 // Fallback jika hosting belum mengizinkan kolom photo_path / package_photos
                 $stmtFallback = $pdo->prepare("
-                    SELECT id, receipt_number, expedition, courier_name, NULL as courier_photo, vehicle_no, operator_name, total_packages, notes, NULL as photo_path, NULL as package_photos, status, created_at
+                    SELECT id, receipt_number, expedition, courier_name, NULL as sack_number, NULL as courier_photo, vehicle_no, operator_name, total_packages, notes, NULL as photo_path, NULL as package_photos, status, created_at
                     FROM expedition_receptions
                     WHERE {$whereSql}
                     ORDER BY id DESC
@@ -312,6 +317,7 @@ if ($method === 'POST') {
 
     $expedition   = trim($input['expedition'] ?? '');
     $courierName  = trim($input['courier_name'] ?? '');
+    $sackNumber   = trim($input['sack_number'] ?? '');
     $vehicleNo    = trim($input['vehicle_no'] ?? '');
     $notes        = trim($input['notes'] ?? '');
     $receiptNo    = trim($input['receipt_number'] ?? '');
@@ -325,24 +331,27 @@ if ($method === 'POST') {
         jsonResponse(['error' => 'Minimal 1 barcode/resi paket harus di-scan sebelum submit!'], 400);
     }
 
-    // Bersihkan dan proses paket (bisa string biasa atau object {barcode, photo})
+    // Bersihkan dan proses paket (bisa string biasa atau object {barcode, photo, sack_number})
     $cleanPackages = [];
     foreach ($packages as $pkg) {
         if (is_array($pkg)) {
             $b = trim((string)($pkg['barcode'] ?? ''));
             $p = $pkg['photo'] ?? null;
+            $s = trim((string)($pkg['sack_number'] ?? '')) ?: $sackNumber;
             if ($b !== '') {
                 $cleanPackages[] = [
-                    'barcode' => $b,
-                    'photo'   => $p
+                    'barcode'     => $b,
+                    'photo'       => $p,
+                    'sack_number' => $s ?: null
                 ];
             }
         } else {
             $val = trim((string)$pkg);
             if ($val !== '') {
                 $cleanPackages[] = [
-                    'barcode' => $val,
-                    'photo'   => null
+                    'barcode'     => $val,
+                    'photo'       => null,
+                    'sack_number' => $sackNumber ?: null
                 ];
             }
         }
@@ -453,6 +462,9 @@ if ($method === 'POST') {
         if (!in_array('courier_name', $recCols)) {
             try { $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN courier_name VARCHAR(150) NULL AFTER expedition"); $recCols[] = 'courier_name'; } catch (Exception $e) {}
         }
+        if (!in_array('sack_number', $recCols)) {
+            try { $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN sack_number VARCHAR(100) NULL AFTER courier_name"); $recCols[] = 'sack_number'; } catch (Exception $e) {}
+        }
         if (!in_array('courier_photo', $recCols)) {
             try { $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN courier_photo VARCHAR(255) NULL AFTER courier_name"); $recCols[] = 'courier_photo'; } catch (Exception $e) {}
         }
@@ -476,6 +488,9 @@ if ($method === 'POST') {
         if (!in_array('photo_path', $pkgCols)) {
             try { $pdo->exec("ALTER TABLE reception_packages ADD COLUMN photo_path VARCHAR(255) NULL AFTER package_barcode"); $pkgCols[] = 'photo_path'; } catch (Exception $e) {}
         }
+        if (!in_array('sack_number', $pkgCols)) {
+            try { $pdo->exec("ALTER TABLE reception_packages ADD COLUMN sack_number VARCHAR(100) NULL AFTER package_barcode"); $pkgCols[] = 'sack_number'; } catch (Exception $e) {}
+        }
     } catch (Exception $eCols2) {}
 
     // Cek keunikan receipt_number agar tidak error Duplicate Entry
@@ -488,12 +503,14 @@ if ($method === 'POST') {
     } catch (Exception $eRcpt) {}
 
     $hasCourierNameCol   = in_array('courier_name', $recCols);
+    $hasSackNumberCol    = in_array('sack_number', $recCols);
     $hasCourierPhotoCol  = in_array('courier_photo', $recCols);
     $hasVehicleNoCol     = in_array('vehicle_no', $recCols);
     $hasNotesCol         = in_array('notes', $recCols);
     $hasPhotoPathCol     = in_array('photo_path', $recCols);
     $hasPackagePhotosCol = in_array('package_photos', $recCols);
     $hasItemPhotoCol     = in_array('photo_path', $pkgCols);
+    $hasItemSackCol      = in_array('sack_number', $pkgCols);
 
     try {
         $pdo->beginTransaction();
@@ -510,6 +527,11 @@ if ($method === 'POST') {
             $fields[] = 'courier_name';
             $placeholders[] = '?';
             $values[] = $courierName ?: null;
+        }
+        if ($hasSackNumberCol) {
+            $fields[] = 'sack_number';
+            $placeholders[] = '?';
+            $values[] = $sackNumber ?: null;
         }
         if ($hasCourierPhotoCol) {
             $fields[] = 'courier_photo';
@@ -543,9 +565,19 @@ if ($method === 'POST') {
         $receptionId = $pdo->lastInsertId();
 
         // 2. Simpan Detail Paket
-        if ($hasItemPhotoCol) {
+        if ($hasItemPhotoCol && $hasItemSackCol) {
+            $stmtItem = $pdo->prepare("
+                INSERT INTO reception_packages (reception_id, package_barcode, sack_number, photo_path, scanned_at)
+                VALUES (?, ?, ?, ?, NOW())
+            ");
+        } elseif ($hasItemPhotoCol) {
             $stmtItem = $pdo->prepare("
                 INSERT INTO reception_packages (reception_id, package_barcode, photo_path, scanned_at)
+                VALUES (?, ?, ?, NOW())
+            ");
+        } elseif ($hasItemSackCol) {
+            $stmtItem = $pdo->prepare("
+                INSERT INTO reception_packages (reception_id, package_barcode, sack_number, scanned_at)
                 VALUES (?, ?, ?, NOW())
             ");
         } else {
@@ -556,8 +588,12 @@ if ($method === 'POST') {
         }
 
         foreach ($cleanPackages as $pkg) {
-            if ($hasItemPhotoCol) {
+            if ($hasItemPhotoCol && $hasItemSackCol) {
+                $stmtItem->execute([$receptionId, $pkg['barcode'], $pkg['sack_number'], $pkg['saved_photo']]);
+            } elseif ($hasItemPhotoCol) {
                 $stmtItem->execute([$receptionId, $pkg['barcode'], $pkg['saved_photo']]);
+            } elseif ($hasItemSackCol) {
+                $stmtItem->execute([$receptionId, $pkg['barcode'], $pkg['sack_number']]);
             } else {
                 $stmtItem->execute([$receptionId, $pkg['barcode']]);
             }

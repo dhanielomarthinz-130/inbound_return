@@ -252,6 +252,19 @@ function executeSyncRound($pdo) {
     }
 
     // 3. Proses Receiving Inbound
+    if (!empty($receptions)) {
+        try {
+            $colsRec = $pdo->query("SHOW COLUMNS FROM expedition_receptions")->fetchAll(PDO::FETCH_COLUMN);
+            if (!in_array('sack_number', $colsRec)) {
+                try { $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN sack_number VARCHAR(100) NULL AFTER courier_name"); } catch (Exception $e) {}
+            }
+            $colsPkg = $pdo->query("SHOW COLUMNS FROM reception_packages")->fetchAll(PDO::FETCH_COLUMN);
+            if (!in_array('sack_number', $colsPkg)) {
+                try { $pdo->exec("ALTER TABLE reception_packages ADD COLUMN sack_number VARCHAR(100) NULL AFTER package_barcode"); } catch (Exception $e) {}
+            }
+        } catch (Exception $e) {}
+    }
+
     foreach ($receptions as $recGroup) {
         $rec = $recGroup['reception'] ?? [];
         $packages = $recGroup['packages'] ?? [];
@@ -271,17 +284,19 @@ function executeSyncRound($pdo) {
 
             $stmtInsRec = $pdo->prepare("
                 INSERT INTO expedition_receptions (
-                    receipt_number, expedition, courier_name, vehicle_no, operator_name,
+                    receipt_number, expedition, courier_name, sack_number, vehicle_no, operator_name,
                     total_packages, notes, photo_path, package_photos, status, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE 
                     expedition = VALUES(expedition),
+                    sack_number = VALUES(sack_number),
                     total_packages = VALUES(total_packages)
             ");
             $stmtInsRec->execute([
                 $rec['receipt_number'],
                 $rec['expedition'] ?? '',
                 $rec['courier_name'] ?? null,
+                $rec['sack_number'] ?? null,
                 $rec['vehicle_no'] ?? null,
                 $rec['operator_name'] ?? '',
                 (int)($rec['total_packages'] ?? count($packages)),
@@ -295,13 +310,15 @@ function executeSyncRound($pdo) {
 
             if (!empty($packages)) {
                 $stmtInsPkg = $pdo->prepare("
-                    INSERT INTO reception_packages (reception_id, package_barcode, scanned_at)
-                    VALUES (?, ?, ?)
+                    INSERT INTO reception_packages (reception_id, package_barcode, sack_number, photo_path, scanned_at)
+                    VALUES (?, ?, ?, ?, ?)
                 ");
                 foreach ($packages as $pkg) {
                     $stmtInsPkg->execute([
                         $newRecId,
                         $pkg['package_barcode'] ?? '',
+                        $pkg['sack_number'] ?? ($rec['sack_number'] ?? null),
+                        $pkg['photo_path'] ?? null,
                         $pkg['scanned_at'] ?? date('Y-m-d H:i:s')
                     ]);
                 }

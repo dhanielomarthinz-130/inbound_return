@@ -234,37 +234,77 @@ try {
                 </div>
             </div>
 
-            <!-- STEP 2: NAMA DRIVER / KURIR (TERBUKA SETELAH STEP 1) -->
+            <!-- STEP 2: NAMA DRIVER & NOMOR KARUNG (TERBUKA SETELAH STEP 1) -->
             <div id="cardStep2" class="hidden bg-white rounded-2xl shadow-xs border border-slate-200/90 p-3 sm:p-3.5 space-y-2.5 transition-all">
                 <div class="flex items-center justify-between border-b border-slate-100 pb-2">
                     <div class="flex items-center gap-2">
                         <span class="w-6 h-6 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0">2</span>
-                        <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Nama Driver / Kurir</h2>
+                        <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Driver / Kurir & Nomor Karung</h2>
                     </div>
-                    <span class="text-[10px] text-slate-400 font-medium">Tekan Enter atau klik Foto</span>
+                    <span class="text-[10px] text-slate-400 font-medium">Input kurir & nomor karung</span>
                 </div>
 
-                <div id="step2InputWrapper" class="flex gap-2 items-stretch">
-                    <div class="relative flex-1">
-                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
-                            <i class="fa-solid fa-id-card"></i>
-                        </span>
-                        <input type="text" id="inputCourierName" placeholder="Ketik nama kurir pengantar..." 
-                            class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition">
+                <div id="step2InputWrapper" class="space-y-2.5">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <!-- Input Nama Kurir -->
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Nama Driver / Kurir</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+                                    <i class="fa-solid fa-id-card"></i>
+                                </span>
+                                <input type="text" id="inputCourierName" placeholder="Ketik nama kurir pengantar..." 
+                                    class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition">
+                            </div>
+                        </div>
+
+                        <!-- Input Nomor Karung -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-[10px] font-bold uppercase text-slate-500">Nomor / Label Karung</label>
+                                <span class="text-[9px] text-amber-700 font-bold bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">Karung Paket</span>
+                            </div>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+                                    <i class="fa-solid fa-box-archive"></i>
+                                </span>
+                                <input type="text" id="inputSackNumber" placeholder="Contoh: Karung 1, KR-01..." value="Karung 1" oninput="saveDraftToStorage()"
+                                    class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 transition font-mono">
+                            </div>
+                        </div>
                     </div>
-                    <button type="button" id="btnConfirmCourier" onclick="confirmCourierName()" 
-                        class="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white px-3.5 sm:px-4 py-2.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm shadow-indigo-600/20 shrink-0">
-                        <i class="fa-solid fa-camera text-sm"></i>
-                        <span>Foto Kurir</span>
-                    </button>
+
+                    <!-- Quick Chips Pilihan Karung Cepat -->
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="text-[10px] text-slate-400 font-medium mr-1">Pilih Cepat:</span>
+                        <button type="button" onclick="selectQuickSack('Karung 1')" class="quick-sack-chip px-2.5 py-1 bg-amber-500 text-white border border-amber-600 rounded-lg text-[11px] font-bold transition shadow-2xs">Karung 1</button>
+                        <button type="button" onclick="selectQuickSack('Karung 2')" class="quick-sack-chip px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[11px] font-bold transition shadow-2xs">Karung 2</button>
+                        <button type="button" onclick="selectQuickSack('Karung 3')" class="quick-sack-chip px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[11px] font-bold transition shadow-2xs">Karung 3</button>
+                        <button type="button" onclick="selectQuickSack('Karung 4')" class="quick-sack-chip px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[11px] font-bold transition shadow-2xs">Karung 4</button>
+                        <button type="button" onclick="selectQuickSack('Karung 5')" class="quick-sack-chip px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[11px] font-bold transition shadow-2xs">Karung 5</button>
+                    </div>
+
+                    <div class="pt-1">
+                        <button type="button" id="btnConfirmCourier" onclick="confirmCourierName()" 
+                            class="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white py-2.5 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-sm shadow-indigo-600/20">
+                            <i class="fa-solid fa-camera text-sm"></i>
+                            <span>Konfirmasi & Ambil Foto Kurir</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div id="step2Summary" class="hidden flex items-center justify-between bg-indigo-50 border border-indigo-200 px-3 py-2 rounded-xl text-xs">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-user-check text-indigo-600 text-sm"></i>
-                        <div>
-                            <span class="text-[9px] uppercase font-bold text-indigo-700 block">Nama Kurir</span>
-                            <span id="txtConfirmedCourier" class="font-black text-indigo-950 text-xs sm:text-sm">-</span>
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-1.5">
+                            <i class="fa-solid fa-user-check text-indigo-600 text-sm"></i>
+                            <div>
+                                <span class="text-[9px] uppercase font-bold text-indigo-700 block">Nama Kurir</span>
+                                <span id="txtConfirmedCourier" class="font-black text-indigo-950 text-xs sm:text-sm">-</span>
+                            </div>
+                        </div>
+                        <div class="border-l border-indigo-200 pl-3">
+                            <span class="text-[9px] uppercase font-bold text-amber-700 block">Nomor Karung</span>
+                            <span id="txtConfirmedSack" class="font-black text-amber-950 text-xs sm:text-sm font-mono">-</span>
                         </div>
                     </div>
                     <button type="button" onclick="editCourierName()" class="text-xs font-bold text-indigo-700 hover:text-indigo-900 bg-white border border-indigo-300 px-2.5 py-1 rounded-lg shadow-2xs">
@@ -313,6 +353,23 @@ try {
                     <span class="bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
                         <i class="fa-solid fa-hand-holding-hand"></i> Handheld Scanner
                     </span>
+                </div>
+
+                <!-- Active Sack Indicator Bar -->
+                <div class="flex items-center justify-between bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl text-xs">
+                    <div class="flex items-center gap-2">
+                        <span class="w-6 h-6 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                            <i class="fa-solid fa-box-archive text-xs"></i>
+                        </span>
+                        <div>
+                            <span class="text-[9px] uppercase font-bold text-amber-800 block">Karung Aktif</span>
+                            <span id="displayActiveSack" class="font-black text-amber-950 text-xs sm:text-sm font-mono">Karung 1</span>
+                        </div>
+                    </div>
+                    <button type="button" onclick="promptChangeSack()" class="text-xs font-bold text-amber-800 hover:text-amber-950 bg-white border border-amber-300 px-2.5 py-1 rounded-lg shadow-2xs flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-arrow-right-arrow-left text-[10px]"></i>
+                        <span>Ganti Karung</span>
+                    </button>
                 </div>
 
                 <div class="space-y-2">
@@ -452,6 +509,7 @@ try {
                                 <th class="py-2.5 px-3">No. Resi / Barcode</th>
                                 <th class="py-2.5 px-3">Ekspedisi</th>
                                 <th class="py-2.5 px-3">Driver / Kurir</th>
+                                <th class="py-2.5 px-3">Karung</th>
                                 <th class="py-2.5 px-3">Ref Serah Terima</th>
                                 <th class="py-2.5 px-3">Waktu Scan</th>
                                 <th class="py-2.5 px-3">Operator</th>
@@ -460,7 +518,7 @@ try {
                         </thead>
                         <tbody id="historyTableBody" class="divide-y divide-slate-100 bg-white">
                             <tr>
-                                <td colspan="9" class="text-center py-10 text-slate-400">
+                                <td colspan="10" class="text-center py-10 text-slate-400">
                                     <i class="fa-solid fa-spinner fa-spin text-emerald-500 mr-2 text-base"></i> Memuat data paket...
                                 </td>
                             </tr>
@@ -628,6 +686,10 @@ try {
                         <span id="slipCourier" class="font-semibold text-slate-700">-</span>
                     </div>
                     <div>
+                        <span class="text-slate-400 block text-[9px] uppercase font-bold">Nomor Karung / Bag</span>
+                        <span id="slipSackNumber" class="font-bold text-amber-700 text-xs">-</span>
+                    </div>
+                    <div class="col-span-2 sm:col-span-1">
                         <span class="text-slate-400 block text-[9px] uppercase font-bold">Operator Penerima</span>
                         <span id="slipOperator" class="font-bold text-slate-800">-</span>
                     </div>
@@ -813,8 +875,9 @@ try {
         let currentExpedition = '';
         let currentCourierName = '';
         let currentCourierPhoto = null; // DataURL Foto Kurir
+        let currentSackNumber = 'Karung 1'; // Nomor Karung / Bag Aktif
         let currentScanningBarcode = ''; // Barcode yang sedang difoto
-        let draftPackages = []; // Array of { id, barcode, photo, time, timestamp }
+        let draftPackages = []; // Array of { id, barcode, photo, sack_number, time, timestamp }
         let targetRetakeDraftId = null;
 
         // State Modal Kamera Terpadu
@@ -825,10 +888,244 @@ try {
         let pendingCapturedPhoto = null;
         let cameraClockInterval = null;
 
+        // ==============================================================
+        // DRAFT PERSISTENCE ENGINE (INDEXEDDB + LOCALSTORAGE)
+        // Mencegah data draft hilang jika halaman tidak sengaja di-refresh
+        // ==============================================================
+        const DB_NAME = 'IEG_InboundReceivingDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'reception_draft_store';
+
+        function openDraftDB() {
+            return new Promise((resolve) => {
+                if (!window.indexedDB) {
+                    resolve(null);
+                    return;
+                }
+                try {
+                    const req = indexedDB.open(DB_NAME, DB_VERSION);
+                    req.onupgradeneeded = (e) => {
+                        const db = e.target.result;
+                        if (!db.objectStoreNames.contains(STORE_NAME)) {
+                            db.createObjectStore(STORE_NAME, { keyPath: 'key' });
+                        }
+                    };
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = (e) => {
+                        console.warn('IndexedDB open error:', e);
+                        resolve(null);
+                    };
+                } catch (err) {
+                    console.warn('IndexedDB exception:', err);
+                    resolve(null);
+                }
+            });
+        }
+
+        async function saveDraftToStorage() {
+            // Validasi: jika belum ada ekspedisi atau kurir atau paket, jangan simpan sampah kosong
+            if (!currentExpedition && !currentCourierName && draftPackages.length === 0) {
+                return;
+            }
+
+            const draftPayload = {
+                key: 'active_session_draft',
+                receiptId: currentReceiptId,
+                expedition: currentExpedition,
+                courierName: currentCourierName,
+                courierPhoto: currentCourierPhoto,
+                sackNumber: currentSackNumber || 'Karung 1',
+                draftPackages: draftPackages,
+                savedAt: Date.now()
+            };
+
+            // 1. Simpan ke IndexedDB (Kapasitas besar, sanggup simpan puluhan foto Base64)
+            try {
+                const db = await openDraftDB();
+                if (db) {
+                    const tx = db.transaction(STORE_NAME, 'readwrite');
+                    tx.objectStore(STORE_NAME).put(draftPayload);
+                }
+            } catch (e) {
+                console.warn('Gagal menyimpan draft ke IndexedDB:', e);
+            }
+
+            // 2. Simpan metadata ke localStorage sebagai indikator cepat
+            try {
+                localStorage.setItem('ieg_inbound_active_draft_meta', JSON.stringify({
+                    hasDraft: true,
+                    receiptId: currentReceiptId,
+                    expedition: currentExpedition,
+                    courierName: currentCourierName,
+                    sackNumber: currentSackNumber || 'Karung 1',
+                    totalPackages: draftPackages.length,
+                    savedAt: Date.now()
+                }));
+            } catch (e) {}
+        }
+
+        async function loadDraftFromStorage() {
+            try {
+                const db = await openDraftDB();
+                if (db) {
+                    return new Promise((resolve) => {
+                        const tx = db.transaction(STORE_NAME, 'readonly');
+                        const store = tx.objectStore(STORE_NAME);
+                        const req = store.get('active_session_draft');
+                        req.onsuccess = () => resolve(req.result || null);
+                        req.onerror = () => resolve(null);
+                    });
+                }
+            } catch (e) {
+                console.warn('Gagal membaca draft dari IndexedDB:', e);
+            }
+            return null;
+        }
+
+        async function clearDraftFromStorage() {
+            try {
+                const db = await openDraftDB();
+                if (db) {
+                    const tx = db.transaction(STORE_NAME, 'readwrite');
+                    tx.objectStore(STORE_NAME).delete('active_session_draft');
+                }
+                localStorage.removeItem('ieg_inbound_active_draft_meta');
+            } catch (e) {
+                console.warn('Gagal membersihkan draft storage:', e);
+            }
+        }
+
+        // Otomatis pulihkan data draft jika halaman sempat di-refresh
+        async function restoreDraftIfAvailable() {
+            try {
+                const draft = await loadDraftFromStorage();
+                if (!draft || (!draft.expedition && !draft.courierName && (!draft.draftPackages || draft.draftPackages.length === 0))) {
+                    // Tidak ada draft aktif, generate ID baru
+                    await generateReceiptId();
+                    return;
+                }
+
+                // Pulihkan data state
+                currentReceiptId = draft.receiptId || '';
+                currentExpedition = draft.expedition || '';
+                currentCourierName = draft.courierName || '';
+                currentCourierPhoto = draft.courierPhoto || null;
+                currentSackNumber = draft.sackNumber || 'Karung 1';
+                draftPackages = Array.isArray(draft.draftPackages) ? draft.draftPackages : [];
+
+                if (!currentReceiptId) {
+                    await generateReceiptId();
+                } else {
+                    const inputNo = document.getElementById('inputReceiptNo');
+                    if (inputNo) inputNo.value = currentReceiptId;
+                    setText('badgeReceiptDisplay', '#' + currentReceiptId);
+                }
+
+                // Pulihkan STEP 1 (Ekspedisi)
+                if (currentExpedition) {
+                    const selectExp = document.getElementById('selectExpedition');
+                    if (selectExp) selectExp.value = currentExpedition;
+                    setText('txtSelectedExpedition', currentExpedition);
+                    setText('mobileExpBadge', currentExpedition);
+                    hideElement('step1SelectWrapper');
+                    showElement('step1Summary');
+                    showElement('cardStep2');
+                }
+
+                // Pulihkan STEP 2 (Kurir & Karung)
+                const inputCourier = document.getElementById('inputCourierName');
+                if (inputCourier && currentCourierName) inputCourier.value = currentCourierName;
+                
+                const inputSack = document.getElementById('inputSackNumber');
+                if (inputSack && currentSackNumber) inputSack.value = currentSackNumber;
+                
+                updateActiveSackDisplay(currentSackNumber);
+
+                if (currentCourierName) {
+                    setText('txtConfirmedCourier', currentCourierName);
+                    setText('txtConfirmedSack', currentSackNumber);
+                    hideElement('step2InputWrapper');
+                    showElement('step2Summary');
+                }
+
+                // Pulihkan STEP 3 (Foto Kurir)
+                if (currentCourierPhoto) {
+                    const imgPreview = document.getElementById('imgCourierPhotoPreview');
+                    if (imgPreview) imgPreview.src = currentCourierPhoto;
+                    setText('txtCourierPhotoName', currentCourierName);
+                    setText('txtCourierPhotoTime', 'Draft Tersimpan');
+                    showElement('cardStep3');
+                    showElement('cardStep4');
+                    showElement('cardStep5');
+                }
+
+                // Pulihkan STEP 5 (Daftar Paket Draft)
+                renderDraftList();
+
+                // Notifikasi pemulihan berhasil
+                const restoredCount = draftPackages.length;
+                showStatusMsg(`💾 <b>Draft Berhasil Dipulihkan!</b> Sesi penerimaan ${escapeHtml(currentExpedition || 'Inbound')} (${restoredCount} paket, ${escapeHtml(currentSackNumber)}) tetap aman tersimpan setelah refresh.`, 'info');
+                playBeep('success');
+
+                // Fokuskan ke input scan resi jika langkah 4 sudah terbuka
+                if (currentCourierPhoto) {
+                    setTimeout(() => {
+                        const inputPkg = document.getElementById('inputPackageBarcode');
+                        inputPkg?.focus();
+                    }, 300);
+                }
+            } catch (err) {
+                console.error('Error saat restore draft:', err);
+                await generateReceiptId();
+            }
+        }
+
+        // ==============================================================
+        // SACK / KARUNG MANAGEMENT
+        // ==============================================================
+        function selectQuickSack(sackVal) {
+            const input = document.getElementById('inputSackNumber');
+            if (input) input.value = sackVal;
+            currentSackNumber = sackVal;
+            updateActiveSackDisplay(sackVal);
+
+            // Highlight chip terpilih
+            document.querySelectorAll('.quick-sack-chip').forEach(btn => {
+                if (btn.innerText.trim() === sackVal) {
+                    btn.className = 'quick-sack-chip px-2.5 py-1 bg-amber-500 text-white border border-amber-600 rounded-lg text-[11px] font-bold transition shadow-2xs';
+                } else {
+                    btn.className = 'quick-sack-chip px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[11px] font-bold transition shadow-2xs';
+                }
+            });
+
+            saveDraftToStorage();
+        }
+
+        function updateActiveSackDisplay(sackVal) {
+            const val = sackVal || currentSackNumber || 'Karung 1';
+            setText('displayActiveSack', val);
+            setText('txtConfirmedSack', val);
+        }
+
+        function promptChangeSack() {
+            const currentVal = currentSackNumber || 'Karung 1';
+            const newVal = prompt('Masukkan Nomor / Label Karung Baru:\n(Contoh: Karung 2, Karung 3, KR-02)', currentVal);
+            if (newVal !== null && newVal.trim() !== '') {
+                const cleanVal = newVal.trim();
+                currentSackNumber = cleanVal;
+                const inputSack = document.getElementById('inputSackNumber');
+                if (inputSack) inputSack.value = cleanVal;
+                updateActiveSackDisplay(cleanVal);
+                saveDraftToStorage();
+                showStatusMsg(`📦 Karung aktif berhasil diubah ke <b>${escapeHtml(cleanVal)}</b>. Paket selanjutnya akan dicatat di karung ini.`, 'info');
+                playBeep('success');
+            }
+        }
+
         // Inisialisasi saat DOM siap
-        document.addEventListener('DOMContentLoaded', () => {
-            generateReceiptId();
+        document.addEventListener('DOMContentLoaded', async () => {
             loadHistoryData();
+            await restoreDraftIfAvailable();
 
             // Setup input nama kurir (Tekan Enter langsung konfirmasi & buka foto)
             const inputCourier = document.getElementById('inputCourierName');
@@ -838,6 +1135,22 @@ try {
                         e.preventDefault();
                         confirmCourierName();
                     }
+                });
+            }
+
+            // Setup input nomor karung (Tekan Enter langsung konfirmasi)
+            const inputSack = document.getElementById('inputSackNumber');
+            if (inputSack) {
+                inputSack.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        confirmCourierName();
+                    }
+                });
+                inputSack.addEventListener('input', (e) => {
+                    currentSackNumber = e.target.value.trim() || 'Karung 1';
+                    updateActiveSackDisplay(currentSackNumber);
+                    saveDraftToStorage();
                 });
             }
 
@@ -889,6 +1202,7 @@ try {
                 hideElement('cardStep4');
                 hideElement('cardStep5');
                 currentExpedition = '';
+                saveDraftToStorage();
                 return;
             }
 
@@ -900,7 +1214,7 @@ try {
             hideElement('step1SelectWrapper');
             showElement('step1Summary');
 
-            // Buka STEP 2: Input Nama Kurir
+            // Buka STEP 2: Input Nama Kurir & Karung
             showElement('cardStep2');
             showElement('step2InputWrapper');
             hideElement('step2Summary');
@@ -910,6 +1224,8 @@ try {
                 inputCourier.value = '';
                 setTimeout(() => inputCourier.focus(), 100);
             }
+
+            saveDraftToStorage();
         }
 
         function changeExpedition() {
@@ -918,10 +1234,13 @@ try {
             document.getElementById('selectExpedition')?.focus();
         }
 
-        // STEP 2: Konfirmasi Nama Kurir & Buka Kamera Foto Kurir
+        // STEP 2: Konfirmasi Nama Kurir & Nomor Karung -> Buka Kamera Foto Kurir
         function confirmCourierName() {
             const input = document.getElementById('inputCourierName');
             const name = (input ? input.value : '').trim();
+
+            const inputSack = document.getElementById('inputSackNumber');
+            const sack = (inputSack ? inputSack.value : '').trim() || 'Karung 1';
 
             if (!name) {
                 alert('Silakan ketik nama driver / kurir pengantar terlebih dahulu!');
@@ -930,11 +1249,16 @@ try {
             }
 
             currentCourierName = name;
+            currentSackNumber = sack;
             setText('txtConfirmedCourier', name);
+            setText('txtConfirmedSack', sack);
+            updateActiveSackDisplay(sack);
 
             // Sembunyikan form input kurir, tampilkan summary ringkas
             hideElement('step2InputWrapper');
             showElement('step2Summary');
+
+            saveDraftToStorage();
 
             // Buka kamera untuk Ambil Foto Kurir
             openCameraModal('courier');
@@ -1230,14 +1554,17 @@ try {
                     const newDraftItem = {
                         id: 'draft_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
                         barcode: currentScanningBarcode,
+                        sack_number: currentSackNumber || 'Karung 1',
                         photo: pendingCapturedPhoto,
                         time: now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB',
                         timestamp: Date.now()
                     };
 
                     draftPackages.unshift(newDraftItem);
-                    showStatusMsg(`📦 Resi <b>${escapeHtml(currentScanningBarcode)}</b> berhasil difoto & masuk ke <b>DRAFT</b>!`, 'success');
+                    showStatusMsg(`📦 Resi <b>${escapeHtml(currentScanningBarcode)}</b> [${escapeHtml(currentSackNumber)}] berhasil difoto & masuk ke <b>DRAFT</b>!`, 'success');
                 }
+
+                saveDraftToStorage();
 
                 stopModalCameraStream();
                 hideElement('modalCameraCapture');
@@ -1339,6 +1666,7 @@ try {
             const receiptNo = currentReceiptId || 'RCV-PENDING';
             const exp = currentExpedition || 'UMUM';
             const courier = currentCourierName || '-';
+            const sack = currentSackNumber || 'Karung 1';
 
             // Font sizing
             const titleSize = Math.max(14, Math.round(w * 0.018));
@@ -1380,7 +1708,7 @@ try {
 
                 ctx.fillStyle = '#ffffff';
                 ctx.font = `bold ${bodySize}px monospace, sans-serif`;
-                ctx.fillText(`RESI: ${barcode || '-'}  |  NO. TERIMA: ${receiptNo}`, 16, h - barHeight + 10 + titleSize + 5);
+                ctx.fillText(`RESI: ${barcode || '-'}  |  KARUNG: ${sack}`, 16, h - barHeight + 10 + titleSize + 5);
 
                 ctx.fillStyle = '#94a3b8';
                 ctx.font = `normal ${subSize}px monospace, sans-serif`;
@@ -1431,6 +1759,7 @@ try {
                 draftPackages.forEach((pkg, idx) => {
                     const seq = count - idx;
                     const hasPhoto = !!pkg.photo;
+                    const pkgSack = pkg.sack_number || currentSackNumber || 'Karung 1';
 
                     const thumbHtml = hasPhoto
                         ? `<div class="relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-black shrink-0 border border-slate-200 cursor-pointer shadow-xs group" onclick="previewDraftPhoto('${pkg.id}')" title="Klik untuk lihat foto">
@@ -1446,6 +1775,8 @@ try {
                         ? `<span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-md border border-emerald-200"><i class="fa-solid fa-check text-[9px]"></i> Foto OK</span>`
                         : `<span class="inline-flex items-center gap-1 bg-rose-50 text-rose-700 text-[10px] font-bold px-2 py-0.5 rounded-md border border-rose-200 animate-pulse"><i class="fa-solid fa-triangle-exclamation text-[9px]"></i> Belum Difoto</span>`;
 
+                    const badgeSack = `<span class="inline-flex items-center gap-1 bg-amber-50 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-md border border-amber-200 font-mono"><i class="fa-solid fa-box-archive text-[9px]"></i> ${escapeHtml(pkgSack)}</span>`;
+
                     html += `
                         <div class="flex items-center justify-between p-2.5 sm:p-3 bg-slate-50 hover:bg-slate-100/90 rounded-2xl border border-slate-200/90 transition shadow-xs gap-2.5 sm:gap-3">
                             <div class="flex items-center gap-2.5 min-w-0 flex-1">
@@ -1453,6 +1784,7 @@ try {
                                 <div class="min-w-0 flex-1">
                                     <div class="flex items-center gap-1.5 flex-wrap">
                                         <span class="font-mono font-black text-slate-900 text-xs sm:text-sm tracking-tight break-all">${escapeHtml(pkg.barcode)}</span>
+                                        ${badgeSack}
                                         ${badgePhoto}
                                     </div>
                                     <div class="flex items-center gap-2 text-[10px] text-slate-400 mt-1">
@@ -1492,6 +1824,7 @@ try {
             if (idx !== -1) {
                 const removed = draftPackages.splice(idx, 1);
                 showStatusMsg(`Resi ${escapeHtml(removed[0].barcode)} dihapus dari draft.`, 'info');
+                saveDraftToStorage();
                 renderDraftList();
             }
         }
@@ -1500,6 +1833,7 @@ try {
             if (draftPackages.length === 0) return;
             if (confirm(`Hapus semua ${draftPackages.length} paket dari draft sesi ini?`)) {
                 draftPackages = [];
+                saveDraftToStorage();
                 renderDraftList();
                 showStatusMsg('Semua paket dalam draft telah dibersihkan.', 'info');
                 document.getElementById('inputPackageBarcode')?.focus();
@@ -1549,7 +1883,7 @@ try {
                 return;
             }
 
-            if (!confirm(`Selesaikan & simpan penerimaan ${draftPackages.length} paket untuk Ekspedisi ${currentExpedition}?`)) {
+            if (!confirm(`Selesaikan & simpan penerimaan ${draftPackages.length} paket untuk Ekspedisi ${currentExpedition} (${currentSackNumber})?`)) {
                 return;
             }
 
@@ -1566,9 +1900,11 @@ try {
                     expedition: currentExpedition,
                     courier_name: currentCourierName,
                     courier_photo: currentCourierPhoto, // Foto kurir
+                    sack_number: currentSackNumber || 'Karung 1',
                     packages: draftPackages.map(p => ({
                         barcode: p.barcode,
-                        photo: p.photo
+                        photo: p.photo,
+                        sack_number: p.sack_number || currentSackNumber || 'Karung 1'
                     })),
                     photos: draftPackages.map(p => p.photo)
                 };
@@ -1583,6 +1919,9 @@ try {
                 if (data && data.success) {
                     showStatusMsg(`✅ <b>Sukses Tersimpan!</b> Penerimaan <b>${data.total_packages} paket</b> (${escapeHtml(data.expedition)}) berhasil disimpan ke sistem! [Ref: ${escapeHtml(data.receipt_number)}]`, 'success');
                     playBeep('success');
+
+                    // Bersihkan draft tersimpan karena penerimaan sudah sukses masuk database
+                    await clearDraftFromStorage();
 
                     // Reset form untuk penerimaan baru tanpa memunculkan modal bukti di layar
                     resetReceptionForm();
@@ -1606,6 +1945,7 @@ try {
             setText('slipReceiptNo', data.receipt_number || '-');
             setText('slipExpedition', data.expedition || '-');
             setText('slipDateTime', data.created_at || '-');
+            setText('slipSackNumber', data.sack_number || '-');
             const actualTotal = (data.packages && data.packages.length > 0) ? data.packages.length : (data.total_packages || 0);
             setText('slipTotalPackages', actualTotal);
 
@@ -1629,13 +1969,16 @@ try {
                 (data.packages || []).forEach((item, i) => {
                     const bCode = (typeof item === 'object') ? (item.package_barcode || item.barcode || '') : item;
                     const pPath = (typeof item === 'object') ? (item.photo_path || item.photo || null) : null;
+                    const sNum  = (typeof item === 'object') ? (item.sack_number || '') : '';
                     const photoThumb = pPath ? `<img src="${escapeHtml(pPath)}" class="w-6 h-6 rounded object-cover border border-slate-200 cursor-pointer shadow-2xs shrink-0" onclick="previewImageDirect('${escapeHtml(pPath)}')">` : '';
+                    const sackTag = sNum ? `<span class="text-[9px] bg-amber-50 text-amber-800 font-bold px-1.5 py-0.2 rounded border border-amber-200 font-mono">${escapeHtml(sNum)}</span>` : '';
 
                     listHtml += `
                         <div class="flex items-center justify-between bg-white rounded-lg border border-slate-200/90 py-1 px-2 text-xs">
                             <div class="flex items-center gap-1.5 min-w-0 pr-1">
                                 <span class="w-5 h-5 rounded-md bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">${i + 1}</span>
                                 <span class="font-mono font-bold text-slate-800 text-xs tracking-tight truncate">${escapeHtml(bCode)}</span>
+                                ${sackTag}
                             </div>
                             <div class="flex items-center gap-1 shrink-0">
                                 ${photoThumb}
@@ -1694,14 +2037,20 @@ try {
             currentExpedition = '';
             currentCourierName = '';
             currentCourierPhoto = null;
+            currentSackNumber = 'Karung 1';
             currentScanningBarcode = '';
             targetRetakeDraftId = null;
+
+            clearDraftFromStorage();
 
             // Reset Input DOM
             const selectExp = document.getElementById('selectExpedition');
             if (selectExp) selectExp.value = '';
             const courierInput = document.getElementById('inputCourierName');
             if (courierInput) courierInput.value = '';
+            const sackInput = document.getElementById('inputSackNumber');
+            if (sackInput) sackInput.value = 'Karung 1';
+            selectQuickSack('Karung 1');
             const pkgInput = document.getElementById('inputPackageBarcode');
             if (pkgInput) pkgInput.value = '';
 
@@ -1887,7 +2236,7 @@ try {
                     if (packages.length === 0) {
                         tbody.innerHTML = `
                             <tr>
-                                <td colspan="9" class="text-center py-12 text-slate-400">
+                                <td colspan="10" class="text-center py-12 text-slate-400">
                                     <div class="flex flex-col items-center justify-center gap-2">
                                         <div class="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 text-xl">
                                             <i class="fa-solid fa-box-open"></i>
@@ -1970,6 +2319,11 @@ try {
                                     </span>
                                 </td>
                                 <td class="py-2.5 px-3">${courierHtml}</td>
+                                <td class="py-2.5 px-3">
+                                    <span class="px-2 py-0.5 rounded-lg bg-amber-50 text-amber-800 font-bold border border-amber-200/80 text-[11px] font-mono">
+                                        ${escapeHtml(item.sack_number || '-')}
+                                    </span>
+                                </td>
                                 <td class="py-2.5 px-3 font-mono text-[11px] text-slate-500">${escapeHtml(item.receipt_number)}</td>
                                 <td class="py-2.5 px-3 font-mono text-[11px] text-slate-600">
                                     <span class="font-bold">${timeOnly}</span>
@@ -1984,7 +2338,7 @@ try {
                 }
             } catch (e) {
                 console.error('Gagal memuat riwayat paket:', e);
-                tbody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-rose-500 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1.5"></i>Gagal memuat riwayat: ${escapeHtml(e.message)}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-rose-500 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1.5"></i>Gagal memuat riwayat: ${escapeHtml(e.message)}</td></tr>`;
             }
         }
 
@@ -1998,11 +2352,13 @@ try {
                         expedition: data.reception.expedition,
                         courier_name: data.reception.courier_name,
                         courier_photo: data.reception.courier_photo,
+                        sack_number: data.reception.sack_number,
                         vehicle_no: data.reception.vehicle_no,
                         total_packages: data.reception.total_packages,
                         packages: (data.packages || []).map(p => ({
                             package_barcode: p.package_barcode,
-                            photo_path: p.photo_path
+                            photo_path: p.photo_path,
+                            sack_number: p.sack_number
                         })),
                         created_at: data.reception.created_at,
                         photos: data.reception.package_photos || (data.reception.photo_path ? [data.reception.photo_path] : [])
