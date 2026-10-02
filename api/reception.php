@@ -257,10 +257,28 @@ if ($method === 'GET') {
     $rows = [];
     try {
         $stmt = $pdo->prepare("
-            SELECT id, receipt_number, expedition, courier_name, sack_number, courier_photo, vehicle_no, operator_name, total_packages, notes, photo_path, package_photos, status, created_at
-            FROM expedition_receptions
+            SELECT 
+                r.id, 
+                r.receipt_number, 
+                r.expedition, 
+                r.courier_name, 
+                COALESCE(
+                    NULLIF(TRIM(r.sack_number), ''),
+                    (SELECT GROUP_CONCAT(DISTINCT NULLIF(TRIM(p.sack_number), '') SEPARATOR ', ') FROM reception_packages p WHERE p.reception_id = r.id AND p.sack_number IS NOT NULL AND p.sack_number != ''),
+                    NULL
+                ) AS sack_number, 
+                r.courier_photo, 
+                r.vehicle_no, 
+                r.operator_name, 
+                r.total_packages, 
+                r.notes, 
+                r.photo_path, 
+                r.package_photos, 
+                r.status, 
+                r.created_at
+            FROM expedition_receptions r
             WHERE {$whereSql}
-            ORDER BY id DESC
+            ORDER BY r.id DESC
         ");
         $stmt->execute($params);
         $rows = $stmt->fetchAll();
@@ -275,10 +293,28 @@ if ($method === 'GET') {
         try {
             // Coba lagi dengan kolom foto
             $stmt = $pdo->prepare("
-                SELECT id, receipt_number, expedition, courier_name, sack_number, courier_photo, vehicle_no, operator_name, total_packages, notes, photo_path, package_photos, status, created_at
-                FROM expedition_receptions
+                SELECT 
+                    r.id, 
+                    r.receipt_number, 
+                    r.expedition, 
+                    r.courier_name, 
+                    COALESCE(
+                        NULLIF(TRIM(r.sack_number), ''),
+                        (SELECT GROUP_CONCAT(DISTINCT NULLIF(TRIM(p.sack_number), '') SEPARATOR ', ') FROM reception_packages p WHERE p.reception_id = r.id AND p.sack_number IS NOT NULL AND p.sack_number != ''),
+                        NULL
+                    ) AS sack_number, 
+                    r.courier_photo, 
+                    r.vehicle_no, 
+                    r.operator_name, 
+                    r.total_packages, 
+                    r.notes, 
+                    r.photo_path, 
+                    r.package_photos, 
+                    r.status, 
+                    r.created_at
+                FROM expedition_receptions r
                 WHERE {$whereSql}
-                ORDER BY id DESC
+                ORDER BY r.id DESC
             ");
             $stmt->execute($params);
             $rows = $stmt->fetchAll();
