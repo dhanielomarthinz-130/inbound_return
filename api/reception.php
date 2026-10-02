@@ -153,7 +153,7 @@ if ($method === 'GET') {
                     p.id AS package_id,
                     p.reception_id,
                     p.package_barcode,
-                    COALESCE(p.sack_number, r.sack_number) AS sack_number,
+                    COALESCE(NULLIF(TRIM(p.sack_number), ''), NULLIF(TRIM(r.sack_number), ''), 'Karung 1') AS sack_number,
                     p.photo_path AS package_photo,
                     COALESCE(p.scanned_at, r.created_at) AS scanned_at,
                     r.receipt_number,
@@ -254,6 +254,12 @@ if ($method === 'GET') {
 
     $whereSql = count($where) > 0 ? implode(' AND ', $where) : '1=1';
 
+    // Auto-backfill data penerimaan lama yang belum memiliki nomor karung
+    try {
+        $pdo->exec("UPDATE expedition_receptions SET sack_number = 'Karung 1' WHERE sack_number IS NULL OR TRIM(sack_number) = '' OR sack_number = '-'");
+        $pdo->exec("UPDATE reception_packages SET sack_number = 'Karung 1' WHERE sack_number IS NULL OR TRIM(sack_number) = '' OR sack_number = '-'");
+    } catch (Exception $eBf) {}
+
     $rows = [];
     try {
         $stmt = $pdo->prepare("
@@ -265,7 +271,7 @@ if ($method === 'GET') {
                 COALESCE(
                     NULLIF(TRIM(r.sack_number), ''),
                     (SELECT GROUP_CONCAT(DISTINCT NULLIF(TRIM(p.sack_number), '') SEPARATOR ', ') FROM reception_packages p WHERE p.reception_id = r.id AND p.sack_number IS NOT NULL AND p.sack_number != ''),
-                    NULL
+                    'Karung 1'
                 ) AS sack_number, 
                 r.courier_photo, 
                 r.vehicle_no, 
@@ -301,7 +307,7 @@ if ($method === 'GET') {
                     COALESCE(
                         NULLIF(TRIM(r.sack_number), ''),
                         (SELECT GROUP_CONCAT(DISTINCT NULLIF(TRIM(p.sack_number), '') SEPARATOR ', ') FROM reception_packages p WHERE p.reception_id = r.id AND p.sack_number IS NOT NULL AND p.sack_number != ''),
-                        NULL
+                        'Karung 1'
                     ) AS sack_number, 
                     r.courier_photo, 
                     r.vehicle_no, 

@@ -292,10 +292,14 @@ try {
             if (!in_array('notes', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN notes TEXT NULL AFTER total_packages");
             if (!in_array('photo_path', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN photo_path VARCHAR(255) NULL AFTER notes");
             if (!in_array('package_photos', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN package_photos TEXT NULL AFTER photo_path");
-            if (!in_array('status', $colsRecep)) $pdo->exec("ALTER TABLE expedition_receptions ADD COLUMN status VARCHAR(50) DEFAULT 'RECEIVED' AFTER package_photos");
-
             $colsRecepPkg = $pdo->query("SHOW COLUMNS FROM reception_packages")->fetchAll(PDO::FETCH_COLUMN);
             if (!in_array('sack_number', $colsRecepPkg)) $pdo->exec("ALTER TABLE reception_packages ADD COLUMN sack_number VARCHAR(100) NULL AFTER package_barcode");
+
+            // Auto-backfill data penerimaan lama yang belum ada nomor karung
+            try {
+                $pdo->exec("UPDATE expedition_receptions SET sack_number = 'Karung 1' WHERE sack_number IS NULL OR TRIM(sack_number) = '' OR sack_number = '-'");
+                $pdo->exec("UPDATE reception_packages SET sack_number = 'Karung 1' WHERE sack_number IS NULL OR TRIM(sack_number) = '' OR sack_number = '-'");
+            } catch (Exception $eBackfill) {}
 
             $colsProd = $pdo->query("SHOW COLUMNS FROM master_products")->fetchAll(PDO::FETCH_COLUMN);
             if (!in_array('seller_sku', $colsProd)) $pdo->exec("ALTER TABLE master_products ADD COLUMN seller_sku VARCHAR(150) NULL AFTER sku");
