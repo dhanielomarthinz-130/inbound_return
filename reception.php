@@ -88,6 +88,27 @@ try {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
+            #printReceiptArea #slipSackBreakdownSection {
+                background-color: #fffbeb !important;
+                border: 1px solid #fde68a !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+            }
+            #printReceiptArea #slipSackBreakdownList {
+                display: grid !important;
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+                gap: 6px !important;
+            }
+            #printReceiptArea #slipSackBreakdownList > div {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+                border: 1px solid #fde68a !important;
+                background-color: #ffffff !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
             #printReceiptArea .border-emerald-300 {
                 border-color: #6ee7b7 !important;
                 -webkit-print-color-adjust: exact !important;
@@ -732,6 +753,20 @@ try {
                     <span class="text-[10px] uppercase font-bold opacity-80 block">Jumlah Paket Diterima</span>
                     <span id="slipTotalPackages" class="font-black text-2xl">0</span>
                     <span class="text-xs font-semibold"> Paket</span>
+                </div>
+
+                <!-- Rekap Total Paket Per Karung (Tampil di Layar & Cetak Fisik) -->
+                <div id="slipSackBreakdownSection" class="border border-amber-200 bg-amber-50/60 rounded-xl p-3">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="font-bold text-amber-900 text-[11px] uppercase flex items-center gap-1.5">
+                            <i class="fa-solid fa-boxes-stacked text-amber-600"></i>
+                            <span>Total Paket Per Karung:</span>
+                        </h4>
+                        <span id="slipTotalSacksCount" class="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full font-mono">0 Karung</span>
+                    </div>
+                    <div id="slipSackBreakdownList" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        <!-- Dynamic items -->
+                    </div>
                 </div>
 
                 <!-- Daftar Resi Paket -->
@@ -2115,9 +2150,43 @@ try {
             setText('slipReceiptNo', data.receipt_number || '-');
             setText('slipExpedition', data.expedition || '-');
             setText('slipDateTime', data.created_at || '-');
+            setText('slipCourier', data.courier_name || '-');
+            setText('slipOperator', data.operator_name || CURRENT_OPERATOR_NAME || '-');
             setText('slipSackNumber', data.sack_number || '-');
             const actualTotal = (data.packages && data.packages.length > 0) ? data.packages.length : (data.total_packages || 0);
             setText('slipTotalPackages', actualTotal);
+
+            // Rekap Total Paket Per Karung
+            const sackSummary = {};
+            const pkgList = data.packages || [];
+            if (pkgList.length > 0) {
+                pkgList.forEach(p => {
+                    const s = (typeof p === 'object' ? (p.sack_number || data.sack_number || 'Karung 1') : (data.sack_number || 'Karung 1')).trim() || 'Karung 1';
+                    sackSummary[s] = (sackSummary[s] || 0) + 1;
+                });
+            } else if (data.sack_number) {
+                sackSummary[data.sack_number] = actualTotal;
+            } else {
+                sackSummary['Karung 1'] = actualTotal;
+            }
+
+            const sackBreakdownList = document.getElementById('slipSackBreakdownList');
+            const sackKeys = Object.keys(sackSummary);
+            setText('slipTotalSacksCount', `${sackKeys.length} Karung`);
+
+            if (sackBreakdownList) {
+                let sHtml = '';
+                sackKeys.forEach(sName => {
+                    const count = sackSummary[sName];
+                    sHtml += `
+                        <div class="bg-white border border-amber-200/90 rounded-lg p-2 flex items-center justify-between shadow-2xs">
+                            <span class="font-mono font-bold text-amber-950 text-xs truncate mr-1.5">${escapeHtml(sName)}</span>
+                            <span class="bg-amber-100 text-amber-900 font-black text-xs px-2 py-0.5 rounded-md shrink-0">${count} <span class="text-[10px] font-medium font-sans">paket</span></span>
+                        </div>
+                    `;
+                });
+                sackBreakdownList.innerHTML = sHtml || '<div class="text-amber-800 text-xs py-1 col-span-2">Tidak ada data karung</div>';
+            }
 
             // Foto Kurir di Slip
             const courierSec = document.getElementById('slipCourierPhotoSection');

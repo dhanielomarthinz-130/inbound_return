@@ -66,6 +66,27 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 break-inside: avoid !important;
                 page-break-inside: avoid !important;
             }
+            #printableReceivingReceiptArea #adminSlipSackBreakdownSection {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+                background-color: #fffbeb !important;
+                border: 1px solid #fde68a !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            #printableReceivingReceiptArea #adminSlipSackBreakdownList {
+                display: grid !important;
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+                gap: 4px 6px !important;
+            }
+            #printableReceivingReceiptArea #adminSlipSackBreakdownList > div {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+                background-color: #ffffff !important;
+                border: 1px solid #fcd34d !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
             #printableReceivingReceiptArea .bg-emerald-500 {
                 background-color: #10b981 !important;
                 color: #ffffff !important;
@@ -491,6 +512,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                     <th class="py-3 px-4">No. Tanda Terima</th>
                                     <th class="py-3 px-4">Ekspedisi</th>
                                     <th class="py-3 px-4">Driver / Kurir</th>
+                                    <th class="py-3 px-4">Nomor Karung</th>
                                     <th class="py-3 px-4 text-center">Total Paket</th>
                                     <th class="py-3 px-4">Operator Penerima</th>
                                     <th class="py-3 px-4">Waktu Penerimaan</th>
@@ -499,7 +521,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             </thead>
                             <tbody id="receivingTableBody" class="divide-y divide-slate-100">
                                 <tr>
-                                    <td colspan="8" class="text-center py-12 text-slate-400">
+                                    <td colspan="9" class="text-center py-12 text-slate-400">
                                         <i class="fa-solid fa-truck-ramp-box text-3xl mb-2 text-slate-300 block"></i>
                                         Memuat data receiving inbound...
                                     </td>
@@ -1921,6 +1943,20 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                     <span class="text-[10px] uppercase font-bold opacity-80 block">Jumlah Paket Diterima</span>
                     <span id="adminSlipTotalPackages" class="font-black text-2xl">0</span>
                     <span class="text-xs font-semibold"> Paket</span>
+                </div>
+
+                <!-- Rekap Total Paket Per Karung (Tampil di Layar & Cetak Fisik) -->
+                <div id="adminSlipSackBreakdownSection" class="border border-amber-200 bg-amber-50/60 rounded-xl p-3">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="font-bold text-amber-900 text-[11px] uppercase flex items-center gap-1.5">
+                            <i class="fa-solid fa-boxes-stacked text-amber-600"></i>
+                            <span>Total Paket Per Karung:</span>
+                        </h4>
+                        <span id="adminSlipTotalSacksCount" class="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full font-mono">0 Karung</span>
+                    </div>
+                    <div id="adminSlipSackBreakdownList" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        <!-- Dynamic items -->
+                    </div>
                 </div>
 
                 <!-- Daftar Resi Paket -->

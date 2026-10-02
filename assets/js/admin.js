@@ -2191,7 +2191,7 @@ window.loadReceivingData = async function(forceRefresh = false) {
 
     const tbody = document.getElementById('receivingTableBody');
     if (tbody) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-12 text-slate-400"><i class="fa-solid fa-spinner fa-spin text-2xl text-emerald-500 mb-2 block"></i>Memuat data receiving inbound...</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center py-12 text-slate-400"><i class="fa-solid fa-spinner fa-spin text-2xl text-emerald-500 mb-2 block"></i>Memuat data receiving inbound...</td></tr>`;
     }
 
     try {
@@ -2223,7 +2223,7 @@ window.loadReceivingData = async function(forceRefresh = false) {
 
         if (res.status === 401) {
             if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-amber-600 font-bold"><i class="fa-solid fa-triangle-exclamation mr-1.5 text-lg"></i>Sesi login Anda telah berakhir. Silakan <a href="login" class="underline text-indigo-600 font-black">Login Kembali</a>.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center py-10 text-amber-600 font-bold"><i class="fa-solid fa-triangle-exclamation mr-1.5 text-lg"></i>Sesi login Anda telah berakhir. Silakan <a href="login" class="underline text-indigo-600 font-black">Login Kembali</a>.</td></tr>`;
             }
             return;
         }
@@ -2246,12 +2246,12 @@ window.loadReceivingData = async function(forceRefresh = false) {
             }
         } else {
             const errMsg = json ? (json.error || 'Kesalahan server') : 'Respon kosong';
-            if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-rose-500 font-semibold"><i class="fa-solid fa-circle-exclamation mr-1.5"></i>Gagal memuat data: ${escapeHtml(errMsg)}</td></tr>`;
+            if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="text-center py-10 text-rose-500 font-semibold"><i class="fa-solid fa-circle-exclamation mr-1.5"></i>Gagal memuat data: ${escapeHtml(errMsg)}</td></tr>`;
         }
     } catch (e) {
         console.error('Error loadReceivingData:', e);
         if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-rose-500 font-semibold"><i class="fa-solid fa-circle-exclamation mr-1.5 text-lg block mb-1"></i>Terjadi kesalahan saat memuat data receiving.<br><span class="text-xs text-slate-500 font-normal mt-1 block">${escapeHtml(e.message || 'Kesalahan koneksi')}</span></td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center py-10 text-rose-500 font-semibold"><i class="fa-solid fa-circle-exclamation mr-1.5 text-lg block mb-1"></i>Terjadi kesalahan saat memuat data receiving.<br><span class="text-xs text-slate-500 font-normal mt-1 block">${escapeHtml(e.message || 'Kesalahan koneksi')}</span></td></tr>`;
         }
     }
 };
@@ -2282,7 +2282,7 @@ function renderReceivingTable(data) {
     if (!data || data.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" class="text-center py-12 text-slate-400">
+                <td colspan="9" class="text-center py-12 text-slate-400">
                     <i class="fa-solid fa-box-open text-3xl mb-2 text-slate-300 block"></i>
                     Tidak ada data receiving inbound yang ditemukan untuk filter ini.
                 </td>
@@ -2304,8 +2304,10 @@ function renderReceivingTable(data) {
                     </span>
                 </td>
                 <td class="py-3 px-4 font-medium text-slate-700">
-                    <div>${escapeHtml(item.courier_name || '-')}</div>
-                    ${item.sack_number ? `<span class="bg-amber-50 text-amber-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-200 mt-1 inline-flex items-center gap-1"><i class="fa-solid fa-box-archive text-[9px]"></i>${escapeHtml(item.sack_number)}</span>` : ''}
+                    ${escapeHtml(item.courier_name || '-')}
+                </td>
+                <td class="py-3 px-4">
+                    ${item.sack_number ? `<span class="bg-amber-50 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-lg border border-amber-200 inline-flex items-center gap-1.5"><i class="fa-solid fa-box-archive text-amber-600 text-[10px]"></i>${escapeHtml(item.sack_number)}</span>` : '<span class="text-slate-400 italic">-</span>'}
                 </td>
                 <td class="py-3 px-4 text-center">
                     <span class="bg-indigo-50 text-indigo-700 font-black px-2.5 py-1 rounded-lg border border-indigo-200 text-xs inline-block">
@@ -2355,6 +2357,39 @@ window.viewReceivingReceipt = async function(id) {
             const actualTotal = (data.packages && data.packages.length > 0) ? data.packages.length : (r.total_packages || 0);
             document.getElementById('adminSlipTotalPackages').innerText = actualTotal;
             document.getElementById('adminSlipSignOperator').innerText = r.operator_name || 'Gudang';
+
+            // Rekap Total Paket Per Karung
+            const sackSummary = {};
+            const pkgList = data.packages || [];
+            if (pkgList.length > 0) {
+                pkgList.forEach(p => {
+                    const s = (p.sack_number || r.sack_number || 'Karung 1').trim() || 'Karung 1';
+                    sackSummary[s] = (sackSummary[s] || 0) + 1;
+                });
+            } else if (r.sack_number) {
+                sackSummary[r.sack_number] = actualTotal;
+            } else {
+                sackSummary['Karung 1'] = actualTotal;
+            }
+
+            const sackBreakdownList = document.getElementById('adminSlipSackBreakdownList');
+            const sackKeys = Object.keys(sackSummary);
+            const elTotalSacks = document.getElementById('adminSlipTotalSacksCount');
+            if (elTotalSacks) elTotalSacks.innerText = `${sackKeys.length} Karung`;
+
+            if (sackBreakdownList) {
+                let sHtml = '';
+                sackKeys.forEach(sName => {
+                    const count = sackSummary[sName];
+                    sHtml += `
+                        <div class="bg-white border border-amber-200/90 rounded-lg p-2 flex items-center justify-between shadow-2xs">
+                            <span class="font-mono font-bold text-amber-950 text-xs truncate mr-1.5">${escapeHtml(sName)}</span>
+                            <span class="bg-amber-100 text-amber-900 font-black text-xs px-2 py-0.5 rounded-md shrink-0">${count} <span class="text-[10px] font-medium font-sans">paket</span></span>
+                        </div>
+                    `;
+                });
+                sackBreakdownList.innerHTML = sHtml || '<div class="text-amber-800 text-xs py-1 col-span-2">Tidak ada data karung</div>';
+            }
 
             const listEl = document.getElementById('adminSlipPackageList');
             let listHtml = '';
@@ -2480,6 +2515,7 @@ window.exportReceivingExcel = function() {
             "No. Tanda Terima": r.receipt_number || '-',
             "Ekspedisi": r.expedition || '-',
             "Driver / Kurir": r.courier_name || '-',
+            "Nomor Karung": r.sack_number || '-',
             "Total Paket (Pieces)": parseInt(r.total_packages || 0),
             "Operator Penerima": r.operator_name || '-',
             "Waktu Penerimaan": r.created_at || '-'
