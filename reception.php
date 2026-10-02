@@ -61,6 +61,9 @@ try {
                 print-color-adjust: exact !important;
             }
             #printReceiptArea #slipPackageList {
+                display: grid !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 4px 8px !important;
                 max-height: none !important;
                 overflow: visible !important;
                 height: auto !important;
@@ -69,9 +72,24 @@ try {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
+            #printReceiptArea #slipPackageList > div {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+            }
             #printReceiptArea .bg-emerald-500 {
                 background-color: #10b981 !important;
                 color: #ffffff !important;
+                padding: 6px 12px !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            #printReceiptArea .bg-emerald-50 {
+                background-color: #ecfdf5 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            #printReceiptArea .border-emerald-300 {
+                border-color: #6ee7b7 !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
@@ -574,7 +592,7 @@ try {
 
     <!-- MODAL DETAIL / BUKTI TANDA TERIMA CETAK -->
     <div id="receiptModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-100">
+        <div class="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-100">
             <!-- Header Modal -->
             <div class="p-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
                 <div class="flex items-center gap-2">
@@ -636,7 +654,7 @@ try {
                 <!-- Daftar Resi Paket -->
                 <div>
                     <h4 class="font-bold text-slate-700 mb-1.5 text-[11px] uppercase">Rincian Nomor Resi / Barcode:</h4>
-                    <div id="slipPackageList" class="bg-slate-50 rounded-xl p-3 max-h-48 overflow-y-auto space-y-1 font-mono text-[11px] border border-slate-200">
+                    <div id="slipPackageList" class="bg-slate-50 rounded-xl p-2.5 max-h-56 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-1.5 font-mono text-[11px] border border-slate-200">
                         <!-- List Resi -->
                     </div>
                 </div>
@@ -1611,22 +1629,22 @@ try {
                 (data.packages || []).forEach((item, i) => {
                     const bCode = (typeof item === 'object') ? (item.package_barcode || item.barcode || '') : item;
                     const pPath = (typeof item === 'object') ? (item.photo_path || item.photo || null) : null;
-                    const photoThumb = pPath ? `<img src="${escapeHtml(pPath)}" class="w-7 h-7 rounded-md object-cover border border-slate-200 cursor-pointer shadow-2xs" onclick="previewImageDirect('${escapeHtml(pPath)}')">` : '';
+                    const photoThumb = pPath ? `<img src="${escapeHtml(pPath)}" class="w-6 h-6 rounded object-cover border border-slate-200 cursor-pointer shadow-2xs shrink-0" onclick="previewImageDirect('${escapeHtml(pPath)}')">` : '';
 
                     listHtml += `
-                        <div class="flex items-center justify-between border-b border-slate-100 py-1 px-1">
-                            <div class="flex items-center gap-2">
-                                <span class="w-5 h-5 rounded-md bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center">${i + 1}</span>
-                                <span class="font-mono font-bold text-slate-800 text-xs">${escapeHtml(bCode)}</span>
+                        <div class="flex items-center justify-between bg-white rounded-lg border border-slate-200/90 py-1 px-2 text-xs">
+                            <div class="flex items-center gap-1.5 min-w-0 pr-1">
+                                <span class="w-5 h-5 rounded-md bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">${i + 1}</span>
+                                <span class="font-mono font-bold text-slate-800 text-xs tracking-tight truncate">${escapeHtml(bCode)}</span>
                             </div>
-                            <div class="flex items-center gap-1.5">
+                            <div class="flex items-center gap-1 shrink-0">
                                 ${photoThumb}
-                                <span class="text-[9px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">TERIMA</span>
+                                <span class="text-[9px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-300 shrink-0">TERIMA OK</span>
                             </div>
                         </div>
                     `;
                 });
-                listEl.innerHTML = listHtml;
+                listEl.innerHTML = listHtml || '<div class="text-slate-400 text-center py-2 col-span-2">Tidak ada rincian resi.</div>';
             }
 
             // Render Foto-foto Bukti Paket di Slip

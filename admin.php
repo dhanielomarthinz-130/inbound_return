@@ -51,6 +51,9 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 print-color-adjust: exact !important;
             }
             #printableReceivingReceiptArea #adminSlipPackageList {
+                display: grid !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 4px 8px !important;
                 max-height: none !important;
                 overflow: visible !important;
                 height: auto !important;
@@ -59,9 +62,24 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
+            #printableReceivingReceiptArea #adminSlipPackageList > div {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+            }
             #printableReceivingReceiptArea .bg-emerald-500 {
                 background-color: #10b981 !important;
                 color: #ffffff !important;
+                padding: 6px 12px !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            #printableReceivingReceiptArea .bg-emerald-50 {
+                background-color: #ecfdf5 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            #printableReceivingReceiptArea .border-emerald-300 {
+                border-color: #6ee7b7 !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
@@ -1841,7 +1859,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
     <!-- MODAL BUKTI SERAH TERIMA PAKET (RECEIVING INBOUND)            -->
     <!-- ============================================================== -->
     <div id="modalReceivingReceipt" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-100">
+        <div class="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-100">
             <!-- Header Modal -->
             <div class="p-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
                 <div class="flex items-center gap-2">
@@ -1892,7 +1910,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 <!-- Daftar Resi Paket -->
                 <div>
                     <h4 class="font-bold text-slate-700 mb-1.5 text-[11px] uppercase">Rincian Nomor Resi / Barcode:</h4>
-                    <div id="adminSlipPackageList" class="bg-slate-50 rounded-xl p-3 max-h-48 overflow-y-auto space-y-1 font-mono text-[11px] border border-slate-200">
+                    <div id="adminSlipPackageList" class="bg-slate-50 rounded-xl p-2.5 max-h-56 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-1.5 font-mono text-[11px] border border-slate-200">
                         <!-- List Resi -->
                     </div>
                 </div>

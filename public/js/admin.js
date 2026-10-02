@@ -2326,16 +2326,16 @@ window.viewReceivingReceipt = async function(id) {
             let listHtml = '';
             (data.packages || []).forEach((bar, i) => {
                 listHtml += `
-                    <div class="flex items-center justify-between border-b border-slate-200/80 py-1.5 px-2 hover:bg-white transition text-xs">
-                        <div class="flex items-center gap-2">
+                    <div class="flex items-center justify-between bg-white rounded-lg border border-slate-200/90 py-1.5 px-2 text-xs">
+                        <div class="flex items-center gap-1.5 min-w-0 pr-1">
                             <span class="w-5 h-5 rounded bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">${i + 1}</span>
-                            <span class="font-mono font-bold text-slate-800 text-xs">${escapeHtml(bar.package_barcode)}</span>
+                            <span class="font-mono font-bold text-slate-800 text-xs tracking-tight truncate">${escapeHtml(bar.package_barcode)}</span>
                         </div>
-                        <span class="text-[9px] font-bold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded border border-emerald-300">TERIMA OK</span>
+                        <span class="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-300 shrink-0">TERIMA OK</span>
                     </div>
                 `;
             });
-            listEl.innerHTML = listHtml || '<div class="text-slate-400 text-center py-2">Tidak ada rincian resi.</div>';
+            listEl.innerHTML = listHtml || '<div class="text-slate-400 text-center py-2 col-span-2">Tidak ada rincian resi.</div>';
 
             document.getElementById('modalReceivingReceipt').classList.remove('hidden');
         } else {
