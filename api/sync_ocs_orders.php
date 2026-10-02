@@ -17,6 +17,9 @@
  * 4. Web Browser / AJAX:  GET /api/sync_ocs_orders.php?date=yesterday
  */
 
+// Output buffering: cegah warning/notice/BOM dari config merusak JSON response
+ob_start();
+
 set_time_limit(1800); // 30 menit
 ini_set('memory_limit', '512M');
 
@@ -31,7 +34,11 @@ if (function_exists('ensureDatabaseSchema')) {
 $isCli = (php_sapi_name() === 'cli');
 
 if (!$isCli) {
+    // Buang semua output yang sudah terlanjur dicetak (warning, BOM, whitespace dari config)
+    ob_clean();
     header('Content-Type: application/json; charset=utf-8');
+    // Perpanjang batas waktu Apache/nginx gateway
+    header('X-Accel-Buffering: no');
 }
 
 function writeOcsSyncLog($msg) {
@@ -64,7 +71,7 @@ if ($isCli) {
 $dateParam      = trim($params['date'] ?? 'yesterday');
 $startParam     = trim($params['start'] ?? $params['start_date'] ?? '');
 $endParam       = trim($params['end'] ?? $params['end_date'] ?? '');
-$limitParam     = isset($params['limit']) ? (int)$params['limit'] : ($isCli ? 0 : 500); // Default aman 500 untuk Web agar bebas timeout
+$limitParam     = isset($params['limit']) ? (int)$params['limit'] : 0; // 0 = tanpa batas (ambil semua orders dari rentang tanggal)
 $dryRun         = !empty($params['dry_run']);
 $fetchDetails   = !isset($params['details']) || $params['details'] === '1' || $params['details'] === 'true' || $params['details'] === 'auto';
 $detailsLimit   = isset($params['details_limit']) ? (int)$params['details_limit'] : 250; // default perkaya 250 detail per run
@@ -475,12 +482,13 @@ try {
     if ($isCli) {
         echo json_encode($resp, JSON_PRETTY_PRINT) . PHP_EOL;
     } else {
+        ob_clean(); // Bersihkan sekali lagi sebelum output JSON final
         echo json_encode($resp);
     }
 
 } catch (Exception $e) {
     if (isset($pdo) && $pdo->inTransaction()) {
-        $pdo->rollBack();
+        try { $pdo->rollBack(); } catch (Exception $eRb) {}
     }
     $errMsg = "Error sinkronisasi OCS Orders: " . $e->getMessage();
     writeOcsSyncLog($errMsg);
@@ -488,6 +496,7 @@ try {
     if ($isCli) {
         echo json_encode(['success' => false, 'error' => $errMsg], JSON_PRETTY_PRINT) . PHP_EOL;
     } else {
+        ob_clean(); // Bersihkan output sebelum kirim error JSON
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => $errMsg]);
     }

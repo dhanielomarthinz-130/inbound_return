@@ -3263,8 +3263,22 @@ window.executeOcsOrderSync = async function() {
 
     try {
         const response = await fetch(`api/sync_ocs_orders.php?date=${encodeURIComponent(dateParam)}`);
-        const result = await response.json();
 
+        // Safe parse: baca sebagai text dulu untuk hindari "Unexpected end of JSON input"
+        const rawText = await response.text();
+        if (!rawText || rawText.trim() === '') {
+            throw new Error('Server mengembalikan respons kosong. Kemungkinan timeout atau OCS tidak dapat dihubungi. Coba lagi dalam beberapa saat.');
+        }
+
+        let result;
+        try {
+            result = JSON.parse(rawText);
+        } catch (jsonErr) {
+            // Tampilkan sebagian respons untuk debugging
+            const preview = rawText.substring(0, 200).replace(/</g, '&lt;');
+            console.error('[sync_ocs_orders] Non-JSON response:', rawText.substring(0, 500));
+            throw new Error(`Server mengembalikan respons tidak valid (bukan JSON). Preview: ${rawText.substring(0, 120)}`);
+        }
         if (result && result.success) {
             if (progressTitle) {
                 progressTitle.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> Sinkronisasi Berhasil Selesai!`;
