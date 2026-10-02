@@ -83,11 +83,8 @@ try {
     }
 
     if (!empty($condition)) {
-        if (strtoupper($condition) === 'GOOD') {
-            $sql .= " AND UPPER(COALESCE(i.type, i.condition, 'GOOD')) = 'GOOD'";
-        } else {
-            $sql .= " AND UPPER(COALESCE(i.type, i.condition, 'GOOD')) != 'GOOD'";
-        }
+        $sql .= " AND UPPER(COALESCE(i.type, i.condition, 'GOOD')) = ?";
+        $params[] = strtoupper($condition);
     }
 
     if (!empty($operator)) {

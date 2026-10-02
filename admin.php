@@ -544,8 +544,16 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             <div class="relative">
                                 <select id="filterCondition" onchange="loadTransactions()" class="bg-slate-50 hover:bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-2xs">
                                     <option value="">Semua Kondisi</option>
-                                    <option value="GOOD">GOOD (Layak)</option>
-                                    <option value="RUSAK">RUSAK</option>
+                                    <?php
+                                    if (isset($pdo)) {
+                                        try {
+                                            $stmtC = $pdo->query("SELECT code, name FROM master_conditions ORDER BY sort_order ASC, name ASC");
+                                            while ($rC = $stmtC->fetch()) {
+                                                echo '<option value="' . htmlspecialchars($rC['code']) . '">' . htmlspecialchars($rC['name']) . ' (' . htmlspecialchars($rC['code']) . ')</option>';
+                                            }
+                                        } catch (Exception $eC) {}
+                                    }
+                                    ?>
                                 </select>
                             </div>
 

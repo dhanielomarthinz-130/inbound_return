@@ -613,15 +613,27 @@ function createTransactionRow(r, isPreview = false) {
         `<span class="font-mono font-bold text-indigo-700 bg-indigo-50/80 border border-indigo-200/80 px-2.5 py-1 rounded-lg text-xs inline-block tracking-tight">${r.seller_sku}</span>` :
         `<span class="text-slate-400 font-mono text-xs italic">-</span>`;
 
-    // Type / Kondisi (GOOD vs RUSAK)
-    const isGood = (r.condition_type === 'GOOD');
-    const typeBadge = isGood ?
-        `<span class="bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-xl font-bold text-[10px] inline-flex items-center gap-1 shadow-2xs">
+    // Type / Kondisi Dinamis dari Master Kondisi
+    const condCode = (r.raw_type || r.condition_type || 'GOOD').toUpperCase();
+    const matchedCond = (typeof allConditions !== 'undefined' && Array.isArray(allConditions)) 
+        ? allConditions.find(x => (x.code || '').toUpperCase() === condCode) 
+        : null;
+    
+    let typeBadge = '';
+    if (matchedCond) {
+        const clr = CONDITION_COLOR_MAP[matchedCond.color] || CONDITION_COLOR_MAP.slate;
+        typeBadge = `<span class="${clr.bg} ${clr.text} border ${clr.border} px-2.5 py-1 rounded-xl font-bold text-[10px] inline-flex items-center gap-1 shadow-2xs font-mono">
+            <i class="fa-solid fa-tag text-[9px]"></i> ${matchedCond.name}
+        </span>`;
+    } else if (condCode === 'GOOD') {
+        typeBadge = `<span class="bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-xl font-bold text-[10px] inline-flex items-center gap-1 shadow-2xs">
             <i class="fa-solid fa-circle-check text-emerald-600"></i> GOOD
-         </span>` :
-        `<span class="bg-rose-100 text-rose-800 border border-rose-200 px-2.5 py-1 rounded-xl font-bold text-[10px] inline-flex items-center gap-1 shadow-2xs">
-            <i class="fa-solid fa-triangle-exclamation text-rose-600"></i> RUSAK${r.raw_type && r.raw_type !== 'RUSAK' ? ` (${r.raw_type})` : ''}
-         </span>`;
+        </span>`;
+    } else {
+        typeBadge = `<span class="bg-rose-100 text-rose-800 border border-rose-200 px-2.5 py-1 rounded-xl font-bold text-[10px] inline-flex items-center gap-1 shadow-2xs">
+            <i class="fa-solid fa-triangle-exclamation text-rose-600"></i> ${escapeHtml(condCode)}
+        </span>`;
+    }
 
     const hasVideo = Boolean(r.video_path && r.video_path.trim() !== '');
 
@@ -1938,9 +1950,26 @@ async function loadConditions() {
         const res = await fetch('api/conditions.php');
         allConditions = await res.json();
         renderConditionsTable(allConditions);
+        populateFilterConditionSelect(allConditions);
     } catch (e) {
         const tbody = document.getElementById('fullConditionsTableBody');
         if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-red-400">Gagal memuat data kondisi: ${e.message}</td></tr>`;
+    }
+}
+
+function populateFilterConditionSelect(list) {
+    const sel = document.getElementById('filterCondition');
+    if (!sel || !Array.isArray(list)) return;
+    const currentVal = sel.value;
+    sel.innerHTML = '<option value="">Semua Kondisi</option>';
+    list.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.code;
+        opt.innerText = `${c.name} (${c.code})`;
+        sel.appendChild(opt);
+    });
+    if (currentVal && Array.from(sel.options).some(o => o.value === currentVal)) {
+        sel.value = currentVal;
     }
 }
 

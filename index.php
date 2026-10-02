@@ -586,10 +586,30 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                             </label>
                             <div class="relative">
                                 <select id="inputType" class="w-full pl-2.5 pr-7 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition appearance-none">
-                                    <option value="GOOD">GOOD (Layak Jual)</option>
-                                    <option value="RUSAK">RUSAK (Defect)</option>
-                                    <option value="EXPIRED">EXPIRED (Kadaluarsa)</option>
-                                    <option value="SALAH_KIRIM">SALAH KIRIM</option>
+                                    <?php
+                                    $hasCustomConditions = false;
+                                    if (isset($pdo)) {
+                                        try {
+                                            $stmtCond = $pdo->query("SELECT code, name, color FROM master_conditions ORDER BY sort_order ASC, name ASC");
+                                            $condRows = $stmtCond->fetchAll();
+                                            if (!empty($condRows)) {
+                                                $hasCustomConditions = true;
+                                                foreach ($condRows as $cRow) {
+                                                    $cCode = htmlspecialchars($cRow['code']);
+                                                    $cName = htmlspecialchars($cRow['name']);
+                                                    $isGood = (strtoupper($cCode) === 'GOOD') ? ' selected' : '';
+                                                    echo "<option value=\"{$cCode}\"{$isGood}>{$cName} ({$cCode})</option>\n";
+                                                }
+                                            }
+                                        } catch (Exception $eC) {}
+                                    }
+                                    if (!$hasCustomConditions) {
+                                        echo '<option value="GOOD" selected>GOOD (Layak Jual)</option>';
+                                        echo '<option value="RUSAK">RUSAK (Defect)</option>';
+                                        echo '<option value="EXPIRED">EXPIRED (Kadaluarsa)</option>';
+                                        echo '<option value="SALAH_KIRIM">SALAH KIRIM</option>';
+                                    }
+                                    ?>
                                 </select>
                                 <span class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-slate-400 text-xs">
                                     <i class="fa-solid fa-chevron-down text-[10px]"></i>

@@ -1180,14 +1180,31 @@ function renderItemsTable() {
     scannedProductsList.forEach((item, index) => {
         totalUnits += item.qty;
 
-        // Badge Tipe
-        let badge = `<span class="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold text-[10px]">GOOD</span>`;
-        if (item.type === 'RUSAK') {
+        // Badge Tipe Dinamis dari Master Kondisi
+        const itemType = (item.type || 'GOOD').toUpperCase();
+        const matchedCond = cachedConditionsList.find(c => (c.code || '').toUpperCase() === itemType);
+        let badge = '';
+        if (matchedCond) {
+            const clr = matchedCond.color || 'slate';
+            const colorClassMap = {
+                emerald: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                rose:    'bg-rose-100 text-rose-800 border-rose-200',
+                amber:   'bg-amber-100 text-amber-800 border-amber-200',
+                orange:  'bg-orange-100 text-orange-800 border-orange-200',
+                purple:  'bg-purple-100 text-purple-800 border-purple-200',
+                blue:    'bg-blue-100 text-blue-800 border-blue-200',
+                slate:   'bg-slate-100 text-slate-700 border-slate-200'
+            };
+            const cCls = colorClassMap[clr] || 'bg-slate-100 text-slate-700 border-slate-200';
+            badge = `<span class="${cCls} border px-1.5 py-0.5 rounded font-bold text-[10px] font-mono">${escapeHtml(matchedCond.name || item.type)}</span>`;
+        } else if (item.type === 'RUSAK') {
             badge = `<span class="bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded font-bold text-[10px]">RUSAK</span>`;
         } else if (item.type === 'EXPIRED') {
             badge = `<span class="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold text-[10px]">EXPIRED</span>`;
         } else if (item.type === 'SALAH_KIRIM') {
             badge = `<span class="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded font-bold text-[10px]">SALAH KIRIM</span>`;
+        } else {
+            badge = `<span class="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold text-[10px]">${escapeHtml(item.type || 'GOOD')}</span>`;
         }
 
         const tr = document.createElement('tr');
@@ -1749,6 +1766,61 @@ async function loadExpeditions() {
     }
 }
 
+// Helper Load Daftar Kondisi untuk Dropdown & Badge Table Inbound Unboxing
+let cachedConditionsList = [];
+async function loadConditions() {
+    try {
+        const res = await fetch('api/conditions.php');
+        const list = await res.json();
+        if (Array.isArray(list) && list.length > 0) {
+            cachedConditionsList = list;
+            try { localStorage.setItem('cached_master_conditions', JSON.stringify(list)); } catch (e) {}
+            populateConditionDropdown(list);
+        } else {
+            fallbackLoadCachedConditions();
+        }
+    } catch (e) {
+        console.warn('Gagal memuat master kondisi dari API:', e);
+        fallbackLoadCachedConditions();
+    }
+}
+
+function fallbackLoadCachedConditions() {
+    try {
+        const saved = localStorage.getItem('cached_master_conditions');
+        if (saved) {
+            cachedConditionsList = JSON.parse(saved);
+            populateConditionDropdown(cachedConditionsList);
+        }
+    } catch (e) {}
+}
+
+function populateConditionDropdown(list) {
+    const select = document.getElementById('inputType');
+    if (!select || !Array.isArray(list) || list.length === 0) return;
+
+    const currentVal = select.value;
+    select.innerHTML = '';
+    list.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.code;
+        opt.innerText = `${c.name} (${c.code})`;
+        select.appendChild(opt);
+    });
+
+    if (currentVal && Array.from(select.options).some(o => o.value === currentVal)) {
+        select.value = currentVal;
+    } else {
+        const hasGood = Array.from(select.options).find(o => o.value.toUpperCase() === 'GOOD');
+        if (hasGood) select.value = hasGood.value;
+    }
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[m]);
+}
+
 // -------------------------------------------------------------
 // 7. FOTO UNBOXING DOKUMENTASI (PAKET & PRODUK DENGAN WATERMARK)
 // -------------------------------------------------------------
@@ -2262,6 +2334,8 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     // Muat daftar ekspedisi
     loadExpeditions();
+    // Muat daftar kondisi produk (Master Condition dinamis)
+    loadConditions();
     // Langsung jalankan kamera live scanner di sebelah kiri
     startCamera();
 });
