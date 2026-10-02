@@ -743,7 +743,14 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                     </div>
                     
                     <div class="flex items-center gap-2.5 w-full md:w-auto shrink-0">
-                        <!-- TOMBOL ENTER DIGEDEIN (Pindah Kolom - Akses Cepat Operator) -->
+                        <!-- TOMBOL SUBMIT -->
+                        <button id="btnFinalizeSession" disabled onclick="submitFinalSession()"
+                            class="flex-1 md:flex-initial bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-2.5 px-5 sm:px-7 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 shrink-0 cursor-pointer">
+                            <i class="fa-solid fa-cloud-arrow-up text-sm sm:text-base"></i>
+                            <span class="tracking-wide">Submit</span>
+                        </button>
+
+                        <!-- TOMBOL ENTER DIGEDEIN (Berada Setelah Tombol Submit di Paling Kanan) -->
                         <button type="button" onclick="triggerVirtualEnter()" id="btnVirtualEnter"
                             title="Klik atau tekan Enter untuk pindah ke kolom berikutnya"
                             class="flex-1 md:flex-initial bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-black py-2.5 px-4 sm:px-6 rounded-xl text-xs sm:text-sm transition shadow-lg shadow-slate-900/30 flex items-center justify-center gap-2 sm:gap-2.5 group border border-slate-700 cursor-pointer">
@@ -752,13 +759,6 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                             <span id="virtualEnterTargetLabel" class="text-[11px] sm:text-xs font-mono font-bold text-emerald-400 group-hover:text-emerald-300 transition hidden sm:inline ml-1">
                                 Lanjut ke No. Batch ➔
                             </span>
-                        </button>
-
-                        <!-- TOMBOL SUBMIT (Sebelumnya: Selesaikan Inbound Invoice) -->
-                        <button id="btnFinalizeSession" disabled onclick="submitFinalSession()"
-                            class="flex-1 md:flex-initial bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-2.5 px-5 sm:px-7 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 shrink-0 cursor-pointer">
-                            <i class="fa-solid fa-cloud-arrow-up text-sm sm:text-base"></i>
-                            <span class="tracking-wide">Submit</span>
                         </button>
                     </div>
                 </div>
