@@ -37,16 +37,57 @@ try {
             border-radius: 1rem;
         }
         @media print {
-            body * { visibility: hidden; }
-            #printReceiptArea, #printReceiptArea * { visibility: visible; }
+            @page {
+                size: A4 portrait;
+                margin: 10mm 15mm;
+            }
+            body * { visibility: hidden !important; }
+            #printReceiptArea, #printReceiptArea * { visibility: visible !important; }
             #printReceiptArea {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
                 background: white !important;
-                color: black !important;
-                padding: 16px;
+                color: #0f172a !important;
+                padding: 10px !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+                overflow: visible !important;
+                max-height: none !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            #printReceiptArea #slipPackageList {
+                max-height: none !important;
+                overflow: visible !important;
+                height: auto !important;
+                background-color: #f8fafc !important;
+                border: 1px solid #cbd5e1 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            #printReceiptArea .bg-emerald-500 {
+                background-color: #10b981 !important;
+                color: #ffffff !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            #printReceiptArea .bg-slate-50 {
+                background-color: #f8fafc !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            ::-webkit-scrollbar {
+                display: none !important;
+                width: 0 !important;
+                height: 0 !important;
+            }
+            * {
+                scrollbar-width: none !important;
+                -ms-overflow-style: none !important;
             }
             .no-print { display: none !important; }
         }
@@ -1547,8 +1588,8 @@ try {
             setText('slipReceiptNo', data.receipt_number || '-');
             setText('slipExpedition', data.expedition || '-');
             setText('slipDateTime', data.created_at || '-');
-            setText('slipCourier', data.courier_name || '-');
-            setText('slipTotalPackages', data.total_packages || 0);
+            const actualTotal = (data.packages && data.packages.length > 0) ? data.packages.length : (data.total_packages || 0);
+            setText('slipTotalPackages', actualTotal);
 
             // Foto Kurir di Slip
             const courierSec = document.getElementById('slipCourierPhotoSection');

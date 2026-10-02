@@ -421,7 +421,125 @@ function executeSyncRound($pdo) {
         }
     }
 
-    // 5. Kirim Konfirmasi Cleanup / Sync Status ke InfinityFree jika ada yang berhasil disimpan
+    // 5. Sinkronisasi Master Data dari InfinityFree ke Localhost
+    // (Users, Master Conditions, Master Expeditions, System Settings)
+    $syncedUsersCount = 0;
+    $syncedConditionsCount = 0;
+    $syncedExpeditionsCount = 0;
+
+    $users = $data['data']['users'] ?? [];
+    if (!empty($users)) {
+        $stmtUpsertUser = $pdo->prepare("
+            INSERT INTO users (username, password, name, role, pin, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE 
+                password   = VALUES(password),
+                name       = VALUES(name),
+                role       = VALUES(role),
+                pin        = VALUES(pin),
+                status     = VALUES(status)
+        ");
+        foreach ($users as $u) {
+            if (empty($u['username'])) continue;
+            try {
+                $stmtUpsertUser->execute([
+                    $u['username'],
+                    $u['password'] ?? '',
+                    $u['name'] ?? $u['username'],
+                    $u['role'] ?? 'operator',
+                    $u['pin'] ?? '123456',
+                    $u['status'] ?? 'ACTIVE',
+                    $u['created_at'] ?? date('Y-m-d H:i:s')
+                ]);
+                $syncedUsersCount++;
+            } catch (Exception $eUser) {
+                writeSyncLog("Error sync user [{$u['username']}]: " . $eUser->getMessage());
+            }
+        }
+    }
+
+    $conditions = $data['data']['master_conditions'] ?? [];
+    if (!empty($conditions)) {
+        $stmtUpsertCond = $pdo->prepare("
+            INSERT INTO master_conditions (code, name, description, color, sort_order, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE 
+                name        = VALUES(name),
+                description = VALUES(description),
+                color       = VALUES(color),
+                sort_order  = VALUES(sort_order)
+        ");
+        foreach ($conditions as $c) {
+            if (empty($c['code'])) continue;
+            try {
+                $stmtUpsertCond->execute([
+                    $c['code'],
+                    $c['name'] ?? $c['code'],
+                    $c['description'] ?? null,
+                    $c['color'] ?? 'slate',
+                    (int)($c['sort_order'] ?? 0),
+                    $c['created_at'] ?? date('Y-m-d H:i:s')
+                ]);
+                $syncedConditionsCount++;
+            } catch (Exception $eCond) {
+                writeSyncLog("Error sync master_condition [{$c['code']}]: " . $eCond->getMessage());
+            }
+        }
+    }
+
+    $expeditions = $data['data']['master_expeditions'] ?? [];
+    if (!empty($expeditions)) {
+        $stmtUpsertExp = $pdo->prepare("
+            INSERT INTO master_expeditions (code, name, prefix_pattern, status, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE 
+                name           = VALUES(name),
+                prefix_pattern = VALUES(prefix_pattern),
+                status         = VALUES(status)
+        ");
+        foreach ($expeditions as $e) {
+            if (empty($e['code'])) continue;
+            try {
+                $stmtUpsertExp->execute([
+                    $e['code'],
+                    $e['name'] ?? $e['code'],
+                    $e['prefix_pattern'] ?? '',
+                    $e['status'] ?? 'ACTIVE',
+                    $e['created_at'] ?? date('Y-m-d H:i:s')
+                ]);
+                $syncedExpeditionsCount++;
+            } catch (Exception $eExp) {
+                writeSyncLog("Error sync master_expedition [{$e['code']}]: " . $eExp->getMessage());
+            }
+        }
+    }
+
+    $settings = $data['data']['system_settings'] ?? [];
+    if (!empty($settings)) {
+        $stmtUpsertSet = $pdo->prepare("
+            INSERT INTO system_settings (key_name, key_value, updated_at)
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE 
+                key_value  = VALUES(key_value),
+                updated_at = VALUES(updated_at)
+        ");
+        foreach ($settings as $s) {
+            if (empty($s['key_name'])) continue;
+            try {
+                $stmtUpsertSet->execute([
+                    $s['key_name'],
+                    $s['key_value'] ?? null,
+                    $s['updated_at'] ?? date('Y-m-d H:i:s')
+                ]);
+            } catch (Exception $eSet) {}
+        }
+    }
+
+    if ($syncedUsersCount > 0 || $syncedConditionsCount > 0 || $syncedExpeditionsCount > 0) {
+        writeSyncLog("Sync Master Data Sukses: {$syncedUsersCount} users, {$syncedConditionsCount} kondisi retur, {$syncedExpeditionsCount} ekspedisi.");
+    }
+
+    // 6. Kirim Konfirmasi Cleanup / Sync Status ke InfinityFree jika ada transaksi yang berhasil disimpan
     $cleanupResult = null;
     if (!empty($syncedReturnIds) || !empty($syncedReceptionIds) || !empty($syncedOrderIds)) {
         $cleanupUrl = $cloudUrl . '/api/sync_cleanup.php?key=' . urlencode($secretKey);
@@ -437,13 +555,16 @@ function executeSyncRound($pdo) {
     }
 
     return [
-        'success'           => true,
-        'synced_returns'    => count($syncedReturnIds),
-        'synced_receptions' => count($syncedReceptionIds),
-        'synced_orders'     => count($syncedOrderIds),
-        'downloaded_photos' => $downloadedPhotosCount,
-        'cloud_cleaned'     => !empty($cleanupResult['success']),
-        'timestamp'         => date('Y-m-d H:i:s')
+        'success'            => true,
+        'synced_returns'     => count($syncedReturnIds),
+        'synced_receptions'  => count($syncedReceptionIds),
+        'synced_orders'      => count($syncedOrderIds),
+        'synced_users'       => $syncedUsersCount,
+        'synced_conditions'  => $syncedConditionsCount,
+        'synced_expeditions' => $syncedExpeditionsCount,
+        'downloaded_photos'  => $downloadedPhotosCount,
+        'cloud_cleaned'      => !empty($cleanupResult['success']),
+        'timestamp'          => date('Y-m-d H:i:s')
     ];
 }
 

@@ -2318,13 +2318,22 @@ window.viewReceivingReceipt = async function(id) {
             document.getElementById('adminSlipDateTime').innerText = r.created_at || '-';
             document.getElementById('adminSlipCourier').innerText = r.courier_name || '-';
             document.getElementById('adminSlipOperator').innerText = r.operator_name || '-';
-            document.getElementById('adminSlipTotalPackages').innerText = r.total_packages || 0;
+            const actualTotal = (data.packages && data.packages.length > 0) ? data.packages.length : (r.total_packages || 0);
+            document.getElementById('adminSlipTotalPackages').innerText = actualTotal;
             document.getElementById('adminSlipSignOperator').innerText = r.operator_name || 'Gudang';
 
             const listEl = document.getElementById('adminSlipPackageList');
             let listHtml = '';
             (data.packages || []).forEach((bar, i) => {
-                listHtml += `<div class="flex justify-between border-b border-slate-100 py-1"><span>${i + 1}. ${escapeHtml(bar.package_barcode)}</span><span class="text-[9px] text-emerald-600 font-bold">TERIMA OK</span></div>`;
+                listHtml += `
+                    <div class="flex items-center justify-between border-b border-slate-200/80 py-1.5 px-2 hover:bg-white transition text-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="w-5 h-5 rounded bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">${i + 1}</span>
+                            <span class="font-mono font-bold text-slate-800 text-xs">${escapeHtml(bar.package_barcode)}</span>
+                        </div>
+                        <span class="text-[9px] font-bold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded border border-emerald-300">TERIMA OK</span>
+                    </div>
+                `;
             });
             listEl.innerHTML = listHtml || '<div class="text-slate-400 text-center py-2">Tidak ada rincian resi.</div>';
 

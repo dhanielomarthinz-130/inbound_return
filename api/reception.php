@@ -64,6 +64,13 @@ if ($method === 'GET') {
         ");
         $stmtPkg->execute([$id]);
         $packages = $stmtPkg->fetchAll();
+        $actualTotal = count($packages);
+        if ($actualTotal > 0 && intval($reception['total_packages'] ?? 0) !== $actualTotal) {
+            $reception['total_packages'] = $actualTotal;
+            try {
+                $pdo->prepare("UPDATE expedition_receptions SET total_packages = ? WHERE id = ?")->execute([$actualTotal, $id]);
+            } catch (Exception $eSyncCount) {}
+        }
 
         jsonResponse([
             'success' => true,

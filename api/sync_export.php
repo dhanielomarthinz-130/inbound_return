@@ -135,18 +135,53 @@ try {
     $stmtOrders->execute();
     $ordersData = $stmtOrders->fetchAll(PDO::FETCH_ASSOC);
 
+    // 5. Ambil Master Data: Users, Master Conditions, Master Expeditions, System Settings
+    // Menjamin update pengguna atau master di InfinityFree otomatis tersinkron ke PC Server Localhost
+    $usersData = [];
+    $conditionsData = [];
+    $expeditionsData = [];
+    $settingsData = [];
+
+    try {
+        $stmtUsers = $pdo->query("SELECT id, username, password, name, role, pin, status, created_at FROM users ORDER BY id ASC");
+        if ($stmtUsers) $usersData = $stmtUsers->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $eU) {}
+
+    try {
+        $stmtCond = $pdo->query("SELECT id, code, name, description, color, sort_order, created_at FROM master_conditions ORDER BY sort_order ASC, id ASC");
+        if ($stmtCond) $conditionsData = $stmtCond->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $eC) {}
+
+    try {
+        $stmtExp = $pdo->query("SELECT id, code, name, prefix_pattern, status, created_at FROM master_expeditions ORDER BY id ASC");
+        if ($stmtExp) $expeditionsData = $stmtExp->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $eE) {}
+
+    try {
+        $stmtSettings = $pdo->query("SELECT key_name, key_value, updated_at FROM system_settings");
+        if ($stmtSettings) $settingsData = $stmtSettings->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $eS) {}
+
     echo json_encode([
         'success' => true,
         'server_time' => date('Y-m-d H:i:s'),
         'counts' => [
-            'returns' => count($returnsData),
-            'receptions' => count($receptionsData),
-            'orders' => count($ordersData)
+            'returns'            => count($returnsData),
+            'receptions'         => count($receptionsData),
+            'orders'             => count($ordersData),
+            'users'              => count($usersData),
+            'master_conditions'  => count($conditionsData),
+            'master_expeditions' => count($expeditionsData),
+            'system_settings'    => count($settingsData)
         ],
         'data' => [
-            'returns' => $returnsData,
-            'receptions' => $receptionsData,
-            'orders' => $ordersData
+            'returns'            => $returnsData,
+            'receptions'         => $receptionsData,
+            'orders'             => $ordersData,
+            'users'              => $usersData,
+            'master_conditions'  => $conditionsData,
+            'master_expeditions' => $expeditionsData,
+            'system_settings'    => $settingsData
         ]
     ], JSON_UNESCAPED_SLASHES);
 
