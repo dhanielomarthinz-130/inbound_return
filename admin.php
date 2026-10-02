@@ -918,45 +918,6 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                     </div>
                 </div>
 
-                <!-- 4 Statistik Ringkas Card -->
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg font-bold shrink-0">
-                            <i class="fa-solid fa-boxes-packing"></i>
-                        </div>
-                        <div>
-                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Total Orders</span>
-                            <span id="orderStatTotal" class="text-lg font-black text-slate-800 font-mono">0</span>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg font-bold shrink-0">
-                            <i class="fa-solid fa-barcode"></i>
-                        </div>
-                        <div>
-                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Dengan No. Resi</span>
-                            <span id="orderStatWithResi" class="text-lg font-black text-emerald-600 font-mono">0</span>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-lg font-bold shrink-0">
-                            <i class="fa-solid fa-shield-halved"></i>
-                        </div>
-                        <div>
-                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Total Nilai Klaim</span>
-                            <span id="orderStatClaim" class="text-sm sm:text-base font-black text-amber-600 font-mono truncate">Rp 0</span>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center text-lg font-bold shrink-0">
-                            <i class="fa-solid fa-clock-rotate-left"></i>
-                        </div>
-                        <div>
-                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Sinkron Terakhir</span>
-                            <span id="orderStatLastSync" class="text-xs font-bold text-slate-700 block truncate">-</span>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- Table Data Orders Container -->
                 <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">

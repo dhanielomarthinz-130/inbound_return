@@ -41,19 +41,19 @@ try {
     }
 
     // ── 1. KPI Summary ──────────────────────────────────────────────────────
-    $kpiWhere = str_replace("s.created_at", "created_at", $where);
-    $kpiParams = $params;
+    // Gunakan JOIN ke return_items agar total qty selalu akurat (bukan kolom denormalisasi)
     $sqlKpi = "
         SELECT
-            COUNT(id)                       AS total_invoices,
-            COALESCE(SUM(total_items), 0)   AS total_items,
-            COALESCE(SUM(total_good), 0)    AS total_good,
-            COALESCE(SUM(total_damaged), 0) AS total_damaged
-        FROM return_sessions
-        {$kpiWhere}
+            COUNT(DISTINCT s.id)            AS total_invoices,
+            COALESCE(SUM(i.qty), 0)         AS total_items,
+            COALESCE(SUM(CASE WHEN UPPER(COALESCE(NULLIF(i.type,''), i.condition, 'GOOD')) = 'GOOD' THEN i.qty ELSE 0 END), 0) AS total_good,
+            COALESCE(SUM(CASE WHEN UPPER(COALESCE(NULLIF(i.type,''), i.condition, 'GOOD')) != 'GOOD' THEN i.qty ELSE 0 END), 0) AS total_damaged
+        FROM return_sessions s
+        LEFT JOIN return_items i ON i.session_id = s.id
+        {$where}
     ";
     $stmtKpi = $pdo->prepare($sqlKpi);
-    $stmtKpi->execute($kpiParams);
+    $stmtKpi->execute($params);
     $metrics = $stmtKpi->fetch();
 
     // ── 2. Total Qty per Ekspedisi ───────────────────────────────────────────
