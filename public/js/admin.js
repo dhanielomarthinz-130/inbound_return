@@ -766,6 +766,63 @@ window.viewDetails = async function(id) {
         downloadBtn.classList.add('hidden');
     }
 
+    // ---- RENDER FOTO DOKUMENTASI UNBOXING ----
+    const photosSection = document.getElementById('modalPhotosSection');
+    const photosGrid    = document.getElementById('modalPhotosGrid');
+    const photoCount    = document.getElementById('modalPhotoCount');
+
+    // Kumpulkan semua foto: package_photo, product_photo, photos (JSON array)
+    const allPhotos = [];
+    if (r.package_photo && r.package_photo.trim()) {
+        allPhotos.push({ url: r.package_photo, label: '📦 Foto Paket' });
+    }
+    if (r.product_photo && r.product_photo.trim()) {
+        allPhotos.push({ url: r.product_photo, label: '🏷️ Foto Produk' });
+    }
+    if (r.photos) {
+        let extraPhotos = r.photos;
+        if (typeof extraPhotos === 'string') {
+            try { extraPhotos = JSON.parse(extraPhotos); } catch(e) { extraPhotos = []; }
+        }
+        if (Array.isArray(extraPhotos)) {
+            extraPhotos.forEach((p, idx) => {
+                const url = (typeof p === 'object') ? (p.path || p.url || '') : p;
+                const label = (typeof p === 'object' && p.type) ? `📷 ${p.type}` : `📷 Foto ${idx + 1}`;
+                if (url && url.trim() && !allPhotos.find(x => x.url === url)) {
+                    allPhotos.push({ url, label });
+                }
+            });
+        }
+    }
+
+    if (photosGrid) photosGrid.innerHTML = '';
+    if (allPhotos.length > 0) {
+        if (photosSection) photosSection.classList.remove('hidden');
+        if (photoCount) photoCount.innerText = `${allPhotos.length} Foto`;
+        allPhotos.forEach(photo => {
+            const imgWrap = document.createElement('div');
+            imgWrap.className = 'relative group cursor-pointer rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-square shadow-xs hover:shadow-md transition';
+            imgWrap.onclick = () => {
+                const lb = document.getElementById('modalPhotoLightbox');
+                const lbImg = document.getElementById('modalPhotoLightboxImg');
+                if (lb && lbImg) {
+                    lbImg.src = photo.url;
+                    lb.classList.remove('hidden');
+                    lb.classList.add('flex');
+                }
+            };
+            imgWrap.innerHTML = `
+                <img src="${photo.url}" alt="${photo.label}" loading="lazy"
+                    class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                    onerror="this.parentElement.innerHTML='<div class=\'flex flex-col items-center justify-center h-full text-slate-400 text-[10px] p-2 text-center\'><i class=\'fa-solid fa-image-slash text-2xl mb-1\'></i>Foto tidak ditemukan</div>'">
+                <div class="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[9px] font-semibold px-2 py-1 opacity-0 group-hover:opacity-100 transition truncate">${photo.label}</div>
+            `;
+            if (photosGrid) photosGrid.appendChild(imgWrap);
+        });
+    } else {
+        if (photosSection) photosSection.classList.add('hidden');
+    }
+
     // Load Items List
     const tbody = document.getElementById('modalItemsTableBody');
     tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat detail item...</td></tr>`;

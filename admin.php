@@ -1659,6 +1659,29 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                     </div>
                 </div>
 
+                <!-- GALERI FOTO DOKUMENTASI UNBOXING -->
+                <div id="modalPhotosSection" class="hidden">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                            <i class="fa-solid fa-images text-indigo-500"></i>
+                            Foto Dokumentasi Unboxing
+                            <span id="modalPhotoCount" class="text-[10px] bg-indigo-50 text-indigo-600 border border-indigo-200 px-1.5 py-0.5 rounded font-bold">0 Foto</span>
+                        </span>
+                        <span class="text-[10px] text-slate-400">Klik foto untuk perbesar</span>
+                    </div>
+                    <div id="modalPhotosGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        <!-- Foto di-render oleh JS -->
+                    </div>
+                </div>
+
+                <!-- Lightbox Foto Full -->
+                <div id="modalPhotoLightbox" class="fixed inset-0 bg-black/90 z-[60] hidden items-center justify-center p-4" onclick="this.classList.add('hidden'); this.classList.remove('flex')">
+                    <img id="modalPhotoLightboxImg" src="" alt="Foto Unboxing" class="max-w-full max-h-[90vh] rounded-xl object-contain shadow-2xl">
+                    <button class="absolute top-4 right-4 text-white text-2xl bg-black/40 rounded-full w-10 h-10 flex items-center justify-center hover:bg-black/60 transition" onclick="document.getElementById('modalPhotoLightbox').classList.add('hidden'); document.getElementById('modalPhotoLightbox').classList.remove('flex')">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
                 <!-- TABEL DETAIL PRODUK YANG DI-RETURN -->
                 <div class="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
                     <div class="p-3 bg-slate-50 border-b border-slate-200 font-bold text-xs text-slate-700 flex items-center justify-between">
