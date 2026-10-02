@@ -97,10 +97,13 @@ if ($query === '' || $action === 'list_claimable') {
     }
 }
 
-// 1. Sanitasi query input
+// 1. Sanitasi query input — pertahankan tanda hubung (-) & slash karena ada di format resi ekspedisi
 $rawQuery = trim($_GET['q'] ?? $_GET['query'] ?? $_POST['query'] ?? '');
 $query    = trim(preg_replace('/[\r\n\t]+/', '', $rawQuery));
-$cleanQuery = trim(preg_replace('/[^a-zA-Z0-9_-]/', '', $query));
+// cleanQuery: hanya hapus karakter benar-benar tidak valid (spasi, dll), tapi pertahankan - dan /
+$cleanQuery = trim(preg_replace('/[^a-zA-Z0-9_\-\/]/', '', $query));
+// alphaNum: versi tanpa separator (untuk fallback matching)
+$alphaNumQuery = preg_replace('/[^a-zA-Z0-9]/', '', $query);
 
 $ocsBaseUrl = 'https://ocs.iegsystem.id';
 $ocsUser    = 'ADMIN';
@@ -118,8 +121,10 @@ try {
                OR tracking_number = :q2 
                OR order_id = :q3 
                OR tracking_number = :q4
-               OR REPLACE(tracking_number, ' ', '') = :q5
-               OR REPLACE(order_id, ' ', '') = :q6
+               OR REPLACE(REPLACE(tracking_number, ' ', ''), '-', '') = :q5
+               OR REPLACE(REPLACE(order_id, ' ', ''), '-', '') = :q6
+               OR tracking_number LIKE :q7
+               OR order_id LIKE :q8
             LIMIT 1
         ");
         $stmtCache->execute([
@@ -127,8 +132,10 @@ try {
             ':q2' => $query,
             ':q3' => $cleanQuery,
             ':q4' => $cleanQuery,
-            ':q5' => $cleanQuery,
-            ':q6' => $cleanQuery
+            ':q5' => $alphaNumQuery,
+            ':q6' => $alphaNumQuery,
+            ':q7' => '%' . $cleanQuery . '%',
+            ':q8' => '%' . $cleanQuery . '%',
         ]);
         $cached = $stmtCache->fetch(PDO::FETCH_ASSOC);
 
@@ -240,27 +247,34 @@ try {
                         }
                     }
 
-                    // Langkah B: Jika belum ketemu, cari di DTO_Orders berdasarkan Id (Primary Key, sangat cepat 0.15s)
+                    // Langkah B: Jika belum ketemu, cari di DTO_Orders berdasarkan Id ATAU TrackingNumber
                     if (!$foundOrderId) {
                         foreach ($queryCandidates as $qc) {
-                            $chOrd = curl_init("{$ocsBaseUrl}/odata/DTO_Orders?\$filter=" . urlencode("Id eq '{$qc}'") . "&\$top=1");
-                            curl_setopt_array($chOrd, [
-                                CURLOPT_RETURNTRANSFER => true,
-                                CURLOPT_HTTPGET        => true,
-                                CURLOPT_HTTPHEADER     => [
-                                    "Authorization: Bearer {$token}",
-                                    "Accept: application/json"
-                                ],
-                                CURLOPT_SSL_VERIFYPEER => false,
-                                CURLOPT_SSL_VERIFYHOST => false,
-                                CURLOPT_TIMEOUT        => 5
-                            ]);
-                            $ordRes = curl_exec($chOrd);
-                            curl_close($chOrd);
-                            $ordJson = json_decode($ordRes, true);
-                            if (!empty($ordJson['value'][0]['Id'])) {
-                                $foundOrderId = $ordJson['value'][0]['Id'];
-                                break;
+                            // Coba via Id
+                            $filterById = urlencode("Id eq '{$qc}'");
+                            // Coba via TrackingNumber (nomor resi ekspedisi)
+                            $filterByTrack = urlencode("TrackingNumber eq '{$qc}'");
+
+                            foreach ([$filterById, $filterByTrack] as $filterStr) {
+                                $chOrd = curl_init("{$ocsBaseUrl}/odata/DTO_Orders?\$filter={$filterStr}&\$top=1&\$select=Id,TrackingNumber");
+                                curl_setopt_array($chOrd, [
+                                    CURLOPT_RETURNTRANSFER => true,
+                                    CURLOPT_HTTPGET        => true,
+                                    CURLOPT_HTTPHEADER     => [
+                                        "Authorization: Bearer {$token}",
+                                        "Accept: application/json"
+                                    ],
+                                    CURLOPT_SSL_VERIFYPEER => false,
+                                    CURLOPT_SSL_VERIFYHOST => false,
+                                    CURLOPT_TIMEOUT        => 5
+                                ]);
+                                $ordRes = curl_exec($chOrd);
+                                curl_close($chOrd);
+                                $ordJson = json_decode($ordRes, true);
+                                if (!empty($ordJson['value'][0]['Id'])) {
+                                    $foundOrderId = $ordJson['value'][0]['Id'];
+                                    break 2;
+                                }
                             }
                         }
                     }
@@ -566,22 +580,39 @@ try {
         $stmtUnbox->execute($candidateIds);
         $unboxRow = $stmtUnbox->fetch(PDO::FETCH_ASSOC);
 
-        // Jika belum ketemu dan ada receiving barcode, coba cari berdasarkan partial / like
+        // Jika belum ketemu, coba normalisasi: strip non-alphanumeric lalu bandingkan
         if (!$unboxRow) {
             foreach ($candidateIds as $cid) {
                 if (strlen($cid) >= 6) {
+                    // Coba exact LIKE partial match
                     $stmtUnboxLike = $pdo->prepare("
                         SELECT rs.* 
                         FROM return_sessions rs
                         WHERE rs.invoice_number LIKE ?
+                           OR REPLACE(REPLACE(rs.invoice_number, '-', ''), ' ', '') = ?
+                           OR REPLACE(REPLACE(?, '-', ''), ' ', '') = REPLACE(REPLACE(rs.invoice_number, '-', ''), ' ', '')
                         ORDER BY rs.id DESC
                         LIMIT 1
                     ");
-                    $stmtUnboxLike->execute(["%{$cid}%"]);
+                    $cidAlnum = preg_replace('/[^a-zA-Z0-9]/', '', $cid);
+                    $stmtUnboxLike->execute(["%{$cid}%", $cidAlnum, $cid]);
                     $unboxRow = $stmtUnboxLike->fetch(PDO::FETCH_ASSOC);
                     if ($unboxRow) break;
                 }
             }
+        }
+
+        // Jika masih belum ketemu, coba cari dari alphaNumQuery (versi tanpa separator)
+        if (!$unboxRow && !empty($alphaNumQuery) && strlen($alphaNumQuery) >= 6) {
+            $stmtAlnum = $pdo->prepare("
+                SELECT rs.* 
+                FROM return_sessions rs
+                WHERE REPLACE(REPLACE(REPLACE(rs.invoice_number, '-', ''), ' ', ''), '/', '') = ?
+                ORDER BY rs.id DESC
+                LIMIT 1
+            ");
+            $stmtAlnum->execute([$alphaNumQuery]);
+            $unboxRow = $stmtAlnum->fetch(PDO::FETCH_ASSOC);
         }
     }
 
@@ -721,13 +752,21 @@ try {
     }
 
     if (!$orderData && !$receptionData && !$unboxingData) {
+        // Bantu user mengerti kenapa tidak ketemu
         echo json_encode([
-            'success' => false,
-            'message' => 'Data nomor resi atau order tidak ditemukan di sistem OCS maupun gudang lokal.',
-            'query'   => $query
+            'success'        => false,
+            'ocs_not_found'  => true,
+            'message'        => 'Data tidak ditemukan. Pastikan nomor resi/order sesuai dengan yang tercatat di Inbound Unboxing atau OCS. Coba juga cari tanpa tanda hubung (-) atau dengan format lain.',
+            'query'          => $query,
+            'clean_query'    => $cleanQuery,
+            'alpha_query'    => $alphaNumQuery,
+            'hint'           => 'Jika baru saja melakukan unboxing, pastikan session sudah tersimpan. Cek juga apakah nomor resi di unboxing menggunakan format yang sama.'
         ]);
         exit;
     }
+    
+    // Tandai apakah data OCS berhasil ditemukan (untuk info user di halaman klaim)
+    $ocsFound = !empty($orderData) && ($orderData['_source'] ?? '') !== 'local_database';
 
     // 7. EVALUASI KELAYAKAN KLAIM: HANYA PAKET DENGAN TYPE ATAU KONDISI BUKAN GOOD / BAGUS
     $isClaimable = false;
@@ -787,6 +826,8 @@ try {
     echo json_encode([
         'success'                  => true,
         'query'                    => $query,
+        'ocs_found'                => $ocsFound,
+        'ocs_source'               => $orderData['_source'] ?? 'unknown',
         'is_claimable'             => $isClaimable,
         'claim_eligibility_reason' => $claimEligibilityReason,
         'damaged_count'            => $damagedCount,

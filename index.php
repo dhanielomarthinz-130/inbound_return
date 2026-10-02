@@ -198,10 +198,11 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                 <!-- Input File Multiple Fallback Tersembunyi -->
                 <input type="file" id="filePhotosUpload" accept="image/*" multiple class="hidden" onchange="handlePhotosMultipleUpload(this)">
 
-                <!-- Tombol Shortcut Tuts Keyboard -->
+                <!-- Tombol Shortcut Tuts Keyboard (Hanya Aktif Jika Resi / Invoice Sudah Terisi) -->
                 <div class="grid grid-cols-2 gap-2 shrink-0">
-                    <button id="btnCapturePackagePhoto" onclick="capturePackagePhoto()" type="button" 
-                        class="flex items-center justify-center gap-2 py-1.5 px-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl font-bold text-xs transition shadow-sm shadow-indigo-600/25">
+                    <button id="btnCapturePackagePhoto" onclick="capturePackagePhoto()" type="button" disabled
+                        title="Isi nomor resi / invoice terlebih dahulu"
+                        class="flex items-center justify-center gap-2 py-1.5 px-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl font-bold text-xs transition shadow-sm shadow-indigo-600/25 opacity-40 cursor-not-allowed">
                         <i class="fa-solid fa-box text-xs"></i>
                         <div class="text-left leading-tight">
                             <span class="block text-[9px] opacity-80 font-mono font-black">TUTS [F2]</span>
@@ -209,8 +210,9 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                         </div>
                     </button>
 
-                    <button id="btnCaptureProductPhoto" onclick="captureProductPhoto()" type="button" 
-                        class="flex items-center justify-center gap-2 py-1.5 px-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl font-bold text-xs transition shadow-sm shadow-emerald-600/25">
+                    <button id="btnCaptureProductPhoto" onclick="captureProductPhoto()" type="button" disabled
+                        title="Isi nomor resi / invoice terlebih dahulu"
+                        class="flex items-center justify-center gap-2 py-1.5 px-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl font-bold text-xs transition shadow-sm shadow-emerald-600/25 opacity-40 cursor-not-allowed">
                         <i class="fa-solid fa-tag text-xs"></i>
                         <div class="text-left leading-tight">
                             <span class="block text-[9px] opacity-80 font-mono font-black">TUTS [F4]</span>
@@ -219,10 +221,12 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                     </button>
                 </div>
 
-                <!-- Opsi Tambah dari File & Info -->
+                <!-- Opsi Tambah dari File & Info Status -->
                 <div class="flex items-center justify-between text-[10px] text-slate-500 shrink-0">
-                    <span class="text-slate-400">Tekan F2/F4 untuk ambil foto</span>
-                    <button type="button" onclick="document.getElementById('filePhotosUpload').click()" title="Unggah foto dari galeri / komputer" class="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 hover:underline">
+                    <span id="photoShortcutsHint" class="text-amber-600 font-semibold flex items-center gap-1">
+                        <i class="fa-solid fa-lock text-[9px]"></i> Isi Resi/Invoice dahulu
+                    </span>
+                    <button type="button" id="btnUploadPhotosFile" onclick="triggerPhotosUploadClick()" title="Unggah foto dari galeri / komputer" class="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 hover:underline opacity-40 cursor-not-allowed">
                         <i class="fa-solid fa-upload"></i> Upload File
                     </button>
                 </div>
@@ -657,29 +661,7 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                         </div>
                     </div>
 
-                    <!-- Action Bar: Tombol ENTER Terpisah & Tombol Tambah Item -->
-                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-0.5">
-                        <!-- Tombol ENTER Terpisah (Besar & Responsif untuk Touchscreen / Tanpa Keyboard Fisik) -->
-                        <button type="button" onclick="triggerVirtualEnter()" id="btnVirtualEnter"
-                            class="sm:col-span-7 bg-slate-800 hover:bg-slate-900 active:scale-98 text-white font-bold py-2 px-3 rounded-xl text-xs transition shadow-sm flex items-center justify-between group border border-slate-700 cursor-pointer">
-                            <span class="flex items-center gap-1.5">
-                                <kbd class="px-1.5 py-0.5 bg-slate-700 group-hover:bg-indigo-600 rounded-md font-mono text-[10px] font-black tracking-wider text-white shadow-xs transition">↵ ENTER</kbd>
-                                <span class="font-bold text-xs">Pindah Kolom</span>
-                            </span>
-                            <span id="virtualEnterTargetLabel" class="text-[10px] font-mono text-slate-300 group-hover:text-indigo-200 transition">
-                                Lanjut ke No. Batch ➔
-                            </span>
-                        </button>
-
-                        <!-- Tombol Tambahkan Item -->
-                        <button type="submit" id="btnSubmitItem"
-                            class="sm:col-span-5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-bold py-2 px-3 rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-sm shadow-indigo-600/30 cursor-pointer">
-                            <i class="fa-solid fa-plus-circle text-xs"></i>
-                            <span>Tambahkan Item</span>
-                        </button>
-                    </div>
-
-                    <!-- Status Preview Produk Terdeteksi -->
+                    <!-- Status Preview Produk Terdeteksi (Di Atas Tombol Aksi) -->
                     <div class="text-[11px] bg-slate-50 p-2 rounded-xl border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1.5">
                         <div class="min-w-0 flex-1">
                             <span class="text-slate-400 font-bold uppercase text-[9px] tracking-wider block">Produk Terdeteksi:</span>
@@ -688,6 +670,28 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                             </div>
                             <div id="detectedProductSku" class="mt-0.5"></div>
                         </div>
+                    </div>
+
+                    <!-- Action Bar Paling Bawah: Tambahkan Item di Kiri & Tombol ENTER di Kanan Paling Bawah -->
+                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-0.5">
+                        <!-- Tombol Tambahkan Item (Sebelah Kiri) -->
+                        <button type="submit" id="btnSubmitItem"
+                            class="sm:col-span-5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-sm shadow-indigo-600/30 cursor-pointer">
+                            <i class="fa-solid fa-plus-circle text-xs"></i>
+                            <span>Tambahkan Item</span>
+                        </button>
+
+                        <!-- Tombol ENTER Terpisah (Paling Bawah Sebelah Kanan, Akses Cepat & Gampang Dipencet) -->
+                        <button type="button" onclick="triggerVirtualEnter()" id="btnVirtualEnter"
+                            class="sm:col-span-7 bg-slate-800 hover:bg-slate-900 active:scale-98 text-white font-bold py-2.5 px-3.5 rounded-xl text-xs transition shadow-md shadow-slate-900/20 flex items-center justify-between group border border-slate-700 cursor-pointer">
+                            <span class="flex items-center gap-2">
+                                <kbd class="px-2 py-0.5 bg-indigo-600 text-white rounded-md font-mono text-[10px] font-black tracking-wider shadow-xs transition group-hover:bg-indigo-500">↵ ENTER</kbd>
+                                <span class="font-bold text-xs">Pindah Kolom</span>
+                            </span>
+                            <span id="virtualEnterTargetLabel" class="text-[10px] font-mono font-semibold text-emerald-300 group-hover:text-emerald-200 transition">
+                                Lanjut ke No. Batch ➔
+                            </span>
+                        </button>
                     </div>
 
                 </form>

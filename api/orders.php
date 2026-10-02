@@ -323,22 +323,47 @@ try {
     }
 
     // -------------------------------------------------------------
-    // ACTION: LIST (Data table dengan pagination, search & filter)
+    // ACTION: FILTER_OPTIONS (Pilihan filter unik untuk dropdown UI)
+    // -------------------------------------------------------------
+    if ($action === 'filter_options') {
+        $platforms = $pdo->query("SELECT DISTINCT commerce_platform FROM ocs_orders WHERE commerce_platform IS NOT NULL AND commerce_platform != '' ORDER BY commerce_platform ASC")->fetchAll(PDO::FETCH_COLUMN);
+        $shops     = $pdo->query("SELECT DISTINCT shop_name FROM ocs_orders WHERE shop_name IS NOT NULL AND shop_name != '' ORDER BY shop_name ASC")->fetchAll(PDO::FETCH_COLUMN);
+        $shipping  = $pdo->query("SELECT DISTINCT shipping_provider FROM ocs_orders WHERE shipping_provider IS NOT NULL AND shipping_provider != '' ORDER BY shipping_provider ASC")->fetchAll(PDO::FETCH_COLUMN);
+        $statuses  = $pdo->query("SELECT DISTINCT status_name FROM ocs_orders WHERE status_name IS NOT NULL AND status_name != '' ORDER BY status_name ASC")->fetchAll(PDO::FETCH_COLUMN);
+
+        echo json_encode([
+            'success'            => true,
+            'platforms'          => $platforms,
+            'shops'              => $shops,
+            'shipping_providers' => $shipping,
+            'statuses'           => $statuses
+        ]);
+        exit;
+    }
+
+    // -------------------------------------------------------------
+    // ACTION: LIST (Data table dengan pagination, search & multi-filter)
     // -------------------------------------------------------------
     if ($action === 'list') {
-        $page       = max(1, (int)($_GET['page'] ?? 1));
-        $limit      = min(10000, max(1, (int)($_GET['limit'] ?? 25)));
-        $offset     = ($page - 1) * $limit;
-        $search     = trim($_GET['search'] ?? '');
-        $platform   = trim($_GET['platform'] ?? '');
-        $dateFilter = trim($_GET['date'] ?? '');
-        $startDate  = trim($_GET['start_date'] ?? '');
-        $endDate    = trim($_GET['end_date'] ?? '');
+        $page        = max(1, (int)($_GET['page'] ?? 1));
+        $limit       = min(10000, max(1, (int)($_GET['limit'] ?? 25)));
+        $offset      = ($page - 1) * $limit;
+        $search      = trim($_GET['search'] ?? '');
+        $platform    = trim($_GET['platform'] ?? '');
+        $shop        = trim($_GET['shop'] ?? '');
+        $shipping    = trim($_GET['shipping'] ?? '');
+        $status      = trim($_GET['status'] ?? '');
+        $resiStatus  = trim($_GET['resi_status'] ?? '');
+        $claimStatus = trim($_GET['claim_status'] ?? '');
+        $dateFilter  = trim($_GET['date'] ?? '');
+        $startDate   = trim($_GET['start_date'] ?? '');
+        $endDate     = trim($_GET['end_date'] ?? '');
+        $sort        = trim($_GET['sort'] ?? 'date_desc');
 
         $where = [];
         $params = [];
 
-        // Filter Pencarian kata kunci
+        // 1. Filter Pencarian kata kunci
         if ($search !== '') {
             $where[] = "(
                 order_id LIKE :s1 
@@ -359,13 +384,45 @@ try {
             $params[':s7'] = $sWild;
         }
 
-        // Filter Platform Marketplace
+        // 2. Filter Platform Marketplace
         if ($platform !== '' && $platform !== 'ALL') {
             $where[] = "commerce_platform = :plat";
             $params[':plat'] = $platform;
         }
 
-        // Filter Tanggal
+        // 3. Filter Toko (Shop Name)
+        if ($shop !== '' && $shop !== 'ALL') {
+            $where[] = "shop_name = :shop";
+            $params[':shop'] = $shop;
+        }
+
+        // 4. Filter Ekspedisi (Shipping Provider)
+        if ($shipping !== '' && $shipping !== 'ALL') {
+            $where[] = "shipping_provider LIKE :shipping";
+            $params[':shipping'] = "%{$shipping}%";
+        }
+
+        // 5. Filter Status Order
+        if ($status !== '' && $status !== 'ALL') {
+            $where[] = "(status_name = :status OR status_code = :status)";
+            $params[':status'] = $status;
+        }
+
+        // 6. Filter Kelengkapan No. Resi
+        if ($resiStatus === 'with_resi') {
+            $where[] = "(tracking_number IS NOT NULL AND tracking_number != '')";
+        } elseif ($resiStatus === 'no_resi') {
+            $where[] = "(tracking_number IS NULL OR tracking_number = '')";
+        }
+
+        // 7. Filter Nilai Klaim
+        if ($claimStatus === 'has_claim') {
+            $where[] = "total_amount > 0";
+        } elseif ($claimStatus === 'zero_claim') {
+            $where[] = "(total_amount <= 0 OR total_amount IS NULL)";
+        }
+
+        // 8. Filter Tanggal Order
         if ($dateFilter === 'today') {
             $where[] = "DATE(order_created_at) = CURDATE()";
         } elseif ($dateFilter === 'yesterday') {
@@ -382,10 +439,26 @@ try {
 
         $whereSql = !empty($where) ? ('WHERE ' . implode(' AND ', $where)) : '';
 
-        // Hitung total baris
+        // Hitung total baris sesuai filter
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM ocs_orders {$whereSql}");
         $countStmt->execute($params);
         $totalRecords = (int)$countStmt->fetchColumn();
+
+        // Tentukan Urutan (Sort)
+        switch ($sort) {
+            case 'date_asc':
+                $orderBySql = "order_created_at ASC, id ASC";
+                break;
+            case 'price_desc':
+                $orderBySql = "total_amount DESC, id DESC";
+                break;
+            case 'price_asc':
+                $orderBySql = "total_amount ASC, id ASC";
+                break;
+            default:
+                $orderBySql = "order_created_at DESC, id DESC";
+                break;
+        }
 
         // Ambil data halaman aktif
         $sql = "SELECT id, order_id, tracking_number, commerce_platform, shop_name, 
@@ -397,7 +470,7 @@ try {
                        (CASE WHEN order_items_json IS NOT NULL AND order_items_json != '' THEN 1 ELSE 0 END) AS has_sku_details
                 FROM ocs_orders 
                 {$whereSql} 
-                ORDER BY order_created_at DESC, id DESC 
+                ORDER BY {$orderBySql} 
                 LIMIT {$limit} OFFSET {$offset}";
 
         $stmt = $pdo->prepare($sql);
@@ -456,27 +529,32 @@ try {
         }
         unset($ord);
 
-        // Daftar platform untuk filter dropdown
-        $platformsStmt = $pdo->query("SELECT DISTINCT commerce_platform FROM ocs_orders WHERE commerce_platform IS NOT NULL AND commerce_platform != '' ORDER BY commerce_platform ASC");
-        $platforms = $platformsStmt->fetchAll(PDO::FETCH_COLUMN);
+        // Ambil daftar filter dinamis dari database untuk melengkapi dropdown
+        $platforms = $pdo->query("SELECT DISTINCT commerce_platform FROM ocs_orders WHERE commerce_platform IS NOT NULL AND commerce_platform != '' ORDER BY commerce_platform ASC")->fetchAll(PDO::FETCH_COLUMN);
+        $shops     = $pdo->query("SELECT DISTINCT shop_name FROM ocs_orders WHERE shop_name IS NOT NULL AND shop_name != '' ORDER BY shop_name ASC")->fetchAll(PDO::FETCH_COLUMN);
+        $shipping  = $pdo->query("SELECT DISTINCT shipping_provider FROM ocs_orders WHERE shipping_provider IS NOT NULL AND shipping_provider != '' ORDER BY shipping_provider ASC")->fetchAll(PDO::FETCH_COLUMN);
+        $statuses  = $pdo->query("SELECT DISTINCT status_name FROM ocs_orders WHERE status_name IS NOT NULL AND status_name != '' ORDER BY status_name ASC")->fetchAll(PDO::FETCH_COLUMN);
 
         $totalPages = $totalRecords > 0 ? (int)ceil($totalRecords / $limit) : 1;
 
         echo json_encode([
-            'success'       => true,
-            'orders'        => $orders,
-            'data'          => $orders,
-            'pagination'    => [
+            'success'            => true,
+            'orders'             => $orders,
+            'data'               => $orders,
+            'pagination'         => [
                 'page'        => $page,
                 'limit'       => $limit,
                 'total'       => $totalRecords,
                 'total_pages' => $totalPages
             ],
-            'page'          => $page,
-            'limit'         => $limit,
-            'total_records' => $totalRecords,
-            'total_pages'   => $totalPages,
-            'platforms'     => $platforms
+            'page'               => $page,
+            'limit'              => $limit,
+            'total_records'      => $totalRecords,
+            'total_pages'        => $totalPages,
+            'platforms'          => $platforms,
+            'shops'              => $shops,
+            'shipping_providers' => $shipping,
+            'statuses'           => $statuses
         ]);
         exit;
     }

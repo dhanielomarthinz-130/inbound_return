@@ -593,6 +593,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 <div class="flex flex-wrap items-center gap-2 mb-1.5">
                                     <span class="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 font-bold text-[10px] uppercase tracking-wider">Berkas Klaim Resmi</span>
                                     <span id="claimMarketplaceBadge" class="px-2 py-0.5 rounded-md bg-white/10 text-white font-bold text-[10px] uppercase">Marketplace</span>
+                                    <span id="claimOcsBadge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-300" title="Status sumber data OCS"><i class="fa-solid fa-circle-question"></i> Sumber Data</span>
                                     <span id="claimPriceBadge" class="px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-bold text-xs border border-emerald-400/30 flex items-center gap-1.5 shadow-xs">
                                         <i class="fa-solid fa-money-bill-wave text-emerald-400 text-xs"></i> Nilai Paket: <span id="claimPriceText" class="font-black text-white">Rp -</span>
                                     </span>
@@ -922,53 +923,106 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 <!-- Table Data Orders Container -->
                 <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
                     <!-- Filter Toolbar -->
-                    <div class="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
-                        <div class="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
+                    <div class="p-4 border-b border-slate-200 bg-slate-50/70 space-y-3">
+                        <!-- Baris 1: Pencarian & Dimensi Utama -->
+                        <div class="flex flex-wrap items-center gap-2.5">
                             <!-- Search -->
-                            <div class="relative flex-1 sm:max-w-xs">
+                            <div class="relative flex-1 min-w-[240px] sm:max-w-md">
                                 <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
                                     <i class="fa-solid fa-magnifying-glass"></i>
                                 </span>
-                                <input type="text" id="orderSearchInput" onkeyup="debounceOrderSearch()" placeholder="Cari Resi / Invoice / SKU / Produk..." 
-                                    class="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs">
+                                <input type="text" id="orderSearchInput" onkeyup="debounceOrderSearch()" placeholder="Cari Resi, Order ID, SKU, Produk, Toko, Customer..." 
+                                    class="w-full pl-8 pr-8 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs">
+                                <button type="button" id="btnClearOrderSearch" onclick="clearOrderSearch()" class="hidden absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 text-xs">
+                                    <i class="fa-solid fa-circle-xmark"></i>
+                                </button>
                             </div>
 
                             <!-- Filter Platform -->
                             <select id="orderPlatformFilter" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs">
-                                <option value="ALL">Semua Platform</option>
+                                <option value="ALL">🌐 Semua Platform</option>
                                 <option value="SHOPEE">Shopee</option>
                                 <option value="TIKTOK_SHOP">TikTok Shop</option>
                                 <option value="TOKOPEDIA">Tokopedia</option>
                                 <option value="LAZADA">Lazada</option>
                             </select>
 
-                            <!-- Filter Tanggal -->
-                            <select id="orderDateFilter" onchange="onOrderDateFilterChanged()" class="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs">
-                                <option value="">Semua Periode</option>
-                                <option value="today">Hari Ini</option>
-                                <option value="yesterday">Hari Kemarin</option>
-                                <option value="last7">7 Hari Terakhir</option>
-                                <option value="last30">30 Hari Terakhir</option>
-                                <option value="custom">Pilih Tanggal...</option>
+                            <!-- Filter Toko (Shop Name) -->
+                            <select id="orderShopFilter" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs max-w-[170px] truncate">
+                                <option value="ALL">🏪 Semua Toko</option>
                             </select>
 
-                            <div id="orderCustomDateBox" class="hidden flex items-center gap-1.5">
-                                <input type="date" id="orderStartDate" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs text-slate-700">
-                                <span class="text-xs text-slate-400">s/d</span>
-                                <input type="date" id="orderEndDate" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs text-slate-700">
-                            </div>
+                            <!-- Filter Ekspedisi (Shipping Provider) -->
+                            <select id="orderShippingFilter" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs max-w-[170px] truncate">
+                                <option value="ALL">🚚 Semua Ekspedisi</option>
+                            </select>
+
+                            <!-- Filter Status Order -->
+                            <select id="orderStatusFilter" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs max-w-[160px] truncate">
+                                <option value="ALL">📋 Semua Status</option>
+                            </select>
                         </div>
 
-                        <div class="flex items-center gap-2">
-                            <span class="text-xs text-slate-400">Tampilkan:</span>
-                            <select id="orderLimitSelect" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700">
-                                <option value="25">25</option>
-                                <option value="50">50</option>
-                                <option value="100">100</option>
-                            </select>
-                            <button onclick="loadOrdersTable(1)" class="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs transition" title="Refresh Data">
-                                <i class="fa-solid fa-arrows-rotate"></i>
-                            </button>
+                        <!-- Baris 2: Filter Tambahan, Periode Tanggal, Urutan & Aksi -->
+                        <div class="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-200/80">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <!-- Filter Status Resi -->
+                                <select id="orderResiFilter" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs">
+                                    <option value="ALL">📦 Semua Resi</option>
+                                    <option value="with_resi">✓ Sudah Ada Resi</option>
+                                    <option value="no_resi">✕ Belum Ada Resi</option>
+                                </select>
+
+                                <!-- Filter Kelayakan / Nilai Klaim -->
+                                <select id="orderClaimFilter" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs">
+                                    <option value="ALL">💰 Semua Nilai</option>
+                                    <option value="has_claim">Bernilai Klaim (> Rp 0)</option>
+                                    <option value="zero_claim">Tanpa Klaim (Rp 0)</option>
+                                </select>
+
+                                <!-- Filter Periode Tanggal -->
+                                <select id="orderDateFilter" onchange="onOrderDateFilterChanged()" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs">
+                                    <option value="">📅 Semua Periode</option>
+                                    <option value="today">Hari Ini</option>
+                                    <option value="yesterday">Hari Kemarin</option>
+                                    <option value="last7">7 Hari Terakhir</option>
+                                    <option value="last30">30 Hari Terakhir</option>
+                                    <option value="custom">Pilih Tanggal Kustom...</option>
+                                </select>
+
+                                <div id="orderCustomDateBox" class="hidden flex items-center gap-1.5">
+                                    <input type="date" id="orderStartDate" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs text-slate-700">
+                                    <span class="text-xs text-slate-400">s/d</span>
+                                    <input type="date" id="orderEndDate" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs text-slate-700">
+                                </div>
+
+                                <!-- Urutan (Sort) -->
+                                <select id="orderSortSelect" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs">
+                                    <option value="date_desc">Tgl Order: Terbaru</option>
+                                    <option value="date_asc">Tgl Order: Terlama</option>
+                                    <option value="price_desc">Harga: Tertinggi</option>
+                                    <option value="price_asc">Harga: Terendah</option>
+                                </select>
+
+                                <!-- Tombol Reset Filter -->
+                                <button type="button" onclick="resetOrderFilters()" class="px-2.5 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition flex items-center gap-1" title="Reset Semua Filter ke Default">
+                                    <i class="fa-solid fa-filter-circle-xmark"></i>
+                                    <span>Reset</span>
+                                </button>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-slate-400">Tampilkan:</span>
+                                <select id="orderLimitSelect" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700">
+                                    <option value="25">25</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                    <option value="250">250</option>
+                                </select>
+                                <button onclick="loadOrdersTable(1)" class="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs transition" title="Refresh Data">
+                                    <i class="fa-solid fa-arrows-rotate"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
 

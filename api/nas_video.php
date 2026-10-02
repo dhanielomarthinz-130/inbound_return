@@ -110,7 +110,7 @@ function streamVideoWithRange($filePath) {
 }
 
 // -------------------------------------------------------------
-// Helper: Login ke Synology DSM API (Web API fallback)
+// Helper: Login ke Synology DSM API (Web API)
 // -------------------------------------------------------------
 function getSynoSid($protocol, $host, $port, $user, $pass) {
     if (empty($user) || empty($pass)) return null;
@@ -144,34 +144,46 @@ if ($action === 'stream') {
         die("Nama file video tidak disertakan.");
     }
 
-    // Cek di SMB
-    ensureSmbConnected($nasSmbPath, $nasUser, $nasPass);
+    // Cek di SMB lokal jika file ada
     $localSmbFile = rtrim($nasSmbPath, "\\/") . DIRECTORY_SEPARATOR . $targetFile;
-
     if (file_exists($localSmbFile)) {
         streamVideoWithRange($localSmbFile);
     }
 
-    // Fallback: Stream via Synology DSM Web API
+    // Stream via Synology DSM Web API
     $sid = getSynoSid($nasProtocol, $nasHost, $nasPort, $nasUser, $nasPass);
     if (!$sid) {
         http_response_code(404);
-        die("Video tidak ditemukan di direktori SMB dan autentikasi Synology Web API gagal.");
+        die("Autentikasi Synology Web API gagal.");
     }
 
-    $fullNasPath = rtrim($nasFolder, '/') . '/' . $targetFile;
+    $folder = trim($_GET['folder'] ?? $nasFolder);
+    $fullNasPath = rtrim($folder, '/') . '/' . $targetFile;
     $downloadUrl = "{$nasProtocol}://{$nasHost}:{$nasPort}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=" . urlencode($fullNasPath) . "&mode=open&_sid=" . urlencode($sid);
 
     $ch = curl_init($downloadUrl);
+    $curlHeaders = [];
+    if (isset($_SERVER['HTTP_RANGE'])) {
+        $curlHeaders[] = 'Range: ' . $_SERVER['HTTP_RANGE'];
+    }
+
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => false,
         CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_SSL_VERIFYHOST => false,
         CURLOPT_TIMEOUT        => 300,
+        CURLOPT_HTTPHEADER     => $curlHeaders,
         CURLOPT_HEADERFUNCTION => function($curl, $header) {
             $len = strlen($header);
             $h = trim($header);
-            if (stripos($h, 'Content-Type:') === 0 || stripos($h, 'Content-Length:') === 0 || stripos($h, 'Content-Range:') === 0 || stripos($h, 'Accept-Ranges:') === 0) {
+            if (preg_match('#^HTTP/\S+\s+(\d{3})#', $h, $m)) {
+                http_response_code((int)$m[1]);
+            } elseif (stripos($h, 'Content-Type:') === 0 || 
+                      stripos($h, 'Content-Length:') === 0 || 
+                      stripos($h, 'Content-Range:') === 0 || 
+                      stripos($h, 'Accept-Ranges:') === 0 ||
+                      stripos($h, 'ETag:') === 0 ||
+                      stripos($h, 'Last-Modified:') === 0) {
                 header($h);
             }
             return $len;
@@ -219,7 +231,17 @@ if ($action === 'save_config') {
 // -------------------------------------------------------------
 header('Content-Type: application/json; charset=utf-8');
 
-if (empty($query)) {
+$rawCandidates = [
+    $query,
+    trim($_GET['order_id'] ?? $_POST['order_id'] ?? ''),
+    trim($_GET['tracking_number'] ?? $_POST['tracking_number'] ?? ''),
+    trim($_GET['package_barcode'] ?? $_POST['package_barcode'] ?? ''),
+    trim($_GET['alt_query'] ?? $_POST['alt_query'] ?? '')
+];
+
+$rawCandidates = array_values(array_unique(array_filter($rawCandidates)));
+
+if (empty($rawCandidates)) {
     echo json_encode([
         'success' => false,
         'message' => 'Parameter nomor resi atau invoice (q) tidak boleh kosong.'
@@ -228,9 +250,21 @@ if (empty($query)) {
 }
 
 $directFileStationUrl = "{$nasProtocol}://{$nasHost}:{$nasPort}/#/signin";
-$cleanQuery = preg_replace('/[^a-zA-Z0-9_\-]/', '', $query);
 
-if (strlen($cleanQuery) < 4) {
+// Bangun varian pencarian dari semua kandidat
+$searchVariants = [];
+foreach ($rawCandidates as $cand) {
+    $clean = preg_replace('/[^a-zA-Z0-9_\-]/', '', $cand);
+    $alpha = preg_replace('/[^a-zA-Z0-9]/', '', $cand);
+    if (strlen($clean) >= 4) $searchVariants[] = $clean;
+    if (strlen($alpha) >= 4 && $alpha !== $clean) $searchVariants[] = $alpha;
+    // Prefix 12 digit jika panjang
+    if (strlen($clean) > 12) $searchVariants[] = substr($clean, 0, 12);
+    if (strlen($alpha) > 12 && $alpha !== $clean) $searchVariants[] = substr($alpha, 0, 12);
+}
+$searchVariants = array_values(array_unique($searchVariants));
+
+if (empty($searchVariants)) {
     echo json_encode([
         'success'   => false,
         'has_video' => false,
@@ -239,78 +273,118 @@ if (strlen($cleanQuery) < 4) {
     exit;
 }
 
-// 1. Coba cari di SMB Share \\192.168.30.5\PACKER
 $foundVideos = [];
-$smbConnected = ensureSmbConnected($nasSmbPath, $nasUser, $nasPass);
 
-if ($smbConnected && @is_dir($nasSmbPath)) {
-    // Jalankan dir /b untuk mencari file matching
-    $smbSearchCmd = 'cmd.exe /c "dir /b ' . escapeshellarg($nasSmbPath . '\*' . $cleanQuery . '*.mp4') . ' 2>nul"';
-    $outputLines = [];
-    @exec($smbSearchCmd, $outputLines);
+// 1. CARI CEPAT MELALUI SYNOLOGY DSM WEB API (FileStation List dengan Pattern)
+// Ini berjalan sangat cepat (<1 detik) di NAS tanpa overhead scan 2.2 juta file SMB
+$sid = getSynoSid($nasProtocol, $nasHost, $nasPort, $nasUser, $nasPass);
+if ($sid) {
+    $foldersToCheck = array_values(array_unique([$nasFolder, '/RETURN CAM', '/PACKER-BAK']));
+    foreach ($foldersToCheck as $fld) {
+        foreach ($searchVariants as $sv) {
+            $listUrl = "{$nasProtocol}://{$nasHost}:{$nasPort}/webapi/entry.cgi?" . http_build_query([
+                'api'         => 'SYNO.FileStation.List',
+                'version'     => 2,
+                'method'      => 'list',
+                'folder_path' => $fld,
+                'pattern'     => "*{$sv}*",
+                'additional'  => 'size,time',
+                'offset'      => 0,
+                'limit'       => 10,
+                '_sid'        => $sid
+            ]);
+            $ch = curl_init($listUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false,
+                CURLOPT_TIMEOUT        => 5
+            ]);
+            $listRes = curl_exec($ch);
+            curl_close($ch);
 
-    foreach ($outputLines as $fName) {
-        $fName = trim($fName);
-        if (empty($fName)) continue;
+            $listJson = json_decode($listRes, true);
+            $files = $listJson['data']['files'] ?? [];
+            foreach ($files as $f) {
+                if (!empty($f['isdir'])) continue;
+                $fName = $f['name'] ?? '';
+                $fExt = strtolower(pathinfo($fName, PATHINFO_EXTENSION));
+                if (!in_array($fExt, ['mp4', 'webm', 'avi', 'mkv'])) continue;
 
-        $fullPath = rtrim($nasSmbPath, "\\/") . DIRECTORY_SEPARATOR . $fName;
-        $sizeBytes = @filesize($fullPath) ?: 0;
-        $mtime = @filemtime($fullPath) ?: null;
+                // Cek duplikasi
+                foreach ($foundVideos as $fv) {
+                    if ($fv['name'] === $fName) continue 2;
+                }
 
-        // Ekstrak info dari nama file: e.g. JX7690969874_583272087550789099_MOI_8_170920.mp4
-        $station = 'Stasiun Packing';
-        $parts = explode('_', pathinfo($fName, PATHINFO_FILENAME));
-        if (count($parts) >= 3) {
-            // Bagian station seringkali di index ke-2 dan ke-3 (contoh MOI_8 atau MOI_31)
-            $station = $parts[count($parts) - 3] . ' ' . $parts[count($parts) - 2];
+                $sizeBytes = $f['additional']['size'] ?? 0;
+                $mtime = $f['additional']['time'] ?? null;
+                $fPath = $f['path'] ?? ($fld . '/' . $fName);
+
+                // Ekstrak info stasiun dari nama file jika ada
+                // Contoh: SPXID06493096577A_25_261001FV3UD257_20261002102603.mp4 -> Stasiun 25
+                $station = 'Stasiun Packing';
+                $parts = explode('_', pathinfo($fName, PATHINFO_FILENAME));
+                if (count($parts) >= 3 && is_numeric($parts[1])) {
+                    $station = 'Stasiun Packing #' . $parts[1];
+                } elseif (count($parts) >= 3) {
+                    $station = 'Stasiun ' . $parts[1];
+                }
+
+                $foundVideos[] = [
+                    'name'           => $fName,
+                    'path'           => $fPath,
+                    'size'           => $sizeBytes,
+                    'size_formatted' => $sizeBytes > 0 ? round($sizeBytes / (1024 * 1024), 2) . ' MB' : '-',
+                    'mtime'          => $mtime ? (is_numeric($mtime) ? date('Y-m-d H:i:s', $mtime) : $mtime) : null,
+                    'station'        => $station,
+                    'folder'         => $fld,
+                    'stream_url'     => "api/nas_video.php?action=stream&folder=" . urlencode($fld) . "&file=" . urlencode($fName),
+                    'direct_nas_url' => "{$nasProtocol}://{$nasHost}:{$nasPort}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=" . urlencode($fPath) . "&mode=open&_sid=" . urlencode($sid)
+                ];
+            }
+
+            if (!empty($foundVideos)) break 2;
         }
-
-        $foundVideos[] = [
-            'name'             => $fName,
-            'path'             => $fName,
-            'size'             => $sizeBytes,
-            'size_formatted'   => $sizeBytes > 0 ? round($sizeBytes / (1024 * 1024), 2) . ' MB' : '-',
-            'mtime'            => $mtime ? date('Y-m-d H:i:s', $mtime) : null,
-            'station'          => $station,
-            'stream_url'       => "api/nas_video.php?action=stream&file=" . urlencode($fName),
-            'direct_nas_url'   => "{$nasProtocol}://{$nasHost}:{$nasPort}/#/signin"
-        ];
     }
 }
 
-// 2. Jika belum ditemukan dan Web API login aktif, coba search via DSM API
+// 2. FALLBACK KE SMB JIKA WEB API TIDAK TERSEDIA
 if (empty($foundVideos)) {
-    $sid = getSynoSid($nasProtocol, $nasHost, $nasPort, $nasUser, $nasPass);
-    if ($sid) {
-        $searchUrl = "{$nasProtocol}://{$nasHost}:{$nasPort}/webapi/entry.cgi?api=SYNO.FileStation.List&version=2&method=list&folder_path=" . urlencode($nasFolder) . "&_sid=" . urlencode($sid) . "&pattern=" . urlencode("*{$cleanQuery}*");
-        $ch = curl_init($searchUrl);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
-            CURLOPT_TIMEOUT        => 8
-        ]);
-        $res = curl_exec($ch);
-        curl_close($ch);
-        $listJson = json_decode($res, true);
-        $files = $listJson['data']['files'] ?? [];
+    $smbConnected = ensureSmbConnected($nasSmbPath, $nasUser, $nasPass);
+    if ($smbConnected && @is_dir($nasSmbPath)) {
+        foreach ($searchVariants as $sv) {
+            // Pencarian langsung di root folder SMB tanpa /s recursive agar tidak hang
+            $smbSearchCmd = 'cmd.exe /c "dir /b ' . escapeshellarg($nasSmbPath . '\*' . $sv . '*.mp4') . ' 2>nul"';
+            $outputLines = [];
+            @exec($smbSearchCmd, $outputLines);
 
-        foreach ($files as $f) {
-            $fName = $f['name'] ?? '';
-            $fExt = strtolower(pathinfo($fName, PATHINFO_EXTENSION));
-            if ($fExt === 'mp4' || $fExt === 'webm') {
-                $fPath = $f['path'] ?? ($nasFolder . '/' . $fName);
-                $sizeBytes = $f['additional']['size'] ?? 0;
+            foreach ($outputLines as $line) {
+                $fName = trim(basename($line));
+                if (empty($fName)) continue;
+                $ext = strtolower(pathinfo($fName, PATHINFO_EXTENSION));
+                if ($ext !== 'mp4' && $ext !== 'webm') continue;
+
+                foreach ($foundVideos as $fv) {
+                    if ($fv['name'] === $fName) continue 2;
+                }
+
+                $fullPath = rtrim($nasSmbPath, "\\/") . DIRECTORY_SEPARATOR . $fName;
+                $sizeBytes = @filesize($fullPath) ?: 0;
+                $mtime = @filemtime($fullPath) ?: null;
+
                 $foundVideos[] = [
-                    'name'             => $fName,
-                    'path'             => $fName,
-                    'size'             => $sizeBytes,
-                    'size_formatted'   => $sizeBytes > 0 ? round($sizeBytes / (1024 * 1024), 2) . ' MB' : '-',
-                    'station'          => 'Stasiun Packing',
-                    'stream_url'       => "api/nas_video.php?action=stream&file=" . urlencode($fName),
-                    'direct_nas_url'   => "{$nasProtocol}://{$nasHost}:{$nasPort}/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path=" . urlencode($fPath) . "&mode=open&_sid=" . urlencode($sid)
+                    'name'           => $fName,
+                    'path'           => $fName,
+                    'size'           => $sizeBytes,
+                    'size_formatted' => $sizeBytes > 0 ? round($sizeBytes / (1024 * 1024), 2) . ' MB' : '-',
+                    'mtime'          => $mtime ? date('Y-m-d H:i:s', $mtime) : null,
+                    'station'        => 'Stasiun Packing',
+                    'folder'         => $nasFolder,
+                    'stream_url'     => "api/nas_video.php?action=stream&file=" . urlencode($fName),
+                    'direct_nas_url' => "{$nasProtocol}://{$nasHost}:{$nasPort}/#/signin"
                 ];
             }
+            if (!empty($foundVideos)) break;
         }
     }
 }
@@ -326,5 +400,6 @@ echo json_encode([
     'videos'          => $foundVideos,
     'primary_video'   => $hasVideo ? $foundVideos[0] : null,
     'quick_open_url'  => $directFileStationUrl,
-    'message'         => $hasVideo ? "Video packing ditemukan di NAS-IEG ({$foundVideos[0]['name']})." : "Video packing tidak ditemukan di folder /PACKER untuk: {$query}"
+    'message'         => $hasVideo ? "Video packing ditemukan di NAS-IEG ({$foundVideos[0]['name']})." : "Video packing tidak ditemukan di folder {$nasFolder} untuk: {$query}"
 ]);
+

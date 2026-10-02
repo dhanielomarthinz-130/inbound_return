@@ -2491,25 +2491,50 @@ window.executeClaimLookup = async function(e) {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mencari...';
 
     try {
-        const [ocsResult, nasResult] = await Promise.allSettled([
-            fetch(`api/ocs_lookup.php?q=${encodeURIComponent(query)}`).then(r => r.json()),
-            fetch(`api/nas_video.php?action=search&q=${encodeURIComponent(query)}`).then(r => r.json())
-        ]);
-
-        const data = ocsResult.status === 'fulfilled' ? ocsResult.value : null;
+        // 1. Ambil data dossier dari OCS / DB lokal terlebih dahulu
+        const ocsRes = await fetch(`api/ocs_lookup.php?q=${encodeURIComponent(query)}`);
+        const data = await ocsRes.json();
 
         if (!data || !data.success) {
-            showToast('error', data?.message || 'Gagal mencari data bukti klaim di OCS/Database', 'Pencarian Gagal');
+            // Tampilkan pesan lebih informatif + hint
+            let errMsg = data?.message || 'Gagal mencari data bukti klaim di OCS/Database';
+            if (data?.hint) errMsg += '\n\n💡 ' + data.hint;
+            if (data?.clean_query && data.clean_query !== query) {
+                errMsg += `\n\nQuery yang dicoba: "${data.clean_query}" & "${data.alpha_query || ''}"`;
+            }
+            showToast('error', errMsg, 'Pencarian Gagal');
             return;
         }
 
-        if (nasResult.status === 'fulfilled' && nasResult.value) {
-            data.packing_video = nasResult.value;
+        // 2. Ambil video NAS dengan menggabungkan query, Order ID, dan Tracking Number hasil verifikasi OCS/Gudang
+        const nasParams = new URLSearchParams({ action: 'search', q: query });
+        if (data.order?.Id) nasParams.append('order_id', data.order.Id);
+        if (data.order?.TrackingNumber) nasParams.append('tracking_number', data.order.TrackingNumber);
+        if (data.reception?.package_barcode) nasParams.append('package_barcode', data.reception.package_barcode);
+        if (data.unboxing?.invoice_number) nasParams.append('alt_query', data.unboxing.invoice_number);
+
+        try {
+            const nasRes = await fetch(`api/nas_video.php?${nasParams.toString()}`);
+            const nasData = await nasRes.json();
+            if (nasData) {
+                data.packing_video = nasData;
+            }
+        } catch (eNas) {
+            console.warn('[NAS Video] Gagal memuat video:', eNas);
         }
 
         window.currentClaimDossier = data;
         renderClaimDossier(data);
-        showToast('success', 'Data bukti berhasil ditemukan & diverifikasi!', 'Dossier Ditemukan');
+
+        // Toast informatif tergantung sumber data
+        const src = data.ocs_source || '';
+        if (src === 'ocs_order_detail') {
+            showToast('success', 'Data ditemukan langsung dari OCS IEG System & diverifikasi!', 'OCS: Data Ditemukan');
+        } else if (src === 'local_cache') {
+            showToast('info', 'Data diambil dari cache OCS lokal. Klik Refresh untuk data terbaru.', 'Cache OCS');
+        } else {
+            showToast('warning', 'Data ditemukan di gudang lokal, tapi TIDAK ditemukan di OCS. Harga mungkin tidak tersedia.', 'Data Lokal Saja');
+        }
     } catch (err) {
         showToast('error', 'Terjadi kesalahan: ' + err.message, 'Gagal');
     } finally {
@@ -2545,6 +2570,25 @@ function renderClaimDossier(data) {
     const platformBadge = document.getElementById('claimMarketplaceBadge');
     if (platformBadge) {
         platformBadge.innerText = (order.CommercePlatform || 'Marketplace').toUpperCase();
+    }
+
+    // Badge status sumber data OCS
+    const ocsBadge = document.getElementById('claimOcsBadge');
+    if (ocsBadge) {
+        const src = data.ocs_source || data.ocs_found ? data.ocs_source : 'local_only';
+        if (src === 'ocs_order_detail') {
+            ocsBadge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-300';
+            ocsBadge.innerHTML = '<i class="fa-solid fa-circle-check"></i> Data OCS Live';
+            ocsBadge.title = 'Data diambil langsung dari OCS IEG System (real-time)';
+        } else if (src === 'local_cache') {
+            ocsBadge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700 border border-sky-300';
+            ocsBadge.innerHTML = '<i class="fa-solid fa-database"></i> Cache OCS';
+            ocsBadge.title = 'Data dari cache OCS lokal. Klik refresh untuk update.';
+        } else {
+            ocsBadge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-300';
+            ocsBadge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Lokal Saja';
+            ocsBadge.title = 'Tidak ditemukan di OCS. Harga/detail mungkin tidak tersedia.';
+        }
     }
 
     // Checklist Badges
@@ -3419,10 +3463,27 @@ window.loadOrdersStats = async function() {
 
 // 2. Debounce Pencarian Orders
 window.debounceOrderSearch = function() {
+    const input = document.getElementById('orderSearchInput');
+    const clearBtn = document.getElementById('btnClearOrderSearch');
+    if (clearBtn) {
+        if (input && input.value.trim().length > 0) {
+            clearBtn.classList.remove('hidden');
+        } else {
+            clearBtn.classList.add('hidden');
+        }
+    }
     clearTimeout(orderSearchDebounceTimer);
     orderSearchDebounceTimer = setTimeout(() => {
         loadOrdersTable(1);
     }, 350);
+};
+
+window.clearOrderSearch = function() {
+    const input = document.getElementById('orderSearchInput');
+    const clearBtn = document.getElementById('btnClearOrderSearch');
+    if (input) input.value = '';
+    if (clearBtn) clearBtn.classList.add('hidden');
+    loadOrdersTable(1);
 };
 
 // 3. Handler Perubahan Filter Tanggal
@@ -3437,6 +3498,62 @@ window.onOrderDateFilterChanged = function() {
         if (customBox) customBox.classList.add('hidden');
         loadOrdersTable(1);
     }
+};
+
+// Helper: Populate dropdown options dinamis
+function populateOrderFilterDropdown(selectId, options, defaultLabel, currentValue) {
+    const select = document.getElementById(selectId);
+    if (!select || !Array.isArray(options)) return;
+
+    const curr = currentValue !== undefined ? currentValue : select.value;
+    const cleanOptions = options.filter(o => o && String(o).trim() !== '');
+
+    // Update jika belum ada atau opsi berubah
+    const existingCount = select.options.length;
+    if (existingCount <= 1 && cleanOptions.length > 0) {
+        let html = `<option value="ALL">${defaultLabel}</option>`;
+        cleanOptions.forEach(opt => {
+            html += `<option value="${escapeHtml(String(opt))}">${escapeHtml(String(opt))}</option>`;
+        });
+        select.innerHTML = html;
+        if (curr && select.querySelector(`option[value="${curr}"]`)) {
+            select.value = curr;
+        }
+    }
+}
+
+// 3b. Reset Semua Filter Orders ke Default
+window.resetOrderFilters = function() {
+    const searchInput = document.getElementById('orderSearchInput');
+    const clearBtn = document.getElementById('btnClearOrderSearch');
+    const platformSelect = document.getElementById('orderPlatformFilter');
+    const shopSelect = document.getElementById('orderShopFilter');
+    const shippingSelect = document.getElementById('orderShippingFilter');
+    const statusSelect = document.getElementById('orderStatusFilter');
+    const resiSelect = document.getElementById('orderResiFilter');
+    const claimSelect = document.getElementById('orderClaimFilter');
+    const dateSelect = document.getElementById('orderDateFilter');
+    const customBox = document.getElementById('orderCustomDateBox');
+    const startDate = document.getElementById('orderStartDate');
+    const endDate = document.getElementById('orderEndDate');
+    const sortSelect = document.getElementById('orderSortSelect');
+
+    if (searchInput) searchInput.value = '';
+    if (clearBtn) clearBtn.classList.add('hidden');
+    if (platformSelect) platformSelect.value = 'ALL';
+    if (shopSelect) shopSelect.value = 'ALL';
+    if (shippingSelect) shippingSelect.value = 'ALL';
+    if (statusSelect) statusSelect.value = 'ALL';
+    if (resiSelect) resiSelect.value = 'ALL';
+    if (claimSelect) claimSelect.value = 'ALL';
+    if (dateSelect) dateSelect.value = '';
+    if (customBox) customBox.classList.add('hidden');
+    if (startDate) startDate.value = '';
+    if (endDate) endDate.value = '';
+    if (sortSelect) sortSelect.value = 'date_desc';
+
+    showToast('info', 'Semua filter pesanan telah direset ke default', 'Filter Direset');
+    loadOrdersTable(1);
 };
 
 // 4. Memuat Data Tabel Orders
@@ -3462,20 +3579,38 @@ window.loadOrdersTable = async function(page = 1) {
     `;
 
     try {
-        const searchInput = document.getElementById('orderSearchInput');
-        const platformSelect = document.getElementById('orderPlatformFilter');
-        const dateSelect = document.getElementById('orderDateFilter');
-        const limitSelect = document.getElementById('orderLimitSelect');
+        const searchInput    = document.getElementById('orderSearchInput');
+        const platformSelect  = document.getElementById('orderPlatformFilter');
+        const shopSelect      = document.getElementById('orderShopFilter');
+        const shippingSelect  = document.getElementById('orderShippingFilter');
+        const statusSelect    = document.getElementById('orderStatusFilter');
+        const resiSelect      = document.getElementById('orderResiFilter');
+        const claimSelect     = document.getElementById('orderClaimFilter');
+        const dateSelect      = document.getElementById('orderDateFilter');
+        const sortSelect      = document.getElementById('orderSortSelect');
+        const limitSelect     = document.getElementById('orderLimitSelect');
 
-        const search = searchInput ? searchInput.value.trim() : '';
-        const platform = platformSelect ? platformSelect.value : 'ALL';
-        const dateType = dateSelect ? dateSelect.value : '';
-        const limit = limitSelect ? parseInt(limitSelect.value) || 25 : 25;
+        const search     = searchInput ? searchInput.value.trim() : '';
+        const platform   = platformSelect ? platformSelect.value : 'ALL';
+        const shop       = shopSelect ? shopSelect.value : 'ALL';
+        const shipping   = shippingSelect ? shippingSelect.value : 'ALL';
+        const status     = statusSelect ? statusSelect.value : 'ALL';
+        const resiStatus = resiSelect ? resiSelect.value : 'ALL';
+        const claimStatus= claimSelect ? claimSelect.value : 'ALL';
+        const dateType   = dateSelect ? dateSelect.value : '';
+        const sort       = sortSelect ? sortSelect.value : 'date_desc';
+        const limit      = limitSelect ? parseInt(limitSelect.value) || 25 : 25;
 
         let url = `api/orders.php?action=list&page=${page}&limit=${limit}`;
         if (search) url += `&search=${encodeURIComponent(search)}`;
         if (platform && platform !== 'ALL') url += `&platform=${encodeURIComponent(platform)}`;
+        if (shop && shop !== 'ALL') url += `&shop=${encodeURIComponent(shop)}`;
+        if (shipping && shipping !== 'ALL') url += `&shipping=${encodeURIComponent(shipping)}`;
+        if (status && status !== 'ALL') url += `&status=${encodeURIComponent(status)}`;
+        if (resiStatus && resiStatus !== 'ALL') url += `&resi_status=${encodeURIComponent(resiStatus)}`;
+        if (claimStatus && claimStatus !== 'ALL') url += `&claim_status=${encodeURIComponent(claimStatus)}`;
         if (dateType) url += `&date=${encodeURIComponent(dateType)}`;
+        if (sort && sort !== 'date_desc') url += `&sort=${encodeURIComponent(sort)}`;
 
         if (dateType === 'custom') {
             const startDate = document.getElementById('orderStartDate')?.value || '';
@@ -3488,9 +3623,14 @@ window.loadOrdersTable = async function(page = 1) {
         const data = await res.json();
 
         if (!data || !data.success) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-rose-500 font-semibold">${data.message || 'Gagal mengambil data pesanan'}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-rose-500 font-semibold">${data.message || data.error || 'Gagal mengambil data pesanan'}</td></tr>`;
             return;
         }
+
+        // Isi opsi filter dropdown dinamis jika data tersedia dari backend
+        if (data.shops) populateOrderFilterDropdown('orderShopFilter', data.shops, '🏪 Semua Toko', shop);
+        if (data.shipping_providers) populateOrderFilterDropdown('orderShippingFilter', data.shipping_providers, '🚚 Semua Ekspedisi', shipping);
+        if (data.statuses) populateOrderFilterDropdown('orderStatusFilter', data.statuses, '📋 Semua Status', status);
 
         renderOrdersTable(data.orders || [], data.pagination || {});
     } catch (err) {
@@ -3790,14 +3930,26 @@ window.copyOrderText = function(text, label = 'Teks') {
 window.exportOrdersExcel = async function() {
     showGlobalLoading("Mengekspor Excel...", "Mengambil seluruh data pesanan tersinkron dari server...");
     try {
-        const platform = document.getElementById('orderPlatformFilter')?.value || 'ALL';
-        const dateType = document.getElementById('orderDateFilter')?.value || '';
-        const search = document.getElementById('orderSearchInput')?.value.trim() || '';
+        const platform    = document.getElementById('orderPlatformFilter')?.value || 'ALL';
+        const shop        = document.getElementById('orderShopFilter')?.value || 'ALL';
+        const shipping    = document.getElementById('orderShippingFilter')?.value || 'ALL';
+        const status      = document.getElementById('orderStatusFilter')?.value || 'ALL';
+        const resiStatus  = document.getElementById('orderResiFilter')?.value || 'ALL';
+        const claimStatus = document.getElementById('orderClaimFilter')?.value || 'ALL';
+        const dateType    = document.getElementById('orderDateFilter')?.value || '';
+        const sort        = document.getElementById('orderSortSelect')?.value || 'date_desc';
+        const search      = document.getElementById('orderSearchInput')?.value.trim() || '';
 
         let url = `api/orders.php?action=list&page=1&limit=10000`;
         if (search) url += `&search=${encodeURIComponent(search)}`;
         if (platform && platform !== 'ALL') url += `&platform=${encodeURIComponent(platform)}`;
+        if (shop && shop !== 'ALL') url += `&shop=${encodeURIComponent(shop)}`;
+        if (shipping && shipping !== 'ALL') url += `&shipping=${encodeURIComponent(shipping)}`;
+        if (status && status !== 'ALL') url += `&status=${encodeURIComponent(status)}`;
+        if (resiStatus && resiStatus !== 'ALL') url += `&resi_status=${encodeURIComponent(resiStatus)}`;
+        if (claimStatus && claimStatus !== 'ALL') url += `&claim_status=${encodeURIComponent(claimStatus)}`;
         if (dateType) url += `&date=${encodeURIComponent(dateType)}`;
+        if (sort && sort !== 'date_desc') url += `&sort=${encodeURIComponent(sort)}`;
 
         if (dateType === 'custom') {
             const start = document.getElementById('orderStartDate')?.value || '';

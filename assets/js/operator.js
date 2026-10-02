@@ -52,6 +52,74 @@ function playBeep(type = 'success') {
 }
 
 // -------------------------------------------------------------
+// HELPER VALIDASI STATUS INVOICE / RESI UNTUK TOMBOL FOTO
+// -------------------------------------------------------------
+window.isInvoiceFilled = function() {
+    if (activeInvoice && String(activeInvoice).trim().length > 0) return true;
+    const invInput = document.getElementById('inputInvoice');
+    if (invInput && invInput.value && invInput.value.trim().length > 0) return true;
+    return false;
+};
+
+window.updatePhotoButtonsState = function() {
+    const isFilled = isInvoiceFilled();
+    const btnPkg = document.getElementById('btnCapturePackagePhoto');
+    const btnPrd = document.getElementById('btnCaptureProductPhoto');
+    const btnUp  = document.getElementById('btnUploadPhotosFile');
+    const hint   = document.getElementById('photoShortcutsHint');
+
+    if (btnPkg) {
+        btnPkg.disabled = !isFilled;
+        btnPkg.classList.toggle('opacity-40', !isFilled);
+        btnPkg.classList.toggle('cursor-not-allowed', !isFilled);
+        if (isFilled) {
+            btnPkg.setAttribute('title', 'Ambil Foto Paket Unboxing [TUTS F2]');
+        } else {
+            btnPkg.setAttribute('title', 'Isi nomor resi / invoice terlebih dahulu');
+        }
+    }
+    if (btnPrd) {
+        btnPrd.disabled = !isFilled;
+        btnPrd.classList.toggle('opacity-40', !isFilled);
+        btnPrd.classList.toggle('cursor-not-allowed', !isFilled);
+        if (isFilled) {
+            btnPrd.setAttribute('title', 'Ambil Foto Produk Unboxing [TUTS F4]');
+        } else {
+            btnPrd.setAttribute('title', 'Isi nomor resi / invoice terlebih dahulu');
+        }
+    }
+    if (btnUp) {
+        btnUp.classList.toggle('opacity-40', !isFilled);
+        btnUp.classList.toggle('cursor-not-allowed', !isFilled);
+        if (isFilled) {
+            btnUp.setAttribute('title', 'Unggah foto bukti dari galeri / komputer');
+        } else {
+            btnUp.setAttribute('title', 'Isi nomor resi / invoice terlebih dahulu');
+        }
+    }
+    if (hint) {
+        if (isFilled) {
+            hint.innerHTML = '<span class="text-slate-500 font-medium">Shortcut: <b>[F2]</b> Foto Paket &bull; <b>[F4]</b> Foto Produk</span>';
+        } else {
+            hint.innerHTML = '<span class="text-amber-600 font-semibold flex items-center gap-1"><i class="fa-solid fa-lock text-[9px]"></i> Isi Resi / Invoice dahulu</span>';
+        }
+    }
+};
+
+window.triggerPhotosUploadClick = function() {
+    if (!isInvoiceFilled()) {
+        showToast('warning', 'Silakan scan atau masukkan Nomor Invoice / Resi terlebih dahulu sebelum mengunggah foto bukti!', 'Resi Belum Terisi');
+        const inputInv = document.getElementById('inputInvoice');
+        if (inputInv && !inputInv.disabled && inputInv.offsetParent !== null) {
+            inputInv.focus();
+        }
+        return;
+    }
+    const fileEl = document.getElementById('filePhotosUpload');
+    if (fileEl) fileEl.click();
+};
+
+// -------------------------------------------------------------
 // 1. INVOICE HANDLING (Auto Record on Scan / Enter)
 // -------------------------------------------------------------
 const inputInvoice = document.getElementById('inputInvoice');
@@ -59,6 +127,7 @@ const btnLockInvoice = document.getElementById('btnLockInvoice');
 
 if (inputInvoice) {
     inputInvoice.addEventListener('input', () => {
+        updatePhotoButtonsState();
         const val = inputInvoice.value.trim();
         const autoBadge = document.getElementById('autoDetectBadge');
         const autoLabel = document.getElementById('autoDetectLabel');
@@ -80,6 +149,14 @@ if (inputInvoice) {
         if (expSelect) expSelect.classList.remove('border-emerald-500', 'bg-emerald-50/50');
     });
 
+    inputInvoice.addEventListener('change', () => {
+        updatePhotoButtonsState();
+    });
+
+    inputInvoice.addEventListener('keyup', () => {
+        updatePhotoButtonsState();
+    });
+
     inputInvoice.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -99,6 +176,7 @@ if (btnLockInvoice) {
 window.quickSelectInvoice = function(code) {
     if (inputInvoice) {
         inputInvoice.value = code;
+        updatePhotoButtonsState();
         processInvoiceScan(code);
     }
 };
@@ -139,6 +217,7 @@ async function processInvoiceScan(invoiceNumber) {
         document.getElementById('displayActiveInvoice').innerText = activeInvoice;
         document.getElementById('invoiceInputWrapper').classList.add('hidden');
         document.getElementById('invoiceLockedBanner').classList.remove('hidden');
+        if (typeof updatePhotoButtonsState === 'function') updatePhotoButtonsState();
 
         // Tampilkan Form Input Produk (Langkah 2)
         const secProd = document.getElementById('sectionProductInput');
@@ -203,6 +282,7 @@ window.resetInvoiceSession = function(force = false) {
     capturedPackagePhoto = null;
     capturedProductPhoto = null;
     if (typeof renderPhotosGallery === 'function') renderPhotosGallery();
+    if (typeof updatePhotoButtonsState === 'function') updatePhotoButtonsState();
 
     renderItemsTable();
 
@@ -1918,6 +1998,15 @@ window.previewImageDirect = function(src, title = 'Preview Foto Watermark') {
 };
 
 window.capturePackagePhoto = function(sourceImage = null) {
+    if (!isInvoiceFilled()) {
+        showToast('warning', 'Silakan scan atau masukkan Nomor Invoice / Resi terlebih dahulu sebelum mengambil foto paket!', 'Resi Belum Terisi');
+        const inputInv = document.getElementById('inputInvoice');
+        if (inputInv && !inputInv.disabled && inputInv.offsetParent !== null) {
+            inputInv.focus();
+        }
+        return;
+    }
+
     const videoElement = document.getElementById('liveVideoFeed');
     if (!sourceImage && (!isCameraActive || !videoElement || videoElement.readyState < 2)) {
         showToast('warning', 'Kamera belum aktif. Menghubungkan kamera...', 'Kamera Belum Aktif');
@@ -1969,6 +2058,15 @@ window.capturePackagePhoto = function(sourceImage = null) {
 };
 
 window.captureProductPhoto = function(sourceImage = null) {
+    if (!isInvoiceFilled()) {
+        showToast('warning', 'Silakan scan atau masukkan Nomor Invoice / Resi terlebih dahulu sebelum mengambil foto produk!', 'Resi Belum Terisi');
+        const inputInv = document.getElementById('inputInvoice');
+        if (inputInv && !inputInv.disabled && inputInv.offsetParent !== null) {
+            inputInv.focus();
+        }
+        return;
+    }
+
     const videoElement = document.getElementById('liveVideoFeed');
     if (!sourceImage && (!isCameraActive || !videoElement || videoElement.readyState < 2)) {
         showToast('warning', 'Kamera belum aktif. Menghubungkan kamera...', 'Kamera Belum Aktif');
@@ -2046,6 +2144,16 @@ window.captureProductPhoto = function(sourceImage = null) {
 };
 
 window.handlePhotosMultipleUpload = async function(inputElement) {
+    if (!isInvoiceFilled()) {
+        showToast('warning', 'Silakan scan atau masukkan Nomor Invoice / Resi terlebih dahulu sebelum mengunggah foto bukti!', 'Resi Belum Terisi');
+        if (inputElement) inputElement.value = '';
+        const inputInv = document.getElementById('inputInvoice');
+        if (inputInv && !inputInv.disabled && inputInv.offsetParent !== null) {
+            inputInv.focus();
+        }
+        return;
+    }
+
     if (!inputElement || !inputElement.files || inputElement.files.length === 0) return;
     const files = Array.from(inputElement.files);
     
@@ -2080,6 +2188,16 @@ window.handlePhotosMultipleUpload = async function(inputElement) {
 };
 
 window.handlePhotoUpload = function(target, inputElement) {
+    if (!isInvoiceFilled()) {
+        showToast('warning', 'Silakan scan atau masukkan Nomor Invoice / Resi terlebih dahulu sebelum mengunggah foto bukti!', 'Resi Belum Terisi');
+        if (inputElement) inputElement.value = '';
+        const inputInv = document.getElementById('inputInvoice');
+        if (inputInv && !inputInv.disabled && inputInv.offsetParent !== null) {
+            inputInv.focus();
+        }
+        return;
+    }
+
     if (!inputElement || !inputElement.files || !inputElement.files[0]) return;
     const file = inputElement.files[0];
     const reader = new FileReader();
@@ -2132,6 +2250,9 @@ window.addEventListener('keydown', (e) => {
 
 // Inisialisasi Otomatis saat Halaman Dimuat
 window.addEventListener('DOMContentLoaded', () => {
+    if (typeof updatePhotoButtonsState === 'function') {
+        updatePhotoButtonsState();
+    }
     if (inputInvoice) {
         inputInvoice.focus();
     }
