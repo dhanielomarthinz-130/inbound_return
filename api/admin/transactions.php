@@ -95,7 +95,12 @@ try {
         $params[] = $operator;
     }
 
-    $sql .= " ORDER BY i.id DESC LIMIT 300";
+    $limitParam = isset($_GET['limit']) ? (int)$_GET['limit'] : 0;
+    if ($limitParam > 0) {
+        $sql .= " ORDER BY i.id DESC LIMIT " . $limitParam;
+    } else {
+        $sql .= " ORDER BY i.id DESC"; // Tanpa limitasi keras, tampilkan semua data transaksi
+    }
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);

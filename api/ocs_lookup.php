@@ -49,7 +49,6 @@ if ($query === '' || $action === 'list_claimable') {
                          rs.total_items, rs.total_good, rs.total_damaged, rs.notes, rs.video_path, rs.created_at
                 HAVING rs.total_damaged > 0 OR damaged_items_count > 0
                 ORDER BY rs.id DESC
-                LIMIT 50
             ";
         } else {
             // Fallback query jika ocs_orders belum siap
@@ -71,7 +70,6 @@ if ($query === '' || $action === 'list_claimable') {
                          rs.total_items, rs.total_good, rs.total_damaged, rs.notes, rs.video_path, rs.created_at
                 HAVING rs.total_damaged > 0 OR damaged_items_count > 0
                 ORDER BY rs.id DESC
-                LIMIT 50
             ";
         }
 

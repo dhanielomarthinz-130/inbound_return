@@ -1074,10 +1074,14 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             <div class="flex items-center gap-2">
                                 <span class="text-xs text-slate-400">Tampilkan:</span>
                                 <select id="orderLimitSelect" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700">
-                                    <option value="25">25</option>
-                                    <option value="50">50</option>
-                                    <option value="100">100</option>
-                                    <option value="250">250</option>
+                                    <option value="25">25 Baris</option>
+                                    <option value="50">50 Baris</option>
+                                    <option value="100">100 Baris</option>
+                                    <option value="250">250 Baris</option>
+                                    <option value="500">500 Baris</option>
+                                    <option value="1000">1.000 Baris</option>
+                                    <option value="5000">5.000 Baris</option>
+                                    <option value="50000">Semua Data (Maks)</option>
                                 </select>
                                 <button onclick="loadOrdersTable(1)" class="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs transition" title="Refresh Data">
                                     <i class="fa-solid fa-arrows-rotate"></i>

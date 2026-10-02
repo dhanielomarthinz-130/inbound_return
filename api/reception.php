@@ -41,6 +41,34 @@ if ($method === 'GET') {
         ]);
     }
 
+    // A2. Cek apakah Resi / Barcode sudah pernah diterima di database sebelumnya (Anti Double Input)
+    if ($action === 'check_barcode') {
+        $barcode = trim($_GET['barcode'] ?? '');
+        if ($barcode === '') {
+            jsonResponse(['exists' => false]);
+        }
+        $stmt = $pdo->prepare("
+            SELECT rp.id, rp.package_barcode, rp.sack_number, rp.scanned_at, er.receipt_number, er.expedition, er.courier_name, er.created_at
+            FROM reception_packages rp
+            JOIN expedition_receptions er ON rp.reception_id = er.id
+            WHERE rp.package_barcode = ?
+            ORDER BY rp.id DESC
+            LIMIT 1
+        ");
+        $stmt->execute([$barcode]);
+        $found = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($found) {
+            $scanTime = $found['scanned_at'] ?: $found['created_at'];
+            jsonResponse([
+                'exists' => true,
+                'message' => "Resi {$barcode} sudah pernah diterima pada No. Terima {$found['receipt_number']} ({$found['expedition']}) oleh {$found['courier_name']} [Waktu: {$scanTime}]",
+                'data' => $found
+            ]);
+        } else {
+            jsonResponse(['exists' => false]);
+        }
+    }
+
     // B. Detail Penerimaan beserta daftar resi/paketnya
     if ($action === 'detail') {
         $id = intval($_GET['id'] ?? 0);
@@ -357,6 +385,18 @@ if ($method === 'POST') {
         }
     }
 
+    // Deduplikasi resi di dalam batch agar tidak ada barcode yang ter-input ganda dalam 1 penerimaan
+    $uniquePackages = [];
+    $seenCodes = [];
+    foreach ($cleanPackages as $cp) {
+        $key = strtoupper(trim($cp['barcode']));
+        if (!isset($seenCodes[$key])) {
+            $seenCodes[$key] = true;
+            $uniquePackages[] = $cp;
+        }
+    }
+    $cleanPackages = $uniquePackages;
+
     if (count($cleanPackages) === 0) {
         jsonResponse(['error' => 'Daftar barcode paket tidak boleh kosong!'], 400);
     }
@@ -493,14 +533,49 @@ if ($method === 'POST') {
         }
     } catch (Exception $eCols2) {}
 
-    // Cek keunikan receipt_number agar tidak error Duplicate Entry
+    // Anti Double-Submission & Idempotensi Penerimaan:
+    // 1. Cek apakah receipt_number yang sama persis sudah pernah tersimpan (misal double-click submit)
     try {
-        $chkRcpt = $pdo->prepare("SELECT id FROM expedition_receptions WHERE receipt_number = ? LIMIT 1");
+        $chkRcpt = $pdo->prepare("SELECT id, receipt_number, expedition, total_packages, created_at FROM expedition_receptions WHERE receipt_number = ? LIMIT 1");
         $chkRcpt->execute([$receiptNo]);
-        if ($chkRcpt->fetch()) {
-            $receiptNo .= '-' . strtoupper(substr(uniqid(), -4));
+        $existingRcpt = $chkRcpt->fetch(PDO::FETCH_ASSOC);
+        if ($existingRcpt) {
+            jsonResponse([
+                'success'        => true,
+                'message'        => 'Penerimaan ini sudah tersimpan di database.',
+                'id'             => $existingRcpt['id'],
+                'receipt_number' => $existingRcpt['receipt_number'],
+                'expedition'     => $existingRcpt['expedition'],
+                'total_packages' => (int)$existingRcpt['total_packages'],
+                'already_exists' => true
+            ]);
         }
     } catch (Exception $eRcpt) {}
+
+    // 2. Cek apakah operator yang sama baru saja men-submit ekspedisi yang sama dengan jumlah paket yang sama dalam 8 detik terakhir (anti double submit cepat)
+    try {
+        $opNameCheck = $user['name'] ?? $user['username'] ?? 'Operator';
+        $chkFastDup = $pdo->prepare("
+            SELECT id, receipt_number, expedition, total_packages 
+            FROM expedition_receptions 
+            WHERE operator_name = ? AND expedition = ? AND total_packages = ? AND created_at >= (NOW() - INTERVAL 8 SECOND)
+            ORDER BY id DESC 
+            LIMIT 1
+        ");
+        $chkFastDup->execute([$opNameCheck, $expedition, count($cleanPackages)]);
+        $fastDup = $chkFastDup->fetch(PDO::FETCH_ASSOC);
+        if ($fastDup) {
+            jsonResponse([
+                'success'        => true,
+                'message'        => 'Penerimaan telah berhasil dicatat sebelumnya.',
+                'id'             => $fastDup['id'],
+                'receipt_number' => $fastDup['receipt_number'],
+                'expedition'     => $fastDup['expedition'],
+                'total_packages' => (int)$fastDup['total_packages'],
+                'already_exists' => true
+            ]);
+        }
+    } catch (Exception $eDup) {}
 
     $hasCourierNameCol   = in_array('courier_name', $recCols);
     $hasSackNumberCol    = in_array('sack_number', $recCols);

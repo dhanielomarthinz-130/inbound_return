@@ -1381,9 +1381,12 @@ function stopVideoRecording() {
     });
 }
 
+let isSubmittingFinalSession = false;
 window.submitFinalSession = async function() {
+    if (isSubmittingFinalSession) return;
     if (!activeInvoice || scannedProductsList.length === 0) return;
 
+    isSubmittingFinalSession = true;
     const notes = document.getElementById('sessionNotesInput').value.trim();
     const btn = document.getElementById('btnFinalizeSession');
     btn.disabled = true;
@@ -1475,6 +1478,7 @@ window.submitFinalSession = async function() {
         hideGlobalLoading();
         showToast('error', "Gagal koneksi ke server: " + err.message, "Koneksi Terputus");
     } finally {
+        isSubmittingFinalSession = false;
         hideGlobalLoading();
         btn.disabled = false;
         btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Submit`;

@@ -1281,8 +1281,11 @@ try {
             openCameraModal('courier');
         }
 
-        // STEP 4: Scan Resi Barcode Handheld -> Otomatis Buka Kamera Foto Paket
-        function submitPackageBarcode() {
+        // STEP 4: Scan Resi Barcode Handheld -> Otomatis Buka Kamera Foto Paket (Anti Double Input)
+        let isCheckingBarcode = false;
+        async function submitPackageBarcode() {
+            if (isCheckingBarcode) return;
+
             const input = document.getElementById('inputPackageBarcode');
             const rawCode = (input ? input.value : '').trim();
 
@@ -1293,15 +1296,38 @@ try {
 
             const cleanCode = rawCode.trim();
 
-            // Cek duplikasi di sesi draft saat ini
-            const isDuplicate = draftPackages.some(item => item.barcode.toUpperCase() === cleanCode.toUpperCase());
-            if (isDuplicate) {
+            // 1. Cek duplikasi di sesi draft saat ini (Local Session Check)
+            const isDuplicateLocal = draftPackages.some(item => item.barcode.toUpperCase() === cleanCode.toUpperCase());
+            if (isDuplicateLocal) {
                 playBeep('warning');
                 vibrateMobile([120, 60, 120]);
                 showStatusMsg(`⚠️ Resi <b>${escapeHtml(cleanCode)}</b> sudah pernah di-scan dalam sesi draft ini!`, 'warning');
                 if (input) input.value = '';
                 input?.focus();
                 return;
+            }
+
+            // 2. Cek ke database apakah resi ini pernah diterima sebelumnya (Database Duplicate Check)
+            isCheckingBarcode = true;
+            try {
+                const checkRes = await fetch(`api/reception.php?action=check_barcode&barcode=${encodeURIComponent(cleanCode)}`);
+                const checkData = await checkRes.json();
+                if (checkData && checkData.exists) {
+                    playBeep('warning');
+                    vibrateMobile([150, 80, 150]);
+                    const proceed = confirm(`⚠️ PERINGATAN RESI PERNAH DIINPUT:\n\n${checkData.message}\n\nApakah Anda yakin ingin tetap memproses & memotret ulang resi ini?`);
+                    if (!proceed) {
+                        showStatusMsg(`⛔ Scan resi <b>${escapeHtml(cleanCode)}</b> dibatalkan karena sudah pernah diterima.`, 'warning');
+                        if (input) input.value = '';
+                        input?.focus();
+                        isCheckingBarcode = false;
+                        return;
+                    }
+                }
+            } catch (errCheck) {
+                console.warn('Gagal cek duplikasi resi ke server:', errCheck);
+            } finally {
+                isCheckingBarcode = false;
             }
 
             currentScanningBarcode = cleanCode;
@@ -1847,10 +1873,16 @@ try {
         }
 
         // ==============================================================
-        // SUBMIT BATCH PENERIMAAN DRAFT KE DATABASE
+        // SUBMIT BATCH PENERIMAAN DRAFT KE DATABASE (ANTI DOUBLE INPUT)
         // ==============================================================
+        let isSubmittingReception = false;
 
         async function submitCompleteReception() {
+            if (isSubmittingReception) {
+                console.warn('Pengiriman data penerimaan sedang berlangsung...');
+                return;
+            }
+
             if (!currentExpedition) {
                 alert('Silakan pilih Ekspedisi terlebih dahulu!');
                 document.getElementById('selectExpedition')?.focus();
@@ -1887,11 +1919,23 @@ try {
                 return;
             }
 
-            const btn = document.getElementById('btnSubmitReception');
-            const origHtml = btn ? btn.innerHTML : '';
-            if (btn) {
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan Paket & Foto ke Server...';
+            // Lock agar tidak bisa dipencet 2x (Anti Double Submit)
+            isSubmittingReception = true;
+
+            const btnDesktop = document.getElementById('btnSubmitReception');
+            const origDesktopHtml = btnDesktop ? btnDesktop.innerHTML : '';
+            if (btnDesktop) {
+                btnDesktop.disabled = true;
+                btnDesktop.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan Paket & Foto ke Server...';
+                btnDesktop.classList.add('opacity-70', 'pointer-events-none');
+            }
+
+            const btnMobile = document.querySelector('#mobileStickyBar button');
+            const origMobileHtml = btnMobile ? btnMobile.innerHTML : '';
+            if (btnMobile) {
+                btnMobile.disabled = true;
+                btnMobile.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...';
+                btnMobile.classList.add('opacity-70', 'pointer-events-none');
             }
 
             try {
@@ -1933,9 +1977,16 @@ try {
                 console.error('Error submitCompleteReception:', err);
                 alert('Terjadi kesalahan saat memproses data: ' + err.message);
             } finally {
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerHTML = origHtml;
+                isSubmittingReception = false;
+                if (btnDesktop) {
+                    btnDesktop.disabled = false;
+                    btnDesktop.innerHTML = origDesktopHtml;
+                    btnDesktop.classList.remove('opacity-70', 'pointer-events-none');
+                }
+                if (btnMobile) {
+                    btnMobile.disabled = false;
+                    btnMobile.innerHTML = origMobileHtml;
+                    btnMobile.classList.remove('opacity-70', 'pointer-events-none');
                 }
             }
         }

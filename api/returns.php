@@ -174,6 +174,28 @@ foreach ($items as $item) {
     }
 }
 
+// Anti Double-Submit: Cek apakah invoice_number yang sama persis baru saja di-submit dalam 10 detik terakhir
+try {
+    $chkRecent = $pdo->prepare("
+        SELECT id, invoice_number, created_at 
+        FROM return_sessions 
+        WHERE invoice_number = ? AND created_at >= (NOW() - INTERVAL 10 SECOND) 
+        ORDER BY id DESC 
+        LIMIT 1
+    ");
+    $chkRecent->execute([$invoiceNumber]);
+    $recentSession = $chkRecent->fetch(PDO::FETCH_ASSOC);
+    if ($recentSession) {
+        jsonResponse([
+            'success'        => true,
+            'message'        => 'Data transaksi telah berhasil dicatat sebelumnya.',
+            'session_id'     => $recentSession['id'],
+            'invoice_number' => $recentSession['invoice_number'],
+            'already_exists' => true
+        ]);
+    }
+} catch (Exception $eDup) {}
+
 try {
     $pdo->beginTransaction();
 

@@ -602,7 +602,12 @@ try {
     // -------------------------------------------------------------
     if ($action === 'list') {
         $page        = max(1, (int)($_GET['page'] ?? 1));
-        $limit       = min(10000, max(1, (int)($_GET['limit'] ?? 25)));
+        $limitRaw    = $_GET['limit'] ?? 25;
+        if (strtolower((string)$limitRaw) === 'all' || (int)$limitRaw >= 50000) {
+            $limit   = 50000;
+        } else {
+            $limit   = min(50000, max(1, (int)$limitRaw));
+        }
         $offset      = ($page - 1) * $limit;
         $search      = trim($_GET['search'] ?? '');
         $platform    = trim($_GET['platform'] ?? '');
