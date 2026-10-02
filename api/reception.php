@@ -397,6 +397,16 @@ if ($method === 'POST') {
     }
     $cleanPackages = $uniquePackages;
 
+    // Rangkum seluruh karung yang ada dalam penerimaan ini (bisa multiple karung per 1 ID)
+    $distinctSacks = [];
+    foreach ($cleanPackages as $cp) {
+        $s = trim((string)($cp['sack_number'] ?? ''));
+        if ($s !== '' && !in_array($s, $distinctSacks)) {
+            $distinctSacks[] = $s;
+        }
+    }
+    $headerSackSummary = !empty($distinctSacks) ? implode(', ', $distinctSacks) : ($sackNumber ?: 'Karung 1');
+
     if (count($cleanPackages) === 0) {
         jsonResponse(['error' => 'Daftar barcode paket tidak boleh kosong!'], 400);
     }
@@ -606,7 +616,7 @@ if ($method === 'POST') {
         if ($hasSackNumberCol) {
             $fields[] = 'sack_number';
             $placeholders[] = '?';
-            $values[] = $sackNumber ?: null;
+            $values[] = $headerSackSummary ?: ($sackNumber ?: null);
         }
         if ($hasCourierPhotoCol) {
             $fields[] = 'courier_photo';

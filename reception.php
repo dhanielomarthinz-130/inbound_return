@@ -284,6 +284,11 @@ try {
                         <button type="button" onclick="selectQuickSack('Karung 5')" class="quick-sack-chip px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[11px] font-bold transition shadow-2xs">Karung 5</button>
                     </div>
 
+                    <p class="text-[10px] text-amber-800 bg-amber-50/80 border border-amber-200/60 rounded-xl px-2.5 py-1.5 flex items-center gap-1.5">
+                        <i class="fa-solid fa-circle-info text-amber-600 shrink-0"></i>
+                        <span><b>Bisa multi-karung:</b> 1 kurir bisa bawa banyak karung dalam 1 ID serah terima. Anda bisa langsung tambah & pindah karung di Langkah 4 saat scan.</span>
+                    </p>
+
                     <div class="pt-1">
                         <button type="button" id="btnConfirmCourier" onclick="confirmCourierName()" 
                             class="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white py-2.5 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-sm shadow-indigo-600/20">
@@ -355,21 +360,28 @@ try {
                     </span>
                 </div>
 
-                <!-- Active Sack Indicator Bar -->
-                <div class="flex items-center justify-between bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl text-xs">
-                    <div class="flex items-center gap-2">
-                        <span class="w-6 h-6 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                            <i class="fa-solid fa-box-archive text-xs"></i>
-                        </span>
-                        <div>
-                            <span class="text-[9px] uppercase font-bold text-amber-800 block">Karung Aktif</span>
-                            <span id="displayActiveSack" class="font-black text-amber-950 text-xs sm:text-sm font-mono">Karung 1</span>
+                <!-- Active Sack Indicator & Quick Switcher (Bisa Banyak Karung dalam 1 ID) -->
+                <div class="bg-amber-50/90 border border-amber-200/90 p-2.5 rounded-xl space-y-2 shadow-2xs">
+                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <div class="flex items-center gap-2">
+                            <span class="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                                <i class="fa-solid fa-box-archive text-xs"></i>
+                            </span>
+                            <div>
+                                <span class="text-[9px] uppercase font-bold text-amber-800 block">Karung Aktif (Target Scan Saat Ini)</span>
+                                <span id="displayActiveSack" class="font-black text-amber-950 text-xs sm:text-sm font-mono">Karung 1</span>
+                            </div>
                         </div>
+                        <button type="button" onclick="promptCustomSack()" class="text-xs font-bold text-amber-900 hover:text-amber-950 bg-white hover:bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-lg shadow-2xs flex items-center gap-1.5 transition ml-auto" title="Buat nomor atau label karung baru">
+                            <i class="fa-solid fa-plus text-[10px]"></i>
+                            <span>+ Karung Lain</span>
+                        </button>
                     </div>
-                    <button type="button" onclick="promptChangeSack()" class="text-xs font-bold text-amber-800 hover:text-amber-950 bg-white border border-amber-300 px-2.5 py-1 rounded-lg shadow-2xs flex items-center gap-1.5 transition">
-                        <i class="fa-solid fa-arrow-right-arrow-left text-[10px]"></i>
-                        <span>Ganti Karung</span>
-                    </button>
+
+                    <!-- Tombol Cepat Pindah Karung (Karung 1, Karung 2, dst) -->
+                    <div class="flex items-center gap-1.5 overflow-x-auto pb-0.5 pt-0.5" id="step4SackChipsList">
+                        <!-- Di-render dinamis oleh JavaScript -->
+                    </div>
                 </div>
 
                 <div class="space-y-2">
@@ -410,6 +422,15 @@ try {
                         <i class="fa-solid fa-trash-can text-xs"></i>
                         <span>Hapus Semua</span>
                     </button>
+                </div>
+
+                <!-- Ringkasan Distribusi Karung dalam 1 ID Penerimaan -->
+                <div id="draftSacksSummaryBar" class="hidden flex items-center justify-between bg-amber-50/60 border border-amber-200/70 px-3 py-2 rounded-xl text-xs flex-wrap gap-2">
+                    <div class="flex items-center gap-1.5 text-amber-900 font-bold text-[11px]">
+                        <i class="fa-solid fa-layer-group text-amber-600"></i>
+                        <span>Rincian Karung ID Ini:</span>
+                    </div>
+                    <div id="draftSacksSummaryChips" class="flex items-center gap-1.5 flex-wrap"></div>
                 </div>
 
                 <!-- Empty State Draft -->
@@ -1081,15 +1102,12 @@ try {
         }
 
         // ==============================================================
-        // SACK / KARUNG MANAGEMENT
+        // SACK / KARUNG MANAGEMENT (DUKUNG MULTI-KARUNG DALAM 1 ID)
         // ==============================================================
         function selectQuickSack(sackVal) {
-            const input = document.getElementById('inputSackNumber');
-            if (input) input.value = sackVal;
-            currentSackNumber = sackVal;
-            updateActiveSackDisplay(sackVal);
+            switchActiveSack(sackVal);
 
-            // Highlight chip terpilih
+            // Highlight chip terpilih di Langkah 2
             document.querySelectorAll('.quick-sack-chip').forEach(btn => {
                 if (btn.innerText.trim() === sackVal) {
                     btn.className = 'quick-sack-chip px-2.5 py-1 bg-amber-500 text-white border border-amber-600 rounded-lg text-[11px] font-bold transition shadow-2xs';
@@ -1097,8 +1115,23 @@ try {
                     btn.className = 'quick-sack-chip px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[11px] font-bold transition shadow-2xs';
                 }
             });
+        }
 
+        function switchActiveSack(sackVal) {
+            const cleanVal = (sackVal || '').trim() || 'Karung 1';
+            currentSackNumber = cleanVal;
+            const inputSack = document.getElementById('inputSackNumber');
+            if (inputSack) inputSack.value = cleanVal;
+
+            updateActiveSackDisplay(cleanVal);
             saveDraftToStorage();
+            renderStep4SackChips();
+
+            // Refocus ke input resi agar bisa langsung tembak laser
+            const inputPkg = document.getElementById('inputPackageBarcode');
+            if (inputPkg && !inputPkg.disabled) {
+                setTimeout(() => inputPkg.focus(), 80);
+            }
         }
 
         function updateActiveSackDisplay(sackVal) {
@@ -1107,19 +1140,73 @@ try {
             setText('txtConfirmedSack', val);
         }
 
-        function promptChangeSack() {
+        function renderStep4SackChips(sackCounts = null) {
+            const container = document.getElementById('step4SackChipsList');
+            if (!container) return;
+
+            if (!sackCounts) {
+                sackCounts = {};
+                draftPackages.forEach(p => {
+                    const s = p.sack_number || currentSackNumber || 'Karung 1';
+                    sackCounts[s] = (sackCounts[s] || 0) + 1;
+                });
+            }
+
+            // Gabungkan karung default, karung yang ada di draft, dan karung aktif
+            const sacksSet = new Set(['Karung 1', 'Karung 2', 'Karung 3', 'Karung 4', 'Karung 5']);
+            Object.keys(sackCounts).forEach(s => { if (s) sacksSet.add(s); });
+            if (currentSackNumber) sacksSet.add(currentSackNumber);
+
+            // Urutkan secara natural
+            const sortedSacks = Array.from(sacksSet).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+
+            let chipsHtml = '';
+            sortedSacks.forEach(sackName => {
+                const isActive = (sackName.toLowerCase() === (currentSackNumber || 'Karung 1').toLowerCase());
+                const count = sackCounts[sackName] || 0;
+                const countBadge = count > 0 
+                    ? `<span class="ml-1 text-[9px] px-1.5 py-0.2 rounded-full ${isActive ? 'bg-amber-700 text-white' : 'bg-amber-100 text-amber-800'} font-black font-mono">${count}</span>` 
+                    : '';
+
+                if (isActive) {
+                    chipsHtml += `
+                        <button type="button" onclick="switchActiveSack('${escapeHtml(sackName)}')" 
+                            class="px-3 py-1.5 bg-amber-500 text-white border-2 border-amber-600 rounded-xl text-xs font-black shrink-0 transition shadow-sm flex items-center gap-1 active:scale-95 cursor-pointer"
+                            title="Sedang aktif: Paket selanjutnya masuk ke ${escapeHtml(sackName)}">
+                            <i class="fa-solid fa-check text-[10px]"></i>
+                            <span>${escapeHtml(sackName)}</span>
+                            ${countBadge}
+                        </button>
+                    `;
+                } else {
+                    chipsHtml += `
+                        <button type="button" onclick="switchActiveSack('${escapeHtml(sackName)}')" 
+                            class="px-3 py-1.5 bg-white hover:bg-amber-50/80 text-slate-700 hover:text-amber-900 border border-slate-200 hover:border-amber-300 rounded-xl text-xs font-bold shrink-0 transition shadow-2xs flex items-center gap-1 active:scale-95 cursor-pointer"
+                            title="Klik untuk pindah scan ke ${escapeHtml(sackName)}">
+                            <i class="fa-solid fa-box-archive text-[10px] text-slate-400"></i>
+                            <span>${escapeHtml(sackName)}</span>
+                            ${countBadge}
+                        </button>
+                    `;
+                }
+            });
+
+            container.innerHTML = chipsHtml;
+        }
+
+        function promptCustomSack() {
             const currentVal = currentSackNumber || 'Karung 1';
-            const newVal = prompt('Masukkan Nomor / Label Karung Baru:\n(Contoh: Karung 2, Karung 3, KR-02)', currentVal);
+            const newVal = prompt('Ketik Nama / Nomor Karung Tambahan:\n(Contoh: Karung 6, Karung 7, Karung Jumbo, KR-08)', '');
             if (newVal !== null && newVal.trim() !== '') {
                 const cleanVal = newVal.trim();
-                currentSackNumber = cleanVal;
-                const inputSack = document.getElementById('inputSackNumber');
-                if (inputSack) inputSack.value = cleanVal;
-                updateActiveSackDisplay(cleanVal);
-                saveDraftToStorage();
-                showStatusMsg(`📦 Karung aktif berhasil diubah ke <b>${escapeHtml(cleanVal)}</b>. Paket selanjutnya akan dicatat di karung ini.`, 'info');
+                switchActiveSack(cleanVal);
+                showStatusMsg(`📦 Karung aktif berpindah ke <b>${escapeHtml(cleanVal)}</b>. Resi yang di-scan selanjutnya akan dicatat di ${escapeHtml(cleanVal)}.`, 'info');
                 playBeep('success');
             }
+        }
+
+        function promptChangeSack() {
+            promptCustomSack();
         }
 
         // Inisialisasi saat DOM siap
@@ -1768,6 +1855,38 @@ try {
 
             const emptyBox = document.getElementById('draftListEmpty');
             const container = document.getElementById('draftPackagesContainer');
+
+            // Hitung distribusi paket per karung dalam 1 ID serah terima
+            const sackCounts = {};
+            draftPackages.forEach(p => {
+                const s = p.sack_number || currentSackNumber || 'Karung 1';
+                sackCounts[s] = (sackCounts[s] || 0) + 1;
+            });
+
+            // Update bar ringkasan karung di Step 5
+            const summaryBar = document.getElementById('draftSacksSummaryBar');
+            const summaryChips = document.getElementById('draftSacksSummaryChips');
+            if (summaryBar && summaryChips) {
+                const sackEntries = Object.entries(sackCounts);
+                if (sackEntries.length > 0) {
+                    showElement(summaryBar);
+                    summaryChips.innerHTML = sackEntries.map(([sName, sQty]) => `
+                        <button type="button" onclick="switchActiveSack('${escapeHtml(sName)}')" 
+                            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white hover:bg-amber-100 border border-amber-300 text-amber-950 font-bold text-[11px] shadow-2xs font-mono transition cursor-pointer"
+                            title="Klik untuk jadikan karung target scan">
+                            <i class="fa-solid fa-box-archive text-amber-600 text-[10px]"></i>
+                            <span>${escapeHtml(sName)}</span>
+                            <span class="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.2 rounded-full font-black">${sQty} paket</span>
+                        </button>
+                    `).join('');
+                } else {
+                    hideElement(summaryBar);
+                    summaryChips.innerHTML = '';
+                }
+            }
+
+            // Update bar quick switch karung di Langkah 4
+            renderStep4SackChips(sackCounts);
 
             if (count === 0) {
                 showElement(emptyBox);
