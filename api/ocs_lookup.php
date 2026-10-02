@@ -216,13 +216,18 @@ try {
                 $loginJson = json_decode($loginRes, true);
                 $token = $loginJson['Token'] ?? null;
                 if ($token) {
-                    $foundOrderId = null;
-
-                    // Langkah A: Coba panggil GetOrderDetail dengan $cleanQuery atau $query
                     $queryCandidates = array_values(array_unique(array_filter([$cleanQuery, $query])));
+
+                    // =========================================================================
+                    // LANGKAH 1 (PRIORITAS UTAMA): FIND ORDER OCS (FITUR RESMI PICKLIST OCS)
+                    // Menggunakan https://ocs.iegsystem.id/Orders/FindOrder?keyword=...
+                    // Sesuai modul Find Order di https://ocs.iegsystem.id/picklist
+                    // Mendukung pencarian instan: No. Resi (TrackingNumber), No. Order (Id), PackageId!
+                    // =========================================================================
+                    $findOrderMatched = null;
                     foreach ($queryCandidates as $qc) {
-                        $chDetail = curl_init("{$ocsBaseUrl}/Orders/GetOrderDetail?orderId=" . urlencode($qc));
-                        curl_setopt_array($chDetail, [
+                        $chFind = curl_init("{$ocsBaseUrl}/Orders/FindOrder?keyword=" . urlencode($qc));
+                        curl_setopt_array($chFind, [
                             CURLOPT_RETURNTRANSFER => true,
                             CURLOPT_HTTPGET        => true,
                             CURLOPT_HTTPHEADER     => [
@@ -231,53 +236,282 @@ try {
                             ],
                             CURLOPT_SSL_VERIFYPEER => false,
                             CURLOPT_SSL_VERIFYHOST => false,
-                            CURLOPT_TIMEOUT        => 6
+                            CURLOPT_TIMEOUT        => 8
                         ]);
-                        $detailRes = curl_exec($chDetail);
-                        $detailHttp = curl_getinfo($chDetail, CURLINFO_HTTP_CODE);
-                        curl_close($chDetail);
+                        $findRes = curl_exec($chFind);
+                        $findHttp = curl_getinfo($chFind, CURLINFO_HTTP_CODE);
+                        curl_close($chFind);
 
-                        if ($detailHttp === 200 && $detailRes) {
-                            $detailJson = json_decode($detailRes, true);
-                            $od = $detailJson['data']['Data'] ?? $detailJson['Data'] ?? null;
-                            if (!empty($od['Id'])) {
-                                $foundOrderId = $od['Id'];
+                        if ($findHttp === 200 && $findRes) {
+                            $findJson = json_decode($findRes, true);
+                            if (!empty($findJson['Order']['Id'])) {
+                                $findOrderMatched = $findJson;
                                 break;
                             }
                         }
                     }
 
-                    // Langkah B: Jika belum ketemu, cari di DTO_Orders berdasarkan Id ATAU TrackingNumber
-                    if (!$foundOrderId) {
-                        foreach ($queryCandidates as $qc) {
-                            // Coba via Id
-                            $filterById = urlencode("Id eq '{$qc}'");
-                            // Coba via TrackingNumber (nomor resi ekspedisi)
-                            $filterByTrack = urlencode("TrackingNumber eq '{$qc}'");
+                    if ($findOrderMatched) {
+                        $fo = $findOrderMatched['Order'];
+                        $fp = $findOrderMatched['Payment'] ?? [];
+                        $fa = $findOrderMatched['Address'] ?? [];
+                        $fSkus = $findOrderMatched['Skus'] ?? [];
+                        $fPick = $findOrderMatched['Picklists'] ?? [];
 
-                            foreach ([$filterById, $filterByTrack] as $filterStr) {
-                                $chOrd = curl_init("{$ocsBaseUrl}/odata/DTO_Orders?\$filter={$filterStr}&\$top=1&\$select=Id,TrackingNumber");
-                                curl_setopt_array($chOrd, [
-                                    CURLOPT_RETURNTRANSFER => true,
-                                    CURLOPT_HTTPGET        => true,
-                                    CURLOPT_HTTPHEADER     => [
-                                        "Authorization: Bearer {$token}",
-                                        "Accept: application/json"
-                                    ],
-                                    CURLOPT_SSL_VERIFYPEER => false,
-                                    CURLOPT_SSL_VERIFYHOST => false,
-                                    CURLOPT_TIMEOUT        => 5
-                                ]);
-                                $ordRes = curl_exec($chOrd);
-                                curl_close($chOrd);
-                                $ordJson = json_decode($ordRes, true);
-                                if (!empty($ordJson['value'][0]['Id'])) {
-                                    $foundOrderId = $ordJson['value'][0]['Id'];
-                                    break 2;
+                        $origProdPrice = (float)($fp['OriginalTotalProductPrice'] ?? 0);
+                        $sellerDisc = (float)($fp['SellerDiscount'] ?? 0);
+                        $platformDisc = (float)($fp['PlatformDiscount'] ?? 0);
+                        $shipFee = (float)($fp['ShippingFee'] ?? 0);
+                        $serviceFee = (float)($fp['ServiceFee'] ?? 0);
+                        $subtotal = (float)($fp['SubTotal'] ?? ($origProdPrice - $sellerDisc));
+                        $totalAmount = (float)($fp['TotalAmount'] ?? 0);
+                        if ($totalAmount <= 0) {
+                            $totalAmount = $subtotal > 0 ? ($subtotal + $shipFee + $serviceFee) : $origProdPrice;
+                        }
+
+                        $parsedItems = [];
+                        $itemNames = [];
+                        $primarySellerSku = null;
+
+                        foreach ($fSkus as $det) {
+                            $pSku = trim($det['SellerSku'] ?? $det['BundleSku'] ?? '');
+                            $pName = trim($det['ProductName'] ?? '');
+                            $sName = trim($det['SkuName'] ?? '');
+                            $pQty = (int)($det['Qty'] ?? 1);
+
+                            if (!$primarySellerSku && !empty($pSku)) $primarySellerSku = $pSku;
+                            $itemNames[] = ($pSku ? "[{$pSku}] " : "") . $pName . ($sName ? " ({$sName})" : "") . " (x{$pQty})";
+
+                            $parsedItems[] = [
+                                'sku_id'            => $pSku,
+                                'seller_sku'        => $pSku,
+                                'product_name'      => $pName,
+                                'sku_name'          => $sName,
+                                'qty'               => $pQty,
+                                'original_price'    => (float)($det['OriginalPrice'] ?? 0),
+                                'sale_price'        => (float)($det['SalePrice'] ?? 0),
+                                'seller_discount'   => 0,
+                                'platform_discount' => 0,
+                                'subtotal'          => (float)($det['SalePrice'] ?? 0) * $pQty
+                            ];
+                        }
+
+                        if (empty($parsedItems) && !empty($fPick)) {
+                            foreach ($fPick as $pIt) {
+                                $pSku = trim($pIt['ItemCode'] ?? $pIt['BundleCode'] ?? '');
+                                $pName = trim($pIt['ItemName'] ?? '');
+                                $pQty = (int)($pIt['QtyOrdered'] ?? 1);
+                                if (!$primarySellerSku && !empty($pSku)) $primarySellerSku = $pSku;
+                                $itemNames[] = ($pSku ? "[{$pSku}] " : "") . $pName . " (x{$pQty})";
+                                $parsedItems[] = [
+                                    'sku_id'            => $pSku,
+                                    'seller_sku'        => $pSku,
+                                    'product_name'      => $pName,
+                                    'sku_name'          => '',
+                                    'qty'               => $pQty,
+                                    'original_price'    => 0,
+                                    'sale_price'        => 0,
+                                    'seller_discount'   => 0,
+                                    'platform_discount' => 0,
+                                    'subtotal'          => 0
+                                ];
+                            }
+                        }
+
+                        $prodText = !empty($itemNames) ? implode(', ', $itemNames) : ($fo['ProductName'] ?? '');
+
+                        $orderData = [
+                            'Id'                     => $fo['Id'],
+                            'TrackingNumber'         => $fo['TrackingNumber'] ?? '',
+                            'PlatformId'             => $fo['PlatformId'] ?? null,
+                            'CommercePlatform'       => $fo['CommercePlatform'] ?? '',
+                            'ShopName'               => $fo['ShopName'] ?? '',
+                            'ShippingProvider'       => trim(($fo['ShippingProvider'] ?? '') . ' ' . ($fo['DeliveryOptionName'] ?? '')),
+                            'StatusCode'             => $fo['StatusCode'] ?? null,
+                            'StatusName'             => $fo['Status'] ?? $fo['StatusName'] ?? '',
+                            'ProductName'            => $prodText,
+                            'SellerSku'              => $primarySellerSku,
+                            'TotalQtyOrder'          => (int)($fo['TotalQtyOrder'] ?? count($parsedItems)),
+                            'PackagePrice'           => $totalAmount,
+                            'PackagePriceFormatted'  => 'Rp ' . number_format($totalAmount, 0, ',', '.'),
+                            'OriginalPrice'          => $origProdPrice,
+                            'SellerDiscount'         => $sellerDisc,
+                            'PlatformDiscount'       => $platformDisc,
+                            'ShippingFee'            => $shipFee,
+                            'ShippingFeeFormatted'   => $shipFee > 0 ? 'Rp ' . number_format($shipFee, 0, ',', '.') : 'Rp 0',
+                            'ServiceFee'             => $serviceFee,
+                            'SubTotal'               => $subtotal,
+                            'TotalClaimAmount'       => $totalAmount,
+                            'TotalClaimAmountFormatted' => 'Rp ' . number_format($totalAmount, 0, ',', '.'),
+                            'GMV'                    => $origProdPrice > 0 ? $origProdPrice : $totalAmount,
+                            'NMV'                    => $totalAmount,
+                            'Details'                => $parsedItems,
+                            'Items'                  => $parsedItems,
+                            'Picklists'              => $fPick,
+                            'Customer'               => [
+                                'Name'        => $fa['Name'] ?? '',
+                                'PhoneNumber' => $fa['PhoneNumber'] ?? '',
+                                'FullAddress' => trim(($fa['Province'] ?? '') . ' ' . ($fa['Regency'] ?? '') . ' ' . ($fa['Country'] ?? ''))
+                            ],
+                            'Payment'                => $fp,
+                            'CreatedAt'              => $fo['CreatedAt'] ?? '',
+                            '_source'                => 'ocs_picklist_find_order'
+                        ];
+
+                        // Simpan ke database ocs_orders lokal
+                        try {
+                            $hasIsSyncedCol = false;
+                            try {
+                                $colsOcs = $pdo->query("SHOW COLUMNS FROM ocs_orders")->fetchAll(PDO::FETCH_COLUMN);
+                                if (!in_array('is_synced_to_local', $colsOcs)) {
+                                    try { $pdo->exec("ALTER TABLE ocs_orders ADD COLUMN is_synced_to_local TINYINT(1) DEFAULT 0 AFTER raw_payload"); $colsOcs[] = 'is_synced_to_local'; } catch (Exception $eCol) {}
+                                }
+                                $hasIsSyncedCol = in_array('is_synced_to_local', $colsOcs);
+                            } catch (Exception $eCols) {}
+
+                            $colSyncPart = $hasIsSyncedCol ? ", is_synced_to_local" : "";
+                            $valSyncPart = $hasIsSyncedCol ? ", 1" : "";
+
+                            $stmtUpsert = $pdo->prepare("
+                                INSERT INTO ocs_orders (
+                                    order_id, tracking_number, platform_id, commerce_platform, 
+                                    shop_name, shipping_provider, status_code, status_name, product_name, seller_sku,
+                                    total_qty, package_price, original_price, seller_discount, platform_discount,
+                                    shipping_fee, service_fee, subtotal, total_amount, gmv, nmv,
+                                    customer_name, customer_phone, customer_address, order_items_json,
+                                    has_packing_video, packing_video_url, order_created_at, raw_payload{$colSyncPart}
+                                ) VALUES (
+                                    :order_id, :tracking_number, :platform_id, :commerce_platform, 
+                                    :shop_name, :shipping_provider, :status_code, :status_name, :product_name, :seller_sku,
+                                    :total_qty, :package_price, :original_price, :seller_discount, :platform_discount,
+                                    :shipping_fee, :service_fee, :subtotal, :total_amount, :gmv, :nmv,
+                                    :customer_name, :customer_phone, :customer_address, :order_items_json,
+                                    0, NULL, :order_created_at, :raw_payload{$valSyncPart}
+                                )
+                                ON DUPLICATE KEY UPDATE 
+                                    tracking_number   = COALESCE(VALUES(tracking_number), tracking_number),
+                                    platform_id       = VALUES(platform_id),
+                                    commerce_platform = VALUES(commerce_platform),
+                                    shop_name         = VALUES(shop_name),
+                                    shipping_provider = VALUES(shipping_provider),
+                                    status_code       = VALUES(status_code),
+                                    status_name       = VALUES(status_name),
+                                    product_name      = VALUES(product_name),
+                                    seller_sku        = VALUES(seller_sku),
+                                    total_qty         = VALUES(total_qty),
+                                    package_price     = VALUES(package_price),
+                                    original_price    = VALUES(original_price),
+                                    seller_discount   = VALUES(seller_discount),
+                                    platform_discount = VALUES(platform_discount),
+                                    shipping_fee      = VALUES(shipping_fee),
+                                    service_fee       = VALUES(service_fee),
+                                    subtotal          = VALUES(subtotal),
+                                    total_amount      = VALUES(total_amount),
+                                    gmv               = VALUES(gmv),
+                                    nmv               = VALUES(nmv),
+                                    customer_name     = VALUES(customer_name),
+                                    customer_phone    = VALUES(customer_phone),
+                                    customer_address  = VALUES(customer_address),
+                                    order_items_json  = VALUES(order_items_json),
+                                    order_created_at  = VALUES(order_created_at),
+                                    raw_payload       = VALUES(raw_payload)
+                            ");
+                            $stmtUpsert->execute([
+                                ':order_id'          => $orderData['Id'],
+                                ':tracking_number'   => $orderData['TrackingNumber'] ?: null,
+                                ':platform_id'       => $orderData['PlatformId'] ?: null,
+                                ':commerce_platform' => $orderData['CommercePlatform'] ?: null,
+                                ':shop_name'         => $orderData['ShopName'] ?: null,
+                                ':shipping_provider' => $orderData['ShippingProvider'] ?: null,
+                                ':status_code'       => $orderData['StatusCode'] ?: null,
+                                ':status_name'       => $orderData['StatusName'] ?: null,
+                                ':product_name'      => $orderData['ProductName'] ?: null,
+                                ':seller_sku'        => $orderData['SellerSku'] ?: null,
+                                ':total_qty'         => (int)$orderData['TotalQtyOrder'],
+                                ':package_price'     => $orderData['PackagePrice'],
+                                ':original_price'    => $orderData['OriginalPrice'],
+                                ':seller_discount'   => $orderData['SellerDiscount'],
+                                ':platform_discount' => $orderData['PlatformDiscount'],
+                                ':shipping_fee'      => $orderData['ShippingFee'],
+                                ':service_fee'       => $orderData['ServiceFee'],
+                                ':subtotal'          => $orderData['SubTotal'],
+                                ':total_amount'      => $orderData['TotalClaimAmount'],
+                                ':gmv'               => $orderData['GMV'],
+                                ':nmv'               => $orderData['NMV'],
+                                ':customer_name'     => $orderData['Customer']['Name'] ?: null,
+                                ':customer_phone'    => $orderData['Customer']['PhoneNumber'] ?: null,
+                                ':customer_address'  => $orderData['Customer']['FullAddress'] ?: null,
+                                ':order_items_json'  => json_encode($parsedItems, JSON_UNESCAPED_UNICODE),
+                                ':order_created_at'  => !empty($orderData['CreatedAt']) ? gmdate('Y-m-d H:i:s', strtotime($orderData['CreatedAt'])) : date('Y-m-d H:i:s'),
+                                ':raw_payload'       => json_encode($findOrderMatched, JSON_UNESCAPED_UNICODE)
+                            ]);
+                        } catch (Exception $eUpsert) {
+                            error_log("Gagal upsert ocs_orders dari FindOrder: " . $eUpsert->getMessage());
+                        }
+                    }
+
+                    // FALLBACK JIKA FIND ORDER TIDAK MENEMUKAN DATA:
+                    if (!$orderData) {
+                        $foundOrderId = null;
+
+                        // Fallback A: Coba panggil GetOrderDetail dengan $cleanQuery atau $query
+                        foreach ($queryCandidates as $qc) {
+                            $chDetail = curl_init("{$ocsBaseUrl}/Orders/GetOrderDetail?orderId=" . urlencode($qc));
+                            curl_setopt_array($chDetail, [
+                                CURLOPT_RETURNTRANSFER => true,
+                                CURLOPT_HTTPGET        => true,
+                                CURLOPT_HTTPHEADER     => [
+                                    "Authorization: Bearer {$token}",
+                                    "Accept: application/json"
+                                ],
+                                CURLOPT_SSL_VERIFYPEER => false,
+                                CURLOPT_SSL_VERIFYHOST => false,
+                                CURLOPT_TIMEOUT        => 6
+                            ]);
+                            $detailRes = curl_exec($chDetail);
+                            $detailHttp = curl_getinfo($chDetail, CURLINFO_HTTP_CODE);
+                            curl_close($chDetail);
+
+                            if ($detailHttp === 200 && $detailRes) {
+                                $detailJson = json_decode($detailRes, true);
+                                $od = $detailJson['data']['Data'] ?? $detailJson['Data'] ?? null;
+                                if (!empty($od['Id'])) {
+                                    $foundOrderId = $od['Id'];
+                                    break;
                                 }
                             }
                         }
+
+                        // Fallback B: Jika belum ketemu, cari di DTO_Orders berdasarkan Id ATAU TrackingNumber
+                        if (!$foundOrderId) {
+                            foreach ($queryCandidates as $qc) {
+                                $filterById = urlencode("Id eq '{$qc}'");
+                                $filterByTrack = urlencode("TrackingNumber eq '{$qc}'");
+
+                                foreach ([$filterById, $filterByTrack] as $filterStr) {
+                                    $chOrd = curl_init("{$ocsBaseUrl}/odata/DTO_Orders?\$filter={$filterStr}&\$top=1&\$select=Id,TrackingNumber");
+                                    curl_setopt_array($chOrd, [
+                                        CURLOPT_RETURNTRANSFER => true,
+                                        CURLOPT_HTTPGET        => true,
+                                        CURLOPT_HTTPHEADER     => [
+                                            "Authorization: Bearer {$token}",
+                                            "Accept: application/json"
+                                        ],
+                                        CURLOPT_SSL_VERIFYPEER => false,
+                                        CURLOPT_SSL_VERIFYHOST => false,
+                                        CURLOPT_TIMEOUT        => 5
+                                    ]);
+                                    $ordRes = curl_exec($chOrd);
+                                    curl_close($chOrd);
+                                    $ordJson = json_decode($ordRes, true);
+                                    if (!empty($ordJson['value'][0]['Id'])) {
+                                        $foundOrderId = $ordJson['value'][0]['Id'];
+                                        break 2;
+                                    }
+                                }
+                        }
                     }
+
 
                     // Langkah C: Cari di DTO_ReturnOrder (Tabel Retur OCS, cepat 0.5s)
                     if (!$foundOrderId) {
@@ -502,7 +736,8 @@ try {
                     }
                 }
             }
-        } catch (Exception $ocsErr) {
+        }
+    } catch (Exception $ocsErr) {
             // Lanjutkan jika OCS tidak merespon
         }
     }

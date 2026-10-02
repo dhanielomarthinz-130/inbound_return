@@ -3263,11 +3263,24 @@ setTimeout(() => {
 // -------------------------------------------------------------
 // SINKRONISASI ORDERS OCS (RESI, INVOICE, SKU, BIAYA, KLAIM)
 // -------------------------------------------------------------
-window.openOcsSyncModal = function() {
+window.openOcsSyncModal = function(mode = null) {
     const modal = document.getElementById('modalOcsSync');
     if (modal) {
         modal.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
+    }
+    if (mode === 'picklist') {
+        const radios = document.getElementsByName('syncPeriodType');
+        for (const r of radios) {
+            r.checked = (r.value === 'picklist');
+        }
+        if (typeof toggleSyncDateInput === 'function') {
+            toggleSyncDateInput();
+        }
+        setTimeout(() => {
+            const input = document.getElementById('syncPicklistKeywordInput');
+            if (input) input.focus();
+        }, 150);
     }
 };
 
@@ -3287,29 +3300,40 @@ window.toggleSyncDateInput = function() {
     }
 
     const customContainer = document.getElementById('syncCustomDateContainer');
+    const picklistContainer = document.getElementById('syncPicklistContainer');
     const labelYesterday = document.getElementById('labelSyncYesterday');
     const labelToday = document.getElementById('labelSyncToday');
     const labelCustom = document.getElementById('labelSyncCustom');
+    const labelPicklist = document.getElementById('labelSyncPicklist');
 
-    [labelYesterday, labelToday, labelCustom].forEach(l => {
+    [labelYesterday, labelToday, labelCustom, labelPicklist].forEach(l => {
         if (l) {
-            l.classList.remove('border-indigo-600', 'bg-indigo-50/50');
+            l.classList.remove('border-indigo-600', 'bg-indigo-50/50', 'border-blue-600', 'bg-blue-50/50');
             l.classList.add('border-slate-200', 'bg-white');
         }
     });
 
+    if (customContainer) customContainer.classList.add('hidden');
+    if (picklistContainer) picklistContainer.classList.add('hidden');
+
     if (selected === 'yesterday' && labelYesterday) {
         labelYesterday.classList.add('border-indigo-600', 'bg-indigo-50/50');
         labelYesterday.classList.remove('border-slate-200', 'bg-white');
-        if (customContainer) customContainer.classList.add('hidden');
     } else if (selected === 'today' && labelToday) {
         labelToday.classList.add('border-indigo-600', 'bg-indigo-50/50');
         labelToday.classList.remove('border-slate-200', 'bg-white');
-        if (customContainer) customContainer.classList.add('hidden');
     } else if (selected === 'custom' && labelCustom) {
         labelCustom.classList.add('border-indigo-600', 'bg-indigo-50/50');
         labelCustom.classList.remove('border-slate-200', 'bg-white');
         if (customContainer) customContainer.classList.remove('hidden');
+    } else if (selected === 'picklist' && labelPicklist) {
+        labelPicklist.classList.add('border-blue-600', 'bg-blue-50/50');
+        labelPicklist.classList.remove('border-slate-200', 'bg-white');
+        if (picklistContainer) {
+            picklistContainer.classList.remove('hidden');
+            const inp = document.getElementById('syncPicklistKeywordInput');
+            if (inp) inp.focus();
+        }
     }
 };
 
@@ -3331,14 +3355,31 @@ window.executeOcsOrderSync = async function() {
         if (r.checked) selected = r.value;
     }
 
-    let dateParam = selected;
-    if (selected === 'custom') {
+    let url = '';
+    let targetLabel = '';
+
+    if (selected === 'picklist') {
+        const inputKey = document.getElementById('syncPicklistKeywordInput');
+        const keyword = inputKey ? inputKey.value.trim() : '';
+        if (!keyword) {
+            showToast('warning', 'Harap masukkan No. Resi atau Order ID terlebih dahulu.', 'Peringatan');
+            if (inputKey) inputKey.focus();
+            return;
+        }
+        url = `api/sync_ocs_orders.php?keyword=${encodeURIComponent(keyword)}`;
+        targetLabel = `No. Resi / Order ID: <b>${keyword}</b> via Picklist OCS`;
+    } else if (selected === 'custom') {
         const customDateInput = document.getElementById('syncCustomDateInput');
-        dateParam = customDateInput ? customDateInput.value : '';
+        const dateParam = customDateInput ? customDateInput.value : '';
         if (!dateParam) {
             showToast('warning', 'Harap pilih tanggal sinkronisasi terlebih dahulu.', 'Peringatan');
             return;
         }
+        url = `api/sync_ocs_orders.php?date=${encodeURIComponent(dateParam)}`;
+        targetLabel = `tanggal ${dateParam}`;
+    } else {
+        url = `api/sync_ocs_orders.php?date=${encodeURIComponent(selected)}`;
+        targetLabel = selected === 'yesterday' ? 'hari kemarin (00:00 - 23:59 WIB)' : 'hari ini';
     }
 
     // Tampilkan progress UI
@@ -3352,7 +3393,7 @@ window.executeOcsOrderSync = async function() {
         progressTitle.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin text-indigo-400"></i> Sinkronisasi Orders Sedang Berjalan...`;
     }
     if (progressDetail) {
-        progressDetail.innerText = `Menghubungkan ke OCS IEG System untuk mengambil data orders ${selected === 'yesterday' ? 'hari kemarin (00:00 - 23:59 WIB)' : (selected === 'today' ? 'hari ini' : dateParam)}...`;
+        progressDetail.innerHTML = `Menghubungkan ke OCS IEG System untuk ${targetLabel}...`;
     }
 
     if (btnStart) {
@@ -3363,9 +3404,7 @@ window.executeOcsOrderSync = async function() {
     if (btnCancel) btnCancel.disabled = true;
 
     try {
-        const response = await fetch(`api/sync_ocs_orders.php?date=${encodeURIComponent(dateParam)}`);
-
-        // Safe parse: baca sebagai text dulu untuk hindari "Unexpected end of JSON input"
+        const response = await fetch(url);
         const rawText = await response.text();
         if (!rawText || rawText.trim() === '') {
             throw new Error('Server mengembalikan respons kosong. Kemungkinan timeout atau OCS tidak dapat dihubungi. Coba lagi dalam beberapa saat.');
@@ -3376,7 +3415,7 @@ window.executeOcsOrderSync = async function() {
             result = JSON.parse(rawText);
         } catch (jsonErr) {
             console.error('[sync_ocs_orders] Non-JSON response:', rawText.substring(0, 500));
-            throw new Error(`Server mengembalikan respons tidak valid (bukan JSON). Preview: ${rawText.substring(0, 120)}`);
+            throw new Error(`Server mengembalikan respons tidak valid. Preview: ${rawText.substring(0, 120)}`);
         }
 
         if (result && result.success) {
@@ -3388,26 +3427,24 @@ window.executeOcsOrderSync = async function() {
                 progressBadge.innerText = 'SELESAI';
             }
             if (progressDetail) {
-                progressDetail.innerHTML = `Periode: <b>${result.target_date || dateParam}</b> (${result.start_wib} s/d ${result.end_wib})<br>Semua invoice, resi, detail item SKU & biaya klaim telah tersimpan ke sistem.`;
+                if (result.mode === 'single_order_picklist' || result.source === 'picklist_find_order') {
+                    progressDetail.innerHTML = `Order <b>${result.order_id}</b> (Resi: <b>${result.tracking_number || '-'}</b>) dari <b>${result.shop_name || '-'}</b> (${result.platform || '-'}) berhasil disinkronisasi lengkap dengan ${result.skus_count || 1} SKU!`;
+                } else {
+                    progressDetail.innerHTML = `Periode: <b>${result.target_date || selected}</b> (${result.start_wib} s/d ${result.end_wib})<br>Semua invoice, resi, detail item SKU & biaya klaim telah tersimpan ke sistem.`;
+                }
             }
 
             if (statsBox) statsBox.classList.remove('hidden');
-            if (statTotalOrders) statTotalOrders.innerText = (result.total_synced || result.total_orders_found || 0).toLocaleString('id-ID');
-            if (statWithResi) statWithResi.innerText = (result.total_with_resi || 0).toLocaleString('id-ID');
+            if (statTotalOrders) statTotalOrders.innerText = (result.total_synced || result.total_orders_found || 1).toLocaleString('id-ID');
+            if (statWithResi) statWithResi.innerText = (result.total_with_resi || (result.tracking_number ? 1 : 0)).toLocaleString('id-ID');
             if (statTotalClaim) statTotalClaim.innerText = result.total_claim_amount_fmt || `Rp ${(result.total_claim_amount || 0).toLocaleString('id-ID')}`;
 
-            showToast('success', `Berhasil menyinkron ${result.total_synced || 0} orders dengan total nilai klaim ${result.total_claim_amount_fmt || 'Rp 0'}!`, 'Sinkronisasi Selesai');
+            showToast('success', `Berhasil menyinkron order dari Picklist OCS (Nilai Klaim: ${result.total_claim_amount_fmt || 'Rp 0'})!`, 'Sinkronisasi Selesai');
 
             // Refresh data setelah sync sukses
-            if (typeof loadClaimCandidates === 'function') {
-                loadClaimCandidates(true);
-            }
-            if (typeof loadOrdersStats === 'function') {
-                loadOrdersStats();
-            }
-            if (typeof loadOrdersTable === 'function') {
-                loadOrdersTable(1);
-            }
+            if (typeof loadClaimCandidates === 'function') loadClaimCandidates(true);
+            if (typeof loadOrdersStats === 'function') loadOrdersStats();
+            if (typeof loadOrdersTable === 'function') loadOrdersTable(1);
         } else {
             throw new Error(result.error || result.message || 'Gagal menyinkron data orders dari OCS');
         }

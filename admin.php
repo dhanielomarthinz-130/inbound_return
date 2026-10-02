@@ -911,6 +911,10 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 <i class="fa-solid fa-file-excel"></i>
                                 <span>Export Excel</span>
                             </button>
+                            <button onclick="openOcsSyncModal('picklist')" type="button" class="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white text-xs px-3.5 py-2.5 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-sm shadow-blue-600/20" title="Sync via No. Resi atau Order ID menggunakan Picklist OCS">
+                                <i class="fa-solid fa-barcode"></i>
+                                <span>Sync Resi/Order (Picklist)</span>
+                            </button>
                             <button onclick="openOcsSyncModal()" type="button" class="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-2.5 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-sm shadow-indigo-600/25">
                                 <i class="fa-solid fa-cloud-arrow-down text-sm"></i>
                                 <span>Sinkronisasi OCS</span>
@@ -2021,14 +2025,14 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
             <!-- Form Pilihan Rentang Waktu -->
             <div class="space-y-4">
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-2">Pilih Periode Sinkronisasi:</label>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <label class="block text-xs font-bold text-slate-700 mb-2">Pilih Metode & Periode Sinkronisasi:</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                         <label class="cursor-pointer border-2 border-indigo-600 bg-indigo-50/50 rounded-2xl p-3 flex flex-col justify-between transition hover:border-indigo-600" id="labelSyncYesterday">
                             <div class="flex items-center justify-between mb-1">
                                 <span class="text-xs font-black text-indigo-900">Hari Kemarin</span>
                                 <input type="radio" name="syncPeriodType" value="yesterday" checked onchange="toggleSyncDateInput()" class="text-indigo-600 focus:ring-indigo-500">
                             </div>
-                            <span class="text-[10px] text-indigo-700 font-semibold leading-tight">00:00:00 s/d 23:59:59 WIB (Rekomendasi Klaim)</span>
+                            <span class="text-[10px] text-indigo-700 font-semibold leading-tight">00:00:00 s/d 23:59:59 WIB</span>
                         </label>
 
                         <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-2xl p-3 flex flex-col justify-between transition hover:border-slate-300" id="labelSyncToday">
@@ -2046,6 +2050,16 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             </div>
                             <span class="text-[10px] text-slate-500 leading-tight">Tanggal Tertentu</span>
                         </label>
+
+                        <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-2xl p-3 flex flex-col justify-between transition hover:border-slate-300" id="labelSyncPicklist">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs font-bold text-slate-800 flex items-center gap-1">
+                                    <i class="fa-solid fa-barcode text-blue-500"></i> No. Resi/Order
+                                </span>
+                                <input type="radio" name="syncPeriodType" value="picklist" onchange="toggleSyncDateInput()" class="text-indigo-600 focus:ring-indigo-500">
+                            </div>
+                            <span class="text-[10px] text-slate-500 leading-tight">Picklist FindOrder</span>
+                        </label>
                     </div>
                 </div>
 
@@ -2053,6 +2067,20 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 <div id="syncCustomDateContainer" class="hidden">
                     <label class="block text-xs font-bold text-slate-700 mb-1">Tentukan Tanggal (WIB):</label>
                     <input type="date" id="syncCustomDateInput" value="<?= date('Y-m-d', strtotime('-1 day')) ?>" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <!-- Input Resi / Order ID Khusus Picklist OCS (Hidden by default) -->
+                <div id="syncPicklistContainer" class="hidden space-y-1.5 bg-blue-50/60 border border-blue-200/80 rounded-2xl p-3.5">
+                    <label class="block text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                        <i class="fa-solid fa-barcode text-blue-600"></i> Masukkan No. Resi atau Order ID:
+                    </label>
+                    <div class="relative">
+                        <input type="text" id="syncPicklistKeywordInput" placeholder="Contoh: JY1555283461 atau 585719466774005654" 
+                            class="w-full px-3.5 py-2.5 bg-white border border-blue-300 rounded-xl text-xs font-mono font-bold text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs">
+                    </div>
+                    <p class="text-[10px] text-blue-700 leading-tight">
+                        Mengambil data langsung dari endpoint resmi <a href="https://ocs.iegsystem.id/picklist" target="_blank" class="underline font-bold">ocs.iegsystem.id/picklist</a> (Fitur Find Order). Mendukung pencarian instan: No. Resi, Order ID, atau Package ID.
+                    </p>
                 </div>
 
                 <!-- Info Box Kebutuhan Klaim -->

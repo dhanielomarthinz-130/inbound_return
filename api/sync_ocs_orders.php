@@ -68,6 +68,7 @@ if ($isCli) {
     $params = array_merge($_GET, $_POST);
 }
 
+$keywordParam   = trim($params['keyword'] ?? $params['resi'] ?? $params['order_id'] ?? $params['q'] ?? '');
 $dateParam      = trim($params['date'] ?? 'yesterday');
 $startParam     = trim($params['start'] ?? $params['start_date'] ?? '');
 $endParam       = trim($params['end'] ?? $params['end_date'] ?? '');
@@ -146,6 +147,230 @@ try {
     }
 
     writeOcsSyncLog("Login OCS berhasil. Token diperoleh.");
+
+    // =============================================================
+    // SYNC TUNGGAL BERDASARKAN NO. RESI / ORDER ID (TARIKAN PICKLIST OCS)
+    // Menggunakan endpoint resmi Picklist OCS: https://ocs.iegsystem.id/Orders/FindOrder?keyword=...
+    // =============================================================
+    if (!empty($keywordParam)) {
+        writeOcsSyncLog("Melakukan sync tunggal via Picklist OCS (FindOrder): '{$keywordParam}'");
+        $chFind = curl_init("{$ocsBaseUrl}/Orders/FindOrder?keyword=" . urlencode($keywordParam));
+        curl_setopt_array($chFind, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPGET        => true,
+            CURLOPT_HTTPHEADER     => [
+                "Authorization: Bearer {$token}",
+                "Accept: application/json"
+            ],
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_TIMEOUT        => 12
+        ]);
+        $findRes = curl_exec($chFind);
+        $findHttp = curl_getinfo($chFind, CURLINFO_HTTP_CODE);
+        curl_close($chFind);
+
+        if ($findHttp !== 200 || !$findRes) {
+            throw new Exception("Gagal menghubungi endpoint FindOrder OCS (HTTP {$findHttp})");
+        }
+
+        $findJson = json_decode($findRes, true);
+        if (empty($findJson['Order']['Id'])) {
+            throw new Exception("Order atau No. Resi '{$keywordParam}' tidak ditemukan di Picklist OCS");
+        }
+
+        $fo = $findJson['Order'];
+        $fp = $findJson['Payment'] ?? [];
+        $fa = $findJson['Address'] ?? [];
+        $fSkus = $findJson['Skus'] ?? [];
+        $fPick = $findJson['Picklists'] ?? [];
+
+        $origProdPrice = (float)($fp['OriginalTotalProductPrice'] ?? 0);
+        $sellerDisc = (float)($fp['SellerDiscount'] ?? 0);
+        $platformDisc = (float)($fp['PlatformDiscount'] ?? 0);
+        $shipFee = (float)($fp['ShippingFee'] ?? 0);
+        $serviceFee = (float)($fp['ServiceFee'] ?? 0);
+        $subtotal = (float)($fp['SubTotal'] ?? ($origProdPrice - $sellerDisc));
+        $totalAmount = (float)($fp['TotalAmount'] ?? 0);
+        if ($totalAmount <= 0) {
+            $totalAmount = $subtotal > 0 ? ($subtotal + $shipFee + $serviceFee) : $origProdPrice;
+        }
+
+        $parsedItems = [];
+        $itemNames = [];
+        $skuList = [];
+
+        foreach ($fSkus as $det) {
+            $pSku = trim($det['SellerSku'] ?? $det['BundleSku'] ?? '');
+            $pName = trim($det['ProductName'] ?? '');
+            $sName = trim($det['SkuName'] ?? '');
+            $pQty = (int)($det['Qty'] ?? 1);
+            $sPrice = (float)($det['SalePrice'] ?? 0);
+            $oPrice = (float)($det['OriginalPrice'] ?? 0);
+
+            if ($pSku) $skuList[] = $pSku;
+            $itemNames[] = ($pSku ? "[{$pSku}] " : "") . $pName . ($sName ? " ({$sName})" : "") . " (x{$pQty})";
+
+            $parsedItems[] = [
+                'sku'               => $pSku,
+                'seller_sku'        => $pSku,
+                'product_name'      => $pName,
+                'sku_name'          => $sName,
+                'qty'               => $pQty,
+                'quantity'          => $pQty,
+                'original_price'    => $oPrice,
+                'sale_price'        => $sPrice > 0 ? $sPrice : $oPrice,
+                'price'             => $sPrice > 0 ? $sPrice : $oPrice,
+                'subtotal'          => ($sPrice > 0 ? $sPrice : $oPrice) * $pQty
+            ];
+        }
+
+        if (empty($parsedItems) && !empty($fPick)) {
+            foreach ($fPick as $pIt) {
+                $pSku = trim($pIt['ItemCode'] ?? $pIt['BundleCode'] ?? '');
+                $pName = trim($pIt['ItemName'] ?? '');
+                $pQty = (int)($pIt['QtyOrdered'] ?? 1);
+                if ($pSku) $skuList[] = $pSku;
+                $itemNames[] = ($pSku ? "[{$pSku}] " : "") . $pName . " (x{$pQty})";
+                $parsedItems[] = [
+                    'sku'               => $pSku,
+                    'seller_sku'        => $pSku,
+                    'product_name'      => $pName,
+                    'sku_name'          => '',
+                    'qty'               => $pQty,
+                    'quantity'          => $pQty,
+                    'original_price'    => 0,
+                    'sale_price'        => 0,
+                    'price'             => 0,
+                    'subtotal'          => 0
+                ];
+            }
+        }
+
+        $prodText = !empty($itemNames) ? implode(', ', $itemNames) : ($fo['ProductName'] ?? '');
+        $skuJoined = !empty($skuList) ? implode(', ', array_unique($skuList)) : null;
+        $shippingProvider = trim(($fo['ShippingProvider'] ?? '') . ' ' . ($fo['DeliveryOptionName'] ?? ''));
+
+        // Skema dan Simpan ke database ocs_orders jika database aktif
+        if (!empty($pdo)) {
+            $hasIsSyncedCol = false;
+            try {
+                $colsOcs = $pdo->query("SHOW COLUMNS FROM ocs_orders")->fetchAll(PDO::FETCH_COLUMN);
+                $hasIsSyncedCol = in_array('is_synced_to_local', $colsOcs);
+            } catch (Exception $eCols) {}
+
+            $colSyncPart = $hasIsSyncedCol ? ", is_synced_to_local" : "";
+            $valSyncPart = $hasIsSyncedCol ? ", 0" : "";
+
+            $stmtUpsert = $pdo->prepare("
+                INSERT INTO ocs_orders (
+                    order_id, tracking_number, platform_id, commerce_platform, 
+                    shop_name, shipping_provider, status_code, status_name, product_name, seller_sku,
+                    total_qty, package_price, original_price, seller_discount, platform_discount,
+                    shipping_fee, service_fee, subtotal, total_amount,
+                    customer_name, customer_phone, customer_address, order_items_json,
+                    order_created_at, raw_payload{$colSyncPart}
+                ) VALUES (
+                    :order_id, :tracking_number, :platform_id, :commerce_platform, 
+                    :shop_name, :shipping_provider, :status_code, :status_name, :product_name, :seller_sku,
+                    :total_qty, :package_price, :original_price, :seller_discount, :platform_discount,
+                    :shipping_fee, :service_fee, :subtotal, :total_amount,
+                    :customer_name, :customer_phone, :customer_address, :order_items_json,
+                    :order_created_at, :raw_payload{$valSyncPart}
+                )
+                ON DUPLICATE KEY UPDATE 
+                    tracking_number   = COALESCE(VALUES(tracking_number), tracking_number),
+                    platform_id       = VALUES(platform_id),
+                    commerce_platform = VALUES(commerce_platform),
+                    shop_name         = VALUES(shop_name),
+                    shipping_provider = VALUES(shipping_provider),
+                    status_code       = VALUES(status_code),
+                    status_name       = VALUES(status_name),
+                    product_name      = VALUES(product_name),
+                    seller_sku        = VALUES(seller_sku),
+                    total_qty         = VALUES(total_qty),
+                    package_price     = VALUES(package_price),
+                    original_price    = VALUES(original_price),
+                    seller_discount   = VALUES(seller_discount),
+                    platform_discount = VALUES(platform_discount),
+                    shipping_fee      = VALUES(shipping_fee),
+                    service_fee       = VALUES(service_fee),
+                    subtotal          = VALUES(subtotal),
+                    total_amount      = VALUES(total_amount),
+                    customer_name     = VALUES(customer_name),
+                    customer_phone    = VALUES(customer_phone),
+                    customer_address  = VALUES(customer_address),
+                    order_items_json  = VALUES(order_items_json),
+                    order_created_at  = VALUES(order_created_at),
+                    raw_payload       = VALUES(raw_payload)
+            ");
+
+            $stmtUpsert->execute([
+                ':order_id'          => $fo['Id'],
+                ':tracking_number'   => $fo['TrackingNumber'] ?: null,
+                ':platform_id'       => $fo['PlatformId'] ?: null,
+                ':commerce_platform' => $fo['CommercePlatform'] ?: null,
+                ':shop_name'         => $fo['ShopName'] ?: null,
+                ':shipping_provider' => $shippingProvider ?: null,
+                ':status_code'       => $fo['StatusCode'] ?: null,
+                ':status_name'       => $fo['StatusName'] ?: null,
+                ':product_name'      => $prodText ?: null,
+                ':seller_sku'        => $skuJoined ?: null,
+                ':total_qty'         => (int)($fo['TotalQtyOrder'] ?? 1),
+                ':package_price'     => $totalAmount,
+                ':original_price'    => $origProdPrice,
+                ':seller_discount'   => $sellerDisc,
+                ':platform_discount' => $platformDisc,
+                ':shipping_fee'      => $shipFee,
+                ':service_fee'       => $serviceFee,
+                ':subtotal'          => $subtotal,
+                ':total_amount'      => $totalAmount,
+                ':customer_name'     => $fa['Name'] ?? null,
+                ':customer_phone'    => $fa['PhoneNumber'] ?? null,
+                ':customer_address'  => $fa['FullAddress'] ?? null,
+                ':order_items_json'  => json_encode($parsedItems, JSON_UNESCAPED_UNICODE),
+                ':order_created_at'  => !empty($fo['CreatedAt']) ? gmdate('Y-m-d H:i:s', strtotime($fo['CreatedAt'])) : date('Y-m-d H:i:s'),
+                ':raw_payload'       => json_encode($findJson, JSON_UNESCAPED_UNICODE)
+            ]);
+            writeOcsSyncLog("Sukses simpan order {$fo['Id']} (Resi: " . ($fo['TrackingNumber'] ?: '-') . ") ke database lokal.");
+        } else {
+            writeOcsSyncLog("Order {$fo['Id']} (Resi: " . ($fo['TrackingNumber'] ?: '-') . ") berhasil ditarik dari Picklist OCS.");
+        }
+
+        writeOcsSyncLog("Sukses sync order {$fo['Id']} (Resi: " . ($fo['TrackingNumber'] ?: '-') . "). Nilai klaim: Rp " . number_format($totalAmount, 0, ',', '.'));
+
+        $resPayload = [
+            'success'                => true,
+            'source'                 => 'picklist_find_order',
+            'matched_by'             => $findJson['MatchedBy'] ?? 'Keyword',
+            'order_id'               => $fo['Id'],
+            'tracking_number'        => $fo['TrackingNumber'] ?? '',
+            'platform'               => $fo['CommercePlatform'] ?? '',
+            'shop_name'              => $fo['ShopName'] ?? '',
+            'status'                 => $fo['StatusName'] ?? '',
+            'total_items'            => (int)($fo['TotalQtyOrder'] ?? 1),
+            'skus_count'             => count($parsedItems),
+            'total_claim_amount'     => $totalAmount,
+            'total_claim_amount_fmt' => 'Rp ' . number_format($totalAmount, 0, ',', '.'),
+            'total_synced'           => 1,
+            'total_with_resi'        => !empty($fo['TrackingNumber']) ? 1 : 0,
+            'order'                  => [
+                'order_id'           => $fo['Id'],
+                'tracking_number'    => $fo['TrackingNumber'] ?? '',
+                'commerce_platform'  => $fo['CommercePlatform'] ?? '',
+                'shop_name'          => $fo['ShopName'] ?? '',
+                'shipping_provider'  => $shippingProvider,
+                'status_name'        => $fo['StatusName'] ?? '',
+                'product_name'       => $prodText,
+                'seller_sku'         => $skuJoined,
+                'total_amount'       => $totalAmount,
+                'items_detail'       => $parsedItems
+            ]
+        ];
+
+        echo json_encode($resPayload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        exit;
+    }
 
     // -------------------------------------------------------------
     // 3. QUERY ODATA DTO_Orders & STREAM UPSERT KE DATABASE
