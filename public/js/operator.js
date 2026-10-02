@@ -1387,7 +1387,7 @@ window.submitFinalSession = async function() {
     const notes = document.getElementById('sessionNotesInput').value.trim();
     const btn = document.getElementById('btnFinalizeSession');
     btn.disabled = true;
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan Sesi & Video...`;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...`;
 
     // Ambil rekaman video unboxing dari sesi ini
     let videoBlob = null;
@@ -1477,7 +1477,7 @@ window.submitFinalSession = async function() {
     } finally {
         hideGlobalLoading();
         btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Selesaikan Inbound Invoice`;
+        btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Submit`;
     }
 };
 

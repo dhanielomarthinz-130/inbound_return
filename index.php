@@ -672,25 +672,12 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                         </div>
                     </div>
 
-                    <!-- Action Bar Paling Bawah: Tambahkan Item di Kiri & Tombol ENTER di Kanan Paling Bawah -->
-                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-0.5">
-                        <!-- Tombol Tambahkan Item (Sebelah Kiri) -->
+                    <!-- Action Bar Tambah Item -->
+                    <div class="pt-0.5">
                         <button type="submit" id="btnSubmitItem"
-                            class="sm:col-span-5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-sm shadow-indigo-600/30 cursor-pointer">
-                            <i class="fa-solid fa-plus-circle text-xs"></i>
-                            <span>Tambahkan Item</span>
-                        </button>
-
-                        <!-- Tombol ENTER Terpisah (Paling Bawah Sebelah Kanan, Akses Cepat & Gampang Dipencet) -->
-                        <button type="button" onclick="triggerVirtualEnter()" id="btnVirtualEnter"
-                            class="sm:col-span-7 bg-slate-800 hover:bg-slate-900 active:scale-98 text-white font-bold py-2.5 px-3.5 rounded-xl text-xs transition shadow-md shadow-slate-900/20 flex items-center justify-between group border border-slate-700 cursor-pointer">
-                            <span class="flex items-center gap-2">
-                                <kbd class="px-2 py-0.5 bg-indigo-600 text-white rounded-md font-mono text-[10px] font-black tracking-wider shadow-xs transition group-hover:bg-indigo-500">↵ ENTER</kbd>
-                                <span class="font-bold text-xs">Pindah Kolom</span>
-                            </span>
-                            <span id="virtualEnterTargetLabel" class="text-[10px] font-mono font-semibold text-emerald-300 group-hover:text-emerald-200 transition">
-                                Lanjut ke No. Batch ➔
-                            </span>
+                            class="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-bold py-2.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-sm shadow-indigo-600/30 cursor-pointer">
+                            <i class="fa-solid fa-plus-circle text-sm"></i>
+                            <span>Tambahkan Item ke Daftar</span>
                         </button>
                     </div>
 
@@ -746,20 +733,34 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                 </div>
 
                 <!-- Action Footer (Locked at bottom of card) -->
-                <div class="p-2 sm:p-2.5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-2 shrink-0">
-                    <div class="relative w-full sm:w-auto flex-1">
+                <div class="p-2 sm:p-2.5 bg-slate-50 border-t border-slate-200 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-2.5 shrink-0">
+                    <div class="relative w-full md:w-auto flex-1">
                         <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center text-slate-400 text-xs">
                             <i class="fa-regular fa-note-sticky"></i>
                         </span>
                         <input type="text" id="sessionNotesInput" placeholder="Catatan invoice (opsional)..."
-                            class="w-full pl-7 pr-2.5 py-1.5 border border-slate-300 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                            class="w-full pl-7 pr-2.5 py-2.5 border border-slate-300 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
                     </div>
                     
-                    <button id="btnFinalizeSession" disabled onclick="submitFinalSession()"
-                        class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold px-4 py-1.5 rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/25 shrink-0 cursor-pointer">
-                        <i class="fa-solid fa-cloud-arrow-up"></i>
-                        <span>Selesaikan Inbound Invoice</span>
-                    </button>
+                    <div class="flex items-center gap-2.5 w-full md:w-auto shrink-0">
+                        <!-- TOMBOL ENTER DIGEDEIN (Pindah Kolom - Akses Cepat Operator) -->
+                        <button type="button" onclick="triggerVirtualEnter()" id="btnVirtualEnter"
+                            title="Klik atau tekan Enter untuk pindah ke kolom berikutnya"
+                            class="flex-1 md:flex-initial bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-black py-2.5 px-4 sm:px-6 rounded-xl text-xs sm:text-sm transition shadow-lg shadow-slate-900/30 flex items-center justify-center gap-2 sm:gap-2.5 group border border-slate-700 cursor-pointer">
+                            <kbd class="px-2.5 py-1 bg-indigo-600 group-hover:bg-indigo-500 text-white rounded-lg font-mono text-xs sm:text-sm font-black tracking-wider shadow-sm transition">↵ ENTER</kbd>
+                            <span class="font-extrabold text-xs sm:text-sm tracking-wide">Pindah Kolom</span>
+                            <span id="virtualEnterTargetLabel" class="text-[11px] sm:text-xs font-mono font-bold text-emerald-400 group-hover:text-emerald-300 transition hidden sm:inline ml-1">
+                                Lanjut ke No. Batch ➔
+                            </span>
+                        </button>
+
+                        <!-- TOMBOL SUBMIT (Sebelumnya: Selesaikan Inbound Invoice) -->
+                        <button id="btnFinalizeSession" disabled onclick="submitFinalSession()"
+                            class="flex-1 md:flex-initial bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-2.5 px-5 sm:px-7 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 shrink-0 cursor-pointer">
+                            <i class="fa-solid fa-cloud-arrow-up text-sm sm:text-base"></i>
+                            <span class="tracking-wide">Submit</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
