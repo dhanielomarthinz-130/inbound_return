@@ -1086,22 +1086,21 @@ window.viewDetails = async function(id, focusCondition) {
     const photosGrid    = document.getElementById('modalPhotosGrid');
     const photoCount    = document.getElementById('modalPhotoCount');
 
-    // Kumpulkan semua foto: package_photo, product_photo, photos (JSON array)
+    // Kumpulkan semua foto: photos (JSON array), package_photo, product_photo
     const allPhotos = [];
+    const seenUrls = new Set();
     const isSessionDamaged = (parseInt(r.total_damaged, 10) > 0 || (condCode && condCode !== 'GOOD' && condCode !== 'BAGUS'));
 
-    if (r.package_photo && r.package_photo.trim()) {
-        allPhotos.push({ url: r.package_photo, label: '📦 Foto Paket Sebelum Unboxing', type: 'PAKET', isDamaged: false });
+    function addPhotoUnique(photoObj) {
+        if (!photoObj || !photoObj.url) return;
+        const rawUrl = String(photoObj.url).trim();
+        const cleanUrl = rawUrl.replace(/^(\.\.\/|\/)+/, '');
+        if (!cleanUrl || seenUrls.has(cleanUrl)) return;
+        seenUrls.add(cleanUrl);
+        allPhotos.push(photoObj);
     }
-    if (r.product_photo && r.product_photo.trim()) {
-        const isDmgProduct = isSessionDamaged;
-        allPhotos.push({ 
-            url: r.product_photo, 
-            label: isDmgProduct ? `⚠️ Foto Bukti Barang Rusak (${condCode || 'RUSAK'})` : `🏷️ Foto Produk (${condCode || 'GOOD'})`, 
-            type: isDmgProduct ? 'damaged' : (condCode || 'GOOD'),
-            isDamaged: isDmgProduct
-        });
-    }
+
+    // 1. Ambil dari r.photos (array lengkap hasil unboxing dengan badge & title spesifik)
     if (r.photos) {
         let extraPhotos = r.photos;
         if (typeof extraPhotos === 'string') {
@@ -1110,17 +1109,44 @@ window.viewDetails = async function(id, focusCondition) {
         if (Array.isArray(extraPhotos)) {
             extraPhotos.forEach((p, idx) => {
                 const url = (typeof p === 'object') ? (p.path || p.url || '') : p;
+                if (!url || !url.trim()) return;
                 let pType = (typeof p === 'object' && p.type) ? p.type : (condCode || 'BUKTI');
                 const isObjDmg = (typeof p === 'object' && (p.isDamaged || p.is_damaged || p.badge === 'Barang Rusak' || pType === 'damaged' || String(p.title || '').toLowerCase().includes('rusak'))) || (pType === 'damaged');
-                const label = (typeof p === 'object' && p.title) ? p.title : (isObjDmg ? `⚠️ Foto Bukti Rusak #${idx + 1}` : `📷 Foto ${pType} #${idx + 1}`);
-                if (url && url.trim() && !allPhotos.find(x => x.url === url)) {
-                    allPhotos.push({ 
-                        url, 
-                        label, 
-                        type: isObjDmg ? 'damaged' : pType,
-                        isDamaged: isObjDmg
-                    });
+                const isPkg = (pType === 'package' || String(p.title || '').toLowerCase().includes('paket'));
+                let label = (typeof p === 'object' && p.title) ? p.title : '';
+                if (!label) {
+                    if (isPkg) label = `📦 Foto Paket Unboxing #${idx + 1}`;
+                    else if (isObjDmg) label = `⚠️ Foto Bukti Barang Rusak #${idx + 1}`;
+                    else label = `🏷️ Foto Produk Unboxing #${idx + 1}`;
                 }
+                addPhotoUnique({ 
+                    url: url.trim(), 
+                    label: label, 
+                    type: isPkg ? 'PAKET' : (isObjDmg ? 'damaged' : pType),
+                    isDamaged: isObjDmg
+                });
+            });
+        }
+    }
+
+    // 2. Fallback Foto Paket jika belum tercakup
+    if (r.package_photo && r.package_photo.trim()) {
+        const hasPkg = allPhotos.some(p => p.type === 'PAKET');
+        if (!hasPkg) {
+            addPhotoUnique({ url: r.package_photo.trim(), label: '📦 Foto Paket Sebelum Unboxing', type: 'PAKET', isDamaged: false });
+        }
+    }
+
+    // 3. Fallback Foto Produk jika belum ada foto produk sama sekali
+    if (r.product_photo && r.product_photo.trim()) {
+        const hasProdOrDmg = allPhotos.some(p => p.type !== 'PAKET');
+        if (!hasProdOrDmg) {
+            const isDmgProduct = isSessionDamaged;
+            addPhotoUnique({ 
+                url: r.product_photo.trim(), 
+                label: isDmgProduct ? `⚠️ Foto Bukti Barang Rusak (${condCode || 'RUSAK'})` : `🏷️ Foto Produk (${condCode || 'GOOD'})`, 
+                type: isDmgProduct ? 'damaged' : (condCode || 'GOOD'),
+                isDamaged: isDmgProduct
             });
         }
     }
@@ -1223,16 +1249,23 @@ window.viewDetails = async function(id, focusCondition) {
         // Tambahkan foto produk dari masing-masing item ke galeri foto jika belum ada
         let hasItemPhotosAdded = false;
         items.forEach(it => {
-            if (it.photo_path && !allPhotos.find(x => x.url === it.photo_path)) {
-                const itC = (it.type || it.condition || 'GOOD').toUpperCase().trim();
-                const isDmg = (itC !== 'GOOD' && itC !== 'BAGUS' && itC !== 'LAYAK');
-                allPhotos.push({
-                    url: it.photo_path,
-                    label: isDmg ? `⚠️ Foto Bukti Rusak: ${it.product_name || it.barcode} (${itC})` : `Foto Item: ${it.product_name || it.barcode}`,
-                    type: isDmg ? 'damaged' : 'product',
-                    isDamaged: isDmg
-                });
-                hasItemPhotosAdded = true;
+            if (it.photo_path) {
+                const itClean = String(it.photo_path).trim().replace(/^(\.\.\/|\/)+/, '');
+                if (itClean && !seenUrls.has(itClean)) {
+                    const itC = (it.type || it.condition || 'GOOD').toUpperCase().trim();
+                    const isDmg = (itC !== 'GOOD' && itC !== 'BAGUS' && itC !== 'LAYAK');
+                    if (isDmg && sumDamaged === 1 && allPhotos.some(p => p.isDamaged)) {
+                        return;
+                    }
+                    seenUrls.add(itClean);
+                    allPhotos.push({
+                        url: it.photo_path,
+                        label: isDmg ? `⚠️ Foto Bukti Rusak: ${it.product_name || it.barcode} (${itC})` : `Foto Item: ${it.product_name || it.barcode}`,
+                        type: isDmg ? 'damaged' : 'product',
+                        isDamaged: isDmg
+                    });
+                    hasItemPhotosAdded = true;
+                }
             }
         });
 

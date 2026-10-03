@@ -986,6 +986,12 @@ try {
                 $pTitle = is_array($ep) ? ($ep['title'] ?? '') : '';
                 $isDmg = ($pType === 'damaged' || stripos($pTitle, 'rusak') !== false || stripos($pType, 'rusak') !== false);
                 
+                $alreadyInList = false;
+                foreach ($photosList as $pl) {
+                    if ($pl['url'] === $pPath) { $alreadyInList = true; break; }
+                }
+                if ($alreadyInList) continue;
+
                 if ($pPath && $pPath !== ($unboxRow['package_photo'] ?? '') && $pPath !== ($unboxRow['product_photo'] ?? '')) {
                     $photosList[] = [
                         'type'       => $pType,

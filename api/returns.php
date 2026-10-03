@@ -140,11 +140,12 @@ function saveBase64Image($base64Data, $dir, $prefix) {
 
 $cleanInv = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $invoiceNumber);
 
-// 1. Simpan semua foto unboxing (bisa multiple photos)
+// 1. Simpan semua foto unboxing (bisa multiple photos) dengan deduplikasi
 $photosArr = [];
 $packagePhoto = '';
 $productPhoto = '';
 $damagedPhoto = '';
+$savedBase64Map = []; // hash => saved relative path
 
 if (!empty($body['photos']) && is_array($body['photos'])) {
     foreach ($body['photos'] as $idx => $itemP) {
@@ -154,8 +155,16 @@ if (!empty($body['photos']) && is_array($body['photos'])) {
         
         $savedPath = '';
         if (strpos($pStr, 'data:image') === 0) {
-            $prefix = ($pType === 'package' ? 'pkg_' : ($pType === 'damaged' ? 'dmg_' : 'prod_')) . $cleanInv . "_{$idx}";
-            $savedPath = saveBase64Image($pStr, __DIR__ . '/../uploads/photos', $prefix);
+            $pHash = md5($pStr);
+            if (isset($savedBase64Map[$pHash])) {
+                $savedPath = $savedBase64Map[$pHash];
+            } else {
+                $prefix = ($pType === 'package' ? 'pkg_' : ($pType === 'damaged' ? 'dmg_' : 'prod_')) . $cleanInv . "_{$idx}";
+                $savedPath = saveBase64Image($pStr, __DIR__ . '/../uploads/photos', $prefix);
+                if (!empty($savedPath)) {
+                    $savedBase64Map[$pHash] = $savedPath;
+                }
+            }
         } elseif (!empty($pStr) && is_string($pStr)) {
             $savedPath = $pStr;
         }
@@ -324,8 +333,17 @@ try {
 
         $itemPhoto = trim($item['photo_path'] ?? $item['photo'] ?? '');
         if (!empty($itemPhoto) && strpos($itemPhoto, 'data:image') === 0) {
-            $bCodeClean = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $item['barcode'] ?? 'item');
-            $itemPhoto = saveBase64Image($itemPhoto, __DIR__ . '/../uploads/photos', 'item_' . $cleanInv . '_' . $bCodeClean);
+            $iHash = md5($itemPhoto);
+            if (isset($savedBase64Map[$iHash])) {
+                // Re-use file yang sudah disimpan di photosArr agar TIDAK TERDUPLIKASI
+                $itemPhoto = $savedBase64Map[$iHash];
+            } else {
+                $bCodeClean = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $item['barcode'] ?? 'item');
+                $itemPhoto = saveBase64Image($itemPhoto, __DIR__ . '/../uploads/photos', 'item_' . $cleanInv . '_' . $bCodeClean);
+                if (!empty($itemPhoto)) {
+                    $savedBase64Map[$iHash] = $itemPhoto;
+                }
+            }
         }
         if (empty($itemPhoto) && $cond === 'RUSAK' && !empty($damagedPhoto)) {
             $itemPhoto = $damagedPhoto;
