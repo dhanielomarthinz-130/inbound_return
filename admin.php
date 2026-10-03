@@ -621,7 +621,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
                                     <i class="fa-solid fa-search"></i>
                                 </span>
-                                <input type="text" id="searchReceivingInput" placeholder="Cari No. RCV / Kurir..."
+                                <input type="text" id="searchReceivingInput" placeholder="Cari No. RCV / Kurir..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                                     class="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs transition">
                             </div>
 
@@ -763,7 +763,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 <span class="absolute left-3 text-slate-400 pointer-events-none text-xs">
                                     <i class="fa-solid fa-magnifying-glass"></i>
                                 </span>
-                                <input type="text" id="filterSearch" placeholder="Cari invoice/sku..." 
+                                <input type="text" id="filterSearch" placeholder="Cari invoice/sku..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                                     class="border border-slate-300 rounded-xl pl-8 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs w-36 sm:w-44">
                             </div>
 
@@ -817,12 +817,12 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
 
                         <!-- Quick Scan / Resi Lookup & Refresh Button -->
                         <div class="flex items-center gap-2 w-full lg:w-auto">
-                            <form id="formClaimLookup" onsubmit="executeClaimLookup(event)" class="flex items-center gap-1.5 flex-1 lg:flex-none">
+                            <form id="formClaimLookup" onsubmit="executeClaimLookup(event)" autocomplete="off" class="flex items-center gap-1.5 flex-1 lg:flex-none">
                                 <div class="relative flex-1 sm:w-72">
                                     <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
                                         <i class="fa-solid fa-barcode text-amber-500"></i>
                                     </span>
-                                    <input type="text" id="claimSearchInput" placeholder="Scan Resi / Order ID..." 
+                                    <input type="text" id="claimSearchInput" placeholder="Scan Resi / Order ID..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                                         class="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 transition shadow-2xs">
                                 </div>
                                 <button type="submit" id="btnClaimSearch" class="bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-amber-500/20 shrink-0" title="Cari berkas klaim">
@@ -842,7 +842,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                         <div class="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
                             <!-- Input Search -->
                             <div class="relative flex-1 min-w-[180px] max-w-xs">
-                                <input type="text" id="filterClaimSearch" placeholder="Cari Resi / Invoice / Produk..." 
+                                <input type="text" id="filterClaimSearch" placeholder="Cari Resi / Invoice / Produk..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                                     oninput="applyClaimCandidatesFilter()"
                                     class="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none transition shadow-2xs">
                                 <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
@@ -936,7 +936,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                     <div class="p-3 border-b border-slate-200 bg-slate-50/70 overflow-x-auto">
                         <div class="flex items-center gap-2 min-w-max">
                             <!-- Search -->
-                            <input type="text" id="orderSearchInput" onkeyup="debounceOrderSearch()" placeholder="Cari Resi, Order ID, SKU, Toko..." 
+                            <input type="text" id="orderSearchInput" onkeyup="debounceOrderSearch()" placeholder="Cari Resi, Order ID, SKU, Toko..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                                 class="w-48 sm:w-56 px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs shrink-0">
 
                             <!-- Filter Platform -->
@@ -1059,7 +1059,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             </div>
                             <!-- Search Input Keyword -->
                             <div class="relative">
-                                <input type="text" id="filterProductSearch" onkeyup="filterProductTable()" placeholder="Cari nama/barcode/sku/sap..." class="border border-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 w-44 sm:w-60">
+                                <input type="text" id="filterProductSearch" onkeyup="filterProductTable()" placeholder="Cari nama/barcode/sku/sap..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="border border-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 w-44 sm:w-60">
                             </div>
                             <button id="btnSyncOcs" onclick="syncProductsFromOCS()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-2xs">
                                 <i class="fa-solid fa-arrows-rotate" id="syncOcsIcon"></i> Tarik Data dari OCS IEG
@@ -1108,7 +1108,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             <h3 class="font-bold text-base text-slate-800">Master Data Ekspedisi & Kurir</h3>
                         </div>
                         <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                            <input type="text" id="filterExpeditionSearch" oninput="filterExpeditionTable()" placeholder="Cari nama / kode ekspedisi..."
+                            <input type="text" id="filterExpeditionSearch" oninput="filterExpeditionTable()" placeholder="Cari nama / kode ekspedisi..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                                 class="border border-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-56">
                             <button onclick="exportExpeditionsExcel()" title="Download Seluruh Data Ekspedisi ke Excel" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shrink-0 shadow-sm shadow-emerald-600/20">
                                 <i class="fa-solid fa-file-excel text-xs"></i> Download Excel
@@ -1148,7 +1148,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             <p class="text-xs text-slate-400 mt-0.5">Kelola daftar kondisi yang tersedia saat scanning retur</p>
                         </div>
                         <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                            <input type="text" id="filterConditionSearch" oninput="filterConditionTable()" placeholder="Cari kode / nama kondisi..."
+                            <input type="text" id="filterConditionSearch" oninput="filterConditionTable()" placeholder="Cari kode / nama kondisi..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                                 class="border border-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-56">
                             <button onclick="openAddConditionModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shrink-0 shadow-sm">
                                 <i class="fa-solid fa-plus-circle"></i> Tambah Kondisi
@@ -1184,7 +1184,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             <h3 class="font-bold text-base text-slate-800">Manajemen Pengguna Sistem</h3>
                         </div>
                         <div class="flex items-center space-x-2 w-full sm:w-auto">
-                            <input type="text" id="filterUserSearch" oninput="filterUserTable()" placeholder="Cari nama / username..."
+                            <input type="text" id="filterUserSearch" oninput="filterUserTable()" placeholder="Cari nama / username..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                                 class="border border-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-64">
                             <button onclick="openAddUserModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shrink-0 shadow-sm">
                                 <i class="fa-solid fa-user-plus"></i> Tambah Pengguna
@@ -2029,7 +2029,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
             <div class="px-4 pt-3 pb-2 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs shrink-0">
                 <div class="relative w-full sm:w-72">
                     <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                    <input type="text" id="pkgModalSearchInput" oninput="filterReceivingPackagesModal(this.value)" placeholder="Cari resi paket / karung..." class="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <input type="text" id="pkgModalSearchInput" oninput="filterReceivingPackagesModal(this.value)" placeholder="Cari resi paket / karung..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                 </div>
                 <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
                     <button type="button" onclick="copyAllReceivingBarcodes()" class="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200 text-xs flex items-center gap-1.5 transition shadow-2xs">

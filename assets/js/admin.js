@@ -169,9 +169,69 @@ function closeMobileSidebar() {
 if (btnClose) btnClose.addEventListener('click', closeMobileSidebar);
 if (backdrop) backdrop.addEventListener('click', closeMobileSidebar);
 
+// =========================================================================
+// PEMBERSIH AUTOFILL KREDENSIAL BROWSER (Mencegah teks "admin.cs" masuk ke kolom search)
+// =========================================================================
+function clearAutofilledSearchInputs() {
+    const searchSelectors = [
+        '#searchReceivingInput',
+        '#filterSearch',
+        '#claimSearchInput',
+        '#filterClaimSearch',
+        '#orderSearchInput',
+        '#filterProductSearch',
+        '#filterExpeditionSearch',
+        '#filterConditionSearch',
+        '#filterUserSearch',
+        '#pkgModalSearchInput'
+    ];
+    searchSelectors.forEach(sel => {
+        const el = document.querySelector(sel);
+        if (el) {
+            const v = (el.value || '').trim().toLowerCase();
+            if (v === 'admin.cs' || v.includes('admin.cs')) {
+                el.value = '';
+                if (typeof applyClaimCandidatesFilter === 'function' && el.id === 'filterClaimSearch') {
+                    applyClaimCandidatesFilter();
+                }
+                if (typeof filterProductTable === 'function' && el.id === 'filterProductSearch') {
+                    filterProductTable();
+                }
+            }
+        }
+    });
+}
+window.clearAutofilledSearchInputs = clearAutofilledSearchInputs;
+
+// Jalankan pembersihan saat DOM dimuat dan dengan interval pendek untuk menangkal browser autofill delay
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        clearAutofilledSearchInputs();
+        setTimeout(clearAutofilledSearchInputs, 150);
+        setTimeout(clearAutofilledSearchInputs, 500);
+        setTimeout(clearAutofilledSearchInputs, 1200);
+    });
+} else {
+    clearAutofilledSearchInputs();
+    setTimeout(clearAutofilledSearchInputs, 150);
+    setTimeout(clearAutofilledSearchInputs, 500);
+    setTimeout(clearAutofilledSearchInputs, 1200);
+}
+
+// Bersihkan jika input mendapatkan focus atau input baru
+document.addEventListener('focusin', (e) => {
+    if (e.target && (e.target.matches('input[type="text"], input[type="search"]'))) {
+        const v = (e.target.value || '').trim().toLowerCase();
+        if (v === 'admin.cs' || v.includes('admin.cs')) {
+            e.target.value = '';
+        }
+    }
+});
+
 // Switch Tabs
 window.switchTab = function(tabName, updateUrl = true) {
     currentTab = tabName;
+    clearAutofilledSearchInputs();
 
     // Reset styles navigasi
     document.querySelectorAll('.nav-item').forEach(el => {

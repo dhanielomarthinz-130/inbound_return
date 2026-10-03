@@ -607,7 +607,7 @@ try {
                     <!-- Search Input -->
                     <div class="sm:col-span-5 relative">
                         <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                        <input type="text" id="historySearchInput" oninput="debounceHistorySearch()" placeholder="Cari barcode resi / kurir / ref..." class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-800 focus:bg-white focus:border-emerald-500 transition outline-none">
+                        <input type="text" id="historySearchInput" oninput="debounceHistorySearch()" placeholder="Cari barcode resi / kurir / ref..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-800 focus:bg-white focus:border-emerald-500 transition outline-none">
                         <button type="button" id="historyClearSearch" onclick="clearHistorySearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                             <i class="fa-solid fa-xmark text-xs"></i>
                         </button>
@@ -2804,6 +2804,31 @@ try {
                 return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
             });
         }
+
+        // Mencegah browser meng-autofill kredensial (admin.cs) ke input pencarian
+        function clearReceptionSearchAutofill() {
+            const el = document.getElementById('historySearchInput');
+            if (el) {
+                const v = (el.value || '').trim().toLowerCase();
+                if (v === 'admin.cs' || v.includes('admin.cs')) {
+                    el.value = '';
+                    if (typeof debounceHistorySearch === 'function') debounceHistorySearch();
+                }
+            }
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            clearReceptionSearchAutofill();
+            setTimeout(clearReceptionSearchAutofill, 200);
+            setTimeout(clearReceptionSearchAutofill, 800);
+        });
+        document.addEventListener('focusin', (e) => {
+            if (e.target && e.target.id === 'historySearchInput') {
+                const v = (e.target.value || '').trim().toLowerCase();
+                if (v === 'admin.cs' || v.includes('admin.cs')) {
+                    e.target.value = '';
+                }
+            }
+        });
     </script>
 </body>
 </html>
