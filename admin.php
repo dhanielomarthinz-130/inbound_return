@@ -1160,12 +1160,11 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                         <table class="w-full text-left text-xs">
                             <thead class="bg-slate-50 text-slate-600 border-b border-slate-200 font-bold uppercase text-[10px]">
                                 <tr>
-                                    <th class="py-3 px-3">#</th>
-                                    <th class="py-3 px-3">No. Resi / Invoice</th>
-                                    <th class="py-3 px-3">Nama Produk</th>
+                                    <th class="py-3 px-3 text-center w-10">#</th>
+                                    <th class="py-3 px-3">No. Resi / Invoice & Ekspedisi</th>
+                                    <th class="py-3 px-3">Nama Produk & SKU</th>
                                     <th class="py-3 px-3 text-center">Qty Rusak</th>
                                     <th class="py-3 px-3">Kondisi / Alasan Rusak</th>
-                                    <th class="py-3 px-3">Ekspedisi</th>
                                     <th class="py-3 px-3 text-right">Biaya Paket</th>
                                     <th class="py-3 px-3">Waktu Unboxing</th>
                                     <th class="py-3 px-3 text-center">Video Unbox</th>
@@ -1174,7 +1173,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             </thead>
                             <tbody id="claimCandidatesTableBody" class="divide-y divide-slate-100">
                                 <tr>
-                                    <td colspan="10" class="text-center py-10 text-slate-400">
+                                    <td colspan="9" class="text-center py-10 text-slate-400">
                                         <i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat daftar paket rusak...
                                     </td>
                                 </tr>

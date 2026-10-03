@@ -48,11 +48,20 @@ if ($query === '' || $action === 'list_claimable') {
                            ELSE NULL 
                        END SEPARATOR ', ') as damaged_product_names,
                        GROUP_CONCAT(DISTINCT CONCAT(ri.product_name, ' (x', ri.qty, ')') SEPARATOR ', ') as all_product_names,
+                       GROUP_CONCAT(DISTINCT CASE 
+                           WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
+                             OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
+                             OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') 
+                           THEN NULLIF(COALESCE(NULLIF(ri.seller_sku, ''), NULLIF(ri.sku, '')), '') 
+                           ELSE NULL 
+                       END SEPARATOR ', ') as damaged_skus,
+                       GROUP_CONCAT(DISTINCT NULLIF(COALESCE(NULLIF(ri.seller_sku, ''), NULLIF(ri.sku, '')), '') SEPARATOR ', ') as all_skus,
                        GROUP_CONCAT(DISTINCT CASE WHEN ri.damage_reason IS NOT NULL AND ri.damage_reason != '' THEN ri.damage_reason ELSE NULL END SEPARATOR '; ') as damage_reasons,
                        MAX(o.package_price) as package_price, 
                        MAX(o.commerce_platform) as commerce_platform, 
                        MAX(o.shop_name) as shop_name, 
                        MAX(o.product_name) as ocs_product_name,
+                       MAX(o.seller_sku) as ocs_seller_sku,
                        MAX(o.has_packing_video) as has_packing_video
                 FROM return_sessions rs
                 LEFT JOIN return_items ri ON ri.session_id = rs.id
@@ -82,11 +91,20 @@ if ($query === '' || $action === 'list_claimable') {
                            ELSE NULL 
                        END SEPARATOR ', ') as damaged_product_names,
                        GROUP_CONCAT(DISTINCT CONCAT(ri.product_name, ' (x', ri.qty, ')') SEPARATOR ', ') as all_product_names,
+                       GROUP_CONCAT(DISTINCT CASE 
+                           WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
+                             OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
+                             OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') 
+                           THEN NULLIF(COALESCE(NULLIF(ri.seller_sku, ''), NULLIF(ri.sku, '')), '') 
+                           ELSE NULL 
+                       END SEPARATOR ', ') as damaged_skus,
+                       GROUP_CONCAT(DISTINCT NULLIF(COALESCE(NULLIF(ri.seller_sku, ''), NULLIF(ri.sku, '')), '') SEPARATOR ', ') as all_skus,
                        GROUP_CONCAT(DISTINCT CASE WHEN ri.damage_reason IS NOT NULL AND ri.damage_reason != '' THEN ri.damage_reason ELSE NULL END SEPARATOR '; ') as damage_reasons,
                        0 as package_price, 
                        NULL as commerce_platform, 
                        NULL as shop_name, 
                        NULL as ocs_product_name,
+                       NULL as ocs_seller_sku,
                        0 as has_packing_video
                 FROM return_sessions rs
                 LEFT JOIN return_items ri ON ri.session_id = rs.id
@@ -108,6 +126,10 @@ if ($query === '' || $action === 'list_claimable') {
             // Nama produk prioritaskan barang yang rusak
             $pName = !empty($c['damaged_product_names']) ? $c['damaged_product_names'] : (!empty($c['all_product_names']) ? $c['all_product_names'] : ($c['ocs_product_name'] ?? '-'));
             $c['product_names'] = $pName;
+
+            // SKU prioritaskan barang yang rusak
+            $skuVal = !empty($c['damaged_skus']) ? $c['damaged_skus'] : (!empty($c['all_skus']) ? $c['all_skus'] : ($c['ocs_seller_sku'] ?? ''));
+            $c['sku'] = ($skuVal && $skuVal !== '-') ? $skuVal : '';
 
             // Qty rusak akurat
             $dmgQty = (int)($c['damaged_qty_sum'] ?? 0);

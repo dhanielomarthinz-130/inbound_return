@@ -83,7 +83,7 @@ window.isProductDetailAndBatchExpFilled = function() {
 
 window.isConditionDamaged = function() {
     const typeEl = document.getElementById('inputType');
-    const val = String(typeEl?.value || 'GOOD').toUpperCase().trim();
+    const val = String(typeEl?.value || '').toUpperCase().trim();
     return val !== '' && val !== 'GOOD' && val !== 'BAGUS' && val !== 'LAYAK';
 };
 
@@ -111,8 +111,8 @@ window.updatePhotoButtonsState = function() {
         }
     }
 
-    // 2. Tombol Foto Produk [F4]: Aktif jika Ekspedisi, Invoice, Detail Produk, Batch, Exp Date sudah diisi DAN kondisi GOOD
-    const canPrd = hasProdDetail && !isDamaged;
+    // 2. Tombol Foto Produk [F4]: Aktif jika Ekspedisi, Invoice, Detail Produk, Batch, Exp Date sudah diisi
+    const canPrd = hasProdDetail;
     if (btnPrd) {
         btnPrd.disabled = !canPrd;
         btnPrd.classList.toggle('opacity-40', !canPrd);
@@ -125,8 +125,6 @@ window.updatePhotoButtonsState = function() {
             btnPrd.setAttribute('title', 'Scan barcode produk terlebih dahulu sampai detail produk muncul');
         } else if (!document.getElementById('inputBatch')?.value?.trim() || !document.getElementById('inputExpDate')?.value?.trim()) {
             btnPrd.setAttribute('title', 'Isi nomor batch dan exp date produk terlebih dahulu');
-        } else if (isDamaged) {
-            btnPrd.setAttribute('title', 'Kondisi produk RUSAK. Gunakan tombol [F5] Foto Barang Rusak');
         } else {
             btnPrd.setAttribute('title', 'Lengkapi data produk terlebih dahulu');
         }
@@ -748,24 +746,20 @@ window.confirmTakeDamagedPhotoNow = function() {
 
 function updateProductPhotoButtonState() {
     const btn = document.getElementById('btnCaptureProductPhoto');
-    const typeVal = String(inputType?.value || '').toUpperCase().trim();
-    const isDamaged = (typeVal !== 'GOOD' && typeVal !== 'BAGUS' && typeVal !== '');
-
     if (btn) {
+        btn.classList.remove('bg-rose-600', 'hover:bg-rose-700', 'shadow-rose-600/25');
+        btn.classList.add('bg-emerald-600', 'hover:bg-emerald-700', 'shadow-emerald-600/25');
         const icon = btn.querySelector('i');
         const label = btn.querySelector('#labelCaptureProductPhoto') || btn.querySelector('div span:last-child');
-        
-        if (isDamaged) {
-            btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700', 'shadow-emerald-600/25');
-            btn.classList.add('bg-rose-600', 'hover:bg-rose-700', 'shadow-rose-600/25');
-            if (icon) icon.className = 'fa-solid fa-triangle-exclamation text-xs';
-            if (label) label.innerText = '+ Foto Barang Rusak';
-        } else {
-            btn.classList.remove('bg-rose-600', 'hover:bg-rose-700', 'shadow-rose-600/25');
-            btn.classList.add('bg-emerald-600', 'hover:bg-emerald-700', 'shadow-emerald-600/25');
-            if (icon) icon.className = 'fa-solid fa-tag text-xs';
-            if (label) label.innerText = '+ Foto Produk';
-        }
+        if (icon) icon.className = 'fa-solid fa-tag text-xs';
+        if (label) label.innerText = 'Foto Produk';
+    }
+
+    const labelNp = document.getElementById('labelNpPhoto');
+    const btnNp = document.getElementById('btnNpEnter');
+    if (labelNp && btnNp) {
+        labelNp.innerText = 'FOTO PRODUK [F4] ➔ QTY';
+        btnNp.className = 'w-full h-9 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition shadow-md shadow-emerald-950/40 select-none cursor-pointer border border-emerald-300/40';
     }
 
     updateDamagedPhotoBanner();
@@ -1119,16 +1113,25 @@ window.npSetPreset = function(type) {
 };
 
 window.npEnter = function() {
-    // Tombol ENTER di Numpad:
+    // Tombol di Numpad Exp Date:
     // 1. Sembunyikan Numpad Exp Date
     toggleNumpadExpDate(false);
 
-    // 2. Pindah ke kolom Qty dan seleksi teks
-    if (inputQty) {
-        inputQty.focus();
-        inputQty.select();
+    // 2. Ambil Foto Produk
+    if (typeof captureProductPhoto === 'function') {
+        captureProductPhoto(null, null);
     }
-    updateVirtualEnterBadge('inputQty');
+
+    // 3. Setelah itu baru pindah ke kolom Qty dan seleksi teks
+    setTimeout(() => {
+        if (inputQty) {
+            inputQty.focus();
+            inputQty.select();
+        }
+        if (typeof updateVirtualEnterBadge === 'function') {
+            updateVirtualEnterBadge('inputQty');
+        }
+    }, 200);
 };
 
 // 3. Event Listener Fokus Kolom:
@@ -1275,8 +1278,14 @@ window.handleAddItem = function(e) {
         return;
     }
 
-    const type = inputType.value || 'GOOD';
-    const isItemDamaged = (type !== 'GOOD' && type !== 'BAGUS');
+    const type = inputType.value ? inputType.value.trim() : '';
+    if (!type) {
+        playBeep('error');
+        showToast('warning', "Silakan pilih Type / Kondisi produk terlebih dahulu!", "Kondisi Belum Dipilih");
+        inputType.focus();
+        return;
+    }
+    const isItemDamaged = (type !== 'GOOD' && type !== 'BAGUS' && type !== 'LAYAK');
     if (isItemDamaged && !currentActiveDamagedPhoto) {
         playBeep('error');
         showToast('error', `Barang dengan kondisi [${type}] WAJIB difoto buktinya terlebih dahulu!`, 'Wajib Foto Bukti Rusak');
@@ -1314,8 +1323,16 @@ function commitAddItem() {
     const batchNo = inputBatch.value.trim();
     const expDate = inputExpDate.value.trim();
     const qty = parseInt(inputQty.value, 10) || 1;
-    const type = inputType.value || 'GOOD';
-    const isItemDamaged = (type !== 'GOOD' && type !== 'BAGUS');
+    const type = inputType.value ? inputType.value.trim() : '';
+
+    if (!type) {
+        playBeep('error');
+        showToast('warning', "Silakan pilih Type / Kondisi produk terlebih dahulu!", "Kondisi Belum Dipilih");
+        inputType.focus();
+        return;
+    }
+
+    const isItemDamaged = (type !== 'GOOD' && type !== 'BAGUS' && type !== 'LAYAK');
 
     if (isItemDamaged && !currentActiveDamagedPhoto) {
         playBeep('error');
@@ -1348,7 +1365,8 @@ function commitAddItem() {
     if (Array.isArray(capturedPhotosList)) {
         capturedPhotosList.forEach(photo => {
             if (photo.type === 'product' || photo.type === 'damaged') {
-                if (photo.isInitialBeforeScan) {
+                const isThisItemPhoto = (photo.dataUrl === itemPhoto || (isItemDamaged && photo.type === 'damaged') || photo.isInitialBeforeScan);
+                if (isThisItemPhoto) {
                     photo.isDamaged = isItemDamaged;
                     photo.type = isItemDamaged ? 'damaged' : 'product';
                     photo.badge = isItemDamaged ? 'Barang Rusak' : 'Produk Retur';
@@ -1406,7 +1424,7 @@ function resetProductInputs() {
     inputBatch.value = '';
     inputExpDate.value = '';
     inputQty.value = 1;
-    inputType.value = 'GOOD';
+    inputType.value = '';
     npDateDigits = '';
     clearAutoExpIndicator();
     if (typeof updateNumpadDisplay === 'function') updateNumpadDisplay();
@@ -2101,8 +2119,7 @@ function populateConditionDropdown(list) {
     const select = document.getElementById('inputType');
     if (!select || !Array.isArray(list) || list.length === 0) return;
 
-    const currentVal = select.value;
-    select.innerHTML = '';
+    select.innerHTML = '<option value="" selected>-- Pilih Kondisi --</option>';
     list.forEach(c => {
         const opt = document.createElement('option');
         opt.value = c.code;
@@ -2110,12 +2127,8 @@ function populateConditionDropdown(list) {
         select.appendChild(opt);
     });
 
-    if (currentVal && Array.from(select.options).some(o => o.value === currentVal)) {
-        select.value = currentVal;
-    } else {
-        const hasGood = Array.from(select.options).find(o => o.value.toUpperCase() === 'GOOD');
-        if (hasGood) select.value = hasGood.value;
-    }
+    select.value = '';
+    if (typeof updatePhotoButtonsState === 'function') updatePhotoButtonsState();
 }
 
 function escapeHtml(str) {
@@ -2472,13 +2485,9 @@ window.captureProductPhoto = function(sourceImage = null, forcedCondition = null
     // 4. Validasi Kondisi Produk Sesuai Tombol
     const isDmgCond = isConditionDamaged();
     if (forcedCondition === 'RUSAK' && !isDmgCond) {
-        showToast('warning', 'Kondisi produk saat ini GOOD. Ubah kondisi ke RUSAK / DEFECT terlebih dahulu untuk mengambil foto barang rusak!', 'Kondisi Belum Rusak');
+        showToast('warning', 'Ubah Type / Kondisi ke RUSAK / DEFECT terlebih dahulu untuk mengambil foto bukti barang rusak!', 'Kondisi Belum Rusak');
         const typeEl = document.getElementById('inputType');
         if (typeEl) typeEl.focus();
-        return;
-    }
-    if (forcedCondition !== 'RUSAK' && isDmgCond) {
-        showToast('warning', 'Kondisi produk adalah RUSAK. Silakan gunakan tombol [F5] Barang Rusak untuk mengambil foto bukti!', 'Gunakan Foto Rusak');
         return;
     }
 
@@ -2504,12 +2513,12 @@ window.captureProductPhoto = function(sourceImage = null, forcedCondition = null
 
         let pBatch = bVal || '-';
         let pExp = eVal || '-';
-        let pType = (typeEl && typeEl.value) ? typeEl.value.trim() : (isDmgCond ? 'RUSAK' : 'GOOD');
+        let pType = (typeEl && typeEl.value) ? typeEl.value.trim() : (forcedCondition === 'RUSAK' ? 'RUSAK' : 'GOOD');
         let pQty = (qtyEl && qtyEl.value) ? parseInt(qtyEl.value, 10) : 1;
         let pName = currentDetectedProduct.name || 'Produk Return';
         let pSku = currentDetectedProduct.seller_sku || currentDetectedProduct.sku || '-';
         let pSap = currentDetectedProduct.sap_code || '-';
-        let isDamaged = (forcedCondition === 'RUSAK' || isDmgCond);
+        let isDamaged = (forcedCondition === 'RUSAK');
 
         if (isDamaged && (pType === 'GOOD' || pType === 'BAGUS' || !pType)) {
             pType = 'RUSAK';

@@ -595,7 +595,8 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                                 <span>Type / Kondisi</span>
                             </label>
                             <div class="relative">
-                                <select id="inputType" class="w-full pl-2.5 pr-7 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition appearance-none">
+                                <select id="inputType" required class="w-full pl-2.5 pr-7 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition appearance-none">
+                                    <option value="" selected>-- Pilih Kondisi --</option>
                                     <?php
                                     $hasCustomConditions = false;
                                     if (isset($pdo)) {
@@ -607,14 +608,13 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                                                 foreach ($condRows as $cRow) {
                                                     $cCode = htmlspecialchars($cRow['code']);
                                                     $cName = htmlspecialchars($cRow['name']);
-                                                    $isGood = (strtoupper($cCode) === 'GOOD') ? ' selected' : '';
-                                                    echo "<option value=\"{$cCode}\"{$isGood}>{$cName} ({$cCode})</option>\n";
+                                                    echo "<option value=\"{$cCode}\">{$cName} ({$cCode})</option>\n";
                                                 }
                                             }
                                         } catch (Exception $eC) {}
                                     }
                                     if (!$hasCustomConditions) {
-                                        echo '<option value="GOOD" selected>GOOD (Layak Jual)</option>';
+                                        echo '<option value="GOOD">GOOD (Layak Jual)</option>';
                                         echo '<option value="RUSAK">RUSAK (Defect)</option>';
                                         echo '<option value="EXPIRED">EXPIRED (Kadaluarsa)</option>';
                                         echo '<option value="SALAH_KIRIM">SALAH KIRIM</option>';
@@ -705,9 +705,9 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                                 </div>
 
                                 <button type="button" onclick="npEnter()" id="btnNpEnter"
-                                    class="w-full h-9 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition shadow-md shadow-emerald-950/40 select-none cursor-pointer border border-emerald-300/40">
-                                    <kbd class="px-1.5 py-0.5 bg-emerald-800/90 border border-emerald-400/40 rounded font-mono font-black text-[10px] text-white shadow-xs">↵ ENTER</kbd>
-                                    <span>PINDAH KE QTY ➔</span>
+                                    class="w-full h-9 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition shadow-md shadow-emerald-950/40 select-none cursor-pointer border border-emerald-300/40">
+                                    <i class="fa-solid fa-camera text-xs"></i>
+                                    <span id="labelNpPhoto">FOTO PRODUK [F4] ➔ QTY</span>
                                 </button>
                             </div>
                         </div>

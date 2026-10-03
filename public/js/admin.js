@@ -4004,7 +4004,7 @@ window.loadClaimCandidates = async function(force = false) {
     if (!tbody) return;
 
     if (refreshIcon) refreshIcon.classList.add('fa-spin');
-    tbody.innerHTML = `<tr><td colspan="10" class="py-12 text-center text-slate-400">
+    tbody.innerHTML = `<tr><td colspan="9" class="py-12 text-center text-slate-400">
         <div class="inline-flex items-center gap-2.5 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl">
             <i class="fa-solid fa-spinner fa-spin text-lg"></i>
             <span class="text-xs font-semibold">Memuat kandidat paket klaim...</span>
@@ -4016,7 +4016,7 @@ window.loadClaimCandidates = async function(force = false) {
         const data = await res.json();
 
         if (!data.success) {
-            tbody.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-rose-500 font-semibold">${data.message || 'Gagal memuat kandidat klaim'}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-rose-500 font-semibold">${data.message || 'Gagal memuat kandidat klaim'}</td></tr>`;
             return;
         }
 
@@ -4032,7 +4032,7 @@ window.loadClaimCandidates = async function(force = false) {
             showToast('success', `Berhasil memuat ${cachedClaimCandidates.length} paket rusak / layak klaim`, 'Daftar Diperbarui');
         }
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-rose-500">Error: ${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-rose-500">Error: ${err.message}</td></tr>`;
     } finally {
         if (refreshIcon) refreshIcon.classList.remove('fa-spin');
     }
@@ -4069,13 +4069,14 @@ window.applyClaimCandidatesFilter = function() {
     const date = dateInput ? dateInput.value.trim() : '';
 
     let filtered = cachedClaimCandidates.filter(c => {
-        // Filter Search (Invoice / Resi, Produk, Alasan Rusak, Operator)
+        // Filter Search (Invoice / Resi, Produk, SKU, Alasan Rusak, Operator)
         if (q) {
             const inv = String(c.invoice_number || '').toLowerCase();
             const prod = String(c.product_names || '').toLowerCase();
+            const sku = String(c.sku || '').toLowerCase();
             const rsn = String(c.damage_reasons || c.notes || '').toLowerCase();
             const op = String(c.operator_name || '').toLowerCase();
-            if (!inv.includes(q) && !prod.includes(q) && !rsn.includes(q) && !op.includes(q)) {
+            if (!inv.includes(q) && !prod.includes(q) && !sku.includes(q) && !rsn.includes(q) && !op.includes(q)) {
                 return false;
             }
         }
@@ -4102,7 +4103,7 @@ window.applyClaimCandidatesFilter = function() {
     if (totalEl) totalEl.innerText = cachedClaimCandidates.length;
 
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" class="text-center py-10 text-slate-400">
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center py-10 text-slate-400">
             <i class="fa-solid fa-filter-circle-xmark text-2xl text-slate-300 mb-2 block"></i>
             Tidak ada paket rusak yang sesuai dengan filter pencarian yang diterapkan.
         </td></tr>`;
@@ -4119,17 +4120,29 @@ window.applyClaimCandidatesFilter = function() {
 
         html += `
             <tr class="hover:bg-rose-50/40 transition border-b border-slate-100">
-                <td class="py-3 px-3 font-bold text-slate-500">${idx + 1}</td>
+                <td class="py-3 px-3 font-bold text-slate-500 text-center">${idx + 1}</td>
                 <td class="py-3 px-3">
-                    <button onclick="openClaimDetailModal('${c.invoice_number}')" class="font-mono font-bold text-indigo-600 hover:text-indigo-800 text-left block hover:underline" title="Klik untuk melihat berkas detail klaim">
+                    <button onclick="openClaimDetailModal('${c.invoice_number}')" class="font-mono font-bold text-indigo-600 hover:text-indigo-800 text-left block hover:underline text-xs" title="Klik untuk melihat berkas detail klaim">
                         ${escapeHtml(c.invoice_number)}
                     </button>
-                    <span class="text-[10px] text-slate-400 block">${escapeHtml(c.operator_name || 'Operator')}</span>
+                    <div class="flex items-center gap-1.5 mt-1 text-[11px] text-slate-600">
+                        <span class="inline-flex items-center gap-1 font-semibold bg-slate-100 border border-slate-200/80 px-1.5 py-0.5 rounded text-[10px]" title="Ekspedisi">
+                            <i class="fa-solid fa-truck-fast text-[9px] text-amber-500"></i> ${escapeHtml(c.expedition || '-')}
+                        </span>
+                        <span class="text-[10px] text-slate-400">(${escapeHtml(c.operator_name || 'Operator')})</span>
+                    </div>
                 </td>
                 <td class="py-3 px-3">
-                    <div class="font-bold text-slate-800 text-xs truncate max-w-[200px]" title="${escapeHtml(c.product_names || '')}">
+                    <div class="font-bold text-slate-800 text-xs truncate max-w-[240px]" title="${escapeHtml(c.product_names || '')}">
                         ${prodName}
                     </div>
+                    ${c.sku ? `
+                        <div class="mt-0.5">
+                            <span class="inline-flex items-center gap-1 font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-1.5 py-0.5 rounded tracking-tight" title="Seller SKU">
+                                <i class="fa-solid fa-tag text-[8px] text-indigo-400"></i> SKU: ${escapeHtml(c.sku)}
+                            </span>
+                        </div>
+                    ` : ''}
                 </td>
                 <td class="py-3 px-3 text-center">
                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
@@ -4142,7 +4155,6 @@ window.applyClaimCandidatesFilter = function() {
                         ${escapeHtml(reason)}
                     </span>
                 </td>
-                <td class="py-3 px-3 font-semibold text-slate-700">${escapeHtml(c.expedition || '-')}</td>
                 <td class="py-3 px-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
                     ${priceFormatted}
                 </td>
