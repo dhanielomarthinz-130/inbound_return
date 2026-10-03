@@ -823,11 +823,19 @@ window.viewDetails = async function(id, focusCondition) {
 
     // Kumpulkan semua foto: package_photo, product_photo, photos (JSON array)
     const allPhotos = [];
+    const isSessionDamaged = (parseInt(r.total_damaged, 10) > 0 || (condCode && condCode !== 'GOOD' && condCode !== 'BAGUS'));
+
     if (r.package_photo && r.package_photo.trim()) {
-        allPhotos.push({ url: r.package_photo, label: '📦 Foto Paket Sebelum Unboxing', type: 'PAKET' });
+        allPhotos.push({ url: r.package_photo, label: '📦 Foto Paket Sebelum Unboxing', type: 'PAKET', isDamaged: false });
     }
     if (r.product_photo && r.product_photo.trim()) {
-        allPhotos.push({ url: r.product_photo, label: `🏷️ Foto Produk (${condCode})`, type: condCode });
+        const isDmgProduct = isSessionDamaged;
+        allPhotos.push({ 
+            url: r.product_photo, 
+            label: isDmgProduct ? `⚠️ Foto Bukti Barang Rusak (${condCode || 'RUSAK'})` : `🏷️ Foto Produk (${condCode || 'GOOD'})`, 
+            type: isDmgProduct ? 'damaged' : (condCode || 'GOOD'),
+            isDamaged: isDmgProduct
+        });
     }
     if (r.photos) {
         let extraPhotos = r.photos;
@@ -837,17 +845,28 @@ window.viewDetails = async function(id, focusCondition) {
         if (Array.isArray(extraPhotos)) {
             extraPhotos.forEach((p, idx) => {
                 const url = (typeof p === 'object') ? (p.path || p.url || '') : p;
-                const pType = (typeof p === 'object' && p.type) ? p.type : (condCode || 'BUKTI');
-                const label = `📷 Foto ${pType} #${idx + 1}`;
+                let pType = (typeof p === 'object' && p.type) ? p.type : (condCode || 'BUKTI');
+                const isObjDmg = (typeof p === 'object' && (p.isDamaged || p.is_damaged || p.badge === 'Barang Rusak' || pType === 'damaged' || String(p.title || '').toLowerCase().includes('rusak'))) || (pType === 'damaged');
+                const label = (typeof p === 'object' && p.title) ? p.title : (isObjDmg ? `⚠️ Foto Bukti Rusak #${idx + 1}` : `📷 Foto ${pType} #${idx + 1}`);
                 if (url && url.trim() && !allPhotos.find(x => x.url === url)) {
-                    allPhotos.push({ url, label, type: pType });
+                    allPhotos.push({ 
+                        url, 
+                        label, 
+                        type: isObjDmg ? 'damaged' : pType,
+                        isDamaged: isObjDmg
+                    });
                 }
             });
         }
     }
 
-    // Prioritaskan foto yang sesuai tipe kondisi yang sedang dilihat
+    // Prioritaskan foto barang rusak dan yang sesuai kondisi yang sedang dilihat di urutan pertama
     allPhotos.sort((a, b) => {
+        const aDmg = a.isDamaged || (a.type || '').toUpperCase() === 'DAMAGED';
+        const bDmg = b.isDamaged || (b.type || '').toUpperCase() === 'DAMAGED';
+        if (aDmg && !bDmg) return -1;
+        if (!aDmg && bDmg) return 1;
+
         const aMatch = (a.type || '').toUpperCase() === condCode;
         const bMatch = (b.type || '').toUpperCase() === condCode;
         if (aMatch && !bMatch) return -1;
@@ -860,9 +879,9 @@ window.viewDetails = async function(id, focusCondition) {
         if (photosSection) photosSection.classList.remove('hidden');
         if (photoCount) photoCount.innerText = `${allPhotos.length} Foto (${condCode})`;
         allPhotos.forEach(photo => {
-            const isMatch = (photo.type || '').toUpperCase() === condCode && condCode !== 'GOOD';
+            const isDamagedPhoto = photo.isDamaged || (photo.type || '').toLowerCase() === 'damaged' || ((photo.type || '').toUpperCase() === condCode && condCode !== 'GOOD');
             const imgWrap = document.createElement('div');
-            imgWrap.className = `relative group cursor-pointer rounded-xl overflow-hidden border ${isMatch ? 'border-rose-400 ring-2 ring-rose-300' : 'border-slate-200'} bg-slate-100 aspect-square shadow-xs hover:shadow-md transition`;
+            imgWrap.className = `relative group cursor-pointer rounded-xl overflow-hidden border ${isDamagedPhoto ? 'border-rose-500 ring-2 ring-rose-400' : 'border-slate-200'} bg-slate-100 aspect-square shadow-xs hover:shadow-md transition`;
             imgWrap.onclick = () => {
                 const lb = document.getElementById('modalPhotoLightbox');
                 const lbImg = document.getElementById('modalPhotoLightboxImg');
@@ -876,9 +895,9 @@ window.viewDetails = async function(id, focusCondition) {
                 <img src="${photo.url}" alt="${photo.label}" loading="lazy"
                     class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                     onerror="this.parentElement.innerHTML='<div class=\\'flex flex-col items-center justify-center h-full text-slate-400 text-[10px] p-2 text-center\\'><i class=\\'fa-solid fa-image-slash text-2xl mb-1\\'></i>Foto tidak ditemukan</div>'">
-                <div class="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] font-semibold px-2 py-1 flex items-center justify-between transition truncate">
+                <div class="absolute bottom-0 left-0 right-0 ${isDamagedPhoto ? 'bg-rose-950/80 text-rose-100' : 'bg-black/60 text-white'} text-[9px] font-semibold px-2 py-1 flex items-center justify-between transition truncate">
                     <span class="truncate">${photo.label}</span>
-                    <span class="bg-indigo-600/80 px-1 rounded text-[8px] shrink-0 font-mono">${photo.type || 'FOTO'}</span>
+                    <span class="${isDamagedPhoto ? 'bg-rose-600' : 'bg-indigo-600/80'} px-1.5 py-0.5 rounded text-[8px] shrink-0 font-mono font-bold">${isDamagedPhoto ? 'RUSAK' : (photo.type || 'FOTO')}</span>
                 </div>
             `;
             if (photosGrid) photosGrid.appendChild(imgWrap);
@@ -2846,15 +2865,10 @@ window.executeClaimLookup = async function(e) {
             return;
         }
 
-        // 2. Jika ditemukan, buka di halaman baru (claim_dossier.php)
-        const targetUrl = `claim_dossier.php?q=${encodeURIComponent(query)}`;
-        const newWin = window.open(targetUrl, '_blank');
-        
-        if (newWin) {
-            showToast('success', `Data #${query} ditemukan! Berkas klaim dibuka di halaman baru.`, 'Membuka Berkas Klaim');
-        } else {
-            showToast('info', `Popup diblokir browser. <a href="${targetUrl}" target="_blank" class="underline font-bold text-white ml-1">Klik di sini untuk membuka Berkas Klaim ↗</a>`, 'Buka Halaman Baru');
-        }
+        // 2. Render di tampilan bawah dan tampilkan popup modal detail klaim
+        renderClaimDossier(data);
+        openClaimDetailModal(query);
+        showToast('success', `Data #${query} ditemukan! Berkas detail klaim ditampilkan.`, 'Berkas Ditemukan');
     } catch (err) {
         showToast('error', 'Terjadi kesalahan: ' + err.message, 'Gagal');
     } finally {
@@ -3516,8 +3530,11 @@ window.printClaimDossier = function() {
 };
 
 // ==========================================
-// KANDIDAT PAKET KLAIM (KONDISI BUKAN GOOD)
+// KANDIDAT PAKET KLAIM (KONDISI BUKAN GOOD) & DETAIL MODAL POPUP
 // ==========================================
+let cachedClaimCandidates = [];
+let activeClaimCandidateInvoice = '';
+
 window.loadClaimCandidates = async function(force = false) {
     const tbody = document.getElementById('claimCandidatesTableBody');
     const refreshIcon = document.getElementById('iconRefreshCandidates');
@@ -3530,89 +3547,438 @@ window.loadClaimCandidates = async function(force = false) {
         const data = await res.json();
 
         if (!data.success) {
-            tbody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-rose-500 font-semibold">${data.message || 'Gagal memuat kandidat klaim'}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-rose-500 font-semibold">${data.message || 'Gagal memuat kandidat klaim'}</td></tr>`;
             return;
         }
 
-        const candidates = data.candidates || [];
-        if (candidates.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="9" class="text-center py-10 text-slate-400">
-                <i class="fa-solid fa-box-open text-2xl text-slate-300 mb-2 block"></i>
-                Tidak ada paket unboxing yang berkondisi rusak / cacat saat ini. Semua paket berkondisi BAGUS (GOOD).
-            </td></tr>`;
-            return;
-        }
+        cachedClaimCandidates = data.candidates || [];
 
-        let html = '';
-        candidates.forEach((c, idx) => {
-            const hasVideo = !!c.video_path;
-            const damagedCount = c.damaged_qty || (c.total_damaged > 0 ? c.total_damaged : (c.damaged_items_count || 1));
-            const reason = c.damage_reasons || c.notes || 'Kondisi Rusak / Bukan Good';
-            const prodName = c.product_names || '<span class="text-slate-400 italic">Produk Retur</span>';
+        // Isi dropdown ekspedisi secara dinamis
+        populateClaimExpeditionFilter(cachedClaimCandidates);
 
-            html += `
-                <tr class="hover:bg-rose-50/40 transition border-b border-slate-100">
-                    <td class="py-3 px-3 font-bold text-slate-500">${idx + 1}</td>
-                    <td class="py-3 px-3">
-                        <button onclick="lookupClaimCandidate('${c.invoice_number}')" class="font-mono font-bold text-indigo-600 hover:text-indigo-800 text-left block hover:underline">
-                            ${c.invoice_number}
-                        </button>
-                        <span class="text-[10px] text-slate-400 block">${c.operator_name || 'Operator'}</span>
-                    </td>
-                    <td class="py-3 px-3">
-                        <div class="font-bold text-slate-800 text-xs truncate max-w-[220px]" title="${c.product_names || ''}">
-                            ${prodName}
-                        </div>
-                    </td>
-                    <td class="py-3 px-3 text-center">
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
-                            ${damagedCount} Rusak
-                        </span>
-                        ${c.total_items ? `<span class="block text-[9px] text-slate-400 font-medium mt-0.5">Total: ${c.total_items} pcs</span>` : ''}
-                    </td>
-                    <td class="py-3 px-3">
-                        <span class="text-slate-800 font-medium block max-w-xs truncate" title="${reason}">
-                            ${reason}
-                        </span>
-                    </td>
-                    <td class="py-3 px-3 font-semibold text-slate-700">${c.expedition || '-'}</td>
-                    <td class="py-3 px-3 text-slate-500 text-[11px] whitespace-nowrap">${c.created_at || '-'}</td>
-                    <td class="py-3 px-3 text-center">
-                        ${hasVideo ? 
-                            `<span class="inline-flex items-center gap-1 text-[11px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                                <i class="fa-solid fa-video"></i> Ada
-                             </span>` : 
-                            `<span class="inline-flex items-center gap-1 text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
-                                <i class="fa-solid fa-video-slash"></i> -
-                             </span>`
-                        }
-                    </td>
-                    <td class="py-3 px-3 text-center">
-                        <button onclick="lookupClaimCandidate('${c.invoice_number}')" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[11px] font-bold transition shadow-2xs flex items-center gap-1.5 mx-auto">
-                            <i class="fa-solid fa-file-shield"></i> Berkas Klaim
-                        </button>
-                    </td>
-                </tr>
-            `;
-        });
-        tbody.innerHTML = html;
+        // Render tabel berdasarkan filter saat ini
+        applyClaimCandidatesFilter();
+
         if (force) {
-            showToast('success', `Berhasil memuat ${candidates.length} paket rusak / layak klaim`, 'Daftar Diperbarui');
+            showToast('success', `Berhasil memuat ${cachedClaimCandidates.length} paket rusak / layak klaim`, 'Daftar Diperbarui');
         }
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-rose-500">Error: ${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-rose-500">Error: ${err.message}</td></tr>`;
     } finally {
         if (refreshIcon) refreshIcon.classList.remove('fa-spin');
     }
 };
 
-window.searchClaimDossier = function(e) {
-    if (window.executeClaimLookup) return window.executeClaimLookup(e);
+function populateClaimExpeditionFilter(candidates) {
+    const sel = document.getElementById('filterClaimExpedition');
+    if (!sel) return;
+    const currentVal = sel.value;
+    const expeditions = new Set();
+    candidates.forEach(c => {
+        if (c.expedition && c.expedition.trim()) {
+            expeditions.add(c.expedition.trim());
+        }
+    });
+
+    let optHtml = '<option value="">Semua Ekspedisi</option>';
+    Array.from(expeditions).sort().forEach(exp => {
+        optHtml += `<option value="${escapeHtml(exp)}" ${exp === currentVal ? 'selected' : ''}>${escapeHtml(exp)}</option>`;
+    });
+    sel.innerHTML = optHtml;
+}
+
+window.applyClaimCandidatesFilter = function() {
+    const tbody = document.getElementById('claimCandidatesTableBody');
+    if (!tbody) return;
+
+    const searchInput = document.getElementById('filterClaimSearch');
+    const expSelect = document.getElementById('filterClaimExpedition');
+    const dateInput = document.getElementById('filterClaimDate');
+
+    const q = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    const exp = expSelect ? expSelect.value.trim().toLowerCase() : '';
+    const date = dateInput ? dateInput.value.trim() : '';
+
+    let filtered = cachedClaimCandidates.filter(c => {
+        // Filter Search (Invoice / Resi, Produk, Alasan Rusak, Operator)
+        if (q) {
+            const inv = String(c.invoice_number || '').toLowerCase();
+            const prod = String(c.product_names || '').toLowerCase();
+            const rsn = String(c.damage_reasons || c.notes || '').toLowerCase();
+            const op = String(c.operator_name || '').toLowerCase();
+            if (!inv.includes(q) && !prod.includes(q) && !rsn.includes(q) && !op.includes(q)) {
+                return false;
+            }
+        }
+
+        // Filter Ekspedisi
+        if (exp) {
+            const cExp = String(c.expedition || '').toLowerCase();
+            if (cExp !== exp) return false;
+        }
+
+        // Filter Tanggal
+        if (date) {
+            const cDate = String(c.created_at || '').substring(0, 10);
+            if (cDate !== date) return false;
+        }
+
+        return true;
+    });
+
+    // Update Counter
+    const countEl = document.getElementById('countClaimFiltered');
+    const totalEl = document.getElementById('countClaimTotal');
+    if (countEl) countEl.innerText = filtered.length;
+    if (totalEl) totalEl.innerText = cachedClaimCandidates.length;
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center py-10 text-slate-400">
+            <i class="fa-solid fa-filter-circle-xmark text-2xl text-slate-300 mb-2 block"></i>
+            Tidak ada paket rusak yang sesuai dengan filter pencarian yang diterapkan.
+        </td></tr>`;
+        return;
+    }
+
+    let html = '';
+    filtered.forEach((c, idx) => {
+        const hasVideo = !!c.video_path;
+        const damagedCount = c.damaged_qty || (c.total_damaged > 0 ? c.total_damaged : (c.damaged_items_count || 1));
+        const reason = c.damage_reasons || c.notes || 'Kondisi Rusak / Bukan Good';
+        const prodName = c.product_names || '<span class="text-slate-400 italic">Produk Retur</span>';
+        const priceFormatted = c.package_price_formatted && c.package_price_formatted !== '-' ? c.package_price_formatted : (c.package_price > 0 ? 'Rp ' + Number(c.package_price).toLocaleString('id-ID') : '-');
+
+        html += `
+            <tr class="hover:bg-rose-50/40 transition border-b border-slate-100">
+                <td class="py-3 px-3 font-bold text-slate-500">${idx + 1}</td>
+                <td class="py-3 px-3">
+                    <button onclick="openClaimDetailModal('${c.invoice_number}')" class="font-mono font-bold text-indigo-600 hover:text-indigo-800 text-left block hover:underline" title="Klik untuk melihat berkas detail klaim">
+                        ${escapeHtml(c.invoice_number)}
+                    </button>
+                    <span class="text-[10px] text-slate-400 block">${escapeHtml(c.operator_name || 'Operator')}</span>
+                </td>
+                <td class="py-3 px-3">
+                    <div class="font-bold text-slate-800 text-xs truncate max-w-[200px]" title="${escapeHtml(c.product_names || '')}">
+                        ${prodName}
+                    </div>
+                </td>
+                <td class="py-3 px-3 text-center">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
+                        ${damagedCount} Rusak
+                    </span>
+                    ${c.total_items ? `<span class="block text-[9px] text-slate-400 font-medium mt-0.5">Total: ${c.total_items} pcs</span>` : ''}
+                </td>
+                <td class="py-3 px-3">
+                    <span class="text-slate-800 font-medium block max-w-xs truncate" title="${escapeHtml(reason)}">
+                        ${escapeHtml(reason)}
+                    </span>
+                </td>
+                <td class="py-3 px-3 font-semibold text-slate-700">${escapeHtml(c.expedition || '-')}</td>
+                <td class="py-3 px-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
+                    ${priceFormatted}
+                </td>
+                <td class="py-3 px-3 text-slate-500 text-[11px] whitespace-nowrap">${escapeHtml(c.created_at || '-')}</td>
+                <td class="py-3 px-3 text-center">
+                    ${hasVideo ? 
+                        `<span class="inline-flex items-center gap-1 text-[11px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                            <i class="fa-solid fa-video"></i> Ada
+                         </span>` : 
+                        `<span class="inline-flex items-center gap-1 text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
+                            <i class="fa-solid fa-video-slash"></i> -
+                         </span>`
+                    }
+                </td>
+                <td class="py-3 px-3 text-center">
+                    <button onclick="openClaimDetailModal('${c.invoice_number}')" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[11px] font-bold transition shadow-2xs flex items-center gap-1.5 mx-auto" title="Buka popup berkas detail klaim">
+                        <i class="fa-solid fa-shield-halved"></i> Klaim
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    tbody.innerHTML = html;
+};
+
+window.resetClaimCandidatesFilter = function() {
+    const searchInput = document.getElementById('filterClaimSearch');
+    const expSelect = document.getElementById('filterClaimExpedition');
+    const dateInput = document.getElementById('filterClaimDate');
+
+    if (searchInput) searchInput.value = '';
+    if (expSelect) expSelect.value = '';
+    if (dateInput) dateInput.value = '';
+
+    applyClaimCandidatesFilter();
+};
+
+// ==========================================
+// POPUP MODAL DETAIL KLAIM (BERKAS LENGKAP)
+// ==========================================
+window.openClaimDetailModal = async function(identifier) {
+    if (!identifier) return;
+    activeClaimCandidateInvoice = identifier;
+
+    const modal = document.getElementById('modalClaimDetail');
+    const loading = document.getElementById('mClaimLoading');
+    const body = document.getElementById('mClaimBody');
+    if (!modal) {
+        // Fallback jika modal belum terpasang
+        window.open(`claim_dossier.php?q=${encodeURIComponent(identifier)}`, '_blank');
+        return;
+    }
+
+    modal.classList.remove('hidden');
+    if (loading) loading.classList.remove('hidden');
+    if (body) body.classList.add('hidden');
+
+    try {
+        const res = await fetch(`api/ocs_lookup.php?q=${encodeURIComponent(identifier)}`);
+        const data = await res.json();
+
+        if (!data || !data.success) {
+            showToast('error', data?.message || 'Gagal memuat detail berkas klaim', 'Data Tidak Ditemukan');
+            if (loading) {
+                loading.innerHTML = `
+                    <div class="text-rose-500 space-y-2 py-8">
+                        <i class="fa-solid fa-triangle-exclamation text-3xl"></i>
+                        <p class="font-bold">${escapeHtml(data?.message || 'Data berkas klaim tidak ditemukan')}</p>
+                    </div>
+                `;
+            }
+            return;
+        }
+
+        renderClaimDetailModalContent(data);
+
+        if (loading) loading.classList.add('hidden');
+        if (body) body.classList.remove('hidden');
+
+    } catch (err) {
+        console.error("openClaimDetailModal error:", err);
+        showToast('error', 'Terjadi kesalahan saat memuat berkas klaim: ' + err.message, 'Gagal');
+        if (loading) {
+            loading.innerHTML = `
+                <div class="text-rose-500 space-y-2 py-8">
+                    <i class="fa-solid fa-circle-exclamation text-3xl"></i>
+                    <p class="font-bold">Gagal memuat: ${escapeHtml(err.message)}</p>
+                </div>
+            `;
+        }
+    }
+};
+
+function renderClaimDetailModalContent(data) {
+    const order = data.order || {};
+    const unboxing = data.unboxing || {};
+    const reception = data.reception || {};
+    const photos = data.photos || [];
+    const items = unboxing.items || data.items || [];
+
+    // Header info
+    const invTitle = document.getElementById('mClaimInvoiceTitle');
+    const subtitle = document.getElementById('mClaimSubtitle');
+    const statusBadge = document.getElementById('mClaimStatusBadge');
+
+    const invNo = order.Id || unboxing.invoice_number || data.query || '-';
+    const trackingNo = order.TrackingNumber || reception.package_barcode || invNo;
+
+    if (invTitle) invTitle.innerText = `Invoice #${invNo} • Resi #${trackingNo}`;
+    if (subtitle) subtitle.innerText = `Toko: ${order.ShopName || '-'} | Ekspedisi: ${order.ShippingProvider || unboxing.expedition || '-'}`;
+    
+    if (statusBadge) {
+        if (data.is_claimable) {
+            statusBadge.className = 'px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-rose-600 text-white';
+            statusBadge.innerText = 'RUSAK / LAYAK KLAIM';
+        } else {
+            statusBadge.className = 'px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white';
+            statusBadge.innerText = 'BAGUS / NORMAL';
+        }
+    }
+
+    // 1. Banner Kelayakan
+    const bannerTitle = document.getElementById('mClaimBannerTitle');
+    const bannerDesc = document.getElementById('mClaimBannerDesc');
+    const badgeTag = document.getElementById('mClaimBadgeTag');
+    if (bannerTitle) {
+        bannerTitle.innerText = data.is_claimable ? '⚠️ PAKET LAYAK KLAIM (Kondisi Rusak / Cacat)' : '✓ BUKAN PAKET KLAIM (Kondisi Baik/Good)';
+    }
+    if (bannerDesc) {
+        bannerDesc.innerText = data.claim_eligibility_reason || (data.is_claimable ? 'Kerusakan produk terkonfirmasi saat proses unboxing di gudang retur.' : 'Semua item dalam kondisi baik.');
+    }
+    if (badgeTag) {
+        badgeTag.className = data.is_claimable ? 'px-2.5 py-1 rounded-lg bg-rose-600 text-white font-black text-[10px] uppercase tracking-wider' : 'px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-black text-[10px] uppercase tracking-wider';
+        badgeTag.innerText = data.is_claimable ? 'LAYAK KLAIM' : 'NORMAL';
+    }
+
+    // 2. Finansial & Data Ekspedisi
+    const priceText = order.PackagePriceFormatted || (order.PackagePrice > 0 ? 'Rp ' + Number(order.PackagePrice).toLocaleString('id-ID') : 'Rp -');
+    const totalClaimText = order.TotalClaimAmountFormatted || (order.TotalClaimAmount > 0 ? 'Rp ' + Number(order.TotalClaimAmount).toLocaleString('id-ID') : priceText);
+
+    const priceEl = document.getElementById('mClaimPrice');
+    const totalClaimEl = document.getElementById('mClaimTotalClaim');
+    const expEl = document.getElementById('mClaimExpedition');
+    const trackingEl = document.getElementById('mClaimTrackingNo');
+    const shopEl = document.getElementById('mClaimShopName');
+    const platformEl = document.getElementById('mClaimPlatform');
+
+    if (priceEl) priceEl.innerText = priceText;
+    if (totalClaimEl) totalClaimEl.innerText = totalClaimText;
+    if (expEl) expEl.innerText = order.ShippingProvider || unboxing.expedition || reception.expedition || '-';
+    if (trackingEl) trackingEl.innerText = `AWB: ${trackingNo}`;
+    if (shopEl) shopEl.innerText = order.ShopName || '-';
+    if (platformEl) platformEl.innerText = order.CommercePlatform || 'Marketplace';
+
+    // 3. Serah Terima & Unboxing Info
+    const courierEl = document.getElementById('mClaimCourierInfo');
+    const receiptEl = document.getElementById('mClaimReceiptNo');
+    const opEl = document.getElementById('mClaimOperatorInfo');
+    const unboxTimeEl = document.getElementById('mClaimUnboxTime');
+
+    if (courierEl) courierEl.innerText = reception.courier_name ? `${reception.courier_name} (${reception.expedition || '-'})` : (unboxing.expedition || '-');
+    if (receiptEl) receiptEl.innerText = reception.receipt_number ? `Surat Jalan: ${reception.receipt_number}` : 'Tanda Terima: -';
+    if (opEl) opEl.innerText = `Petugas: ${unboxing.operator_name || 'Operator Gudang'}`;
+    if (unboxTimeEl) unboxTimeEl.innerText = unboxing.created_at || '-';
+
+    // 4. Video Unboxing Player
+    const videoEl = document.getElementById('mClaimVideoPlayer');
+    const noVideoPlaceholder = document.getElementById('mClaimNoVideoPlaceholder');
+    const videoOp = document.getElementById('mClaimVideoOperator');
+
+    if (videoOp) videoOp.innerText = unboxing.operator_name ? `Operator: ${unboxing.operator_name}` : 'Stasiun Unboxing';
+
+    if (unboxing.video_path) {
+        if (videoEl) {
+            videoEl.src = unboxing.video_path;
+            videoEl.classList.remove('hidden');
+        }
+        if (noVideoPlaceholder) noVideoPlaceholder.classList.add('hidden');
+    } else {
+        if (videoEl) {
+            videoEl.pause();
+            videoEl.src = '';
+            videoEl.classList.add('hidden');
+        }
+        if (noVideoPlaceholder) noVideoPlaceholder.classList.remove('hidden');
+    }
+
+    // 5. Galeri Foto Bukti
+    const photosGrid = document.getElementById('mClaimPhotosGrid');
+    const noPhotosEl = document.getElementById('mClaimNoPhotosPlaceholder');
+    const photoCountEl = document.getElementById('mClaimPhotoCount');
+
+    if (photoCountEl) photoCountEl.innerText = photos.length;
+
+    if (photos && photos.length > 0) {
+        if (noPhotosEl) noPhotosEl.classList.add('hidden');
+        if (photosGrid) {
+            photosGrid.classList.remove('hidden');
+            photosGrid.innerHTML = photos.map((p, idx) => {
+                const isDmg = (p.is_damaged || p.badge === 'Barang Rusak' || (p.title && p.title.toLowerCase().includes('rusak')));
+                const borderCls = isDmg ? 'border-2 border-rose-500 shadow-sm shadow-rose-500/25 ring-2 ring-rose-200' : 'border border-slate-200';
+                const badgeBg = isDmg ? 'bg-rose-600 text-white font-black' : 'bg-slate-900/80 text-white font-bold';
+                const badgeLabel = isDmg ? '⚠️ RUSAK' : (p.badge || 'FOTO');
+                return `
+                    <div class="relative group rounded-xl overflow-hidden ${borderCls} bg-slate-100 aspect-square cursor-pointer hover:shadow-md transition" onclick="openClaimPhotoModal('${encodeURI(p.url)}', '${encodeURIComponent(p.title || 'Foto Bukti')}')" title="${escapeHtml(p.title || 'Klik perbesar foto')}">
+                        <img src="${p.url}" alt="${escapeHtml(p.title || 'Foto')}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+                        <div class="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] px-1.5 py-0.5 truncate group-hover:bg-black/80 transition">
+                            <span class="truncate">${escapeHtml(p.title || 'Foto')}</span>
+                        </div>
+                        <span class="absolute top-1 left-1 px-1.5 py-0.5 rounded ${badgeBg} text-[8px] uppercase tracking-wider backdrop-blur-xs">
+                            ${badgeLabel}
+                        </span>
+                    </div>
+                `;
+            }).join('');
+        }
+    } else {
+        if (photosGrid) {
+            photosGrid.innerHTML = '';
+            photosGrid.classList.add('hidden');
+        }
+        if (noPhotosEl) noPhotosEl.classList.remove('hidden');
+    }
+
+    // 6. Tabel Rincian Produk
+    const itemsTbody = document.getElementById('mClaimItemsTableBody');
+    const itemsSummary = document.getElementById('mClaimItemsSummary');
+
+    if (itemsSummary) itemsSummary.innerText = `${items.length} Produk Tercatat`;
+
+    if (itemsTbody) {
+        if (items.length === 0) {
+            itemsTbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-slate-400">Tidak ada data rincian produk</td></tr>`;
+        } else {
+            itemsTbody.innerHTML = items.map(item => {
+                const cond = String(item.condition || '').toUpperCase().trim();
+                const typ = String(item.type || '').toUpperCase().trim();
+                const isDmg = (cond !== '' && cond !== 'GOOD' && cond !== 'BAGUS') ||
+                              (typ !== '' && typ !== 'GOOD' && typ !== 'BAGUS') ||
+                              Boolean(item.damage_reason);
+
+                const badgeCond = isDmg ? 
+                    `<span class="bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded text-[10px] border border-rose-200">⚠️ ${escapeHtml(item.type || item.condition || 'RUSAK')}</span>` :
+                    `<span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px] border border-emerald-200">GOOD</span>`;
+
+                const reason = item.damage_reason || (isDmg ? (item.type || 'Kondisi Cacat/Rusak') : '-');
+
+                return `
+                    <tr class="hover:bg-slate-50 transition border-b border-slate-100 ${isDmg ? 'bg-rose-50/30' : ''}">
+                        <td class="py-2.5 px-3 font-mono font-bold text-slate-700">
+                            <div>${escapeHtml(item.barcode || '-')}</div>
+                            ${item.seller_sku ? `<span class="text-[10px] text-slate-400 font-normal">SKU: ${escapeHtml(item.seller_sku)}</span>` : ''}
+                        </td>
+                        <td class="py-2.5 px-3 font-semibold text-slate-800">
+                            ${escapeHtml(item.product_name || '-')}
+                        </td>
+                        <td class="py-2.5 px-3 text-center font-bold text-slate-800">
+                            ${item.qty || 1}
+                        </td>
+                        <td class="py-2.5 px-3 text-center">
+                            ${badgeCond}
+                        </td>
+                        <td class="py-2.5 px-3 text-slate-700 font-medium">
+                            ${isDmg ? `<span class="text-rose-700 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1 text-[10px]"></i>${escapeHtml(reason)}</span>` : '<span class="text-slate-400">-</span>'}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    }
+}
+
+window.closeClaimDetailModal = function() {
+    const modal = document.getElementById('modalClaimDetail');
+    if (modal) modal.classList.add('hidden');
+    const video = document.getElementById('mClaimVideoPlayer');
+    if (video) {
+        video.pause();
+        video.src = '';
+    }
+};
+
+window.printClaimFromModal = function() {
+    if (!activeClaimCandidateInvoice) {
+        showToast('warning', 'Pilih berkas klaim terlebih dahulu', 'Invoice Kosong');
+        return;
+    }
+    window.open(`claim_dossier.php?q=${encodeURIComponent(activeClaimCandidateInvoice)}`, '_blank');
+};
+
+window.openClaimDossierFullTab = function() {
+    if (!activeClaimCandidateInvoice) {
+        showToast('warning', 'Pilih berkas klaim terlebih dahulu', 'Invoice Kosong');
+        return;
+    }
+    window.open(`claim_dossier.php?q=${encodeURIComponent(activeClaimCandidateInvoice)}`, '_blank');
 };
 
 window.lookupClaimCandidate = function(identifier) {
     if (!identifier) return;
-    window.open(`claim_dossier.php?q=${encodeURIComponent(identifier)}`, '_blank');
+    openClaimDetailModal(identifier);
+};
+
+window.searchClaimDossier = function(e) {
+    if (window.executeClaimLookup) return window.executeClaimLookup(e);
 };
 
 // -------------------------------------------------------------

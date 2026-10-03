@@ -972,11 +972,47 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             </span>
                             <div>
                                 <h4 class="font-bold text-sm text-slate-800">Daftar Paket Rusak / Layak Klaim</h4>
+                                <p class="text-[11px] text-slate-400">Paket yang terindikasi rusak atau cacat saat unboxing untuk diajukan kompensasi</p>
                             </div>
                         </div>
                         <button onclick="loadClaimCandidates(true)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-slate-300 shadow-2xs">
                             <i class="fa-solid fa-arrows-rotate text-amber-600" id="iconRefreshCandidates"></i> Refresh Daftar
                         </button>
+                    </div>
+
+                    <!-- Filter Toolbar 1 Baris Rapi -->
+                    <div class="p-3 bg-slate-50/80 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+                        <div class="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
+                            <!-- Input Search -->
+                            <div class="relative flex-1 min-w-[180px] max-w-xs">
+                                <input type="text" id="filterClaimSearch" placeholder="Cari Resi / Invoice / Produk..." 
+                                    oninput="applyClaimCandidatesFilter()"
+                                    class="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none transition shadow-2xs">
+                                <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                            </div>
+
+                            <!-- Dropdown Ekspedisi -->
+                            <select id="filterClaimExpedition" onchange="applyClaimCandidatesFilter()" 
+                                class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:ring-2 focus:ring-amber-500 focus:outline-none transition shadow-2xs">
+                                <option value="">Semua Ekspedisi</option>
+                            </select>
+
+                            <!-- Filter Tanggal Unboxing -->
+                            <input type="date" id="filterClaimDate" onchange="applyClaimCandidatesFilter()" 
+                                class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:ring-2 focus:ring-amber-500 focus:outline-none transition shadow-2xs"
+                                title="Filter Tanggal Unboxing">
+
+                            <!-- Reset Filter -->
+                            <button type="button" onclick="resetClaimCandidatesFilter()" 
+                                class="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-xs transition" title="Reset Filter">
+                                <i class="fa-solid fa-rotate-left"></i>
+                            </button>
+                        </div>
+
+                        <!-- Info Counter -->
+                        <div class="text-slate-500 text-[11px] font-medium shrink-0">
+                            Menampilkan: <b id="countClaimFiltered" class="text-rose-600 font-bold">0</b> dari <span id="countClaimTotal">0</span> paket rusak
+                        </div>
                     </div>
 
                     <div class="overflow-x-auto">
@@ -989,6 +1025,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                     <th class="py-3 px-3 text-center">Qty Rusak</th>
                                     <th class="py-3 px-3">Kondisi / Alasan Rusak</th>
                                     <th class="py-3 px-3">Ekspedisi</th>
+                                    <th class="py-3 px-3 text-right">Biaya Paket</th>
                                     <th class="py-3 px-3">Waktu Unboxing</th>
                                     <th class="py-3 px-3 text-center">Video Unbox</th>
                                     <th class="py-3 px-3 text-center">Aksi</th>
@@ -996,7 +1033,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             </thead>
                             <tbody id="claimCandidatesTableBody" class="divide-y divide-slate-100">
                                 <tr>
-                                    <td colspan="9" class="text-center py-10 text-slate-400">
+                                    <td colspan="10" class="text-center py-10 text-slate-400">
                                         <i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat daftar paket rusak...
                                     </td>
                                 </tr>
@@ -2149,6 +2186,203 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 <span class="text-[11px] text-slate-500 font-medium hidden sm:inline"><i class="fa-regular fa-circle-question mr-1 text-slate-400"></i>Klik foto paket untuk memperbesar resolusi tinggi</span>
                 <div class="flex items-center gap-2 ml-auto">
                     <button onclick="closeReceivingPackagesModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DETAIL KANDIDAT KLAIM & DOSSIER BUKTI LENGKAP -->
+    <div id="modalClaimDetail" class="hidden fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+        <div class="bg-white rounded-3xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+            <!-- Header Modal -->
+            <div class="p-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
+                <div class="flex items-center gap-3">
+                    <span class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-base border border-amber-500/30">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </span>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-black text-sm sm:text-base leading-tight" id="mClaimInvoiceTitle">Berkas Detail Klaim</h3>
+                            <span id="mClaimStatusBadge" class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-rose-600 text-white">RUSAK / LAYAK KLAIM</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 font-mono" id="mClaimSubtitle">Dokumen bukti kerusakan paket & komparasi data OCS</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="printClaimFromModal()" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-2xs" title="Cetak Berkas Klaim Resmi (PDF)">
+                        <i class="fa-solid fa-print"></i>
+                        <span class="hidden sm:inline">Cetak PDF</span>
+                    </button>
+                    <button type="button" onclick="openClaimDossierFullTab()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 transition border border-slate-700" title="Buka Halaman Penuh di Tab Baru">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    </button>
+                    <button onclick="closeClaimDetailModal()" class="text-slate-400 hover:text-white text-base p-1.5 rounded-lg hover:bg-slate-800 transition">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scrollable Modal Content Body -->
+            <div class="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1 text-xs">
+                
+                <!-- Loading State inside Modal -->
+                <div id="mClaimLoading" class="py-12 text-center text-slate-500 space-y-3">
+                    <i class="fa-solid fa-spinner fa-spin text-3xl text-amber-500"></i>
+                    <p class="font-bold">Memuat berkas dossier klaim...</p>
+                </div>
+
+                <!-- Main Content (hidden while loading) -->
+                <div id="mClaimBody" class="hidden space-y-4">
+                    
+                    <!-- 1. Banner Kelayakan & Status Klaim -->
+                    <div id="mClaimBanner" class="p-3.5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-rose-50 border-rose-200 text-rose-950">
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center text-sm font-bold shrink-0">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                            </span>
+                            <div>
+                                <b class="font-black text-xs block text-rose-900" id="mClaimBannerTitle">Status: Paket Rusak / Layak Klaim</b>
+                                <span class="text-[11px] text-rose-800" id="mClaimBannerDesc">Kerusakan barang terverifikasi dari stasiun unboxing retur gudang.</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-black text-[10px] uppercase tracking-wider" id="mClaimBadgeTag">LAYAK KLAIM</span>
+                        </div>
+                    </div>
+
+                    <!-- 2. Ringkasan Finansial & Data Ekspedisi (4-Card Grid) -->
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+                        <!-- Biaya Paket -->
+                        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200/90 shadow-2xs">
+                            <span class="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Biaya / Harga Barang (NMV)</span>
+                            <div class="font-black text-emerald-700 text-base font-mono truncate" id="mClaimPrice">Rp -</div>
+                            <span class="text-[9px] text-slate-500 block truncate">Nilai bersih barang OCS</span>
+                        </div>
+
+                        <!-- Estimasi Tuntutan Klaim -->
+                        <div class="bg-amber-50/70 p-3 rounded-2xl border border-amber-200 shadow-2xs">
+                            <span class="text-[9px] uppercase font-bold text-amber-800 block mb-0.5">Total Tuntutan Klaim</span>
+                            <div class="font-black text-amber-700 text-base font-mono truncate" id="mClaimTotalClaim">Rp -</div>
+                            <span class="text-[9px] text-amber-700 block truncate">Estimasi diajukan ke ekspedisi</span>
+                        </div>
+
+                        <!-- Ekspedisi & Resi -->
+                        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200/90 shadow-2xs">
+                            <span class="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Ekspedisi & Resi</span>
+                            <div class="font-bold text-slate-800 text-xs truncate" id="mClaimExpedition">-</div>
+                            <span class="font-mono text-[10px] text-indigo-600 font-bold block truncate" id="mClaimTrackingNo">-</span>
+                        </div>
+
+                        <!-- Toko / Marketplace -->
+                        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200/90 shadow-2xs">
+                            <span class="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Toko & Platform</span>
+                            <div class="font-bold text-slate-800 text-xs truncate" id="mClaimShopName">-</div>
+                            <span class="text-[10px] text-slate-500 font-medium block truncate" id="mClaimPlatform">Marketplace</span>
+                        </div>
+                    </div>
+
+                    <!-- 3. Rincian Serah Terima Kurir & Unboxing Info -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                        <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/90 flex items-center justify-between gap-3 text-xs">
+                            <div>
+                                <span class="text-[10px] uppercase font-bold text-slate-400 block">Serah Terima Ekspedisi</span>
+                                <div class="font-semibold text-slate-800" id="mClaimCourierInfo">-</div>
+                                <span class="text-[10px] text-slate-500 font-mono" id="mClaimReceiptNo">Tanda Terima: -</span>
+                            </div>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200" id="mClaimRecTag">Diterima</span>
+                        </div>
+                        <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/90 flex items-center justify-between gap-3 text-xs">
+                            <div>
+                                <span class="text-[10px] uppercase font-bold text-slate-400 block">Stasiun Unboxing Retur</span>
+                                <div class="font-semibold text-slate-800" id="mClaimOperatorInfo">Operator: -</div>
+                                <span class="text-[10px] text-slate-500" id="mClaimUnboxTime">-</span>
+                            </div>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200" id="mClaimUnboxTag">Terekam</span>
+                        </div>
+                    </div>
+
+                    <!-- 4. Bukti Media: Player Video Unboxing + Galeri Foto Bukti -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        <!-- Video Player Unboxing Retur -->
+                        <div class="bg-slate-900 rounded-2xl overflow-hidden flex flex-col border border-slate-800">
+                            <div class="p-2.5 bg-slate-950 text-white flex items-center justify-between text-xs">
+                                <span class="font-bold flex items-center gap-2">
+                                    <i class="fa-solid fa-video text-rose-500"></i> Video Rekaman Unboxing Retur
+                                </span>
+                                <span class="text-[10px] text-slate-400" id="mClaimVideoOperator">Stasiun Unboxing</span>
+                            </div>
+                            <div class="relative bg-black aspect-video flex items-center justify-center">
+                                <video id="mClaimVideoPlayer" controls class="w-full h-full object-contain hidden"></video>
+                                <div id="mClaimNoVideoPlaceholder" class="text-center p-4 text-slate-400 space-y-1">
+                                    <i class="fa-solid fa-video-slash text-2xl text-slate-600 block"></i>
+                                    <span class="text-xs">Tidak ada video unboxing tersimpan untuk invoice ini.</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Galeri Foto Bukti Kerusakan & Paket -->
+                        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col">
+                            <div class="p-2.5 bg-slate-100 border-b border-slate-200 flex items-center justify-between text-xs">
+                                <span class="font-bold text-slate-800 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-camera text-indigo-600"></i> Dokumentasi Foto Bukti (<span id="mClaimPhotoCount">0</span>)
+                                </span>
+                                <span class="text-[10px] text-slate-500">Klik foto untuk perbesar</span>
+                            </div>
+                            <div class="p-3 flex-1 min-h-[180px] max-h-[220px] overflow-y-auto">
+                                <div id="mClaimPhotosGrid" class="grid grid-cols-3 gap-2">
+                                    <!-- Dynamic Photos -->
+                                </div>
+                                <div id="mClaimNoPhotosPlaceholder" class="hidden text-center py-8 text-slate-400">
+                                    <i class="fa-solid fa-images text-2xl mb-1 block"></i>
+                                    <span>Belum ada foto bukti.</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5. Tabel Rincian Barang di Paket & Kondisi Fisik -->
+                    <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+                        <div class="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                            <h4 class="font-bold text-xs text-slate-800 flex items-center gap-1.5">
+                                <i class="fa-solid fa-boxes-stacked text-amber-600"></i> Rincian Produk & Kerusakan di Paket
+                            </h4>
+                            <span class="text-[10px] text-slate-500" id="mClaimItemsSummary">0 Produk Terdaftar</span>
+                        </div>
+                        <div class="overflow-x-auto max-h-56 overflow-y-auto">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-slate-100 text-slate-600 text-[10px] font-bold uppercase sticky top-0">
+                                    <tr>
+                                        <th class="py-2 px-3">Barcode / SKU</th>
+                                        <th class="py-2 px-3">Nama Produk</th>
+                                        <th class="py-2 px-3 text-center">Qty</th>
+                                        <th class="py-2 px-3 text-center">Kondisi</th>
+                                        <th class="py-2 px-3">Detail Alasan / Kerusakan</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mClaimItemsTableBody" class="divide-y divide-slate-100 font-medium">
+                                    <!-- Dynamic items -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Footer Modal Actions -->
+            <div class="p-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 shrink-0">
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="copyClaimPacketSummary()" class="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition flex items-center gap-1.5">
+                        <i class="fa-regular fa-copy"></i> Salin Ringkasan
+                    </button>
+                    <button type="button" onclick="openClaimDossierFullTab()" class="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition flex items-center gap-1.5 border border-indigo-200">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i> Halaman Lengkap
+                    </button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="closeClaimDetailModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition">
                         Tutup
                     </button>
                 </div>

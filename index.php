@@ -199,24 +199,34 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                 <input type="file" id="filePhotosUpload" accept="image/*" multiple class="hidden" onchange="handlePhotosMultipleUpload(this)">
 
                 <!-- Tombol Shortcut Tuts Keyboard (Hanya Aktif Jika Resi / Invoice Sudah Terisi) -->
-                <div class="grid grid-cols-2 gap-2 shrink-0">
+                <div class="grid grid-cols-3 gap-1.5 shrink-0">
                     <button id="btnCapturePackagePhoto" onclick="capturePackagePhoto()" type="button" disabled
                         title="Isi nomor resi / invoice terlebih dahulu"
-                        class="flex items-center justify-center gap-2 py-1.5 px-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl font-bold text-xs transition shadow-sm shadow-indigo-600/25 opacity-40 cursor-not-allowed">
+                        class="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl font-bold text-xs transition shadow-sm shadow-indigo-600/25 opacity-40 cursor-not-allowed">
                         <i class="fa-solid fa-box text-xs"></i>
-                        <div class="text-left leading-tight">
-                            <span class="block text-[9px] opacity-80 font-mono font-black">TUTS [F2]</span>
-                            <span>+ Foto Paket</span>
+                        <div class="text-left leading-tight min-w-0">
+                            <span class="block text-[8px] opacity-80 font-mono font-black">[F2]</span>
+                            <span class="text-[11px] truncate block">Foto Paket</span>
                         </div>
                     </button>
 
-                    <button id="btnCaptureProductPhoto" onclick="captureProductPhoto()" type="button" disabled
+                    <button id="btnCaptureProductPhoto" onclick="captureProductPhoto(null, 'GOOD')" type="button" disabled
                         title="Isi nomor resi / invoice terlebih dahulu"
-                        class="flex items-center justify-center gap-2 py-1.5 px-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl font-bold text-xs transition shadow-sm shadow-emerald-600/25 opacity-40 cursor-not-allowed">
+                        class="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl font-bold text-xs transition shadow-sm shadow-emerald-600/25 opacity-40 cursor-not-allowed">
                         <i id="iconCaptureProductPhoto" class="fa-solid fa-tag text-xs"></i>
-                        <div class="text-left leading-tight">
-                            <span class="block text-[9px] opacity-80 font-mono font-black">TUTS [F4]</span>
-                            <span id="labelCaptureProductPhoto">+ Foto Produk</span>
+                        <div class="text-left leading-tight min-w-0">
+                            <span class="block text-[8px] opacity-80 font-mono font-black">[F4]</span>
+                            <span id="labelCaptureProductPhoto" class="text-[11px] truncate block">Produk Baik</span>
+                        </div>
+                    </button>
+
+                    <button id="btnCaptureDamagedPhoto" onclick="captureProductPhoto(null, 'RUSAK')" type="button" disabled
+                        title="Foto khusus bukti barang rusak / defect / cacat"
+                        class="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-xl font-bold text-xs transition shadow-sm shadow-rose-600/25 opacity-40 cursor-not-allowed">
+                        <i class="fa-solid fa-triangle-exclamation text-xs"></i>
+                        <div class="text-left leading-tight min-w-0">
+                            <span class="block text-[8px] opacity-80 font-mono font-black">[F5]</span>
+                            <span class="text-[11px] truncate block">Barang Rusak</span>
                         </div>
                     </button>
                 </div>

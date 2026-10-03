@@ -68,6 +68,7 @@ window.updatePhotoButtonsState = function() {
     const btnUp  = document.getElementById('btnUploadPhotosFile');
     const hint   = document.getElementById('photoShortcutsHint');
 
+    const btnDmg = document.getElementById('btnCaptureDamagedPhoto');
     if (btnPkg) {
         btnPkg.disabled = !isFilled;
         btnPkg.classList.toggle('opacity-40', !isFilled);
@@ -88,6 +89,16 @@ window.updatePhotoButtonsState = function() {
             btnPrd.setAttribute('title', 'Isi nomor resi / invoice terlebih dahulu');
         }
     }
+    if (btnDmg) {
+        btnDmg.disabled = !isFilled;
+        btnDmg.classList.toggle('opacity-40', !isFilled);
+        btnDmg.classList.toggle('cursor-not-allowed', !isFilled);
+        if (isFilled) {
+            btnDmg.setAttribute('title', 'Ambil Foto Bukti Barang Rusak / Cacat [TUTS F5]');
+        } else {
+            btnDmg.setAttribute('title', 'Isi nomor resi / invoice terlebih dahulu');
+        }
+    }
     if (btnUp) {
         btnUp.classList.toggle('opacity-40', !isFilled);
         btnUp.classList.toggle('cursor-not-allowed', !isFilled);
@@ -99,7 +110,7 @@ window.updatePhotoButtonsState = function() {
     }
     if (hint) {
         if (isFilled) {
-            hint.innerHTML = '<span class="text-slate-500 font-medium">Shortcut: <b>[F2]</b> Foto Paket &bull; <b>[F4]</b> Foto Produk</span>';
+            hint.innerHTML = '<span class="text-slate-500 font-medium">Shortcut: <b>[F2]</b> Foto Paket &bull; <b>[F4]</b> Foto Produk &bull; <b>[F5]</b> Foto Barang Rusak</span>';
         } else {
             hint.innerHTML = '<span class="text-amber-600 font-semibold flex items-center gap-1"><i class="fa-solid fa-lock text-[9px]"></i> Isi Resi / Invoice dahulu</span>';
         }
@@ -2160,7 +2171,7 @@ window.capturePackagePhoto = function(sourceImage = null) {
     }
 };
 
-window.captureProductPhoto = function(sourceImage = null) {
+window.captureProductPhoto = function(sourceImage = null, forcedCondition = null) {
     if (!isInvoiceFilled()) {
         showToast('warning', 'Silakan scan atau masukkan Nomor Invoice / Resi terlebih dahulu sebelum mengambil foto produk!', 'Resi Belum Terisi');
         const inputInv = document.getElementById('inputInvoice');
@@ -2212,10 +2223,45 @@ window.captureProductPhoto = function(sourceImage = null) {
         }) : null;
 
         // 2. Evaluasi apakah form input saat ini diset sebagai rusak
-        const currentTypeUpper = String(pType).toUpperCase();
+        const currentTypeUpper = String(pType).toUpperCase().trim();
         const formIsDamaged = (currentTypeUpper !== 'GOOD' && currentTypeUpper !== 'BAGUS' && currentTypeUpper !== '');
 
-        if (formIsDamaged) {
+        if (forcedCondition === 'RUSAK') {
+            // Operator secara tegas menekan tombol / shortcut Foto Barang Rusak [F5]
+            isDamaged = true;
+            if (formIsDamaged) {
+                pType = pType; // Gunakan tipe yang sedang dipilih di form (DEFECT / RUSAK dll)
+            } else if (damagedInList) {
+                pType = damagedInList.type || damagedInList.condition || 'RUSAK';
+                pName = damagedInList.product_name || pName;
+                pSku = damagedInList.seller_sku || damagedInList.sku || pSku;
+                pSap = damagedInList.sap_code || pSap;
+                pBatch = damagedInList.batch_no || pBatch;
+                pExp = damagedInList.exp_date || pExp;
+                pQty = damagedInList.qty || pQty;
+            } else {
+                pType = 'RUSAK';
+            }
+
+            if (typeof currentDetectedProduct !== 'undefined' && currentDetectedProduct && !damagedInList) {
+                pName = currentDetectedProduct.name || pName;
+                pSku = currentDetectedProduct.seller_sku || currentDetectedProduct.sku || pSku;
+                pSap = currentDetectedProduct.sap_code || pSap;
+            }
+        } else if (forcedCondition === 'GOOD') {
+            // Operator secara tegas menekan tombol Foto Produk Baik [F4]
+            if (formIsDamaged) {
+                isDamaged = true;
+            } else {
+                isDamaged = false;
+                pType = 'GOOD';
+            }
+            if (typeof currentDetectedProduct !== 'undefined' && currentDetectedProduct) {
+                pName = currentDetectedProduct.name || pName;
+                pSku = currentDetectedProduct.seller_sku || currentDetectedProduct.sku || pSku;
+                pSap = currentDetectedProduct.sap_code || pSap;
+            }
+        } else if (formIsDamaged) {
             // Form aktif sedang memilih type rusak (Defect/Rusak/Expired dll)
             isDamaged = true;
             if (typeof currentDetectedProduct !== 'undefined' && currentDetectedProduct) {
@@ -2257,18 +2303,24 @@ window.captureProductPhoto = function(sourceImage = null) {
             if (lType !== 'GOOD' && lType !== 'BAGUS') isDamaged = true;
         }
 
+        // PASTIKAN: Jika status isDamaged, label kondisi di watermark TIDAK BOLEH "GOOD"!
+        if (isDamaged && (String(pType).toUpperCase() === 'GOOD' || String(pType).toUpperCase() === 'BAGUS' || !pType)) {
+            pType = 'RUSAK';
+        }
+
+        const conditionLabel = isDamaged ? `⚠️ ${pType} (RUSAK)` : (pType || 'GOOD');
+        const badgeText = isDamaged ? `⚠️ FOTO BUKTI BARANG RUSAK (${pType})` : '🏷️ FOTO PRODUK UNBOXING';
+        const badgeColor = isDamaged ? '#dc2626' : '#059669';
+
         const fields = [
             { label: 'NO. INVOICE', val: inv, highlight: true },
-            { label: 'KONDISI / TIPE', val: isDamaged ? `⚠️ ${pType} (RUSAK)` : pType, highlight: isDamaged },
+            { label: 'KONDISI / TIPE', val: conditionLabel, highlight: isDamaged },
             { label: 'NAMA PRODUK', val: pName.length > 28 ? pName.substring(0, 28) + '...' : pName },
             { label: 'SKU / SAP', val: `${pSku} | ${pSap}` },
             { label: 'QTY PRODUK', val: `${pQty || 1} Unit`, highlight: isDamaged },
             { label: 'BATCH & EXP', val: `B:${pBatch || '-'} | Exp:${pExp || '-'}` },
             { label: 'WAKTU & OPERATOR', val: `${getNowFormattedWIB()} (${opName})` }
         ];
-
-        const badgeText = isDamaged ? `⚠️ FOTO BUKTI BARANG RUSAK (${pType})` : '🏷️ FOTO PRODUK UNBOXING';
-        const badgeColor = isDamaged ? '#dc2626' : '#059669';
 
         const dataUrl = generateWatermarkedPhoto({
             badgeText: badgeText,
@@ -2283,17 +2335,21 @@ window.captureProductPhoto = function(sourceImage = null) {
             type: isDamaged ? 'damaged' : 'product',
             badge: isDamaged ? 'Barang Rusak' : 'Produk Retur',
             isDamaged: isDamaged,
-            title: isDamaged ? `Foto Barang Rusak #${prodCount} (${pName} - ${pType} x${pQty})` : `Foto Produk #${prodCount} (${pName})`,
+            title: isDamaged ? `Foto Bukti Barang Rusak #${prodCount} (${pName} - ${pType} x${pQty})` : `Foto Produk #${prodCount} (${pName})`,
             dataUrl: dataUrl,
             createdAt: getNowFormattedWIB()
         };
         capturedPhotosList.push(photoItem);
         renderPhotosGallery();
 
-        showToast('success', `${isDamaged ? 'Foto Bukti Barang Rusak' : 'Foto Produk'} #${prodCount} berhasil disimpan! [Tuts F4]`, isDamaged ? 'Foto Barang Rusak Siap' : 'Foto Produk Siap');
+        showToast(
+            'success',
+            `${isDamaged ? 'Foto Bukti Barang Rusak' : 'Foto Produk'} #${prodCount} berhasil disimpan! [Tuts ${isDamaged ? 'F5' : 'F4'}]`,
+            isDamaged ? 'Foto Barang Rusak Siap' : 'Foto Produk Siap'
+        );
     } catch (err) {
         console.error("captureProductPhoto error:", err);
-        showToast('error', 'Gagal mengambil foto produk: ' + err.message, 'Gagal Foto');
+        showToast('error', 'Gagal mengambil foto: ' + err.message, 'Gagal Foto');
     }
 };
 
@@ -2391,14 +2447,18 @@ window.closePhotoPreviewModal = function() {
     if (modal) modal.classList.add('hidden');
 };
 
-// Global Keyboard Shortcut: F2 (Foto Paket), F4 (Foto Produk)
+// Global Keyboard Shortcut: F2 (Foto Paket), F4 (Foto Produk Baik), F5 (Foto Barang Rusak)
 window.addEventListener('keydown', (e) => {
     if (e.key === 'F2') {
         e.preventDefault();
         capturePackagePhoto();
     } else if (e.key === 'F4') {
         e.preventDefault();
-        captureProductPhoto();
+        captureProductPhoto(null, 'GOOD');
+    } else if (e.key === 'F5') {
+        // Cegah default browser reload jika sedang aktif di halaman
+        e.preventDefault();
+        captureProductPhoto(null, 'RUSAK');
     }
 });
 
