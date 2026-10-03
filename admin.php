@@ -29,24 +29,78 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
         @media print {
             @page {
                 size: A4 portrait;
-                margin: 8mm 12mm;
+                margin: 8mm 10mm 10mm 10mm;
             }
-            body * { visibility: hidden !important; }
-            #printableReceivingReceiptArea, #printableReceivingReceiptArea * { visibility: visible !important; }
-            #printableReceivingReceiptArea {
-                position: absolute !important;
-                left: 0 !important;
-                top: 0 !important;
+            html, body {
+                height: auto !important;
+                min-height: auto !important;
+                overflow: visible !important;
+                background: #ffffff !important;
+                color: #0f172a !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                display: block !important;
+            }
+            body * {
+                visibility: hidden !important;
+            }
+            /* Pastikan modal dan seluruh isi Surat Jalan terlihat saat dicetak */
+            #modalReceivingReceipt,
+            #modalReceivingReceipt * {
+                visibility: visible !important;
+            }
+            #modalReceivingReceipt {
+                position: static !important;
+                inset: auto !important;
+                width: 100% !important;
+                height: auto !important;
+                min-height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                background: transparent !important;
+                backdrop-filter: none !important;
+                border: none !important;
+                box-shadow: none !important;
+                display: block !important;
+                z-index: auto !important;
+            }
+            #modalReceivingReceipt > div {
+                position: static !important;
                 width: 100% !important;
                 max-width: 100% !important;
+                height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                display: block !important;
+                background: transparent !important;
+            }
+            #modalReceivingReceipt .no-print,
+            #modalReceivingReceipt > div > div:first-child {
+                display: none !important;
+            }
+            #printableReceivingReceiptArea {
+                position: static !important;
+                left: auto !important;
+                top: auto !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                height: auto !important;
+                max-height: none !important;
                 background: white !important;
                 color: #0f172a !important;
-                padding: 4px !important;
+                padding: 0 !important;
                 margin: 0 !important;
                 box-shadow: none !important;
                 border: none !important;
                 overflow: visible !important;
-                max-height: none !important;
+                display: block !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
@@ -56,40 +110,49 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
             }
             #printableReceivingReceiptArea .sj-header {
                 border-bottom: 2px solid #0f172a !important;
-                padding-bottom: 8px !important;
-                margin-bottom: 10px !important;
+                padding-bottom: 6px !important;
+                margin-bottom: 8px !important;
             }
             #printableReceivingReceiptArea .sj-info-table {
                 width: 100% !important;
                 border-collapse: collapse !important;
                 border: 1px solid #cbd5e1 !important;
-                margin-bottom: 8px !important;
-                font-size: 8.5pt !important;
+                margin-bottom: 6px !important;
+                font-size: 8pt !important;
             }
             #printableReceivingReceiptArea .sj-info-table td {
-                padding: 4px 8px !important;
+                padding: 3px 6px !important;
                 border: 1px solid #cbd5e1 !important;
             }
             #printableReceivingReceiptArea #adminSlipPackageList {
-                display: grid !important;
-                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-                gap: 4px 8px !important;
+                display: block !important;
+                width: 100% !important;
+                height: auto !important;
                 max-height: none !important;
                 overflow: visible !important;
-                height: auto !important;
                 background-color: transparent !important;
                 border: none !important;
                 padding: 0 !important;
+                margin: 0 !important;
             }
             #printableReceivingReceiptArea #adminSlipPackageList > div {
+                display: inline-flex !important;
+                width: 49.2% !important;
+                margin-right: 1.2% !important;
+                margin-bottom: 3.5px !important;
+                vertical-align: top !important;
+                box-sizing: border-box !important;
                 break-inside: avoid !important;
                 page-break-inside: avoid !important;
                 border: 1px solid #cbd5e1 !important;
                 background-color: #f8fafc !important;
-                padding: 3px 6px !important;
-                font-size: 8pt !important;
+                padding: 2.5px 5px !important;
+                font-size: 7.5pt !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
+            }
+            #printableReceivingReceiptArea #adminSlipPackageList > div:nth-child(2n) {
+                margin-right: 0 !important;
             }
             #printableReceivingReceiptArea #adminSlipPackageList span,
             #printableReceivingReceiptArea #adminSlipPackageList div {
@@ -105,8 +168,8 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 print-color-adjust: exact !important;
                 break-inside: avoid !important;
                 page-break-inside: avoid !important;
-                padding: 6px 10px !important;
-                margin-bottom: 8px !important;
+                padding: 4px 8px !important;
+                margin-bottom: 6px !important;
             }
             #printableReceivingReceiptArea #adminSlipSackBreakdownList {
                 display: grid !important;
@@ -118,25 +181,25 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 page-break-inside: avoid !important;
                 border: 1px solid #fcd34d !important;
                 background-color: #ffffff !important;
-                padding: 3px 6px !important;
-                font-size: 8pt !important;
+                padding: 2px 5px !important;
+                font-size: 7.5pt !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
             #printableReceivingReceiptArea .total-banner {
                 background: #059669 !important;
                 color: #ffffff !important;
-                padding: 6px 12px !important;
+                padding: 5px 10px !important;
                 border-radius: 6px !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
-                margin-bottom: 8px !important;
+                margin-bottom: 6px !important;
             }
             #printableReceivingReceiptArea .signatures-box {
                 break-inside: avoid !important;
                 page-break-inside: avoid !important;
-                margin-top: 12px !important;
-                padding-top: 8px !important;
+                margin-top: 10px !important;
+                padding-top: 6px !important;
                 border-top: 1px solid #94a3b8 !important;
             }
             ::-webkit-scrollbar {
