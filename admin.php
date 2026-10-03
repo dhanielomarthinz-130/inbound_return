@@ -317,37 +317,57 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 </div>
 
                 <!-- KPI Cards Row -->
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <!-- Total Invoice -->
-                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 relative overflow-hidden group hover:shadow-md transition">
+                <!-- KPI Cards Row (5 Cards) -->
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+                    <!-- 1. Total Receiving Inbound -->
+                    <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-xs border border-emerald-200/80 relative overflow-hidden group hover:shadow-md transition">
+                        <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-emerald-50 opacity-60 group-hover:opacity-100 transition"></div>
+                        <div class="relative">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Receiving Inbound</span>
+                                <span class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                                    <i class="fa-solid fa-truck-ramp-box text-xs"></i>
+                                </span>
+                            </div>
+                            <div class="text-2xl sm:text-3xl font-black text-emerald-700 font-mono" id="kpiTotalReceivedPackages">—</div>
+                            <div class="text-[10px] text-emerald-600 mt-1 flex items-center gap-1">
+                                <b id="kpiTotalReceptions">0</b> Surat Jalan Fisik
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Total Unboxing (Invoice) -->
+                    <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-xs border border-indigo-200/80 relative overflow-hidden group hover:shadow-md transition">
                         <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-indigo-50 opacity-60 group-hover:opacity-100 transition"></div>
                         <div class="relative">
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Invoice</span>
+                                <span class="text-[10px] font-bold text-indigo-800 uppercase tracking-wider">Total Unboxing</span>
                                 <span class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                                    <i class="fa-solid fa-file-invoice text-xs"></i>
+                                    <i class="fa-solid fa-box-open text-xs"></i>
                                 </span>
                             </div>
-                            <div class="text-3xl font-black text-slate-800" id="kpiTotalInvoice">—</div>
-                            <div class="text-[10px] text-slate-400 mt-1">Sesi retur tercatat</div>
+                            <div class="text-2xl sm:text-3xl font-black text-indigo-700 font-mono" id="kpiTotalInvoice">—</div>
+                            <div class="text-[10px] text-slate-400 mt-1">Sesi unboxing retur</div>
                         </div>
                     </div>
-                    <!-- Total Unit -->
-                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 relative overflow-hidden group hover:shadow-md transition">
+
+                    <!-- 3. Total Unit Fisik (Qty) -->
+                    <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-xs border border-blue-200/80 relative overflow-hidden group hover:shadow-md transition">
                         <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-blue-50 opacity-60 group-hover:opacity-100 transition"></div>
                         <div class="relative">
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Qty</span>
+                                <span class="text-[10px] font-bold text-blue-800 uppercase tracking-wider">Total Unit Fisik</span>
                                 <span class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
                                     <i class="fa-solid fa-boxes-stacked text-xs"></i>
                                 </span>
                             </div>
-                            <div class="text-3xl font-black text-slate-800" id="kpiTotalItems">—</div>
-                            <div class="text-[10px] text-slate-400 mt-1">Total unit fisik masuk</div>
+                            <div class="text-2xl sm:text-3xl font-black text-blue-700 font-mono" id="kpiTotalItems">—</div>
+                            <div class="text-[10px] text-slate-400 mt-1">Total produk masuk</div>
                         </div>
                     </div>
-                    <!-- Kondisi Baik -->
-                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-emerald-100 relative overflow-hidden group hover:shadow-md transition">
+
+                    <!-- 4. Kondisi Baik -->
+                    <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-xs border border-emerald-100 relative overflow-hidden group hover:shadow-md transition">
                         <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-emerald-50 opacity-60 group-hover:opacity-100 transition"></div>
                         <div class="relative">
                             <div class="flex items-center justify-between mb-2">
@@ -356,12 +376,13 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                     <i class="fa-solid fa-circle-check text-xs"></i>
                                 </span>
                             </div>
-                            <div class="text-3xl font-black text-emerald-600" id="kpiTotalGood">—</div>
+                            <div class="text-2xl sm:text-3xl font-black text-emerald-600 font-mono" id="kpiTotalGood">—</div>
                             <div class="text-[10px] text-emerald-500 mt-1">Layak restock / jual</div>
                         </div>
                     </div>
-                    <!-- Kondisi Rusak -->
-                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-rose-100 relative overflow-hidden group hover:shadow-md transition">
+
+                    <!-- 5. Kondisi Rusak -->
+                    <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-xs border border-rose-200/80 relative overflow-hidden group hover:shadow-md transition col-span-2 md:col-span-1">
                         <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-rose-50 opacity-60 group-hover:opacity-100 transition"></div>
                         <div class="relative">
                             <div class="flex items-center justify-between mb-2">
@@ -370,35 +391,95 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                     <i class="fa-solid fa-triangle-exclamation text-xs"></i>
                                 </span>
                             </div>
-                            <div class="text-3xl font-black text-rose-600" id="kpiTotalDamaged">—</div>
-                            <div class="text-[10px] text-rose-500 mt-1">Cacat / retur vendor</div>
+                            <div class="text-2xl sm:text-3xl font-black text-rose-600 font-mono" id="kpiTotalDamaged">—</div>
+                            <div class="text-[10px] text-rose-500 mt-1">Cacat / layak klaim</div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Middle Row: Charts -->
-                <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
-                    <!-- Donut Rasio -->
-                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 lg:col-span-1 flex flex-col">
-                        <h4 class="font-bold text-sm text-slate-700 mb-3 flex items-center gap-2">
-                            <i class="fa-solid fa-chart-pie text-indigo-500 text-xs"></i> Rasio Kondisi
-                        </h4>
-                        <div class="flex-1 relative min-h-[180px]">
+                <!-- Middle Row: Charts (Ekspedisi + Rasio + Trend) -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                    <!-- Chart 1: Total Paket per Ekspedisi -->
+                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 lg:col-span-5 flex flex-col">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="font-bold text-sm text-slate-800 flex items-center gap-2">
+                                <i class="fa-solid fa-truck-fast text-blue-600 text-xs"></i> Total Paket per Ekspedisi
+                            </h4>
+                            <span class="text-[10px] text-slate-400 font-mono">Receiving & Unboxing</span>
+                        </div>
+                        <div class="flex-1 relative min-h-[220px]">
+                            <canvas id="expeditionChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Chart 2: Donut Rasio Kondisi -->
+                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 lg:col-span-3 flex flex-col">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="font-bold text-sm text-slate-800 flex items-center gap-2">
+                                <i class="fa-solid fa-chart-pie text-emerald-500 text-xs"></i> Rasio Kondisi
+                            </h4>
+                            <span class="text-[10px] text-slate-400 font-mono">Restock vs Rusak</span>
+                        </div>
+                        <div class="flex-1 relative min-h-[220px]">
                             <canvas id="ratioChart"></canvas>
                         </div>
                     </div>
-                    <!-- Trend 7 hari -->
+
+                    <!-- Chart 3: Trend 7 Hari Terakhir -->
                     <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 lg:col-span-4 flex flex-col">
-                        <h4 class="font-bold text-sm text-slate-700 mb-3 flex items-center gap-2">
-                            <i class="fa-solid fa-chart-area text-indigo-500 text-xs"></i> Trend Volume Retur 7 Hari Terakhir
-                        </h4>
-                        <div class="flex-1 relative min-h-[170px]">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="font-bold text-sm text-slate-800 flex items-center gap-2">
+                                <i class="fa-solid fa-chart-area text-indigo-500 text-xs"></i> Trend Volume 7 Hari
+                            </h4>
+                            <span class="text-[10px] text-slate-400 font-mono">Daily Inflow</span>
+                        </div>
+                        <div class="flex-1 relative min-h-[220px]">
                             <canvas id="trendChart"></canvas>
                         </div>
                     </div>
                 </div>
 
-                <!-- Bottom Row: Expedition Tables -->
+                <!-- Row 3: Produktivitas Petugas Inbound (PIC Receiving & Unboxing) -->
+                <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+                    <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 bg-slate-50/70">
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-sm">
+                                <i class="fa-solid fa-users-gear"></i>
+                            </span>
+                            <div>
+                                <h4 class="font-bold text-sm text-slate-800">Produktivitas Petugas Inbound (PIC Receiving & Unboxing)</h4>
+                                <p class="text-[11px] text-slate-500">Jumlah paket yang diproses di serah terima (Receiving) dan stasiun unboxing per PIC</p>
+                            </div>
+                        </div>
+                        <span class="text-[11px] bg-white border border-slate-200 text-slate-600 px-2.5 py-1 rounded-lg font-semibold shadow-2xs">
+                            <i class="fa-regular fa-clock text-amber-500 mr-1"></i> Data Realtime Periode Aktif
+                        </span>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs text-left">
+                            <thead class="bg-slate-50 text-slate-600 uppercase font-bold text-[10px] border-b border-slate-200">
+                                <tr>
+                                    <th class="py-3 px-4 w-12 text-center">#</th>
+                                    <th class="py-3 px-4">Nama Petugas / PIC</th>
+                                    <th class="py-3 px-4 text-center">Receiving (Serah Terima)</th>
+                                    <th class="py-3 px-4 text-center">Inbound Unboxing</th>
+                                    <th class="py-3 px-4 text-right">Total Paket Diproses</th>
+                                    <th class="py-3 px-4 text-center">Status / Kontribusi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dashPicTableBody" class="divide-y divide-slate-100 font-medium">
+                                <tr>
+                                    <td colspan="6" class="p-8 text-center text-slate-400">
+                                        <i class="fa-solid fa-spinner fa-spin mr-2 text-indigo-600"></i> Memuat data produktivitas PIC...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Row 4: Expedition Tables -->
                 <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
                     <!-- Total Qty per Ekspedisi -->
                     <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
@@ -422,7 +503,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                     </tr>
                                 </thead>
                                 <tbody id="dashExpeditionTableBody" class="divide-y divide-slate-100">
-                                    <tr><td colspan="5" class="p-6 text-center text-slate-400">Memuat data...</td></tr>
+                                    <tr><td colspan="5" class="p-6 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2 text-indigo-600"></i>Memuat data...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -437,7 +518,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             <h4 class="font-bold text-sm text-slate-800">Kondisi per Ekspedisi</h4>
                         </div>
                         <div id="dashConditionContainer" class="divide-y divide-slate-100 max-h-[340px] overflow-y-auto">
-                            <div class="p-6 text-center text-slate-400 text-xs">Memuat data...</div>
+                            <div class="p-6 text-center text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-2 text-indigo-600"></i>Memuat data...</div>
                         </div>
                     </div>
                 </div>
@@ -998,7 +1079,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             </select>
 
                             <!-- Filter Tanggal Unboxing -->
-                            <input type="date" id="filterClaimDate" onchange="applyClaimCandidatesFilter()" 
+                            <input type="date" id="filterClaimDate" value="<?= date('Y-m-d') ?>" onchange="applyClaimCandidatesFilter()" 
                                 class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:ring-2 focus:ring-amber-500 focus:outline-none transition shadow-2xs"
                                 title="Filter Tanggal Unboxing">
 
@@ -1117,7 +1198,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             <!-- Filter Periode Tanggal -->
                             <select id="orderDateFilter" onchange="onOrderDateFilterChanged()" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs shrink-0">
                                 <option value="">Semua Periode</option>
-                                <option value="today">Hari Ini</option>
+                                <option value="today" selected>Hari Ini</option>
                                 <option value="yesterday">Hari Kemarin</option>
                                 <option value="last7">7 Hari Terakhir</option>
                                 <option value="last30">30 Hari Terakhir</option>

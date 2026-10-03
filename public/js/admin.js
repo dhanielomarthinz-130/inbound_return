@@ -10,13 +10,25 @@ function escapeHtml(str) {
 }
 window.escapeHtml = escapeHtml;
 
+// Helper Tanggal Sekarang (YYYY-MM-DD)
+function getTodayYMD() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+}
+
 // State Management & Instances
 let ratioChartInstance = null;
+let trendChartInstance = null;
+let expeditionChartInstance = null;
 let currentTab = 'dashboard';
 let cachedProducts = [];
-let activeInboundDateFilter = '';
-let activeDashboardDateFilter = '';
-let activeDateFilter = ''; // alias mundur untuk kompatibilitas
+let activeInboundDateFilter = getTodayYMD();
+let activeDashboardDateFilter = getTodayYMD();
+let activeReceivingDateFilter = getTodayYMD();
+let activeDateFilter = getTodayYMD(); // alias mundur untuk kompatibilitas
 let flatpickrTransactionsInstance = null;
 let flatpickrDashboardInstance = null;
 
@@ -225,6 +237,29 @@ window.switchTab = function(tabName, updateUrl = true) {
 
 // 1. Load Metrics KPI (Refresh di backend via cache atau query)
 async function loadMetrics(forceRefresh = false) {
+    const elRecPkg = document.getElementById('kpiTotalReceivedPackages');
+    const elRecSess = document.getElementById('kpiTotalReceptions');
+    const elInv = document.getElementById('kpiTotalInvoice');
+    const elItems = document.getElementById('kpiTotalItems');
+    const elGood = document.getElementById('kpiTotalGood');
+    const elDamaged = document.getElementById('kpiTotalDamaged');
+    const picTbody = document.getElementById('dashPicTableBody');
+    const expTbody = document.getElementById('dashExpeditionTableBody');
+
+    // Tampilkan spinner loading pada KPI & tabel saat proses fetch
+    if (elRecPkg) elRecPkg.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-base text-emerald-400"></i>';
+    if (elInv) elInv.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-base text-indigo-400"></i>';
+    if (elItems) elItems.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-base text-blue-400"></i>';
+    if (elGood) elGood.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-base text-emerald-400"></i>';
+    if (elDamaged) elDamaged.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-base text-rose-400"></i>';
+
+    if (picTbody) {
+        picTbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-2 text-indigo-600 text-base"></i>Memuat produktivitas petugas inbound...</td></tr>`;
+    }
+    if (expTbody) {
+        expTbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-2 text-indigo-600 text-base"></i>Memuat statistik ekspedisi...</td></tr>`;
+    }
+
     try {
         let url = 'api/admin/metrics';
         const qParams = [];
@@ -240,21 +275,25 @@ async function loadMetrics(forceRefresh = false) {
         const res = await fetch(url);
         const data = await res.json();
 
-        document.getElementById('kpiTotalInvoice').innerText = (data.total_invoices ?? 0).toLocaleString('id-ID');
-        document.getElementById('kpiTotalItems').innerText   = (data.total_items    ?? 0).toLocaleString('id-ID');
-        document.getElementById('kpiTotalGood').innerText    = (data.total_good     ?? 0).toLocaleString('id-ID');
-        document.getElementById('kpiTotalDamaged').innerText = (data.total_damaged  ?? 0).toLocaleString('id-ID');
+        if (elRecPkg) elRecPkg.innerText = (data.total_received_packages ?? 0).toLocaleString('id-ID');
+        if (elRecSess) elRecSess.innerText = (data.total_receptions ?? 0).toLocaleString('id-ID');
+        if (elInv) elInv.innerText = (data.total_invoices ?? 0).toLocaleString('id-ID');
+        if (elItems) elItems.innerText = (data.total_items ?? 0).toLocaleString('id-ID');
+        if (elGood) elGood.innerText = (data.total_good ?? 0).toLocaleString('id-ID');
+        if (elDamaged) elDamaged.innerText = (data.total_damaged ?? 0).toLocaleString('id-ID');
 
         renderRatioChart(data.total_good || 0, data.total_damaged || 0);
         renderTrendChart(data.trend_7days || []);
+        renderExpeditionChart(data.by_expedition || []);
         renderDashExpeditionTable(data.by_expedition || []);
+        renderDashPicTable(data.pic_stats || []);
         renderDashConditionBreakdown(data.by_condition || {});
     } catch (err) {
         console.error("Gagal memuat metrics:", err);
+        if (picTbody) picTbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-rose-500 text-xs font-semibold">Gagal memuat data petugas: ${err.message}</td></tr>`;
+        if (expTbody) expTbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-rose-500 text-xs font-semibold">Gagal memuat data ekspedisi: ${err.message}</td></tr>`;
     }
 }
-
-let trendChartInstance = null;
 
 function renderRatioChart(good, damaged) {
     const canvas = document.getElementById('ratioChart');
@@ -293,6 +332,154 @@ function renderTrendChart(trend) {
             plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ` ${ctx.raw.toLocaleString('id-ID')} pcs` } } },
             scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } }, y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 }, precision: 0 }, beginAtZero: true } }
         }
+    });
+}
+
+// Visualisasi Chart per Ekspedisi Total Paket (Receiving Fisik vs Unboxing Terproses)
+function renderExpeditionChart(list) {
+    const canvas = document.getElementById('expeditionChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (expeditionChartInstance) {
+        expeditionChartInstance.destroy();
+        expeditionChartInstance = null;
+    }
+
+    if (!list || list.length === 0) {
+        return;
+    }
+
+    const labels = list.map(item => item.expedition || 'Lainnya');
+    const recData = list.map(item => parseInt(item.receiving_packages || 0));
+    const unboxData = list.map(item => parseInt(item.unboxing_packages || 0));
+
+    expeditionChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Receiving (Fisik Masuk)',
+                    data: recData,
+                    backgroundColor: 'rgba(99, 102, 241, 0.85)',
+                    borderRadius: 6,
+                    borderSkipped: false
+                },
+                {
+                    label: 'Unboxing (Terproses)',
+                    data: unboxData,
+                    backgroundColor: 'rgba(16, 185, 129, 0.85)',
+                    borderRadius: 6,
+                    borderSkipped: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    align: 'end',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 10,
+                        font: { size: 11, weight: 'bold' }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw.toLocaleString('id-ID')} paket`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { font: { size: 11, weight: '600' } }
+                },
+                y: {
+                    grid: { color: '#f1f5f9' },
+                    ticks: { font: { size: 10 }, precision: 0 },
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+// Tabel Produktivitas Petugas Inbound (PIC Receiving vs Unboxing)
+function renderDashPicTable(list) {
+    const tbody = document.getElementById('dashPicTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!list || list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400 text-xs">
+            <i class="fa-solid fa-users-slash text-2xl text-slate-300 mb-2 block"></i>
+            Tidak ada riwayat aktivitas petugas inbound pada periode tanggal ini.
+        </td></tr>`;
+        return;
+    }
+
+    const sorted = [...list].sort((a, b) => (b.total_processed || 0) - (a.total_processed || 0));
+    const totalAll = sorted.reduce((sum, item) => sum + (item.total_processed || 0), 0) || 1;
+
+    const rankBadges = [
+        '<span class="w-5 h-5 rounded-full bg-amber-100 text-amber-700 font-bold text-[10px] inline-flex items-center justify-center border border-amber-300">1</span>',
+        '<span class="w-5 h-5 rounded-full bg-slate-200 text-slate-700 font-bold text-[10px] inline-flex items-center justify-center border border-slate-300">2</span>',
+        '<span class="w-5 h-5 rounded-full bg-amber-700/10 text-amber-800 font-bold text-[10px] inline-flex items-center justify-center border border-amber-600/30">3</span>'
+    ];
+
+    sorted.forEach((pic, i) => {
+        const badge = rankBadges[i] || `<span class="w-5 h-5 rounded-full bg-slate-100 text-slate-500 font-bold text-[10px] inline-flex items-center justify-center">${i + 1}</span>`;
+        const pct = Math.round(((pic.total_processed || 0) / totalAll) * 100);
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 border-b border-slate-100 transition';
+        tr.innerHTML = `
+            <td class="py-3 px-4 text-center">${badge}</td>
+            <td class="py-3 px-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-indigo-700 text-white font-black text-xs flex items-center justify-center uppercase shadow-2xs">
+                        ${escapeHtml((pic.pic_name || 'U').charAt(0))}
+                    </div>
+                    <div>
+                        <div class="font-bold text-xs text-slate-800">${escapeHtml(pic.pic_name)}</div>
+                        <div class="text-[10px] text-slate-400">Petugas Gudang / Inbound</div>
+                    </div>
+                </div>
+            </td>
+            <td class="py-3 px-4 text-center">
+                <div class="inline-flex flex-col items-center">
+                    <span class="font-extrabold text-xs text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-lg">
+                        ${(pic.receiving_packages || 0).toLocaleString('id-ID')} <span class="text-[10px] font-normal text-slate-500">paket</span>
+                    </span>
+                    <span class="text-[10px] text-slate-400 mt-0.5">${(pic.receiving_sessions || 0).toLocaleString('id-ID')} surat jalan</span>
+                </div>
+            </td>
+            <td class="py-3 px-4 text-center">
+                <div class="inline-flex flex-col items-center">
+                    <span class="font-extrabold text-xs text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-lg">
+                        ${(pic.unboxing_packages || 0).toLocaleString('id-ID')} <span class="text-[10px] font-normal text-slate-500">paket</span>
+                    </span>
+                    <span class="text-[10px] text-slate-400 mt-0.5">${(pic.unboxing_items || 0).toLocaleString('id-ID')} unit fisik</span>
+                </div>
+            </td>
+            <td class="py-3 px-4 text-right">
+                <span class="font-black text-sm text-slate-900">${(pic.total_processed || 0).toLocaleString('id-ID')}</span>
+                <span class="text-[10px] text-slate-400 block font-medium">total paket</span>
+            </td>
+            <td class="py-3 px-4 w-36">
+                <div class="flex items-center gap-2">
+                    <div class="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div class="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 rounded-full" style="width:${pct}%"></div>
+                    </div>
+                    <span class="text-[11px] font-bold text-slate-600 w-8 text-right">${pct}%</span>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
     });
 }
 
@@ -426,6 +613,7 @@ function initFlatpickr() {
         flatpickrTransactionsInstance = flatpickr(el, {
             mode: 'range',
             dateFormat: 'Y-m-d',
+            defaultDate: activeInboundDateFilter || getTodayYMD(),
             altInput: true,
             altFormat: 'j M Y',
             altInputClass: 'bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs transition w-56 sm:w-64 cursor-pointer',
@@ -438,6 +626,7 @@ function initFlatpickr() {
                 loadTransactions();
             }
         });
+        updateInboundDateUI();
     }
 
     // 2. Dashboard (Hanya mengontrol metrik Dashboard - Bebas dari Inbound)
@@ -447,6 +636,7 @@ function initFlatpickr() {
         flatpickrDashboardInstance = flatpickr(dbEl, {
             mode: 'range',
             dateFormat: 'Y-m-d',
+            defaultDate: activeDashboardDateFilter || getTodayYMD(),
             altInput: true,
             altFormat: 'j M Y',
             altInputClass: 'bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs transition w-full sm:w-64 cursor-pointer',
@@ -459,6 +649,7 @@ function initFlatpickr() {
                 loadMetrics();
             }
         });
+        updateDashboardDateUI();
     }
 }
 
@@ -512,6 +703,16 @@ window.refreshDashboardMetrics = async function() {
 
 // 2. Load Transaksi (Full & Preview)
 async function loadTransactions() {
+    const tbody = document.getElementById('transactionsTableBody');
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="12" class="py-12 text-center text-slate-400">
+            <div class="inline-flex items-center gap-2.5 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                <i class="fa-solid fa-spinner fa-spin text-lg"></i>
+                <span class="text-xs font-semibold">Memuat data unboxing paket...</span>
+            </div>
+        </td></tr>`;
+    }
+
     const searchInput = document.getElementById('filterSearch');
     const search = searchInput ? searchInput.value.trim() : '';
     const date = activeInboundDateFilter;
@@ -535,7 +736,6 @@ async function loadTransactions() {
         populateTransactionFilterDropdowns(cachedTransactions);
         
         // Render di tabel transaksi penuh (Tab Inbound Unboxing)
-        const tbody = document.getElementById('transactionsTableBody');
         if (tbody) {
             tbody.innerHTML = '';
             if (!rows || rows.length === 0) {
@@ -546,6 +746,9 @@ async function loadTransactions() {
         }
     } catch (err) {
         console.error("Gagal load transaksi:", err);
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="12" class="text-center py-8 text-rose-500 font-semibold">Gagal memuat transaksi: ${err.message}</td></tr>`;
+        }
     }
 }
 
@@ -962,6 +1165,11 @@ window.closeDetailModal = function() {
 
 // 3. Load Master Produk
 async function loadProducts() {
+    const quickTbody = document.getElementById('quickProductsTableBody');
+    const fullTbody = document.getElementById('fullProductsTableBody');
+    if (quickTbody) quickTbody.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1.5 text-indigo-500"></i>Memuat produk...</td></tr>`;
+    if (fullTbody) fullTbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1.5 text-indigo-500 text-base"></i>Memuat master data produk...</td></tr>`;
+
     try {
         const res = await fetch('api/products.php');
         cachedProducts = await res.json();
@@ -1410,12 +1618,16 @@ window.exportExpeditionsExcel = async function() {
 let cachedExpeditions = [];
 
 async function loadExpeditions() {
+    const tbody = document.getElementById('fullExpeditionsTableBody');
+    if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1.5 text-indigo-500 text-base"></i>Memuat daftar ekspedisi...</td></tr>`;
+
     try {
         const res = await fetch('api/expeditions.php');
         cachedExpeditions = await res.json();
         renderExpeditionsTable(cachedExpeditions);
     } catch (err) {
         console.error("Gagal load ekspedisi:", err);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-rose-500 font-semibold">Gagal memuat ekspedisi: ${err.message}</td></tr>`;
     }
 }
 
@@ -1585,6 +1797,9 @@ window.refreshAllData = function() {
 let cachedUsers = [];
 
 async function loadUsers() {
+    const tbody = document.getElementById('fullUsersTableBody');
+    if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center py-10 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1.5 text-indigo-500 text-base"></i>Memuat daftar pengguna...</td></tr>`;
+
     try {
         const res = await fetch('api/users.php');
         if (res.status === 401) {
@@ -1595,6 +1810,7 @@ async function loadUsers() {
         renderUsersTable(cachedUsers);
     } catch (err) {
         console.error("Gagal load users:", err);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-rose-500 font-semibold">Gagal memuat pengguna: ${err.message}</td></tr>`;
     }
 }
 
@@ -1912,6 +2128,21 @@ function initFromUrlParams() {
                 }
             }
             updateInboundDateUI();
+        } else if (targetTab === 'receiving') {
+            activeReceivingDateFilter = dateParam;
+            if (flatpickrReceivingInstance) {
+                if (dateParam.includes(' to ')) {
+                    const p = dateParam.split(' to ');
+                    flatpickrReceivingInstance.setDate([p[0], p[1]], false);
+                } else {
+                    flatpickrReceivingInstance.setDate(dateParam, false);
+                }
+            }
+            const btnClearRec = document.getElementById('btnClearReceivingDate');
+            if (btnClearRec) btnClearRec.classList.remove('hidden');
+        } else if (targetTab === 'claims') {
+            const claimInput = document.getElementById('filterClaimDate');
+            if (claimInput) claimInput.value = dateParam;
         } else {
             activeDashboardDateFilter = dateParam;
             if (flatpickrDashboardInstance) {
@@ -1923,6 +2154,20 @@ function initFromUrlParams() {
                 }
             }
             updateDashboardDateUI();
+        }
+    } else {
+        // Default filter tanggal hari ini jika tidak dispesifikasikan di URL
+        const todayStr = getTodayYMD();
+        if (!activeDashboardDateFilter) activeDashboardDateFilter = todayStr;
+        if (!activeInboundDateFilter) activeInboundDateFilter = todayStr;
+        if (!activeReceivingDateFilter) activeReceivingDateFilter = todayStr;
+
+        const claimInput = document.getElementById('filterClaimDate');
+        if (claimInput && !claimInput.value) claimInput.value = todayStr;
+
+        const orderDateSelect = document.getElementById('orderDateFilter');
+        if (orderDateSelect && (!orderDateSelect.value || orderDateSelect.value === 'ALL')) {
+            orderDateSelect.value = 'today';
         }
     }
 
@@ -1971,6 +2216,7 @@ window.addEventListener('popstate', () => {
 // Initial Load & Event Listeners
 window.addEventListener('DOMContentLoaded', () => {
     initFlatpickr();
+    initReceivingDatepicker();
     initFromUrlParams();
     refreshAllData();
 
@@ -2022,14 +2268,16 @@ const CONDITION_COLOR_MAP = {
 };
 
 async function loadConditions() {
+    const tbody = document.getElementById('fullConditionsTableBody');
+    if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1.5 text-indigo-500 text-base"></i>Memuat kriteria kondisi...</td></tr>`;
+
     try {
         const res = await fetch('api/conditions.php');
         allConditions = await res.json();
         renderConditionsTable(allConditions);
         populateFilterConditionSelect(allConditions);
     } catch (e) {
-        const tbody = document.getElementById('fullConditionsTableBody');
-        if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-red-400">Gagal memuat data kondisi: ${e.message}</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-rose-500 font-semibold">Gagal memuat data kondisi: ${e.message}</td></tr>`;
     }
 }
 
@@ -2198,7 +2446,6 @@ async function deleteCondition(id, code, name) {
 // RECEIVING INBOUND MANAGEMENT (ADMIN)
 // ==========================================
 let flatpickrReceivingInstance = null;
-let activeReceivingDateFilter = '';
 let cachedReceivingData = [];
 let receivingSearchDebounceTimer = null;
 
@@ -2211,6 +2458,7 @@ function initReceivingDatepicker() {
     flatpickrReceivingInstance = flatpickr(el, {
         mode: "range",
         dateFormat: "Y-m-d",
+        defaultDate: activeReceivingDateFilter || getTodayYMD(),
         altInput: true,
         altFormat: "j F Y",
         locale: "id",
@@ -2238,6 +2486,11 @@ function initReceivingDatepicker() {
             }
         }
     });
+
+    const btnClear = document.getElementById('btnClearReceivingDate');
+    if (btnClear && activeReceivingDateFilter) {
+        btnClear.classList.remove('hidden');
+    }
 
     // Pasang listener search box dengan debounce
     const searchInput = document.getElementById('searchReceivingInput');
@@ -3541,6 +3794,12 @@ window.loadClaimCandidates = async function(force = false) {
     if (!tbody) return;
 
     if (refreshIcon) refreshIcon.classList.add('fa-spin');
+    tbody.innerHTML = `<tr><td colspan="10" class="py-12 text-center text-slate-400">
+        <div class="inline-flex items-center gap-2.5 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl">
+            <i class="fa-solid fa-spinner fa-spin text-lg"></i>
+            <span class="text-xs font-semibold">Memuat kandidat paket klaim...</span>
+        </div>
+    </td></tr>`;
 
     try {
         const res = await fetch('api/ocs_lookup.php?action=list_claimable');
