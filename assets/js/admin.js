@@ -915,13 +915,56 @@ function createTransactionRow(r, isPreview = false) {
         <td class="p-3 text-center whitespace-nowrap">${typeBadge}</td>
         <td class="p-3 text-center whitespace-nowrap">${videoActionsHtml}</td>
         <td class="p-3 text-center whitespace-nowrap">
-            <button type="button" onclick="viewDetails(${r.session_id || r.id}, '${escapeHtml(condCode)}')" title="Lihat Rincian Sesi Invoice & Foto Sesuai Kondisi" class="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-2.5 py-1.5 rounded-xl font-semibold text-[11px] transition inline-flex items-center gap-1 shadow-2xs">
-                <i class="fa-solid fa-list-check text-slate-500"></i> Detail
-            </button>
+            <div class="flex items-center justify-center gap-1.5">
+                <button type="button" onclick="viewDetails(${r.session_id || r.id}, '${escapeHtml(condCode)}')" title="Lihat Detail Transaksi Unboxing" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 border border-slate-200 flex items-center justify-center transition shadow-2xs cursor-pointer">
+                    <i class="fa-solid fa-eye text-xs"></i>
+                </button>
+                <button type="button" onclick="deleteUnboxingTransaction(${r.session_id || r.id}, '${escapeHtml(r.invoice_number || '')}')" title="Hapus Data Unboxing" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 border border-slate-200 flex items-center justify-center transition shadow-2xs cursor-pointer">
+                    <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+            </div>
         </td>
     `;
     return tr;
 }
+
+// Handler Hapus Transaksi Unboxing
+window.deleteUnboxingTransaction = async function(sessionId, invoiceNumber) {
+    if (!sessionId) return;
+    const invText = invoiceNumber ? `[${invoiceNumber}]` : 'ini';
+    
+    if (!confirm(`Apakah Anda yakin ingin menghapus data unboxing invoice ${invText}?\n\nSemua data produk, foto bukti, dan rekaman video unboxing terkait akan dihapus secara permanen.`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`api/returns.php?action=delete&id=${sessionId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: sessionId })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast('success', data.message || `Data transaksi unboxing ${invText} berhasil dihapus!`, 'Berhasil Dihapus');
+            if (typeof loadTransactions === 'function') loadTransactions();
+            if (typeof loadDashboardMetrics === 'function') loadDashboardMetrics();
+            const modal = document.getElementById('transactionDetailModal');
+            if (modal && !modal.classList.contains('hidden')) {
+                closeDetailModal();
+            }
+        } else {
+            showToast('error', data.error || 'Gagal menghapus data transaksi unboxing', 'Gagal Hapus');
+        }
+    } catch (err) {
+        showToast('error', 'Terjadi kesalahan koneksi: ' + err.message, 'Koneksi Terputus');
+    }
+};
+
+window.deleteCurrentModalSession = function() {
+    if (currentModalSessionId) {
+        deleteUnboxingTransaction(currentModalSessionId, currentModalInvoice);
+    }
+};
 
 // 2b. Putar Video Unboxing Langsung (Play Video Action)
 window.playTransactionVideo = async function(id) {
@@ -940,6 +983,9 @@ window.playTransactionVideo = async function(id) {
     }
 };
 
+let currentModalSessionId = null;
+let currentModalInvoice = '';
+
 // 2b. View Details & Video Player Modal Sesuai Tipe Kondisi
 window.viewDetails = async function(id, focusCondition) {
     const r = cachedTransactions.find(t => (t.session_id && t.session_id == id) || t.id == id);
@@ -949,6 +995,8 @@ window.viewDetails = async function(id, focusCondition) {
     if (!modal) return;
 
     const targetSessionId = r.session_id || r.id;
+    currentModalSessionId = targetSessionId;
+    currentModalInvoice = r.invoice_number || '';
     const condCode = (focusCondition || r.raw_type || r.condition_type || 'GOOD').toUpperCase();
 
     const initCond = (focusCondition || r.raw_type || r.condition_type || '').toUpperCase().trim();

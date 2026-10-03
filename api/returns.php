@@ -1,6 +1,85 @@
 <?php
 require_once __DIR__ . '/../config.php';
 
+$method = $_SERVER['REQUEST_METHOD'];
+
+// Handle DELETE: Hapus Transaksi Sesi Unboxing
+if ($method === 'DELETE' || ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'delete')) {
+    $sessionUser = getSessionUser();
+    if (!in_array($sessionUser['role'] ?? '', ['admin', 'superadmin'])) {
+        jsonResponse(['error' => 'Akses ditolak. Hanya Admin yang dapat menghapus data transaksi unboxing.'], 403);
+    }
+
+    $id = intval($_GET['id'] ?? ($_POST['id'] ?? 0));
+    if ($id <= 0) {
+        $raw = file_get_contents('php://input');
+        $parsed = json_decode($raw, true);
+        $id = intval($parsed['id'] ?? 0);
+    }
+
+    if ($id <= 0) {
+        jsonResponse(['error' => 'ID Sesi Unboxing tidak valid'], 400);
+    }
+
+    try {
+        // Ambil data sesi untuk hapus file video & foto
+        $stmtS = $pdo->prepare("SELECT video_path, package_photo, product_photo, photos FROM return_sessions WHERE id = ?");
+        $stmtS->execute([$id]);
+        $s = $stmtS->fetch(PDO::FETCH_ASSOC);
+
+        if ($s) {
+            $filesToDelete = [];
+            if (!empty($s['video_path'])) $filesToDelete[] = $s['video_path'];
+            if (!empty($s['package_photo'])) $filesToDelete[] = $s['package_photo'];
+            if (!empty($s['product_photo'])) $filesToDelete[] = $s['product_photo'];
+            if (!empty($s['photos'])) {
+                $dec = json_decode($s['photos'], true);
+                if (is_array($dec)) {
+                    foreach ($dec as $dp) {
+                        $pPath = is_array($dp) ? ($dp['path'] ?? '') : $dp;
+                        if (!empty($pPath)) $filesToDelete[] = $pPath;
+                    }
+                }
+            }
+
+            // Foto item
+            $stmtItemPhotos = $pdo->prepare("SELECT photo_path FROM return_items WHERE session_id = ?");
+            $stmtItemPhotos->execute([$id]);
+            $itemPhotos = $stmtItemPhotos->fetchAll(PDO::FETCH_COLUMN);
+            foreach ($itemPhotos as $ip) {
+                if (!empty($ip)) $filesToDelete[] = $ip;
+            }
+
+            // Hapus fisik file
+            $uploadsDir = realpath(__DIR__ . '/../uploads');
+            foreach (array_unique($filesToDelete) as $relPath) {
+                $absPath = realpath(__DIR__ . '/../' . ltrim($relPath, '/'));
+                if ($absPath && file_exists($absPath) && is_file($absPath)) {
+                    if ($uploadsDir && strpos($absPath, $uploadsDir) === 0) {
+                        @unlink($absPath);
+                    }
+                }
+            }
+
+            // Hapus items & sessions
+            $pdo->prepare("DELETE FROM return_items WHERE session_id = ?")->execute([$id]);
+            $pdo->prepare("DELETE FROM return_sessions WHERE id = ?")->execute([$id]);
+
+            // Bersihkan cache dashboard
+            $cacheDir = __DIR__ . '/../uploads/cache/';
+            if (is_dir($cacheDir)) {
+                @array_map('unlink', glob($cacheDir . '*.json'));
+            }
+
+            jsonResponse(['success' => true, 'message' => 'Data transaksi unboxing berhasil dihapus']);
+        } else {
+            jsonResponse(['error' => 'Data transaksi tidak ditemukan'], 404);
+        }
+    } catch (Exception $e) {
+        jsonResponse(['error' => 'Gagal menghapus: ' . $e->getMessage()], 500);
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonResponse(['error' => 'Metode tidak diizinkan'], 405);
 }

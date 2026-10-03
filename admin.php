@@ -2013,8 +2013,11 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
             </div>
 
             <!-- Modal Footer -->
-            <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex justify-end">
-                <button type="button" onclick="closeDetailModal()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2 rounded-xl text-xs font-semibold transition">
+            <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+                <button type="button" onclick="deleteCurrentModalSession()" class="text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-300 px-3.5 py-2 rounded-xl text-xs font-semibold transition inline-flex items-center gap-1.5 shadow-2xs cursor-pointer">
+                    <i class="fa-solid fa-trash-can"></i> Hapus Sesi
+                </button>
+                <button type="button" onclick="closeDetailModal()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer">
                     Tutup
                 </button>
             </div>
