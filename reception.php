@@ -742,7 +742,7 @@ try {
                         <img src="assets/image/logo-IEG.png" alt="Logo IEG" class="h-14 w-auto object-contain shrink-0">
                         <div>
                             <h2 class="font-black text-sm sm:text-base tracking-tight text-slate-900 leading-tight">IEG Inovasi Eka Gemilang</h2>
-                            <p class="text-[10px] text-slate-600 font-bold uppercase tracking-wider">Warehouse Return &amp; Dispute Logistics Center</p>
+                            <p class="text-[10px] text-slate-600 font-bold uppercase tracking-wider">Warehouse Return &amp; Dispute</p>
                             <p class="text-[9px] text-slate-400">Inbound Reception Department • Tanda Terima Fisik Barang Retur</p>
                         </div>
                     </div>

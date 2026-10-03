@@ -101,7 +101,7 @@ $query = trim($_GET['q'] ?? $_GET['query'] ?? $_GET['order_id'] ?? $_GET['tracki
                     <img src="assets/image/logo-IEG.png" alt="Logo IEG" class="h-16 w-auto object-contain shrink-0">
                     <div>
                         <h1 class="font-black text-lg sm:text-xl text-slate-900 tracking-tight leading-tight">IEG Inovasi Eka Gemilang</h1>
-                        <p class="text-xs font-bold text-slate-600 uppercase tracking-wider">Warehouse Return &amp; Dispute Logistics Center</p>
+                        <p class="text-xs font-bold text-slate-600 uppercase tracking-wider">Warehouse Return &amp; Dispute</p>
                         <p class="text-[11px] text-slate-400">Divisi Penyelesaian Klaim &amp; Banding Asuransi Ekspedisi / Marketplace</p>
                     </div>
                 </div>

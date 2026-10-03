@@ -1913,7 +1913,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                         <img src="assets/image/logo-IEG.png" alt="Logo IEG" class="h-14 w-auto object-contain shrink-0">
                         <div>
                             <h2 class="font-black text-sm sm:text-base tracking-tight text-slate-900 leading-tight">IEG Inovasi Eka Gemilang</h2>
-                            <p class="text-[10px] text-slate-600 font-bold uppercase tracking-wider">Warehouse Return &amp; Dispute Logistics Center</p>
+                            <p class="text-[10px] text-slate-600 font-bold uppercase tracking-wider">Warehouse Return &amp; Dispute</p>
                             <p class="text-[9px] text-slate-400">Inbound Reception Department • Tanda Terima Fisik Barang Retur</p>
                         </div>
                     </div>
@@ -2057,14 +2057,14 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
             </div>
 
             <!-- Reception Summary Card -->
-            <div class="p-4 bg-slate-50 border-b border-slate-200/80 shrink-0">
+            <div class="p-4 bg-slate-50 border-b border-slate-200/80 shrink-0 space-y-3">
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
                     <div class="bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs">
                         <span class="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">No. Tanda Terima</span>
                         <div class="font-mono font-black text-emerald-700 text-xs truncate" id="pkgModalReceiptNo">-</div>
                     </div>
                     <div class="bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs">
-                        <span class="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Ekspedisi &amp; Kurir</span>
+                        <span class="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Ekspedisi</span>
                         <div class="font-bold text-slate-800 text-xs truncate" id="pkgModalExpeditionCourier">-</div>
                     </div>
                     <div class="bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs">
@@ -2080,12 +2080,46 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                     </div>
                 </div>
 
-                <!-- Foto Kurir (Jika Tersedia) -->
-                <div id="pkgModalCourierPhotoSection" class="hidden mt-2.5 bg-white p-2 rounded-xl border border-slate-200 flex items-center gap-3 shadow-2xs">
-                    <img id="pkgModalCourierImg" src="" alt="Foto Kurir" class="w-10 h-10 rounded-lg object-cover border border-slate-200 cursor-pointer hover:scale-105 transition shrink-0" onclick="openClaimPhotoModal(this.src, 'Foto Kurir Serah Terima')">
-                    <div class="min-w-0 text-xs">
-                        <span class="text-[9px] uppercase font-bold text-slate-400 block">Identitas Driver / Kurir Terverifikasi:</span>
-                        <span id="pkgModalCourierText" class="font-bold text-slate-800 text-xs truncate block">-</span>
+                <!-- Identitas Kurir & PIC Petugas Penerima Gudang -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <!-- Kurir Ekspedisi -->
+                    <div class="bg-white p-2.5 rounded-xl border border-slate-200/90 flex items-center gap-3 shadow-2xs">
+                        <div class="shrink-0 relative">
+                            <img id="pkgModalCourierImg" src="" alt="Foto Kurir" class="w-12 h-12 rounded-xl object-cover border border-slate-200 cursor-pointer hover:scale-105 transition hidden shadow-2xs" onclick="openClaimPhotoModal(this.src, 'Foto Kurir Serah Terima')" title="Klik untuk memperbesar foto kurir">
+                            <div id="pkgModalCourierAvatarPlaceholder" class="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
+                                <i class="fa-solid fa-truck-fast text-lg text-slate-400"></i>
+                            </div>
+                        </div>
+                        <div class="min-w-0 flex-1 text-xs">
+                            <span class="text-[9px] uppercase font-bold text-slate-400 block">Identitas Driver / Kurir:</span>
+                            <span id="pkgModalCourierName" class="font-bold text-slate-800 text-xs truncate block">-</span>
+                            <span id="pkgModalCourierMeta" class="text-[10px] text-slate-500 font-mono block truncate">-</span>
+                        </div>
+                    </div>
+
+                    <!-- PIC Petugas Penerima Gudang -->
+                    <div class="bg-white p-2.5 rounded-xl border border-slate-200/90 flex items-center gap-3 shadow-2xs">
+                        <div class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
+                            <i class="fa-solid fa-user-check text-xl"></i>
+                        </div>
+                        <div class="min-w-0 flex-1 text-xs">
+                            <span class="text-[9px] uppercase font-bold text-slate-400 block">Petugas Penerima (PIC Gudang):</span>
+                            <span id="pkgModalOperatorName" class="font-bold text-emerald-800 text-xs truncate block">-</span>
+                            <span class="text-[10px] text-slate-500 block truncate">Inbound Warehouse Staff</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dokumentasi Galeri Foto Serah Terima (Jika Ada) -->
+                <div id="pkgModalSessionPhotosSection" class="hidden bg-white p-2.5 rounded-xl border border-indigo-100 shadow-2xs">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] uppercase font-bold text-indigo-700 flex items-center gap-1.5">
+                            <i class="fa-solid fa-camera"></i> Dokumentasi Foto Paket Serah Terima (<span id="pkgModalSessionPhotoCount">0</span> Foto)
+                        </span>
+                        <span class="text-[9px] text-slate-400">Klik foto untuk melihat resolusi penuh</span>
+                    </div>
+                    <div id="pkgModalSessionPhotoGallery" class="flex items-center gap-2 overflow-x-auto pb-1">
+                        <!-- Dynamic Session Photos -->
                     </div>
                 </div>
             </div>

@@ -2486,6 +2486,22 @@ window.closeReceivingReceiptModal = function() {
     if (modal) modal.classList.add('hidden');
 };
 
+// Helper URL path gambar receiving yang aman
+window.formatReceivingImgUrl = function(path) {
+    if (!path || typeof path !== 'string') return '';
+    path = path.trim();
+    if (!path) return '';
+    if (path.startsWith('data:image') || path.startsWith('http://') || path.startsWith('https://')) {
+        return path;
+    }
+    const clean = path.replace(/^\/+/, '');
+    const currentPath = window.location.pathname;
+    if (currentPath.includes('/retrun.inboud')) {
+        return '/retrun.inboud/' + clean;
+    }
+    return '/' + clean;
+};
+
 // Buka Modal Detail Paket & Foto History Receiving
 window.viewReceivingPackagesList = async function(id) {
     showGlobalLoading("Memuat Detail Paket...", "Mengambil rincian resi dan dokumentasi foto...");
@@ -2510,7 +2526,7 @@ window.viewReceivingPackagesList = async function(id) {
             if (rcptNoEl) rcptNoEl.innerText = r.receipt_number || '-';
 
             const expCourEl = document.getElementById('pkgModalExpeditionCourier');
-            if (expCourEl) expCourEl.innerText = `${r.expedition || '-'} • ${r.courier_name || '-'}`;
+            if (expCourEl) expCourEl.innerText = r.expedition || '-';
 
             const timeEl = document.getElementById('pkgModalTime');
             if (timeEl) timeEl.innerText = r.created_at || '-';
@@ -2518,21 +2534,82 @@ window.viewReceivingPackagesList = async function(id) {
             const totalEl = document.getElementById('pkgModalTotal');
             if (totalEl) totalEl.innerText = `${data.packages ? data.packages.length : (r.total_packages || 0)} Paket`;
 
-            const photoCount = (data.packages || []).filter(p => !!p.photo_path).length;
-            const photoCountEl = document.getElementById('pkgModalPhotoCount');
-            if (photoCountEl) photoCountEl.innerText = `${photoCount} Berfoto`;
-
-            // Courier photo section
-            const courierSec = document.getElementById('pkgModalCourierPhotoSection');
-            const courierImg = document.getElementById('pkgModalCourierImg');
-            const courierTxt = document.getElementById('pkgModalCourierText');
-            if (r.courier_photo) {
-                if (courierSec) courierSec.classList.remove('hidden');
-                if (courierImg) courierImg.src = r.courier_photo;
-                if (courierTxt) courierTxt.innerText = `${r.courier_name || '-'} (${r.expedition || '-'}) • Nopol: ${r.vehicle_no || '-'}`;
-            } else {
-                if (courierSec) courierSec.classList.add('hidden');
+            // Kumpulkan foto-foto dokumentasi sesi penerimaan (photo_path & package_photos)
+            let sessionPhotos = [];
+            if (r.package_photos) {
+                if (Array.isArray(r.package_photos)) {
+                    sessionPhotos = [...r.package_photos];
+                } else if (typeof r.package_photos === 'string') {
+                    try {
+                        const parsed = JSON.parse(r.package_photos);
+                        if (Array.isArray(parsed)) sessionPhotos = [...parsed];
+                        else if (parsed) sessionPhotos = [parsed];
+                    } catch (e) {
+                        if (r.package_photos.trim()) sessionPhotos = [r.package_photos.trim()];
+                    }
+                }
             }
+            if (r.photo_path && !sessionPhotos.includes(r.photo_path)) {
+                sessionPhotos.unshift(r.photo_path);
+            }
+            sessionPhotos = sessionPhotos.filter(p => !!p);
+            window._currentSessionPhotos = sessionPhotos;
+
+            // Foto Kurir, Nama Kurir & PIC Penerima Gudang
+            const courierImg = document.getElementById('pkgModalCourierImg');
+            const courierAvatarPlaceholder = document.getElementById('pkgModalCourierAvatarPlaceholder');
+            const courierName = document.getElementById('pkgModalCourierName');
+            const courierMeta = document.getElementById('pkgModalCourierMeta');
+            const opName = document.getElementById('pkgModalOperatorName');
+
+            if (opName) opName.innerText = r.operator_name || 'Petugas Gudang';
+            if (courierName) courierName.innerText = r.courier_name || 'Kurir Ekspedisi';
+            if (courierMeta) courierMeta.innerText = `${r.expedition || '-'} • Nopol: ${r.vehicle_no || '-'}`;
+
+            if (r.courier_photo) {
+                const formattedCourierPhoto = window.formatReceivingImgUrl(r.courier_photo);
+                if (courierImg) {
+                    courierImg.src = formattedCourierPhoto;
+                    courierImg.classList.remove('hidden');
+                }
+                if (courierAvatarPlaceholder) courierAvatarPlaceholder.classList.add('hidden');
+            } else {
+                if (courierImg) {
+                    courierImg.src = '';
+                    courierImg.classList.add('hidden');
+                }
+                if (courierAvatarPlaceholder) courierAvatarPlaceholder.classList.remove('hidden');
+            }
+
+            // Dokumentasi Foto Sesi Penerimaan (Gallery)
+            const sessionSec = document.getElementById('pkgModalSessionPhotosSection');
+            const sessionCountEl = document.getElementById('pkgModalSessionPhotoCount');
+            const sessionGallery = document.getElementById('pkgModalSessionPhotoGallery');
+            if (sessionPhotos.length > 0) {
+                if (sessionSec) sessionSec.classList.remove('hidden');
+                if (sessionCountEl) sessionCountEl.innerText = sessionPhotos.length;
+                if (sessionGallery) {
+                    sessionGallery.innerHTML = sessionPhotos.map((sp, sIdx) => {
+                        const sUrl = window.formatReceivingImgUrl(sp);
+                        return `
+                            <div class="relative group w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden border border-slate-200 bg-black shrink-0 cursor-pointer shadow-2xs hover:border-emerald-500 transition" onclick="openClaimPhotoModal('${sUrl}', 'Dokumentasi Foto Paket ${escapeHtml(r.receipt_number)} - Foto ${sIdx + 1}')" title="Klik untuk memperbesar foto paket">
+                                <img src="${sUrl}" alt="Foto Paket ${sIdx + 1}" class="w-full h-full object-cover group-hover:scale-110 transition duration-300">
+                                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-white text-xs">
+                                    <i class="fa-solid fa-magnifying-glass-plus"></i>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } else {
+                if (sessionSec) sessionSec.classList.add('hidden');
+                if (sessionGallery) sessionGallery.innerHTML = '';
+            }
+
+            const pkgPhotoCount = (data.packages || []).filter(p => !!p.photo_path).length;
+            const totalAvailablePhotos = Math.max(pkgPhotoCount, sessionPhotos.length);
+            const photoCountEl = document.getElementById('pkgModalPhotoCount');
+            if (photoCountEl) photoCountEl.innerText = `${totalAvailablePhotos} Berfoto`;
 
             // Reset search input
             const searchInput = document.getElementById('pkgModalSearchInput');
@@ -2568,16 +2645,25 @@ window.renderReceivingPackageCards = function(packages) {
     let html = '';
     packages.forEach((p, idx) => {
         const barcode = escapeHtml(p.package_barcode || '-');
-        const photoPath = p.photo_path ? escapeHtml(p.photo_path) : '';
+        let photoPath = p.photo_path ? window.formatReceivingImgUrl(p.photo_path) : '';
+        let isSessionFallback = false;
+        
+        // Jika tidak ada foto individual per-barcode, gunakan foto dokumentasi sesi serah terima jika ada
+        if (!photoPath && window._currentSessionPhotos && window._currentSessionPhotos.length > 0) {
+            photoPath = window.formatReceivingImgUrl(window._currentSessionPhotos[0]);
+            isSessionFallback = true;
+        }
+
         const sackTag = p.sack_number ? `<span class="bg-amber-50 text-amber-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-200 font-mono"><i class="fa-solid fa-box-archive text-[9px] mr-1"></i>${escapeHtml(p.sack_number)}</span>` : '';
         const scanTime = p.scanned_at ? (p.scanned_at.includes(' ') ? p.scanned_at.split(' ')[1] : p.scanned_at) : '';
 
         const photoHtml = photoPath ? `
-            <div class="relative group w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden border border-slate-200 bg-black shrink-0 cursor-pointer shadow-2xs hover:border-emerald-500 transition" onclick="openClaimPhotoModal('${photoPath}', 'Foto Paket ${barcode}')" title="Klik untuk zoom foto paket">
+            <div class="relative group w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden border border-slate-200 bg-black shrink-0 cursor-pointer shadow-2xs hover:border-emerald-500 transition" onclick="openClaimPhotoModal('${photoPath}', 'Foto Paket ${barcode}${isSessionFallback ? ' (Dokumentasi Serah Terima)' : ''}')" title="Klik untuk zoom foto paket">
                 <img src="${photoPath}" alt="Foto Paket ${barcode}" class="w-full h-full object-cover group-hover:scale-110 transition duration-300">
                 <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-white text-xs">
                     <i class="fa-solid fa-magnifying-glass-plus"></i>
                 </div>
+                ${isSessionFallback ? '<span class="absolute bottom-0 inset-x-0 bg-slate-900/80 text-[7px] text-white font-bold text-center py-0.5">FOTO SESI</span>' : ''}
             </div>
         ` : `
             <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-slate-100 border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 shrink-0 select-none" title="Belum ada foto fisik paket">
@@ -3280,7 +3366,7 @@ window.printClaimDossier = function() {
                 <img src="assets/image/logo-IEG.png" alt="Logo IEG" style="height: 48px; width: auto; object-fit: contain;">
                 <div>
                     <b style="font-size: 12pt; color: #0f172a; text-transform: uppercase;">IEG Inovasi Eka Gemilang</b><br>
-                    <span style="font-size: 8.5pt; color: #475569; font-weight: 600;">Warehouse Return &amp; Dispute Logistics Center</span><br>
+                    <span style="font-size: 8.5pt; color: #475569; font-weight: 600;">Warehouse Return &amp; Dispute</span><br>
                     <span style="font-size: 7.5pt; color: #64748b;">Expedition Dispute &amp; Insurance Claim Management</span>
                 </div>
             </div>
