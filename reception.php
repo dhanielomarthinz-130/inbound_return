@@ -82,8 +82,8 @@ try {
             }
             #printReceiptArea #slipPackageList {
                 display: grid !important;
-                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-                gap: 3px 5px !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 4px 8px !important;
                 max-height: none !important;
                 overflow: visible !important;
                 height: auto !important;
@@ -96,10 +96,17 @@ try {
                 page-break-inside: avoid !important;
                 border: 1px solid #cbd5e1 !important;
                 background-color: #f8fafc !important;
-                padding: 2px 4px !important;
-                font-size: 7.5pt !important;
+                padding: 3px 6px !important;
+                font-size: 8pt !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
+            }
+            #printReceiptArea #slipPackageList span,
+            #printReceiptArea #slipPackageList div {
+                text-overflow: clip !important;
+                white-space: normal !important;
+                word-break: break-all !important;
+                overflow: visible !important;
             }
             #printReceiptArea #slipSackBreakdownSection {
                 background-color: #fffbeb !important;
@@ -2275,10 +2282,10 @@ try {
                     const sackTag = sNum ? `<span class="text-[9px] bg-amber-50 text-amber-800 font-bold px-1.5 py-0.2 rounded border border-amber-200 font-mono">${escapeHtml(sNum)}</span>` : '';
 
                     listHtml += `
-                        <div class="flex items-center justify-between bg-white rounded-lg border border-slate-200/90 py-1 px-2 text-xs">
-                            <div class="flex items-center gap-1.5 min-w-0 pr-1">
+                        <div class="flex items-center justify-between bg-white rounded-lg border border-slate-200/90 py-1.5 px-2 text-xs">
+                            <div class="flex items-center gap-1.5 flex-1 min-w-0 pr-1">
                                 <span class="w-5 h-5 rounded-md bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">${i + 1}</span>
-                                <span class="font-mono font-bold text-slate-800 text-xs tracking-tight truncate">${escapeHtml(bCode)}</span>
+                                <span class="font-mono font-bold text-slate-900 text-xs tracking-tight break-all select-all whitespace-normal leading-tight">${escapeHtml(bCode)}</span>
                                 ${sackTag}
                             </div>
                             <div class="flex items-center gap-1 shrink-0">

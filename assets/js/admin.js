@@ -2397,9 +2397,9 @@ window.viewReceivingReceipt = async function(id) {
                 const sackTag = bar.sack_number ? `<span class="bg-amber-100 text-amber-800 text-[9px] font-bold px-1 py-0.2 rounded border border-amber-200 ml-1 shrink-0">${escapeHtml(bar.sack_number)}</span>` : '';
                 listHtml += `
                     <div class="flex items-center justify-between bg-white rounded-lg border border-slate-200/90 py-1.5 px-2 text-xs">
-                        <div class="flex items-center gap-1.5 min-w-0 pr-1">
-                            <span class="w-5 h-5 rounded bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">${i + 1}</span>
-                            <span class="font-mono font-bold text-slate-800 text-xs tracking-tight truncate">${escapeHtml(bar.package_barcode)}</span>
+                        <div class="flex items-center gap-1.5 flex-1 min-w-0 pr-1">
+                            <span class="w-5 h-5 rounded-md bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">${i + 1}</span>
+                            <span class="font-mono font-bold text-slate-900 text-xs tracking-tight break-all select-all whitespace-normal leading-tight">${escapeHtml(bar.package_barcode)}</span>
                             ${sackTag}
                         </div>
                         <span class="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-300 shrink-0">TERIMA OK</span>

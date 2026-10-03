@@ -72,8 +72,8 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
             }
             #printableReceivingReceiptArea #adminSlipPackageList {
                 display: grid !important;
-                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-                gap: 3px 5px !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 4px 8px !important;
                 max-height: none !important;
                 overflow: visible !important;
                 height: auto !important;
@@ -86,10 +86,17 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 page-break-inside: avoid !important;
                 border: 1px solid #cbd5e1 !important;
                 background-color: #f8fafc !important;
-                padding: 2px 4px !important;
-                font-size: 7.5pt !important;
+                padding: 3px 6px !important;
+                font-size: 8pt !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
+            }
+            #printableReceivingReceiptArea #adminSlipPackageList span,
+            #printableReceivingReceiptArea #adminSlipPackageList div {
+                text-overflow: clip !important;
+                white-space: normal !important;
+                word-break: break-all !important;
+                overflow: visible !important;
             }
             #printableReceivingReceiptArea #adminSlipSackBreakdownSection {
                 background-color: #fffbeb !important;
