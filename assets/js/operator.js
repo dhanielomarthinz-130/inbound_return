@@ -593,29 +593,100 @@ inputType.addEventListener('keypress', (e) => {
     }
 });
 
-function updateProductPhotoButtonState() {
-    const btn = document.getElementById('btnCaptureProductPhoto');
-    if (!btn) return;
+let currentActiveDamagedPhoto = null;
+
+function updateDamagedPhotoBanner() {
+    const banner = document.getElementById('damagedPhotoPromptBanner');
+    const status = document.getElementById('damagedPhotoBannerStatus');
+    const previewMini = document.getElementById('damagedPhotoPreviewMini');
+    const imgThumb = document.getElementById('imgDamagedPhotoThumb');
+    if (!banner) return;
+
     const typeVal = String(inputType?.value || '').toUpperCase().trim();
     const isDamaged = (typeVal !== 'GOOD' && typeVal !== 'BAGUS' && typeVal !== '');
-    const icon = btn.querySelector('i');
-    const label = btn.querySelector('#labelCaptureProductPhoto') || btn.querySelector('div span:last-child');
-    
+
     if (isDamaged) {
-        btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700', 'shadow-emerald-600/25');
-        btn.classList.add('bg-rose-600', 'hover:bg-rose-700', 'shadow-rose-600/25');
-        if (icon) icon.className = 'fa-solid fa-triangle-exclamation text-xs';
-        if (label) label.innerText = '+ Foto Barang Rusak';
+        banner.classList.remove('hidden');
+        if (currentActiveDamagedPhoto) {
+            banner.className = 'mt-2 p-2.5 bg-emerald-50 border-2 border-emerald-400 rounded-xl flex items-center justify-between gap-2 shadow-xs transition-all';
+            if (status) status.innerHTML = `<span class="text-emerald-700 font-bold"><i class="fa-solid fa-circle-check"></i> Foto produk rusak [${typeVal}] siap disimpan!</span>`;
+            if (previewMini && imgThumb) {
+                previewMini.classList.remove('hidden');
+                imgThumb.src = currentActiveDamagedPhoto;
+            }
+        } else {
+            banner.className = 'mt-2 p-2.5 bg-rose-50 border-2 border-rose-400 rounded-xl flex items-center justify-between gap-2 shadow-xs transition-all animate-pulse';
+            if (status) status.innerHTML = `<span class="text-rose-600 font-black"><i class="fa-solid fa-triangle-exclamation"></i> WAJIB ambil foto bukti barang [${typeVal}] sebelum tambah item!</span>`;
+            if (previewMini) previewMini.classList.add('hidden');
+        }
     } else {
-        btn.classList.remove('bg-rose-600', 'hover:bg-rose-700', 'shadow-rose-600/25');
-        btn.classList.add('bg-emerald-600', 'hover:bg-emerald-700', 'shadow-emerald-600/25');
-        if (icon) icon.className = 'fa-solid fa-tag text-xs';
-        if (label) label.innerText = '+ Foto Produk';
+        banner.classList.add('hidden');
+        if (previewMini) previewMini.classList.add('hidden');
     }
 }
 
+window.triggerDamagedPhotoCapture = function() {
+    captureProductPhoto(null, 'RUSAK');
+};
+
+window.viewCurrentDamagedPhoto = function() {
+    if (currentActiveDamagedPhoto) {
+        previewImageDirect(currentActiveDamagedPhoto, `Foto Bukti Barang Rusak (${inputType?.value || 'RUSAK'})`);
+    }
+};
+
+window.showDamagedPhotoRequiredModal = function(type) {
+    const modal = document.getElementById('modalDamagedPhotoRequired');
+    if (!modal) return;
+    const badge = document.getElementById('modalDmgCondBadge');
+    if (badge) badge.innerText = type || 'RUSAK';
+    const prodName = document.getElementById('modalDmgProdName');
+    if (prodName) prodName.innerText = currentDetectedProduct?.name || 'Produk Return';
+    const prodSku = document.getElementById('modalDmgProdSku');
+    if (prodSku) prodSku.innerText = `Barcode: ${inputBarcode.value.trim() || '-'} | SKU: ${currentDetectedProduct?.seller_sku || currentDetectedProduct?.sku || '-'}`;
+    modal.classList.remove('hidden');
+};
+
+window.closeDamagedPhotoRequiredModal = function() {
+    const modal = document.getElementById('modalDamagedPhotoRequired');
+    if (modal) modal.classList.add('hidden');
+};
+
+window.confirmTakeDamagedPhotoNow = function() {
+    closeDamagedPhotoRequiredModal();
+    captureProductPhoto(null, 'RUSAK');
+};
+
+function updateProductPhotoButtonState() {
+    const btn = document.getElementById('btnCaptureProductPhoto');
+    const typeVal = String(inputType?.value || '').toUpperCase().trim();
+    const isDamaged = (typeVal !== 'GOOD' && typeVal !== 'BAGUS' && typeVal !== '');
+
+    if (btn) {
+        const icon = btn.querySelector('i');
+        const label = btn.querySelector('#labelCaptureProductPhoto') || btn.querySelector('div span:last-child');
+        
+        if (isDamaged) {
+            btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700', 'shadow-emerald-600/25');
+            btn.classList.add('bg-rose-600', 'hover:bg-rose-700', 'shadow-rose-600/25');
+            if (icon) icon.className = 'fa-solid fa-triangle-exclamation text-xs';
+            if (label) label.innerText = '+ Foto Barang Rusak';
+        } else {
+            btn.classList.remove('bg-rose-600', 'hover:bg-rose-700', 'shadow-rose-600/25');
+            btn.classList.add('bg-emerald-600', 'hover:bg-emerald-700', 'shadow-emerald-600/25');
+            if (icon) icon.className = 'fa-solid fa-tag text-xs';
+            if (label) label.innerText = '+ Foto Produk';
+        }
+    }
+
+    updateDamagedPhotoBanner();
+}
+
 if (inputType) {
-    inputType.addEventListener('change', updateProductPhotoButtonState);
+    inputType.addEventListener('change', () => {
+        // Reset foto saat ganti tipe jika sebelumnya tidak ada foto
+        updateProductPhotoButtonState();
+    });
 }
 
 // -------------------------------------------------------------
@@ -1113,6 +1184,15 @@ window.handleAddItem = function(e) {
         return;
     }
 
+    const type = inputType.value || 'GOOD';
+    const isItemDamaged = (type !== 'GOOD' && type !== 'BAGUS');
+    if (isItemDamaged && !currentActiveDamagedPhoto) {
+        playBeep('error');
+        showToast('error', `Barang dengan kondisi [${type}] WAJIB difoto buktinya terlebih dahulu!`, 'Wajib Foto Bukti Rusak');
+        showDamagedPhotoRequiredModal(type);
+        return;
+    }
+
     if (!currentDetectedProduct || currentDetectedProduct.barcode !== barcode) {
         // Jika belum ter-lookup, lookup dulu
         lookupProduct(barcode).then(() => {
@@ -1144,6 +1224,16 @@ function commitAddItem() {
     const expDate = inputExpDate.value.trim();
     const qty = parseInt(inputQty.value, 10) || 1;
     const type = inputType.value || 'GOOD';
+    const isItemDamaged = (type !== 'GOOD' && type !== 'BAGUS');
+
+    if (isItemDamaged && !currentActiveDamagedPhoto) {
+        playBeep('error');
+        showToast('error', `Barang dengan kondisi [${type}] WAJIB difoto buktinya terlebih dahulu!`, 'Wajib Foto Bukti Rusak');
+        showDamagedPhotoRequiredModal(type);
+        return;
+    }
+
+    const itemPhoto = isItemDamaged ? currentActiveDamagedPhoto : null;
 
     scannedProductsList.push({
         barcode: currentDetectedProduct.barcode,
@@ -1157,11 +1247,12 @@ function commitAddItem() {
         exp_date: formatExpDate(expDate),
         qty: qty,
         type: type,
-        condition: (type === 'GOOD' || type === 'BAGUS') ? 'GOOD' : 'RUSAK'
+        condition: isItemDamaged ? 'RUSAK' : 'GOOD',
+        photo: itemPhoto,
+        photo_path: itemPhoto
     });
 
     // Otomatis perbarui foto produk yang diambil sebelum scan barcode / jika kondisi rusak
-    const isItemDamaged = (type !== 'GOOD' && type !== 'BAGUS');
     let hasUpdatedPhotos = false;
     if (Array.isArray(capturedPhotosList)) {
         capturedPhotosList.forEach(photo => {
@@ -1205,6 +1296,8 @@ function commitAddItem() {
     }
 
     playBeep('success');
+    currentActiveDamagedPhoto = null;
+    updateDamagedPhotoBanner();
     renderItemsTable();
     resetProductInputs();
 
@@ -1215,6 +1308,8 @@ function commitAddItem() {
 }
 
 function resetProductInputs() {
+    currentActiveDamagedPhoto = null;
+    updateDamagedPhotoBanner();
     currentDetectedProduct = null;
     inputBarcode.value = '';
     inputBatch.value = '';
@@ -1288,6 +1383,28 @@ function renderItemsTable() {
             badge = `<span class="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold text-[10px]">${escapeHtml(item.type || 'GOOD')}</span>`;
         }
 
+        const isDmgItem = (itemType !== 'GOOD' && itemType !== 'BAGUS');
+        const itemPhotoSrc = item.photo || item.photo_path;
+        let photoBtn = '';
+        if (itemPhotoSrc) {
+            photoBtn = `
+                <div class="mt-1">
+                    <button type="button" onclick="previewImageDirect('${itemPhotoSrc}', 'Foto Bukti: ${escapeHtml(item.product_name)} (${escapeHtml(item.type)}') " 
+                        class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[9px] border border-rose-200 transition shadow-2xs cursor-pointer" title="Lihat Foto Bukti">
+                        <i class="fa-solid fa-camera"></i> Foto Siap
+                    </button>
+                </div>
+            `;
+        } else if (isDmgItem) {
+            photoBtn = `
+                <div class="mt-1">
+                    <span class="inline-flex items-center gap-1 text-[9px] text-rose-600 font-bold">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Tanpa Foto
+                    </span>
+                </div>
+            `;
+        }
+
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
         tr.innerHTML = `
@@ -1304,7 +1421,7 @@ function renderItemsTable() {
             <td class="py-1.5 px-2 font-mono text-slate-600 whitespace-nowrap text-xs">${item.batch_no || '-'}</td>
             <td class="py-1.5 px-2 font-mono text-slate-600 whitespace-nowrap text-xs font-medium">${formatExpDate(item.exp_date)}</td>
             <td class="py-1.5 px-2 text-center font-bold text-slate-900 text-xs font-mono">${item.qty}</td>
-            <td class="py-1.5 px-2 text-center">${badge}</td>
+            <td class="py-1.5 px-2 text-center">${badge}${photoBtn}</td>
             <td class="py-1.5 px-2 text-center">
                 <button type="button" onclick="removeItem(${index})" title="Hapus Item" class="text-rose-500 hover:text-rose-700 p-1 rounded-lg hover:bg-rose-50 transition">
                     <i class="fa-solid fa-trash-can text-xs"></i>
@@ -1483,6 +1600,18 @@ let isSubmittingFinalSession = false;
 window.submitFinalSession = async function() {
     if (isSubmittingFinalSession) return;
     if (!activeInvoice || scannedProductsList.length === 0) return;
+
+    // VALIDASI WAJIB FOTO BARANG RUSAK: Setiap item kondisi bukan GOOD wajib punya foto!
+    const unphotographedDamaged = scannedProductsList.find(it => {
+        const c = (it.type || it.condition || '').toUpperCase().trim();
+        const isD = (c !== 'GOOD' && c !== 'BAGUS' && c !== '');
+        return isD && !it.photo && !it.photo_path;
+    });
+    if (unphotographedDamaged) {
+        playBeep('error');
+        showToast('error', `Produk [${unphotographedDamaged.product_name || unphotographedDamaged.barcode}] dengan kondisi ${unphotographedDamaged.type} belum memiliki foto bukti kerusakan! Silakan hapus item dan scan ulang dengan mengambil foto [F5].`, 'Wajib Foto Barang Rusak');
+        return;
+    }
 
     isSubmittingFinalSession = true;
     const notes = document.getElementById('sessionNotesInput').value.trim();
@@ -2416,6 +2545,12 @@ window.captureProductPhoto = function(sourceImage = null, forcedCondition = null
             createdAt: getNowFormattedWIB()
         };
         capturedPhotosList.push(photoItem);
+
+        if (isDamaged) {
+            currentActiveDamagedPhoto = dataUrl;
+            updateDamagedPhotoBanner();
+        }
+
         renderPhotosGallery();
 
         showToast(

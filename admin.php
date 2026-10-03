@@ -41,15 +41,12 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 padding: 0 !important;
                 display: block !important;
             }
-            body * {
-                visibility: hidden !important;
-            }
-            /* Pastikan modal dan seluruh isi Surat Jalan terlihat saat dicetak */
-            #modalReceivingReceipt,
-            #modalReceivingReceipt * {
-                visibility: visible !important;
+            /* Hilangkan seluruh elemen halaman di luar modal cetak agar tidak memakan ruang / lembar kosong */
+            body > *:not(#modalReceivingReceipt) {
+                display: none !important;
             }
             #modalReceivingReceipt {
+                display: block !important;
                 position: static !important;
                 inset: auto !important;
                 width: 100% !important;
@@ -63,7 +60,6 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 backdrop-filter: none !important;
                 border: none !important;
                 box-shadow: none !important;
-                display: block !important;
                 z-index: auto !important;
             }
             #modalReceivingReceipt > div {

@@ -628,6 +628,28 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                         </div>
                     </div>
 
+                    <!-- BANNER PERINGATAN WAJIB FOTO BARANG RUSAK / CACAT -->
+                    <div id="damagedPhotoPromptBanner" class="hidden mt-2 p-2.5 bg-rose-50 border-2 border-rose-400 rounded-xl flex items-center justify-between gap-2 shadow-xs transition-all">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <div class="w-7 h-7 rounded-lg bg-rose-600 text-white flex items-center justify-center shrink-0">
+                                <i class="fa-solid fa-triangle-exclamation text-xs"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-[11px] font-black text-rose-800 leading-tight">KONDISI BUKAN GOOD / RUSAK</div>
+                                <div id="damagedPhotoBannerStatus" class="text-[10px] text-rose-600 font-semibold truncate">⚠️ Wajib ambil foto bukti sebelum menambah item!</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button type="button" id="btnQuickDamagedPhoto" onclick="triggerDamagedPhotoCapture()" class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-xs transition cursor-pointer">
+                                <i class="fa-solid fa-camera"></i> [F5] Ambil Foto
+                            </button>
+                            <div id="damagedPhotoPreviewMini" class="hidden relative group cursor-pointer" onclick="viewCurrentDamagedPhoto()" title="Klik untuk lihat foto">
+                                <img id="imgDamagedPhotoThumb" src="" class="w-8 h-8 rounded-lg object-cover border-2 border-emerald-500 shadow-2xs">
+                                <span class="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-600 text-white rounded-full flex items-center justify-center text-[8px] font-bold"><i class="fa-solid fa-check"></i></span>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- NUMPAD TOUCHSCREEN KHUSUS EXP DATE -->
                     <div id="numpadExpDateContainer" class="hidden bg-slate-900 text-white rounded-2xl p-2.5 sm:p-3 shadow-lg border border-slate-800 space-y-2 transition-all">
                         <div class="flex items-center justify-between border-b border-slate-800/80 pb-1.5">
@@ -802,6 +824,38 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
     <footer class="hidden">
         <span>&copy; <?= date('Y') ?> Inbound Return Station &bull; IEG</span>
     </footer>
+
+    <!-- MODAL WAJIB FOTO BARANG RUSAK -->
+    <div id="modalDamagedPhotoRequired" class="fixed inset-0 bg-black/75 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 text-center shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200 border-2 border-rose-500">
+            <div class="w-16 h-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-3xl mx-auto shadow-sm animate-bounce">
+                <i class="fa-solid fa-camera"></i>
+            </div>
+            <div class="space-y-1">
+                <h3 class="text-base font-black text-rose-900 tracking-tight">Wajib Foto Bukti Barang Rusak!</h3>
+                <p class="text-xs text-slate-600 leading-relaxed">
+                    Kondisi produk terdeteksi <span id="modalDmgCondBadge" class="px-2 py-0.5 rounded font-black font-mono bg-rose-100 text-rose-800">RUSAK</span>. 
+                    Sistem mewajibkan pengambilan foto bukti fisik produk sebelum dimasukkan ke dalam daftar retur dan klaim.
+                </p>
+            </div>
+            <div class="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-left flex items-start gap-2.5">
+                <i class="fa-solid fa-circle-info text-amber-600 mt-0.5 text-xs shrink-0"></i>
+                <div class="text-[11px] text-amber-900 leading-snug">
+                    <span class="font-bold block" id="modalDmgProdName">Nama Produk</span>
+                    <span class="text-slate-500 text-[10px]" id="modalDmgProdSku">SKU / Barcode</span>
+                </div>
+            </div>
+            <div class="pt-2 flex flex-col gap-2">
+                <button type="button" onclick="confirmTakeDamagedPhotoNow()" class="w-full bg-rose-600 hover:bg-rose-700 active:scale-98 text-white font-bold py-3 rounded-2xl text-xs transition shadow-md shadow-rose-600/30 flex items-center justify-center gap-2 cursor-pointer">
+                    <i class="fa-solid fa-camera"></i>
+                    <span>Ambil Foto Produk Sekarang [Tuts F5]</span>
+                </button>
+                <button type="button" onclick="closeDamagedPhotoRequiredModal()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-2xl text-xs transition cursor-pointer">
+                    Batal / Ganti Kondisi
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- MODAL PREVIEW FOTO WATERMARK -->
     <div id="photoPreviewModal" class="fixed inset-0 bg-black/85 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">

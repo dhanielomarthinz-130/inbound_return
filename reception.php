@@ -51,15 +51,12 @@ try {
                 padding: 0 !important;
                 display: block !important;
             }
-            body * {
-                visibility: hidden !important;
-            }
-            /* Pastikan modal dan seluruh isi Surat Jalan terlihat saat dicetak */
-            #receiptModal,
-            #receiptModal * {
-                visibility: visible !important;
+            /* Hilangkan seluruh elemen halaman di luar modal cetak agar tidak memakan ruang / lembar kosong */
+            body > *:not(#receiptModal) {
+                display: none !important;
             }
             #receiptModal {
+                display: block !important;
                 position: static !important;
                 inset: auto !important;
                 width: 100% !important;
@@ -73,7 +70,6 @@ try {
                 backdrop-filter: none !important;
                 border: none !important;
                 box-shadow: none !important;
-                display: block !important;
                 z-index: auto !important;
             }
             #receiptModal > div {

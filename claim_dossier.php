@@ -261,6 +261,10 @@ $query = trim($_GET['q'] ?? $_GET['query'] ?? $_GET['order_id'] ?? $_GET['tracki
                                 <span class="text-[10px] text-slate-400 uppercase font-bold block">Catatan &amp; Alasan Kerusakan</span>
                                 <div id="colConditionNotes" class="bg-amber-50/80 p-2 rounded-xl border border-amber-200 text-slate-800 text-[11px] font-semibold max-h-24 overflow-y-auto leading-tight">-</div>
                             </div>
+                            <div>
+                                <span class="text-[10px] text-slate-400 uppercase font-bold block">Daftar Produk Diperiksa &amp; Bukti Foto</span>
+                                <div id="colUnboxItemsList" class="bg-white p-2 rounded-xl border border-slate-200 text-slate-800 text-[11px] max-h-36 overflow-y-auto space-y-1 mt-0.5">-</div>
+                            </div>
                             <div class="grid grid-cols-2 gap-1.5">
                                 <div>
                                     <span class="text-[10px] text-slate-400 uppercase font-bold block">Operator Unboxing</span>
@@ -543,6 +547,35 @@ $query = trim($_GET['q'] ?? $_GET['query'] ?? $_GET['order_id'] ?? $_GET['tracki
             document.getElementById('colUnboxTime').innerText = unb.unboxed_at || unb.created_at || '-';
             document.getElementById('signUnboxOperator').innerText = unb.operator_name || 'Operator Gudang';
 
+            // Rincian Item Unboxing & Bukti Foto Tiap Item
+            const unboxItemsEl = document.getElementById('colUnboxItemsList');
+            if (unboxItemsEl) {
+                if (Array.isArray(unb.items) && unb.items.length > 0) {
+                    let uHtml = '';
+                    unb.items.forEach(it => {
+                        const itC = (it.type || it.condition || 'GOOD').toUpperCase().trim();
+                        const isDmg = (itC !== 'GOOD' && itC !== 'BAGUS' && itC !== 'LAYAK');
+                        const bColor = isDmg ? 'bg-rose-100 text-rose-800 border-rose-300' : 'bg-emerald-100 text-emerald-800 border-emerald-300';
+                        const photoBtn = it.photo_path ? 
+                            `<button type="button" onclick="previewImageDirect('${escapeHtml(it.photo_path)}')" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white text-[9px] font-bold shadow-2xs transition shrink-0 ml-auto cursor-pointer" title="Lihat Foto Bukti Rusak"><i class="fa-solid fa-camera"></i> Foto Rusak</button>` : 
+                            (isDmg ? `<span class="text-[9px] text-rose-600 font-bold shrink-0 ml-auto">⚠️ Tanpa Foto</span>` : '');
+                        
+                        uHtml += `
+                            <div class="flex items-center justify-between gap-1.5 p-1.5 rounded-lg border border-slate-100 hover:bg-slate-50 transition">
+                                <div class="min-w-0 flex-1">
+                                    <div class="font-bold text-slate-800 truncate">${escapeHtml(it.product_name || it.barcode || 'Produk')}</div>
+                                    <div class="text-[10px] text-slate-500 font-mono mt-0.5">Qty: <b>${it.qty || 1}</b> • <span class="px-1 py-0.2 rounded font-bold border ${bColor}">${itC}</span></div>
+                                </div>
+                                ${photoBtn}
+                            </div>
+                        `;
+                    });
+                    unboxItemsEl.innerHTML = uHtml;
+                } else {
+                    unboxItemsEl.innerHTML = `<span class="text-slate-400 italic">Belum ada rincian item unboxing</span>`;
+                }
+            }
+
             // Video Unboxing
             const unboxVideo = document.getElementById('dossierUnboxingVideo');
             const noUnboxVid = document.getElementById('noDossierUnboxingVideo');
@@ -566,11 +599,13 @@ $query = trim($_GET['q'] ?? $_GET['query'] ?? $_GET['order_id'] ?? $_GET['tracki
                 let phtml = '';
                 photos.forEach(p => {
                     const purl = p.url || p.file_path || p;
-                    const pcap = p.caption || p.type || 'Bukti Barang';
+                    const pcap = p.caption || p.title || p.type || 'Bukti Barang';
+                    const isDamaged = p.is_damaged || p.type === 'damaged' || (p.badge === 'Barang Rusak') || String(pcap).toLowerCase().includes('rusak');
                     phtml += `
-                        <div class="border border-slate-200 rounded-xl p-1.5 bg-white shadow-2xs text-center">
+                        <div class="border ${isDamaged ? 'border-rose-500 ring-2 ring-rose-200' : 'border-slate-200'} rounded-xl p-1.5 bg-white shadow-2xs text-center relative group">
+                            ${isDamaged ? `<span class="absolute top-2 left-2 bg-rose-600 text-white font-mono font-bold text-[9px] px-1.5 py-0.5 rounded shadow-xs z-10">⚠️ RUSAK</span>` : ''}
                             <img src="${escapeHtml(purl)}" alt="${escapeHtml(pcap)}" class="w-full h-24 sm:h-28 object-cover rounded-lg cursor-pointer hover:opacity-95 transition" onclick="previewImageDirect('${escapeHtml(purl)}')">
-                            <span class="text-[9px] font-bold text-slate-700 block mt-1 truncate" title="${escapeHtml(pcap)}">${escapeHtml(pcap)}</span>
+                            <span class="text-[9px] font-bold ${isDamaged ? 'text-rose-700' : 'text-slate-700'} block mt-1 truncate" title="${escapeHtml(pcap)}">${escapeHtml(pcap)}</span>
                         </div>
                     `;
                 });

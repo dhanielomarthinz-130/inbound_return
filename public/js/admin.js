@@ -1172,21 +1172,82 @@ window.viewDetails = async function(id, focusCondition) {
         document.getElementById('modalTotalUnit').innerText = sumTotal;
         document.getElementById('modalTotalGood').innerText = sumGood;
         document.getElementById('modalTotalDamaged').innerText = sumDamaged;
+        // Tambahkan foto produk dari masing-masing item ke galeri foto jika belum ada
+        let hasItemPhotosAdded = false;
+        items.forEach(it => {
+            if (it.photo_path && !allPhotos.find(x => x.url === it.photo_path)) {
+                const itC = (it.type || it.condition || 'GOOD').toUpperCase().trim();
+                const isDmg = (itC !== 'GOOD' && itC !== 'BAGUS' && itC !== 'LAYAK');
+                allPhotos.push({
+                    url: it.photo_path,
+                    label: isDmg ? `⚠️ Foto Bukti Rusak: ${it.product_name || it.barcode} (${itC})` : `Foto Item: ${it.product_name || it.barcode}`,
+                    type: isDmg ? 'damaged' : 'product',
+                    isDamaged: isDmg
+                });
+                hasItemPhotosAdded = true;
+            }
+        });
+
+        // Re-render galeri foto atas jika ada foto item baru
+        if (hasItemPhotosAdded && photosGrid) {
+            allPhotos.sort((a, b) => {
+                const aDmg = a.isDamaged || (a.type || '').toUpperCase() === 'DAMAGED';
+                const bDmg = b.isDamaged || (b.type || '').toUpperCase() === 'DAMAGED';
+                if (aDmg && !bDmg) return -1;
+                if (!aDmg && bDmg) return 1;
+                return 0;
+            });
+            photosGrid.innerHTML = '';
+            if (photosSection) photosSection.classList.remove('hidden');
+            if (photoCount) photoCount.innerText = `${allPhotos.length} Foto (${condCode})`;
+            allPhotos.forEach(photo => {
+                const isDamagedPhoto = photo.isDamaged || (photo.type || '').toLowerCase() === 'damaged' || ((photo.type || '').toUpperCase() === condCode && condCode !== 'GOOD');
+                const imgWrap = document.createElement('div');
+                imgWrap.className = `relative group cursor-pointer rounded-xl overflow-hidden border ${isDamagedPhoto ? 'border-rose-500 ring-2 ring-rose-400' : 'border-slate-200'} bg-slate-100 aspect-square shadow-xs hover:shadow-md transition`;
+                imgWrap.onclick = () => {
+                    openPhotoLightboxDirect(photo.url, `${photo.label} • Invoice: ${r.invoice_number || '-'}`, condCode || (isDamagedPhoto ? 'RUSAK' : 'GOOD'), isDamagedPhoto);
+                };
+                imgWrap.innerHTML = `
+                    <img src="${photo.url}" alt="${photo.label}" loading="lazy"
+                        class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                        onerror="this.parentElement.innerHTML='<div class=\\'flex flex-col items-center justify-center h-full text-slate-400 text-[10px] p-2 text-center\\'><i class=\\'fa-solid fa-image-slash text-2xl mb-1\\'></i>Foto tidak ditemukan</div>'">
+                    <div class="absolute bottom-0 left-0 right-0 ${isDamagedPhoto ? 'bg-rose-950/80 text-rose-100' : 'bg-black/60 text-white'} text-[9px] font-semibold px-2 py-1 flex items-center justify-between transition truncate">
+                        <span class="truncate">${photo.label}</span>
+                        <span class="${isDamagedPhoto ? 'bg-rose-600' : 'bg-indigo-600/80'} px-1.5 py-0.5 rounded text-[8px] shrink-0 font-mono font-bold">${isDamagedPhoto ? 'RUSAK' : (photo.type || 'FOTO')}</span>
+                    </div>
+                `;
+                photosGrid.appendChild(imgWrap);
+            });
+        }
+
         items.forEach(it => {
             const tr = document.createElement('tr');
             const itCond = (it.type || it.condition || 'GOOD').toUpperCase();
             const isMatch = itCond === condCode;
             tr.className = `hover:bg-slate-50 border-b border-slate-100 text-xs ${isMatch ? 'bg-indigo-50/50' : ''}`;
-            const isGood = itCond === 'GOOD';
+            const isGood = itCond === 'GOOD' || itCond === 'BAGUS' || itCond === 'LAYAK';
             const badgeCond = isGood ? 
                 `<span class="bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded text-[10px] border border-emerald-200">GOOD</span>` :
                 `<span class="bg-rose-50 text-rose-700 font-bold px-2 py-0.5 rounded text-[10px] border border-rose-200">${escapeHtml(itCond)}</span>`;
+
+            let photoBtn = '';
+            if (it.photo_path) {
+                photoBtn = `
+                    <div class="mt-1">
+                        <button type="button" onclick="openPhotoLightboxDirect('${escapeHtml(it.photo_path)}', 'Foto Bukti Barang Rusak: ${escapeHtml(it.product_name || it.barcode)}', '${escapeHtml(itCond)}', true)" 
+                            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold text-[10px] border border-rose-300 shadow-2xs transition cursor-pointer">
+                            <i class="fa-solid fa-camera text-rose-600"></i> Bukti Foto (${escapeHtml(itCond)})
+                        </button>
+                    </div>
+                `;
+            }
 
             tr.innerHTML = `
                 <td class="p-2.5 font-mono font-bold text-slate-700">${escapeHtml(it.barcode || '-')}</td>
                 <td class="p-2.5">
                     <div class="font-medium text-slate-800">${escapeHtml(it.product_name || '-')}</div>
                     ${it.damage_reason ? `<div class="text-[10px] text-rose-600 font-medium italic mt-0.5"><i class="fa-solid fa-circle-exclamation mr-1 text-[9px]"></i>${escapeHtml(it.damage_reason)}</div>` : ''}
+                    ${photoBtn}
                 </td>
                 <td class="p-2.5 text-slate-500 font-mono text-[11px] whitespace-nowrap">${escapeHtml(it.batch_no || '-')} / ${formatExpDate(it.exp_date)}</td>
                 <td class="p-2.5 text-center font-bold text-slate-800">${it.qty || 1}</td>
@@ -1196,6 +1257,30 @@ window.viewDetails = async function(id, focusCondition) {
         });
     } catch (e) {
         tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-rose-500 font-semibold">Gagal memuat item: ${e.message}</td></tr>`;
+    }
+};
+
+window.openPhotoLightboxDirect = function(url, title, condition, isDamaged) {
+    const lb = document.getElementById('modalPhotoLightbox');
+    const lbImg = document.getElementById('modalPhotoLightboxImg');
+    const lbTitle = document.getElementById('modalPhotoLightboxTitle');
+    const lbTag = document.getElementById('modalPhotoLightboxTag');
+    const lbDl = document.getElementById('modalPhotoLightboxDownload');
+    if (lb && lbImg) {
+        lbImg.src = url;
+        if (lbDl) {
+            lbDl.href = url;
+            lbDl.setAttribute('download', `foto_barang_${condition || 'rusak'}.jpg`);
+        }
+        if (lbTitle) lbTitle.innerText = title || 'Foto Bukti Barang';
+        if (lbTag) {
+            lbTag.className = isDamaged 
+                ? "px-2.5 py-0.5 rounded-lg font-mono font-bold text-[10px] bg-rose-600 text-white shadow-2xs" 
+                : "px-2.5 py-0.5 rounded-lg font-mono font-bold text-[10px] bg-emerald-600 text-white shadow-2xs";
+            lbTag.innerText = `KONDISI: ${condition || 'RUSAK'}`;
+        }
+        lb.classList.remove('hidden');
+        lb.classList.add('flex');
     }
 };
 
