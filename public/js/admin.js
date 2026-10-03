@@ -2766,10 +2766,19 @@ window.formatReceivingImgUrl = function(path) {
     if (path.startsWith('data:image') || path.startsWith('http://') || path.startsWith('https://')) {
         return path;
     }
-    const clean = path.replace(/^\/+/, '');
-    const currentPath = window.location.pathname;
-    if (currentPath.includes('/retrun.inboud')) {
-        return '/retrun.inboud/' + clean;
+    let clean = path.replace(/^\/+/, '');
+    clean = clean.replace(/^(retrun\.inboud|return\.inbound|inbound_return)\//i, '');
+    
+    // Deteksi subdirektori proyek dari window.location.pathname
+    // Contoh: /inbound_return/admin -> /inbound_return/
+    //         /retrun.inboud/admin -> /retrun.inboud/
+    //         /admin -> /
+    const pathname = window.location.pathname;
+    const segments = pathname.split('/').filter(Boolean);
+    const knownPages = ['admin', 'admin.php', 'login', 'login.php', 'menu', 'menu.php', 'reception', 'reception.php', 'index.php', 'scanner', 'dossier', 'claim_dossier', 'index'];
+    
+    if (segments.length > 0 && !knownPages.includes(segments[0].toLowerCase())) {
+        return '/' + segments[0] + '/' + clean;
     }
     return '/' + clean;
 };
@@ -2806,25 +2815,31 @@ window.viewReceivingPackagesList = async function(id) {
             const totalEl = document.getElementById('pkgModalTotal');
             if (totalEl) totalEl.innerText = `${data.packages ? data.packages.length : (r.total_packages || 0)} Paket`;
 
-            // Kumpulkan foto-foto dokumentasi sesi penerimaan (photo_path & package_photos)
+            // Kumpulkan foto-foto dokumentasi sesi penerimaan (1 foto per paket unik, tidak dobel)
             let sessionPhotos = [];
-            if (r.package_photos) {
+            const pkgPhotos = (data.packages || []).map(p => p.photo_path).filter(Boolean);
+            if (pkgPhotos.length > 0) {
+                sessionPhotos = [...pkgPhotos];
+            } else if (r.package_photos) {
+                let rawPhotos = [];
                 if (Array.isArray(r.package_photos)) {
-                    sessionPhotos = [...r.package_photos];
+                    rawPhotos = [...r.package_photos];
                 } else if (typeof r.package_photos === 'string') {
                     try {
                         const parsed = JSON.parse(r.package_photos);
-                        if (Array.isArray(parsed)) sessionPhotos = [...parsed];
-                        else if (parsed) sessionPhotos = [parsed];
+                        if (Array.isArray(parsed)) rawPhotos = [...parsed];
+                        else if (parsed) rawPhotos = [parsed];
                     } catch (e) {
-                        if (r.package_photos.trim()) sessionPhotos = [r.package_photos.trim()];
+                        if (r.package_photos.trim()) rawPhotos = [r.package_photos.trim()];
                     }
                 }
+                sessionPhotos = rawPhotos;
             }
+
             if (r.photo_path && !sessionPhotos.includes(r.photo_path)) {
                 sessionPhotos.unshift(r.photo_path);
             }
-            sessionPhotos = sessionPhotos.filter(p => !!p);
+            sessionPhotos = Array.from(new Set(sessionPhotos)).filter(p => !!p);
             window._currentSessionPhotos = sessionPhotos;
 
             // Foto Kurir, Nama Kurir & PIC Penerima Gudang
@@ -2843,6 +2858,10 @@ window.viewReceivingPackagesList = async function(id) {
                 if (courierImg) {
                     courierImg.src = formattedCourierPhoto;
                     courierImg.classList.remove('hidden');
+                    courierImg.onerror = function() {
+                        this.classList.add('hidden');
+                        if (courierAvatarPlaceholder) courierAvatarPlaceholder.classList.remove('hidden');
+                    };
                 }
                 if (courierAvatarPlaceholder) courierAvatarPlaceholder.classList.add('hidden');
             } else {
@@ -2864,8 +2883,8 @@ window.viewReceivingPackagesList = async function(id) {
                     sessionGallery.innerHTML = sessionPhotos.map((sp, sIdx) => {
                         const sUrl = window.formatReceivingImgUrl(sp);
                         return `
-                            <div class="relative group w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden border border-slate-200 bg-black shrink-0 cursor-pointer shadow-2xs hover:border-emerald-500 transition" onclick="openClaimPhotoModal('${sUrl}', 'Dokumentasi Foto Paket ${escapeHtml(r.receipt_number)} - Foto ${sIdx + 1}')" title="Klik untuk memperbesar foto paket">
-                                <img src="${sUrl}" alt="Foto Paket ${sIdx + 1}" class="w-full h-full object-cover group-hover:scale-110 transition duration-300">
+                            <div class="relative group w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden border border-slate-200 bg-slate-900 shrink-0 cursor-pointer shadow-2xs hover:border-emerald-500 transition" onclick="openClaimPhotoModal('${sUrl}', 'Dokumentasi Foto Paket ${escapeHtml(r.receipt_number)} - Foto ${sIdx + 1}')" title="Klik untuk memperbesar foto paket">
+                                <img src="${sUrl}" alt="Foto Paket ${sIdx + 1}" class="w-full h-full object-cover group-hover:scale-110 transition duration-300" onerror="this.onerror=null; this.parentElement.classList.add('bg-slate-800'); this.style.display='none'; this.parentElement.insertAdjacentHTML('beforeend', '<div class=\\'flex flex-col items-center justify-center w-full h-full text-slate-400 text-[9px] p-1 text-center\\'><i class=\\'fa-solid fa-triangle-exclamation text-amber-400 text-sm mb-0.5\\'></i><span>Foto Error</span></div>');">
                                 <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-white text-xs">
                                     <i class="fa-solid fa-magnifying-glass-plus"></i>
                                 </div>
@@ -2879,7 +2898,7 @@ window.viewReceivingPackagesList = async function(id) {
             }
 
             const pkgPhotoCount = (data.packages || []).filter(p => !!p.photo_path).length;
-            const totalAvailablePhotos = Math.max(pkgPhotoCount, sessionPhotos.length);
+            const totalAvailablePhotos = pkgPhotoCount > 0 ? pkgPhotoCount : sessionPhotos.length;
             const photoCountEl = document.getElementById('pkgModalPhotoCount');
             if (photoCountEl) photoCountEl.innerText = `${totalAvailablePhotos} Berfoto`;
 
@@ -2930,8 +2949,8 @@ window.renderReceivingPackageCards = function(packages) {
         const scanTime = p.scanned_at ? (p.scanned_at.includes(' ') ? p.scanned_at.split(' ')[1] : p.scanned_at) : '';
 
         const photoHtml = photoPath ? `
-            <div class="relative group w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden border border-slate-200 bg-black shrink-0 cursor-pointer shadow-2xs hover:border-emerald-500 transition" onclick="openClaimPhotoModal('${photoPath}', 'Foto Paket ${barcode}${isSessionFallback ? ' (Dokumentasi Serah Terima)' : ''}')" title="Klik untuk zoom foto paket">
-                <img src="${photoPath}" alt="Foto Paket ${barcode}" class="w-full h-full object-cover group-hover:scale-110 transition duration-300">
+            <div class="relative group w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden border border-slate-200 bg-slate-900 shrink-0 cursor-pointer shadow-2xs hover:border-emerald-500 transition" onclick="openClaimPhotoModal('${photoPath}', 'Foto Paket ${barcode}${isSessionFallback ? ' (Dokumentasi Serah Terima)' : ''}')" title="Klik untuk zoom foto paket">
+                <img src="${photoPath}" alt="Foto Paket ${barcode}" class="w-full h-full object-cover group-hover:scale-110 transition duration-300" onerror="this.onerror=null; this.parentElement.classList.add('bg-slate-800'); this.style.display='none'; this.parentElement.insertAdjacentHTML('beforeend', '<div class=\\'flex flex-col items-center justify-center w-full h-full text-slate-400 text-[8px] p-1 text-center\\'><i class=\\'fa-solid fa-triangle-exclamation text-amber-400 text-xs mb-0.5\\'></i><span>Foto Error</span></div>');">
                 <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-white text-xs">
                     <i class="fa-solid fa-magnifying-glass-plus"></i>
                 </div>

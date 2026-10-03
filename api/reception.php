@@ -106,6 +106,26 @@ if ($method === 'GET') {
             } catch (Exception $eSyncCount) {}
         }
 
+        // Normalisasi dan perbaiki package_photos jika ada duplikasi foto
+        $pkgPhotoList = array_values(array_filter(array_column($packages, 'photo_path')));
+        if (!empty($reception['package_photos'])) {
+            $decPhotos = is_array($reception['package_photos']) ? $reception['package_photos'] : json_decode($reception['package_photos'], true);
+            if (is_array($decPhotos)) {
+                // Jika jumlah foto di package_photos lebih banyak dari jumlah foto paket, bersihkan duplikat rcv_
+                if (count($pkgPhotoList) > 0 && count($decPhotos) > count($pkgPhotoList)) {
+                    $cleanDecPhotos = array_values(array_filter($decPhotos, function($p) {
+                        return strpos($p, 'rcv_') === false;
+                    }));
+                    if (count($cleanDecPhotos) >= count($pkgPhotoList)) {
+                        $reception['package_photos'] = json_encode($cleanDecPhotos);
+                        try {
+                            $pdo->prepare("UPDATE expedition_receptions SET package_photos = ? WHERE id = ?")->execute([$reception['package_photos'], $id]);
+                        } catch (Exception $eFixDup) {}
+                    }
+                }
+            }
+        }
+
         jsonResponse([
             'success' => true,
             'reception' => $reception,
@@ -527,7 +547,7 @@ if ($method === 'POST') {
     }
     unset($cp);
 
-    // 2. Simpan Foto Tambahan Umum (jika dikirim via photos / package_photos)
+    // 2. Simpan Foto Tambahan Umum (jika dikirim via photos / package_photos yang BUKAN foto paket)
     $photosInput = $input['photos'] ?? $input['package_photos'] ?? [];
     if (is_string($photosInput) && !empty($photosInput)) {
         $photosInput = [$photosInput];
@@ -536,7 +556,20 @@ if ($method === 'POST') {
         $photosInput[] = $input['photo_path'];
     }
 
+    // Ambil hash dari foto-foto per-paket yang sudah diproses di atas
+    $existingRawPkgHashes = [];
+    foreach ($cleanPackages as $cp) {
+        if (!empty($cp['photo']) && is_string($cp['photo'])) {
+            $existingRawPkgHashes[md5(trim($cp['photo']))] = true;
+        }
+    }
+
     foreach ($photosInput as $idx => $pData) {
+        if (!is_string($pData) || empty($pData)) continue;
+        // Jangan simpan ulang jika foto ini identik dengan foto salah satu paket
+        if (isset($existingRawPkgHashes[md5(trim($pData))])) {
+            continue;
+        }
         $saved = $saveImgHelper($pData, 'rcv_' . $cleanRcpt . "_{$idx}");
         if ($saved && !in_array($saved, $photoPaths)) {
             $photoPaths[] = $saved;

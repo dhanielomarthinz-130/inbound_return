@@ -2172,8 +2172,7 @@ try {
                         barcode: p.barcode,
                         photo: p.photo,
                         sack_number: p.sack_number || currentSackNumber || 'Karung 1'
-                    })),
-                    photos: draftPackages.map(p => p.photo)
+                    }))
                 };
 
                 const res = await fetch('api/reception.php', {
