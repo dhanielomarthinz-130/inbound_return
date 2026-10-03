@@ -125,7 +125,9 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 border: 1px solid #cbd5e1 !important;
             }
             #printableReceivingReceiptArea #adminSlipPackageList {
-                display: block !important;
+                display: grid !important;
+                grid-template-columns: 1fr 1fr !important;
+                gap: 3px 6px !important;
                 width: 100% !important;
                 height: auto !important;
                 max-height: none !important;
@@ -134,25 +136,26 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 border: none !important;
                 padding: 0 !important;
                 margin: 0 !important;
+                box-sizing: border-box !important;
             }
             #printableReceivingReceiptArea #adminSlipPackageList > div {
-                display: inline-flex !important;
-                width: 49.2% !important;
-                margin-right: 1.2% !important;
-                margin-bottom: 3.5px !important;
-                vertical-align: top !important;
+                display: flex !important;
+                flex-direction: row !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
                 box-sizing: border-box !important;
                 break-inside: avoid !important;
                 page-break-inside: avoid !important;
                 border: 1px solid #cbd5e1 !important;
                 background-color: #f8fafc !important;
-                padding: 2.5px 5px !important;
+                padding: 2.5px 6px !important;
                 font-size: 7.5pt !important;
+                border-radius: 6px !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
-            }
-            #printableReceivingReceiptArea #adminSlipPackageList > div:nth-child(2n) {
-                margin-right: 0 !important;
             }
             #printableReceivingReceiptArea #adminSlipPackageList span,
             #printableReceivingReceiptArea #adminSlipPackageList div {
@@ -2186,7 +2189,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                         </h4>
                         <span class="text-[10px] text-slate-500 font-medium">Status Seluruh Resi: <b class="text-emerald-700">DITERIMA LENGKAP</b></span>
                     </div>
-                    <div id="adminSlipPackageList" class="bg-slate-50 rounded-xl p-2.5 max-h-56 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-1.5 font-mono text-[11px] border border-slate-200">
+                    <div id="adminSlipPackageList" class="bg-slate-50 rounded-xl p-2.5 max-h-56 overflow-y-auto grid grid-cols-2 gap-1.5 font-mono text-[11px] border border-slate-200">
                         <!-- List Resi -->
                     </div>
                 </div>
