@@ -24,3 +24,4 @@ uploads/reception/*.png
 uploads/cache/
 uploads/logs/
 uploads/.db_ready
+cloudflared.exe
