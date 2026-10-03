@@ -2227,19 +2227,6 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                         </div>
                     </div>
                 </div>
-
-                <!-- Dokumentasi Galeri Foto Serah Terima (Jika Ada) -->
-                <div id="pkgModalSessionPhotosSection" class="hidden bg-white p-2.5 rounded-xl border border-indigo-100 shadow-2xs">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-[10px] uppercase font-bold text-indigo-700 flex items-center gap-1.5">
-                            <i class="fa-solid fa-camera"></i> Dokumentasi Foto Paket Serah Terima (<span id="pkgModalSessionPhotoCount">0</span> Foto)
-                        </span>
-                        <span class="text-[9px] text-slate-400">Klik foto untuk melihat resolusi penuh</span>
-                    </div>
-                    <div id="pkgModalSessionPhotoGallery" class="flex items-center gap-2 overflow-x-auto pb-1">
-                        <!-- Dynamic Session Photos -->
-                    </div>
-                </div>
             </div>
 
             <!-- Search Bar & Controls -->

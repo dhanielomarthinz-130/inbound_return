@@ -2872,30 +2872,9 @@ window.viewReceivingPackagesList = async function(id) {
                 if (courierAvatarPlaceholder) courierAvatarPlaceholder.classList.remove('hidden');
             }
 
-            // Dokumentasi Foto Sesi Penerimaan (Gallery)
+            // Dokumentasi Foto Sesi Penerimaan (Gallery dihapus, foto sudah ada di kartu masing-masing paket)
             const sessionSec = document.getElementById('pkgModalSessionPhotosSection');
-            const sessionCountEl = document.getElementById('pkgModalSessionPhotoCount');
-            const sessionGallery = document.getElementById('pkgModalSessionPhotoGallery');
-            if (sessionPhotos.length > 0) {
-                if (sessionSec) sessionSec.classList.remove('hidden');
-                if (sessionCountEl) sessionCountEl.innerText = sessionPhotos.length;
-                if (sessionGallery) {
-                    sessionGallery.innerHTML = sessionPhotos.map((sp, sIdx) => {
-                        const sUrl = window.formatReceivingImgUrl(sp);
-                        return `
-                            <div class="relative group w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden border border-slate-200 bg-slate-900 shrink-0 cursor-pointer shadow-2xs hover:border-emerald-500 transition" onclick="openClaimPhotoModal('${sUrl}', 'Dokumentasi Foto Paket ${escapeHtml(r.receipt_number)} - Foto ${sIdx + 1}')" title="Klik untuk memperbesar foto paket">
-                                <img src="${sUrl}" alt="Foto Paket ${sIdx + 1}" class="w-full h-full object-cover group-hover:scale-110 transition duration-300" onerror="this.onerror=null; this.parentElement.classList.add('bg-slate-800'); this.style.display='none'; this.parentElement.insertAdjacentHTML('beforeend', '<div class=\\'flex flex-col items-center justify-center w-full h-full text-slate-400 text-[9px] p-1 text-center\\'><i class=\\'fa-solid fa-triangle-exclamation text-amber-400 text-sm mb-0.5\\'></i><span>Foto Error</span></div>');">
-                                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-white text-xs">
-                                    <i class="fa-solid fa-magnifying-glass-plus"></i>
-                                </div>
-                            </div>
-                        `;
-                    }).join('');
-                }
-            } else {
-                if (sessionSec) sessionSec.classList.add('hidden');
-                if (sessionGallery) sessionGallery.innerHTML = '';
-            }
+            if (sessionSec) sessionSec.classList.add('hidden');
 
             const pkgPhotoCount = (data.packages || []).filter(p => !!p.photo_path).length;
             const totalAvailablePhotos = pkgPhotoCount > 0 ? pkgPhotoCount : sessionPhotos.length;
