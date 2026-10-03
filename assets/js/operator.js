@@ -582,6 +582,31 @@ inputType.addEventListener('keypress', (e) => {
     }
 });
 
+function updateProductPhotoButtonState() {
+    const btn = document.getElementById('btnCaptureProductPhoto');
+    if (!btn) return;
+    const typeVal = String(inputType?.value || '').toUpperCase().trim();
+    const isDamaged = (typeVal !== 'GOOD' && typeVal !== 'BAGUS' && typeVal !== '');
+    const icon = btn.querySelector('i');
+    const label = btn.querySelector('#labelCaptureProductPhoto') || btn.querySelector('div span:last-child');
+    
+    if (isDamaged) {
+        btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700', 'shadow-emerald-600/25');
+        btn.classList.add('bg-rose-600', 'hover:bg-rose-700', 'shadow-rose-600/25');
+        if (icon) icon.className = 'fa-solid fa-triangle-exclamation text-xs';
+        if (label) label.innerText = '+ Foto Barang Rusak';
+    } else {
+        btn.classList.remove('bg-rose-600', 'hover:bg-rose-700', 'shadow-rose-600/25');
+        btn.classList.add('bg-emerald-600', 'hover:bg-emerald-700', 'shadow-emerald-600/25');
+        if (icon) icon.className = 'fa-solid fa-tag text-xs';
+        if (label) label.innerText = '+ Foto Produk';
+    }
+}
+
+if (inputType) {
+    inputType.addEventListener('change', updateProductPhotoButtonState);
+}
+
 // -------------------------------------------------------------
 // VIRTUAL ENTER BUTTON & INPUT FOCUS TRACKER
 // -------------------------------------------------------------
@@ -1149,6 +1174,7 @@ function resetProductInputs() {
     document.getElementById('detectedProductName').innerText = "Silakan scan / ketik barcode...";
     document.getElementById('detectedProductName').className = "font-bold text-indigo-700 ml-1 text-sm";
     document.getElementById('detectedProductSku').innerText = "";
+    if (typeof updateProductPhotoButtonState === 'function') updateProductPhotoButtonState();
 }
 
 // -------------------------------------------------------------
@@ -1998,7 +2024,7 @@ window.renderPhotosGallery = function() {
 
     // Perbarui legacy fallback
     const pkgPhotos = capturedPhotosList.filter(p => p.type === 'package');
-    const prodPhotos = capturedPhotosList.filter(p => p.type === 'product');
+    const prodPhotos = capturedPhotosList.filter(p => p.type === 'product' || p.type === 'damaged');
     capturedPackagePhoto = pkgPhotos.length > 0 ? pkgPhotos[pkgPhotos.length - 1].dataUrl : null;
     capturedProductPhoto = prodPhotos.length > 0 ? prodPhotos[prodPhotos.length - 1].dataUrl : null;
 
@@ -2017,10 +2043,11 @@ window.renderPhotosGallery = function() {
 
     capturedPhotosList.forEach((item, index) => {
         const isPkg = (item.type === 'package');
-        const badgeColor = isPkg ? 'bg-indigo-600' : 'bg-emerald-600';
-        const badgeIcon = isPkg ? 'fa-box' : 'fa-tag';
-        const badgeText = isPkg ? 'Paket' : 'Produk';
-        const safeTitle = (item.title || (isPkg ? 'Foto Bukti Paket' : 'Foto Bukti Produk')).replace(/"/g, '&quot;');
+        const isDmg = (item.type === 'damaged' || item.isDamaged || (item.title && item.title.toLowerCase().includes('rusak')));
+        const badgeColor = isPkg ? 'bg-indigo-600' : (isDmg ? 'bg-rose-600' : 'bg-emerald-600');
+        const badgeIcon = isPkg ? 'fa-box' : (isDmg ? 'fa-triangle-exclamation' : 'fa-tag');
+        const badgeText = isPkg ? 'Paket' : (isDmg ? 'Rusak' : 'Produk');
+        const safeTitle = (item.title || (isPkg ? 'Foto Bukti Paket' : (isDmg ? 'Foto Barang Rusak' : 'Foto Bukti Produk'))).replace(/"/g, '&quot;');
         const timeStr = item.createdAt ? (item.createdAt.split(' ')[1] || item.createdAt) : '';
 
         const row = document.createElement('div');
@@ -2163,15 +2190,57 @@ window.captureProductPhoto = function(sourceImage = null) {
         const batchEl = document.getElementById('inputBatch');
         const expEl = document.getElementById('inputExpDate');
         const typeEl = document.getElementById('inputType');
+        const qtyEl = document.getElementById('inputQty');
 
         let pBatch = (batchEl && batchEl.value) ? batchEl.value.trim() : '-';
         let pExp = (expEl && expEl.value) ? expEl.value.trim() : '-';
-        let pType = (typeEl && typeEl.value) ? typeEl.value : 'GOOD';
+        let pType = (typeEl && typeEl.value) ? typeEl.value.trim() : 'GOOD';
+        let pQty = (qtyEl && qtyEl.value) ? parseInt(qtyEl.value, 10) : 1;
         let pName = 'Produk Return';
         let pSku = '-';
         let pSap = '-';
+        let isDamaged = false;
 
-        if (typeof currentDetectedProduct !== 'undefined' && currentDetectedProduct) {
+        // 1. Cek apakah ada barang rusak di riwayat list scan unboxing invoice ini
+        const damagedInList = Array.isArray(scannedProductsList) ? [...scannedProductsList].reverse().find(i => {
+            const cond = String(i.condition || '').toUpperCase().trim();
+            const typ = String(i.type || '').toUpperCase().trim();
+            const rsn = String(i.damage_reason || '').trim();
+            return (cond !== '' && cond !== 'GOOD' && cond !== 'BAGUS') ||
+                   (typ !== '' && typ !== 'GOOD' && typ !== 'BAGUS') ||
+                   rsn !== '';
+        }) : null;
+
+        // 2. Evaluasi apakah form input saat ini diset sebagai rusak
+        const currentTypeUpper = String(pType).toUpperCase();
+        const formIsDamaged = (currentTypeUpper !== 'GOOD' && currentTypeUpper !== 'BAGUS' && currentTypeUpper !== '');
+
+        if (formIsDamaged) {
+            // Form aktif sedang memilih type rusak (Defect/Rusak/Expired dll)
+            isDamaged = true;
+            if (typeof currentDetectedProduct !== 'undefined' && currentDetectedProduct) {
+                pName = currentDetectedProduct.name || 'Produk Return';
+                pSku = currentDetectedProduct.seller_sku || currentDetectedProduct.sku || '-';
+                pSap = currentDetectedProduct.sap_code || '-';
+            } else if (damagedInList) {
+                pName = damagedInList.product_name || 'Produk Return';
+                pSku = damagedInList.seller_sku || damagedInList.sku || '-';
+                pSap = damagedInList.sap_code || '-';
+                pBatch = damagedInList.batch_no || pBatch;
+                pExp = damagedInList.exp_date || pExp;
+                pQty = damagedInList.qty || pQty;
+            }
+        } else if (damagedInList) {
+            // Form ter-reset ke GOOD setelah commit, tapi invoice ini memiliki barang rusak yang perlu difoto bukti!
+            isDamaged = true;
+            pType = damagedInList.type || damagedInList.condition || 'RUSAK';
+            pName = damagedInList.product_name || 'Produk Return';
+            pSku = damagedInList.seller_sku || damagedInList.sku || '-';
+            pSap = damagedInList.sap_code || '-';
+            pBatch = damagedInList.batch_no || pBatch;
+            pExp = damagedInList.exp_date || pExp;
+            pQty = damagedInList.qty || pQty;
+        } else if (typeof currentDetectedProduct !== 'undefined' && currentDetectedProduct) {
             pName = currentDetectedProduct.name || 'Produk Return';
             pSku = currentDetectedProduct.seller_sku || currentDetectedProduct.sku || '-';
             pSap = currentDetectedProduct.sap_code || '-';
@@ -2183,36 +2252,45 @@ window.captureProductPhoto = function(sourceImage = null) {
             pBatch = last.batch_no || pBatch;
             pExp = last.exp_date || pExp;
             pType = last.type || pType;
+            pQty = last.qty || pQty;
+            const lType = String(pType).toUpperCase();
+            if (lType !== 'GOOD' && lType !== 'BAGUS') isDamaged = true;
         }
 
         const fields = [
             { label: 'NO. INVOICE', val: inv, highlight: true },
-            { label: 'KONDISI / TIPE', val: pType, highlight: (pType !== 'GOOD') },
+            { label: 'KONDISI / TIPE', val: isDamaged ? `⚠️ ${pType} (RUSAK)` : pType, highlight: isDamaged },
             { label: 'NAMA PRODUK', val: pName.length > 28 ? pName.substring(0, 28) + '...' : pName },
             { label: 'SKU / SAP', val: `${pSku} | ${pSap}` },
+            { label: 'QTY PRODUK', val: `${pQty || 1} Unit`, highlight: isDamaged },
             { label: 'BATCH & EXP', val: `B:${pBatch || '-'} | Exp:${pExp || '-'}` },
             { label: 'WAKTU & OPERATOR', val: `${getNowFormattedWIB()} (${opName})` }
         ];
 
+        const badgeText = isDamaged ? `⚠️ FOTO BUKTI BARANG RUSAK (${pType})` : '🏷️ FOTO PRODUK UNBOXING';
+        const badgeColor = isDamaged ? '#dc2626' : '#059669';
+
         const dataUrl = generateWatermarkedPhoto({
-            badgeText: '🏷️ FOTO PRODUK UNBOXING',
-            badgeColor: '#059669',
+            badgeText: badgeText,
+            badgeColor: badgeColor,
             fields: fields,
             sourceImage: sourceImage
         });
 
-        const prodCount = capturedPhotosList.filter(p => p.type === 'product').length + 1;
+        const prodCount = capturedPhotosList.filter(p => p.type === 'product' || p.type === 'damaged').length + 1;
         const photoItem = {
-            id: 'prod_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-            type: 'product',
-            title: `Foto Produk #${prodCount} (${pName})`,
+            id: (isDamaged ? 'dmg_' : 'prod_') + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+            type: isDamaged ? 'damaged' : 'product',
+            badge: isDamaged ? 'Barang Rusak' : 'Produk Retur',
+            isDamaged: isDamaged,
+            title: isDamaged ? `Foto Barang Rusak #${prodCount} (${pName} - ${pType} x${pQty})` : `Foto Produk #${prodCount} (${pName})`,
             dataUrl: dataUrl,
             createdAt: getNowFormattedWIB()
         };
         capturedPhotosList.push(photoItem);
         renderPhotosGallery();
 
-        showToast('success', `Foto Produk #${prodCount} berhasil disimpan! [Tuts F4]`, 'Foto Produk Siap');
+        showToast('success', `${isDamaged ? 'Foto Bukti Barang Rusak' : 'Foto Produk'} #${prodCount} berhasil disimpan! [Tuts F4]`, isDamaged ? 'Foto Barang Rusak Siap' : 'Foto Produk Siap');
     } catch (err) {
         console.error("captureProductPhoto error:", err);
         showToast('error', 'Gagal mengambil foto produk: ' + err.message, 'Gagal Foto');

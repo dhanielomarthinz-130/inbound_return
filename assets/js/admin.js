@@ -2793,17 +2793,23 @@ function renderClaimDossier(data) {
     if (totalText) totalText.innerText = `${photos.length} Foto Bukti Tersimpan`;
 
     if (photos.length > 0 && galleryEl) {
-        galleryEl.innerHTML = photos.map((p, idx) => `
-            <div class="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-video cursor-pointer shadow-2xs hover:shadow-md transition" onclick="openClaimPhotoModal('${encodeURI(p.url)}', '${encodeURIComponent(p.title || 'Foto Bukti')}')">
+        galleryEl.innerHTML = photos.map((p, idx) => {
+            const isDmg = (p.is_damaged || p.badge === 'Barang Rusak' || (p.title && p.title.toLowerCase().includes('rusak')));
+            const borderCls = isDmg ? 'border-2 border-rose-500 shadow-md shadow-rose-500/20' : 'border border-slate-200';
+            const badgeBg = isDmg ? 'bg-rose-600 text-white font-black' : 'bg-slate-900/80 text-white font-bold';
+            const badgeLabel = isDmg ? '⚠️ BARANG RUSAK' : (p.badge || 'Bukti');
+            return `
+            <div class="relative group rounded-xl overflow-hidden ${borderCls} bg-slate-100 aspect-video cursor-pointer shadow-2xs hover:shadow-md transition" onclick="openClaimPhotoModal('${encodeURI(p.url)}', '${encodeURIComponent(p.title || 'Foto Bukti')}')">
                 <img src="${p.url}" alt="${p.title || 'Foto'}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
                 <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition flex items-end p-2">
                     <span class="text-[10px] text-white font-semibold truncate"><i class="fa-solid fa-magnifying-glass-plus mr-1"></i>${p.title || 'Perbesar'}</span>
                 </div>
-                <span class="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-slate-900/80 text-white font-bold text-[9px] uppercase tracking-wider backdrop-blur-xs">
-                    ${p.badge || 'Bukti'}
+                <span class="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded ${badgeBg} text-[9px] uppercase tracking-wider backdrop-blur-xs">
+                    ${badgeLabel}
                 </span>
             </div>
-        `).join('');
+            `;
+        }).join('');
         galleryEl.classList.remove('hidden');
         if (noPhotosEl) noPhotosEl.classList.add('hidden');
     } else {
@@ -2842,11 +2848,43 @@ function renderClaimDossier(data) {
     setElText('detailShopName', `${order.CommercePlatform || 'Marketplace'} • ${order.ShopName || '-'}`);
     setElText('detailUnboxStatus', unboxing ? `${unboxing.status} (${unboxing.total_damaged || 0} Rusak, ${unboxing.total_good || 0} Bagus)` : '- (Belum di-unboxing)');
 
-    let prodNames = order.ProductName || '';
-    if (!prodNames && unboxing?.items && unboxing.items.length > 0) {
-        prodNames = unboxing.items.map(i => `${i.product_name || i.barcode} (x${i.qty || 1})`).join(', ');
+    let prodItemsHtml = '';
+    if (unboxing?.items && unboxing.items.length > 0) {
+        prodItemsHtml = unboxing.items.map(i => {
+            const cond = String(i.condition || '').toUpperCase().trim();
+            const typ = String(i.type || '').toUpperCase().trim();
+            const isItemDmg = (cond !== '' && cond !== 'GOOD' && cond !== 'BAGUS') ||
+                              (typ !== '' && typ !== 'GOOD' && typ !== 'BAGUS') ||
+                              Boolean(i.damage_reason);
+            const badgeClass = isItemDmg ? 'bg-rose-100 text-rose-800 border-rose-300 font-bold' : 'bg-emerald-100 text-emerald-800 border-emerald-300';
+            const condText = isItemDmg ? `⚠️ ${i.type || i.condition || 'RUSAK'}${i.damage_reason ? ' (' + i.damage_reason + ')' : ''}` : 'GOOD';
+            return `
+                <div class="flex items-center justify-between py-1.5 px-2 rounded-lg ${isItemDmg ? 'bg-rose-50/90 border border-rose-200' : 'bg-slate-50 border border-slate-100'} gap-2">
+                    <div class="truncate flex-1 min-w-0">
+                        <span class="font-bold text-slate-800 text-xs block truncate" title="${i.product_name || i.barcode}">${i.product_name || i.barcode}</span>
+                        <div class="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
+                            ${i.seller_sku ? `<span>SKU: ${i.seller_sku}</span>` : ''}
+                            ${i.batch_no ? `<span>Batch: ${i.batch_no}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <span class="px-2 py-0.5 rounded-md font-mono font-bold text-xs bg-slate-900 text-white shadow-2xs">
+                            ${i.qty || 1} Unit
+                        </span>
+                        <span class="px-2 py-0.5 rounded-md text-[10px] border ${badgeClass}">
+                            ${condText}
+                        </span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } else if (order.ProductName) {
+        prodItemsHtml = `<div class="font-bold text-slate-800 text-xs p-1">${order.ProductName}</div>`;
     }
-    setElText('detailOrderProductName', prodNames || '-');
+    const prodEl = document.getElementById('detailOrderProductName');
+    if (prodEl) {
+        prodEl.innerHTML = prodItemsHtml || '<span class="text-slate-400 italic">Data produk tidak tersedia</span>';
+    }
 
     let notes = '-';
     if (unboxing) {
@@ -3157,6 +3195,38 @@ window.printClaimDossier = function() {
                 <tr><td class="label">Operator Pemeriksa:</td><td class="val">${unb.operator_name || '-'}</td></tr>
                 <tr><td class="label">Catatan Kerusakan:</td><td class="val">${unb.notes || (ord.ReturnReasonText ? '[' + ord.ReturnReason + '] ' + ord.ReturnReasonText : 'Lihat rincian fisik')}</td></tr>
                 <tr><td class="label">Video Unboxing Retur:</td><td class="val">${unb.video_path ? '<span class="badge-ok">✓ TEREKAM LENGKAP</span>' : '<span class="badge-no">✕ BELUM DIREKAM</span>'}</td></tr>
+                ${(unb.items && unb.items.length > 0) ? `
+                <tr>
+                    <td colspan="2" style="padding-top: 8px;">
+                        <b style="font-size: 8.5pt; text-transform: uppercase; color: #475569;">Rincian Item Produk &amp; Kondisi Fisik:</b>
+                        <table style="margin-top: 4px; border: 1px solid #cbd5e1; font-size: 8.5pt;">
+                            <tr style="background: #f1f5f9; font-weight: bold; border-bottom: 1px solid #cbd5e1;">
+                                <td style="padding: 4px; width: 5%;">#</td>
+                                <td style="padding: 4px; width: 45%;">Nama Produk &amp; SKU</td>
+                                <td style="padding: 4px; width: 12%; text-align: center;">Qty</td>
+                                <td style="padding: 4px; width: 18%; text-align: center;">Kondisi / Tipe</td>
+                                <td style="padding: 4px; width: 20%;">Alasan / Catatan</td>
+                            </tr>
+                            ${unb.items.map((it, iIdx) => {
+                                const isD = (String(it.condition || '').toUpperCase() !== 'GOOD' && String(it.condition || '').toUpperCase() !== 'BAGUS') ||
+                                            (String(it.type || '').toUpperCase() !== 'GOOD' && String(it.type || '').toUpperCase() !== 'BAGUS') ||
+                                            Boolean(it.damage_reason);
+                                const rowBg = isD ? 'background: #fff1f2; font-weight: bold;' : '';
+                                const badgeC = isD ? 'badge-no' : 'badge-ok';
+                                return `
+                                <tr style="border-bottom: 1px solid #e2e8f0; ${rowBg}">
+                                    <td style="padding: 4px;">${iIdx + 1}</td>
+                                    <td style="padding: 4px;">${it.product_name || it.barcode} ${it.seller_sku ? '<br><small style="color: #64748b;">SKU: ' + it.seller_sku + '</small>' : ''}</td>
+                                    <td style="padding: 4px; text-align: center; font-family: monospace; font-size: 9pt;">${it.qty || 1} pcs</td>
+                                    <td style="padding: 4px; text-align: center;"><span class="${badgeC}">${it.type || it.condition || 'GOOD'}</span></td>
+                                    <td style="padding: 4px; color: ${isD ? '#991b1b' : '#64748b'};">${it.damage_reason || (isD ? 'Barang Rusak' : '-')}</td>
+                                </tr>
+                                `;
+                            }).join('')}
+                        </table>
+                    </td>
+                </tr>
+                ` : ''}
             </table>
         </div>
 
@@ -3164,12 +3234,17 @@ window.printClaimDossier = function() {
         <div class="box">
             <div class="box-title">V. DOKUMENTASI FOTO BUKTI FISIK (${photos.length} FOTO)</div>
             <div class="photos-grid">
-                ${photos.slice(0, 6).map(p => `
-                    <div class="photo-item">
+                ${photos.slice(0, 6).map(p => {
+                    const isPhotoDmg = (p.is_damaged || p.badge === 'Barang Rusak' || (p.title && p.title.toLowerCase().includes('rusak')));
+                    const borderStyle = isPhotoDmg ? 'border: 2px solid #ef4444; background: #fff1f2;' : 'border: 1px solid #e2e8f0;';
+                    const tagStyle = isPhotoDmg ? 'color: #dc2626; font-weight: 900;' : 'color: #475569;';
+                    return `
+                    <div class="photo-item" style="${borderStyle}">
                         <img src="${p.url}" alt="${p.title || 'Foto Bukti'}">
-                        <span>${p.title || p.badge || 'Bukti Retur'}</span>
+                        <span style="${tagStyle}">${isPhotoDmg ? '⚠️ ' : ''}${p.title || p.badge || 'Bukti Retur'}</span>
                     </div>
-                `).join('')}
+                    `;
+                }).join('')}
             </div>
         </div>
         ` : ''}
@@ -3213,13 +3288,13 @@ window.loadClaimCandidates = async function(force = false) {
         const data = await res.json();
 
         if (!data.success) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-rose-500 font-semibold">${data.message || 'Gagal memuat kandidat klaim'}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-rose-500 font-semibold">${data.message || 'Gagal memuat kandidat klaim'}</td></tr>`;
             return;
         }
 
         const candidates = data.candidates || [];
         if (candidates.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-slate-400">
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center py-10 text-slate-400">
                 <i class="fa-solid fa-box-open text-2xl text-slate-300 mb-2 block"></i>
                 Tidak ada paket unboxing yang berkondisi rusak / cacat saat ini. Semua paket berkondisi BAGUS (GOOD).
             </td></tr>`;
@@ -3229,31 +3304,38 @@ window.loadClaimCandidates = async function(force = false) {
         let html = '';
         candidates.forEach((c, idx) => {
             const hasVideo = !!c.video_path;
-            const damagedCount = c.total_damaged > 0 ? c.total_damaged : (c.damaged_items_count || 1);
+            const damagedCount = c.damaged_qty || (c.total_damaged > 0 ? c.total_damaged : (c.damaged_items_count || 1));
             const reason = c.damage_reasons || c.notes || 'Kondisi Rusak / Bukan Good';
+            const prodName = c.product_names || '<span class="text-slate-400 italic">Produk Retur</span>';
 
             html += `
                 <tr class="hover:bg-rose-50/40 transition border-b border-slate-100">
-                    <td class="py-3 px-4 font-bold text-slate-500">${idx + 1}</td>
-                    <td class="py-3 px-4">
+                    <td class="py-3 px-3 font-bold text-slate-500">${idx + 1}</td>
+                    <td class="py-3 px-3">
                         <button onclick="lookupClaimCandidate('${c.invoice_number}')" class="font-mono font-bold text-indigo-600 hover:text-indigo-800 text-left block hover:underline">
                             ${c.invoice_number}
                         </button>
                         <span class="text-[10px] text-slate-400 block">${c.operator_name || 'Operator'}</span>
                     </td>
-                    <td class="py-3 px-4 font-semibold text-slate-700">${c.expedition || '-'}</td>
-                    <td class="py-3 px-4 text-slate-500 text-[11px] whitespace-nowrap">${c.created_at || '-'}</td>
-                    <td class="py-3 px-4 text-center">
+                    <td class="py-3 px-3">
+                        <div class="font-bold text-slate-800 text-xs truncate max-w-[220px]" title="${c.product_names || ''}">
+                            ${prodName}
+                        </div>
+                    </td>
+                    <td class="py-3 px-3 text-center">
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
                             ${damagedCount} Rusak
                         </span>
+                        ${c.total_items ? `<span class="block text-[9px] text-slate-400 font-medium mt-0.5">Total: ${c.total_items} pcs</span>` : ''}
                     </td>
-                    <td class="py-3 px-4">
+                    <td class="py-3 px-3">
                         <span class="text-slate-800 font-medium block max-w-xs truncate" title="${reason}">
                             ${reason}
                         </span>
                     </td>
-                    <td class="py-3 px-4 text-center">
+                    <td class="py-3 px-3 font-semibold text-slate-700">${c.expedition || '-'}</td>
+                    <td class="py-3 px-3 text-slate-500 text-[11px] whitespace-nowrap">${c.created_at || '-'}</td>
+                    <td class="py-3 px-3 text-center">
                         ${hasVideo ? 
                             `<span class="inline-flex items-center gap-1 text-[11px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                                 <i class="fa-solid fa-video"></i> Ada
@@ -3263,7 +3345,7 @@ window.loadClaimCandidates = async function(force = false) {
                              </span>`
                         }
                     </td>
-                    <td class="py-3 px-4 text-center">
+                    <td class="py-3 px-3 text-center">
                         <button onclick="lookupClaimCandidate('${c.invoice_number}')" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[11px] font-bold transition shadow-2xs flex items-center gap-1.5 mx-auto">
                             <i class="fa-solid fa-file-shield"></i> Berkas Klaim
                         </button>

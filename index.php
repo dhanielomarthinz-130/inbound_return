@@ -213,10 +213,10 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                     <button id="btnCaptureProductPhoto" onclick="captureProductPhoto()" type="button" disabled
                         title="Isi nomor resi / invoice terlebih dahulu"
                         class="flex items-center justify-center gap-2 py-1.5 px-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl font-bold text-xs transition shadow-sm shadow-emerald-600/25 opacity-40 cursor-not-allowed">
-                        <i class="fa-solid fa-tag text-xs"></i>
+                        <i id="iconCaptureProductPhoto" class="fa-solid fa-tag text-xs"></i>
                         <div class="text-left leading-tight">
                             <span class="block text-[9px] opacity-80 font-mono font-black">TUTS [F4]</span>
-                            <span>+ Foto Produk</span>
+                            <span id="labelCaptureProductPhoto">+ Foto Produk</span>
                         </div>
                     </button>
                 </div>

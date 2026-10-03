@@ -915,12 +915,12 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                     <span id="detailUnboxStatus" class="font-bold text-slate-800">-</span>
                                 </div>
                                 <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Rincian Produk di Paket</span>
-                                    <span id="detailOrderProductName" class="text-slate-700 font-medium block bg-slate-50 p-2 rounded-lg border border-slate-200 text-xs max-h-16 overflow-y-auto">-</span>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Rincian Produk di Paket &amp; Qty</span>
+                                    <div id="detailOrderProductName" class="text-slate-700 font-medium block bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs max-h-32 overflow-y-auto space-y-1.5">-</div>
                                 </div>
                                 <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Kondisi Barang & Alasan Retur</span>
-                                    <div id="detailConditionNotes" class="font-semibold text-slate-800 bg-amber-50 p-2 rounded-lg border border-amber-200 text-xs max-h-20 overflow-y-auto">-</div>
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Kondisi Barang &amp; Alasan Retur</span>
+                                    <div id="detailConditionNotes" class="font-semibold text-slate-800 bg-amber-50 p-2.5 rounded-xl border border-amber-200 text-xs max-h-24 overflow-y-auto">-</div>
                                 </div>
                             </div>
                         </div>
@@ -955,19 +955,20 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                         <table class="w-full text-left text-xs">
                             <thead class="bg-slate-50 text-slate-600 border-b border-slate-200 font-bold uppercase text-[10px]">
                                 <tr>
-                                    <th class="py-3 px-4">#</th>
-                                    <th class="py-3 px-4">No. Resi / Invoice</th>
-                                    <th class="py-3 px-4">Ekspedisi</th>
-                                    <th class="py-3 px-4">Waktu Unboxing</th>
-                                    <th class="py-3 px-4 text-center">Qty Rusak</th>
-                                    <th class="py-3 px-4">Kondisi / Alasan Rusak</th>
-                                    <th class="py-3 px-4 text-center">Video Unbox</th>
-                                    <th class="py-3 px-4 text-center">Aksi</th>
+                                    <th class="py-3 px-3">#</th>
+                                    <th class="py-3 px-3">No. Resi / Invoice</th>
+                                    <th class="py-3 px-3">Nama Produk</th>
+                                    <th class="py-3 px-3 text-center">Qty Rusak</th>
+                                    <th class="py-3 px-3">Kondisi / Alasan Rusak</th>
+                                    <th class="py-3 px-3">Ekspedisi</th>
+                                    <th class="py-3 px-3">Waktu Unboxing</th>
+                                    <th class="py-3 px-3 text-center">Video Unbox</th>
+                                    <th class="py-3 px-3 text-center">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody id="claimCandidatesTableBody" class="divide-y divide-slate-100">
                                 <tr>
-                                    <td colspan="8" class="text-center py-10 text-slate-400">
+                                    <td colspan="9" class="text-center py-10 text-slate-400">
                                         <i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat daftar paket rusak...
                                     </td>
                                 </tr>

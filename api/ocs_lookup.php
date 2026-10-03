@@ -37,10 +37,22 @@ if ($query === '' || $action === 'list_claimable') {
                        SUM(CASE WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
                                   OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
                                   OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') THEN 1 ELSE 0 END) as damaged_items_count,
+                       SUM(CASE WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
+                                  OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
+                                  OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') THEN ri.qty ELSE 0 END) as damaged_qty_sum,
+                       GROUP_CONCAT(DISTINCT CASE 
+                           WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
+                             OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
+                             OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') 
+                           THEN CONCAT(ri.product_name, ' (x', ri.qty, ')') 
+                           ELSE NULL 
+                       END SEPARATOR ', ') as damaged_product_names,
+                       GROUP_CONCAT(DISTINCT CONCAT(ri.product_name, ' (x', ri.qty, ')') SEPARATOR ', ') as all_product_names,
                        GROUP_CONCAT(DISTINCT CASE WHEN ri.damage_reason IS NOT NULL AND ri.damage_reason != '' THEN ri.damage_reason ELSE NULL END SEPARATOR '; ') as damage_reasons,
                        MAX(o.package_price) as package_price, 
                        MAX(o.commerce_platform) as commerce_platform, 
                        MAX(o.shop_name) as shop_name, 
+                       MAX(o.product_name) as ocs_product_name,
                        MAX(o.has_packing_video) as has_packing_video
                 FROM return_sessions rs
                 LEFT JOIN return_items ri ON ri.session_id = rs.id
@@ -59,10 +71,22 @@ if ($query === '' || $action === 'list_claimable') {
                        SUM(CASE WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
                                   OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
                                   OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') THEN 1 ELSE 0 END) as damaged_items_count,
+                       SUM(CASE WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
+                                  OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
+                                  OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') THEN ri.qty ELSE 0 END) as damaged_qty_sum,
+                       GROUP_CONCAT(DISTINCT CASE 
+                           WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
+                             OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
+                             OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') 
+                           THEN CONCAT(ri.product_name, ' (x', ri.qty, ')') 
+                           ELSE NULL 
+                       END SEPARATOR ', ') as damaged_product_names,
+                       GROUP_CONCAT(DISTINCT CONCAT(ri.product_name, ' (x', ri.qty, ')') SEPARATOR ', ') as all_product_names,
                        GROUP_CONCAT(DISTINCT CASE WHEN ri.damage_reason IS NOT NULL AND ri.damage_reason != '' THEN ri.damage_reason ELSE NULL END SEPARATOR '; ') as damage_reasons,
                        0 as package_price, 
                        NULL as commerce_platform, 
                        NULL as shop_name, 
+                       NULL as ocs_product_name,
                        0 as has_packing_video
                 FROM return_sessions rs
                 LEFT JOIN return_items ri ON ri.session_id = rs.id
@@ -76,10 +100,24 @@ if ($query === '' || $action === 'list_claimable') {
         $stmtDamaged = $pdo->query($sqlDamaged);
         $candidates = $stmtDamaged->fetchAll(PDO::FETCH_ASSOC);
 
-        // Format harga paket
+        // Format data kandidat
         foreach ($candidates as &$c) {
             $price = (float)($c['package_price'] ?? 0);
             $c['package_price_formatted'] = $price > 0 ? 'Rp ' . number_format($price, 0, ',', '.') : '-';
+            
+            // Nama produk prioritaskan barang yang rusak
+            $pName = !empty($c['damaged_product_names']) ? $c['damaged_product_names'] : (!empty($c['all_product_names']) ? $c['all_product_names'] : ($c['ocs_product_name'] ?? '-'));
+            $c['product_names'] = $pName;
+
+            // Qty rusak akurat
+            $dmgQty = (int)($c['damaged_qty_sum'] ?? 0);
+            if ($dmgQty <= 0) {
+                $dmgQty = (int)($c['total_damaged'] ?? 0);
+            }
+            if ($dmgQty <= 0) {
+                $dmgQty = (int)($c['damaged_items_count'] ?? 1);
+            }
+            $c['damaged_qty'] = $dmgQty;
         }
 
         echo json_encode([
@@ -875,66 +913,92 @@ try {
         ];
     }
 
-    // 5. GATHER SEMUA FOTO BUKTI (FOTO PAKET, PRODUK, ITEM RUSAK, SERAH TERIMA KURIR)
+    // 5. GATHER SEMUA FOTO BUKTI (FOTO BARANG RUSAK WAJIB PERTAMA / UTAMA, PRODUK, PAKET, SERAH TERIMA KURIR)
     $photosList = [];
 
-    // Foto Paket Unboxing
-    if (!empty($unboxRow['package_photo'])) {
-        $photosList[] = [
-            'type'  => 'package',
-            'badge' => 'Paket Retur',
-            'title' => 'Foto Fisik Paket Saat Unboxing',
-            'url'   => $unboxRow['package_photo']
-        ];
+    // Foto Tiap Item Unboxing (Terutama Barang Rusak!)
+    if (!empty($items)) {
+        foreach ($items as $it) {
+            if (!empty($it['photo_path'])) {
+                $condUpper = strtoupper(trim($it['condition'] ?? ''));
+                $typeUpper = strtoupper(trim($it['type'] ?? ''));
+                $isDmg = ($condUpper !== 'GOOD' && $condUpper !== 'BAGUS' && $condUpper !== '') || 
+                          ($typeUpper !== 'GOOD' && $typeUpper !== 'BAGUS' && $typeUpper !== '') || 
+                          !empty($it['damage_reason']);
+                $pQty = (int)($it['qty'] ?? 1);
+                $photosList[] = [
+                    'type'       => $isDmg ? 'damaged' : 'item',
+                    'is_damaged' => $isDmg,
+                    'badge'      => $isDmg ? 'Barang Rusak' : 'Foto Item',
+                    'title'      => ($isDmg ? '⚠️ Foto Barang Rusak: ' : 'Foto Item: ') . ($it['product_name'] ?: $it['barcode']) . " (x{$pQty})" . ($it['damage_reason'] ? ' - ' . $it['damage_reason'] : ''),
+                    'url'        => $it['photo_path']
+                ];
+            }
+        }
     }
-    // Foto Produk Unboxing
-    if (!empty($unboxRow['product_photo'])) {
-        $photosList[] = [
-            'type'  => 'product',
-            'badge' => 'Produk Retur',
-            'title' => 'Foto Produk Saat Unboxing',
-            'url'   => $unboxRow['product_photo']
-        ];
-    }
-    // Foto Tambahan Unboxing
+
+    // Foto Tambahan Unboxing dari return_sessions.photos
     if (!empty($unboxRow['photos'])) {
         $extraPhotos = is_array($unboxRow['photos']) ? $unboxRow['photos'] : json_decode($unboxRow['photos'], true);
         if (is_array($extraPhotos)) {
             foreach ($extraPhotos as $idx => $ep) {
                 $pPath = is_array($ep) ? ($ep['path'] ?? '') : $ep;
                 $pType = is_array($ep) ? ($ep['type'] ?? 'extra') : 'extra';
+                $pTitle = is_array($ep) ? ($ep['title'] ?? '') : '';
+                $isDmg = ($pType === 'damaged' || stripos($pTitle, 'rusak') !== false || stripos($pType, 'rusak') !== false);
+                
                 if ($pPath && $pPath !== ($unboxRow['package_photo'] ?? '') && $pPath !== ($unboxRow['product_photo'] ?? '')) {
                     $photosList[] = [
-                        'type'  => $pType,
-                        'badge' => 'Bukti Retur',
-                        'title' => 'Foto Tambahan Unboxing #' . ($idx + 1),
-                        'url'   => $pPath
+                        'type'       => $pType,
+                        'is_damaged' => $isDmg,
+                        'badge'      => $isDmg ? 'Barang Rusak' : ($pType === 'package' ? 'Paket Retur' : 'Produk Retur'),
+                        'title'      => !empty($pTitle) ? $pTitle : ($isDmg ? 'Foto Barang Rusak #' . ($idx + 1) : 'Foto Dokumentasi #' . ($idx + 1)),
+                        'url'        => $pPath
                     ];
                 }
             }
         }
     }
-    // Foto Tiap Item Unboxing
-    if (!empty($items)) {
-        foreach ($items as $it) {
-            if (!empty($it['photo_path'])) {
-                $isDmg = ($it['condition'] === 'DAMAGED' || !empty($it['damage_reason']));
-                $photosList[] = [
-                    'type'  => 'item',
-                    'badge' => $isDmg ? 'Barang Rusak' : 'Foto Item',
-                    'title' => 'Foto Item: ' . ($it['product_name'] ?: $it['barcode']) . ($it['damage_reason'] ? ' (' . $it['damage_reason'] . ')' : ''),
-                    'url'   => $it['photo_path']
-                ];
-            }
+
+    // Foto Produk Unboxing
+    if (!empty($unboxRow['product_photo'])) {
+        $already = false;
+        foreach ($photosList as $pl) { if ($pl['url'] === $unboxRow['product_photo']) { $already = true; break; } }
+        if (!$already) {
+            $isUnboxDamaged = ((int)($unboxRow['total_damaged'] ?? 0) > 0);
+            $photosList[] = [
+                'type'       => $isUnboxDamaged ? 'damaged' : 'product',
+                'is_damaged' => $isUnboxDamaged,
+                'badge'      => $isUnboxDamaged ? 'Barang Rusak' : 'Produk Retur',
+                'title'      => $isUnboxDamaged ? 'Foto Bukti Produk Rusak Saat Unboxing' : 'Foto Produk Saat Unboxing',
+                'url'        => $unboxRow['product_photo']
+            ];
         }
     }
+
+    // Foto Paket Unboxing
+    if (!empty($unboxRow['package_photo'])) {
+        $already = false;
+        foreach ($photosList as $pl) { if ($pl['url'] === $unboxRow['package_photo']) { $already = true; break; } }
+        if (!$already) {
+            $photosList[] = [
+                'type'       => 'package',
+                'is_damaged' => false,
+                'badge'      => 'Paket Retur',
+                'title'      => 'Foto Fisik Paket Saat Unboxing',
+                'url'        => $unboxRow['package_photo']
+            ];
+        }
+    }
+
     // Foto Serah Terima Kurir Receiving
     if (!empty($receptionRow['photo_path'])) {
         $photosList[] = [
-            'type'  => 'reception',
-            'badge' => 'Kurir Receiving',
-            'title' => 'Foto Serah Terima Kurir: ' . ($receptionRow['courier_name'] ?: $receptionRow['expedition']),
-            'url'   => $receptionRow['photo_path']
+            'type'       => 'reception',
+            'is_damaged' => false,
+            'badge'      => 'Kurir Receiving',
+            'title'      => 'Foto Serah Terima Kurir: ' . ($receptionRow['courier_name'] ?: $receptionRow['expedition']),
+            'url'        => $receptionRow['photo_path']
         ];
     }
     if (!empty($receptionRow['package_photos'])) {
@@ -943,15 +1007,26 @@ try {
             foreach ($recExtra as $idx => $rp) {
                 if ($rp && $rp !== ($receptionRow['photo_path'] ?? '')) {
                     $photosList[] = [
-                        'type'  => 'reception',
-                        'badge' => 'Serah Terima',
-                        'title' => 'Foto Paket Serah Terima Ekspedisi #' . ($idx + 1),
-                        'url'   => $rp
+                        'type'       => 'reception',
+                        'is_damaged' => false,
+                        'badge'      => 'Serah Terima',
+                        'title'      => 'Foto Paket Serah Terima Ekspedisi #' . ($idx + 1),
+                        'url'        => $rp
                     ];
                 }
             }
         }
     }
+
+    // URUTKAN FOTO: FOTO BARANG RUSAK WAJIB BERADA DI URUTAN PERTAMA UNTUK DOKUMEN KLAIM!
+    usort($photosList, function($a, $b) {
+        $aScore = (!empty($a['is_damaged']) || $a['badge'] === 'Barang Rusak' || stripos($a['title'], 'rusak') !== false) ? 0 : 1;
+        $bScore = (!empty($b['is_damaged']) || $b['badge'] === 'Barang Rusak' || stripos($b['title'], 'rusak') !== false) ? 0 : 1;
+        if ($aScore !== $bScore) {
+            return $aScore <=> $bScore;
+        }
+        return 0;
+    });
 
     // 6. JIKA ORDER DATA BELUM ADA DARI OCS, SINTESIS DATA DARI HASIL SCAN LOKAL (UNBOXING & RECEIVING)
     if (!$orderData && ($unboxingData || $receptionData)) {

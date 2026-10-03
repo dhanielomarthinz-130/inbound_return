@@ -65,6 +65,7 @@ $cleanInv = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $invoiceNumber);
 $photosArr = [];
 $packagePhoto = '';
 $productPhoto = '';
+$damagedPhoto = '';
 
 if (!empty($body['photos']) && is_array($body['photos'])) {
     foreach ($body['photos'] as $idx => $itemP) {
@@ -74,22 +75,27 @@ if (!empty($body['photos']) && is_array($body['photos'])) {
         
         $savedPath = '';
         if (strpos($pStr, 'data:image') === 0) {
-            $prefix = ($pType === 'package' ? 'pkg_' : 'prod_') . $cleanInv . "_{$idx}";
+            $prefix = ($pType === 'package' ? 'pkg_' : ($pType === 'damaged' ? 'dmg_' : 'prod_')) . $cleanInv . "_{$idx}";
             $savedPath = saveBase64Image($pStr, __DIR__ . '/../uploads/photos', $prefix);
         } elseif (!empty($pStr) && is_string($pStr)) {
             $savedPath = $pStr;
         }
 
         if (!empty($savedPath)) {
+            $isDmg = ($pType === 'damaged' || stripos($pTitle, 'rusak') !== false);
             $photosArr[] = [
                 'type' => $pType,
                 'path' => $savedPath,
-                'title' => $pTitle
+                'title' => $pTitle,
+                'badge' => $isDmg ? 'Barang Rusak' : ($pType === 'package' ? 'Paket Retur' : 'Produk Retur')
             ];
             if ($pType === 'package' && empty($packagePhoto)) {
                 $packagePhoto = $savedPath;
-            } elseif ($pType === 'product' && empty($productPhoto)) {
+            } elseif (($pType === 'product' || $pType === 'damaged') && empty($productPhoto)) {
                 $productPhoto = $savedPath;
+            }
+            if ($isDmg && empty($damagedPhoto)) {
+                $damagedPhoto = $savedPath;
             }
         }
     }
@@ -241,6 +247,9 @@ try {
         if (!empty($itemPhoto) && strpos($itemPhoto, 'data:image') === 0) {
             $bCodeClean = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $item['barcode'] ?? 'item');
             $itemPhoto = saveBase64Image($itemPhoto, __DIR__ . '/../uploads/photos', 'item_' . $cleanInv . '_' . $bCodeClean);
+        }
+        if (empty($itemPhoto) && $cond === 'RUSAK' && !empty($damagedPhoto)) {
+            $itemPhoto = $damagedPhoto;
         }
 
         $stmtItem->execute([
