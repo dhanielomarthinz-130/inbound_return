@@ -683,7 +683,12 @@ function createTransactionRow(r, isPreview = false) {
                 <span>${time} WIB</span>
             </div>
         </td>
-        <td class="p-3 font-mono font-bold text-indigo-700 whitespace-nowrap">${r.invoice_number}</td>
+        <td class="p-3 font-mono font-bold whitespace-nowrap">
+            <button type="button" onclick="viewDetails(${r.session_id || r.id}, '${escapeHtml(condCode)}')" class="inline-flex items-center gap-1.5 font-bold font-mono text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg border border-indigo-200/80 transition text-xs shadow-2xs group cursor-pointer" title="Klik untuk lihat detail barang, foto & video unboxing kondisi ${escapeHtml(condCode)}">
+                <i class="fa-solid fa-file-invoice text-indigo-500 group-hover:scale-110 transition"></i>
+                <span class="underline decoration-indigo-300 underline-offset-2">${r.invoice_number}</span>
+            </button>
+        </td>
         <td class="p-3 whitespace-nowrap">${expBadge}</td>
         <td class="p-3 font-semibold text-slate-700 whitespace-nowrap">${r.operator_name}</td>
         <td class="p-3 whitespace-nowrap">${skuBadge}</td>
@@ -698,7 +703,11 @@ function createTransactionRow(r, isPreview = false) {
         </td>
         <td class="p-3 text-center whitespace-nowrap">${typeBadge}</td>
         <td class="p-3 text-center whitespace-nowrap">${videoActionsHtml}</td>
-        <td class="p-3 text-center whitespace-nowrap">${detailBtn}</td>
+        <td class="p-3 text-center whitespace-nowrap">
+            <button type="button" onclick="viewDetails(${r.session_id || r.id}, '${escapeHtml(condCode)}')" title="Lihat Rincian Sesi Invoice & Foto Sesuai Kondisi" class="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-2.5 py-1.5 rounded-xl font-semibold text-[11px] transition inline-flex items-center gap-1 shadow-2xs">
+                <i class="fa-solid fa-list-check text-slate-500"></i> Detail
+            </button>
+        </td>
     `;
     return tr;
 }
@@ -720,8 +729,8 @@ window.playTransactionVideo = async function(id) {
     }
 };
 
-// 2b. View Details & Video Player Modal
-window.viewDetails = async function(id) {
+// 2b. View Details & Video Player Modal Sesuai Tipe Kondisi
+window.viewDetails = async function(id, focusCondition) {
     const r = cachedTransactions.find(t => (t.session_id && t.session_id == id) || t.id == id);
     if (!r) return;
 
@@ -729,6 +738,7 @@ window.viewDetails = async function(id) {
     if (!modal) return;
 
     const targetSessionId = r.session_id || r.id;
+    const condCode = (focusCondition || r.raw_type || r.condition_type || 'GOOD').toUpperCase();
 
     document.getElementById('modalDetailInvoice').innerText = r.invoice_number;
     document.getElementById('modalDetailExpedition').innerText = r.expedition || 'Reguler';
@@ -737,6 +747,34 @@ window.viewDetails = async function(id) {
     document.getElementById('modalTotalGood').innerText = (r.condition_type === 'GOOD') ? (r.qty || 1) : 0;
     document.getElementById('modalTotalDamaged').innerText = (r.condition_type === 'RUSAK') ? (r.qty || 1) : 0;
     document.getElementById('modalNotes').innerText = r.notes || 'Tidak ada catatan.';
+
+    // Tampilkan Badge Tipe Kondisi pada Header Modal
+    const condBadge = document.getElementById('modalDetailConditionBadge');
+    if (condBadge) {
+        if (condCode) {
+            const isGood = condCode === 'GOOD';
+            condBadge.className = isGood 
+                ? "text-[10px] font-bold px-2.5 py-0.5 rounded-lg border font-mono shadow-2xs bg-emerald-50 text-emerald-700 border-emerald-300" 
+                : "text-[10px] font-bold px-2.5 py-0.5 rounded-lg border font-mono shadow-2xs bg-rose-50 text-rose-700 border-rose-300";
+            condBadge.innerText = `Kondisi: ${condCode}`;
+            condBadge.classList.remove('hidden');
+        } else {
+            condBadge.classList.add('hidden');
+        }
+    }
+
+    // Tampilkan Alert Alasan Kerusakan / Catatan Kondisi
+    const dmgAlert = document.getElementById('modalDetailDamageAlert');
+    const dmgTxt   = document.getElementById('modalDetailDamageText');
+    if (dmgAlert && dmgTxt) {
+        const reason = r.damage_reason || (condCode !== 'GOOD' ? r.notes : '');
+        if (reason && reason.trim()) {
+            dmgTxt.innerText = reason;
+            dmgAlert.classList.remove('hidden');
+        } else {
+            dmgAlert.classList.add('hidden');
+        }
+    }
 
     // Setup Watermark Overlay pada Video Player
     const wmInv = document.getElementById('watermarkInvoice');
@@ -778,7 +816,7 @@ window.viewDetails = async function(id) {
         downloadBtn.classList.add('hidden');
     }
 
-    // ---- RENDER FOTO DOKUMENTASI UNBOXING ----
+    // ---- RENDER FOTO DOKUMENTASI SESUAI TIPE KONDISI ----
     const photosSection = document.getElementById('modalPhotosSection');
     const photosGrid    = document.getElementById('modalPhotosGrid');
     const photoCount    = document.getElementById('modalPhotoCount');
@@ -786,10 +824,10 @@ window.viewDetails = async function(id) {
     // Kumpulkan semua foto: package_photo, product_photo, photos (JSON array)
     const allPhotos = [];
     if (r.package_photo && r.package_photo.trim()) {
-        allPhotos.push({ url: r.package_photo, label: '📦 Foto Paket' });
+        allPhotos.push({ url: r.package_photo, label: '📦 Foto Paket Sebelum Unboxing', type: 'PAKET' });
     }
     if (r.product_photo && r.product_photo.trim()) {
-        allPhotos.push({ url: r.product_photo, label: '🏷️ Foto Produk' });
+        allPhotos.push({ url: r.product_photo, label: `🏷️ Foto Produk (${condCode})`, type: condCode });
     }
     if (r.photos) {
         let extraPhotos = r.photos;
@@ -799,21 +837,32 @@ window.viewDetails = async function(id) {
         if (Array.isArray(extraPhotos)) {
             extraPhotos.forEach((p, idx) => {
                 const url = (typeof p === 'object') ? (p.path || p.url || '') : p;
-                const label = (typeof p === 'object' && p.type) ? `📷 ${p.type}` : `📷 Foto ${idx + 1}`;
+                const pType = (typeof p === 'object' && p.type) ? p.type : (condCode || 'BUKTI');
+                const label = `📷 Foto ${pType} #${idx + 1}`;
                 if (url && url.trim() && !allPhotos.find(x => x.url === url)) {
-                    allPhotos.push({ url, label });
+                    allPhotos.push({ url, label, type: pType });
                 }
             });
         }
     }
 
+    // Prioritaskan foto yang sesuai tipe kondisi yang sedang dilihat
+    allPhotos.sort((a, b) => {
+        const aMatch = (a.type || '').toUpperCase() === condCode;
+        const bMatch = (b.type || '').toUpperCase() === condCode;
+        if (aMatch && !bMatch) return -1;
+        if (!aMatch && bMatch) return 1;
+        return 0;
+    });
+
     if (photosGrid) photosGrid.innerHTML = '';
     if (allPhotos.length > 0) {
         if (photosSection) photosSection.classList.remove('hidden');
-        if (photoCount) photoCount.innerText = `${allPhotos.length} Foto`;
+        if (photoCount) photoCount.innerText = `${allPhotos.length} Foto (${condCode})`;
         allPhotos.forEach(photo => {
+            const isMatch = (photo.type || '').toUpperCase() === condCode && condCode !== 'GOOD';
             const imgWrap = document.createElement('div');
-            imgWrap.className = 'relative group cursor-pointer rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-square shadow-xs hover:shadow-md transition';
+            imgWrap.className = `relative group cursor-pointer rounded-xl overflow-hidden border ${isMatch ? 'border-rose-400 ring-2 ring-rose-300' : 'border-slate-200'} bg-slate-100 aspect-square shadow-xs hover:shadow-md transition`;
             imgWrap.onclick = () => {
                 const lb = document.getElementById('modalPhotoLightbox');
                 const lbImg = document.getElementById('modalPhotoLightboxImg');
@@ -826,8 +875,11 @@ window.viewDetails = async function(id) {
             imgWrap.innerHTML = `
                 <img src="${photo.url}" alt="${photo.label}" loading="lazy"
                     class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                    onerror="this.parentElement.innerHTML='<div class=\'flex flex-col items-center justify-center h-full text-slate-400 text-[10px] p-2 text-center\'><i class=\'fa-solid fa-image-slash text-2xl mb-1\'></i>Foto tidak ditemukan</div>'">
-                <div class="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[9px] font-semibold px-2 py-1 opacity-0 group-hover:opacity-100 transition truncate">${photo.label}</div>
+                    onerror="this.parentElement.innerHTML='<div class=\\'flex flex-col items-center justify-center h-full text-slate-400 text-[10px] p-2 text-center\\'><i class=\\'fa-solid fa-image-slash text-2xl mb-1\\'></i>Foto tidak ditemukan</div>'">
+                <div class="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] font-semibold px-2 py-1 flex items-center justify-between transition truncate">
+                    <span class="truncate">${photo.label}</span>
+                    <span class="bg-indigo-600/80 px-1 rounded text-[8px] shrink-0 font-mono">${photo.type || 'FOTO'}</span>
+                </div>
             `;
             if (photosGrid) photosGrid.appendChild(imgWrap);
         });
@@ -854,17 +906,22 @@ window.viewDetails = async function(id) {
         document.getElementById('modalItemCount').innerText = items.length;
         items.forEach(it => {
             const tr = document.createElement('tr');
-            tr.className = 'hover:bg-slate-50 border-b border-slate-100 text-xs';
-            const isGood = (it.type || it.condition) === 'GOOD';
+            const itCond = (it.type || it.condition || 'GOOD').toUpperCase();
+            const isMatch = itCond === condCode;
+            tr.className = `hover:bg-slate-50 border-b border-slate-100 text-xs ${isMatch ? 'bg-indigo-50/50' : ''}`;
+            const isGood = itCond === 'GOOD';
             const badgeCond = isGood ? 
-                `<span class="bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded text-[10px] border border-emerald-200">GOOD</span>` :
-                `<span class="bg-rose-50 text-rose-700 font-semibold px-2 py-0.5 rounded text-[10px] border border-rose-200">${it.type || 'RUSAK'}</span>`;
+                `<span class="bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded text-[10px] border border-emerald-200">GOOD</span>` :
+                `<span class="bg-rose-50 text-rose-700 font-bold px-2 py-0.5 rounded text-[10px] border border-rose-200">${escapeHtml(itCond)}</span>`;
 
             tr.innerHTML = `
-                <td class="p-2.5 font-mono font-bold text-slate-700">${it.barcode}</td>
-                <td class="p-2.5 font-medium text-slate-800">${it.product_name || '-'}</td>
-                <td class="p-2.5 text-slate-500 font-mono text-[11px] whitespace-nowrap">${it.batch_no || '-'} / ${formatExpDate(it.exp_date)}</td>
-                <td class="p-2.5 text-center font-bold text-slate-800">${it.qty}</td>
+                <td class="p-2.5 font-mono font-bold text-slate-700">${escapeHtml(it.barcode || '-')}</td>
+                <td class="p-2.5">
+                    <div class="font-medium text-slate-800">${escapeHtml(it.product_name || '-')}</div>
+                    ${it.damage_reason ? `<div class="text-[10px] text-rose-600 font-medium italic mt-0.5"><i class="fa-solid fa-circle-exclamation mr-1 text-[9px]"></i>${escapeHtml(it.damage_reason)}</div>` : ''}
+                </td>
+                <td class="p-2.5 text-slate-500 font-mono text-[11px] whitespace-nowrap">${escapeHtml(it.batch_no || '-')} / ${formatExpDate(it.exp_date)}</td>
+                <td class="p-2.5 text-center font-bold text-slate-800">${it.qty || 1}</td>
                 <td class="p-2.5 text-center">${badgeCond}</td>
             `;
             tbody.appendChild(tr);
@@ -3918,18 +3975,10 @@ window.loadOrdersTable = async function(page = 1) {
             return;
         }
 
-        // Isi opsi filter dropdown dinamis jika data tersedia dari backend
-        if (data.shops) populateOrderFilterDropdown('orderShopFilter', data.shops, '🏪 Semua Toko', shop);
-        if (data.shipping_providers) populateOrderFilterDropdown('orderShippingFilter', data.shipping_providers, '🚚 Semua Ekspedisi', shipping);
-        if (data.statuses) populateOrderFilterDropdown('orderStatusFilter', data.statuses, '📋 Semua Status', status);
-
-        // Update KPI mini cards
-        const elTot = document.getElementById('statOcsTotalOrders');
-        const elResi = document.getElementById('statOcsWithResi');
-        const elClaim = document.getElementById('statOcsClaimValue');
-        if (elTot && data.pagination) elTot.innerText = Number(data.pagination.total_records || 0).toLocaleString('id-ID') + ' Pesanan';
-        if (elResi && data.summary) elResi.innerText = Number(data.summary.total_with_resi || 0).toLocaleString('id-ID') + ' Resi';
-        if (elClaim && data.summary) elClaim.innerText = data.summary.total_claim_fmt || ('Rp ' + Number(data.summary.total_claim_amount || 0).toLocaleString('id-ID'));
+        // Isi opsi filter dropdown dinamis jika data tersedia dari backend (bersih tanpa icon)
+        if (data.shops) populateOrderFilterDropdown('orderShopFilter', data.shops, 'Semua Toko', shop);
+        if (data.shipping_providers) populateOrderFilterDropdown('orderShippingFilter', data.shipping_providers, 'Semua Ekspedisi', shipping);
+        if (data.statuses) populateOrderFilterDropdown('orderStatusFilter', data.statuses, 'Semua Status', status);
 
         renderOrdersTable(data.orders || [], data.pagination || {});
     } catch (err) {

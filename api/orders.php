@@ -700,21 +700,10 @@ try {
 
         $whereSql = !empty($where) ? ('WHERE ' . implode(' AND ', $where)) : '';
 
-        // Hitung total baris sesuai filter
+        // Hitung total baris sesuai filter murni dari database server lokal ocs_orders
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM ocs_orders {$whereSql}");
         $countStmt->execute($params);
         $totalRecords = (int)$countStmt->fetchColumn();
-
-        // Jika pencarian tidak menemukan hasil di database lokal dan kata kunci menyerupai resi/order ID:
-        // Coba sinkronkan langsung secara live dari OCS Picklist (FindOrder)
-        if ($totalRecords === 0 && !empty($search) && strlen($search) >= 5) {
-            $liveOrder = syncSingleOrderFromPicklistFindOrder($pdo, $search);
-            if ($liveOrder) {
-                // Re-execute hitung total baris
-                $countStmt->execute($params);
-                $totalRecords = (int)$countStmt->fetchColumn();
-            }
-        }
 
         // Tentukan Urutan (Sort)
         switch ($sort) {
@@ -749,35 +738,7 @@ try {
         $stmt->execute($params);
         $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Auto-enrich on-demand jika ada order di page ini yang belum memiliki harga & detail SKU
-        $missingOrderIds = [];
-        foreach ($orders as $oRow) {
-            $calc = computeOrderPrice($oRow);
-            if ($calc <= 0 && empty($oRow['order_items_json'])) {
-                $missingOrderIds[] = $oRow['order_id'];
-            }
-        }
-        if (!empty($missingOrderIds)) {
-            $enrichedData = enrichOrdersFromOcs($pdo, $missingOrderIds);
-            if (!empty($enrichedData)) {
-                foreach ($orders as &$oRef) {
-                    $oid = $oRef['order_id'];
-                    if (isset($enrichedData[$oid])) {
-                        $enr = $enrichedData[$oid];
-                        $oRef['tracking_number']  = !empty($enr['tracking_number']) ? $enr['tracking_number'] : $oRef['tracking_number'];
-                        $oRef['seller_sku']       = !empty($enr['seller_sku']) ? $enr['seller_sku'] : $oRef['seller_sku'];
-                        $oRef['total_amount']     = $enr['total_amount'];
-                        $oRef['package_price']    = $enr['package_price'];
-                        $oRef['customer_name']    = !empty($enr['customer_name']) ? $enr['customer_name'] : $oRef['customer_name'];
-                        $oRef['order_items_json'] = $enr['order_items_json'];
-                        $oRef['raw_payload']      = $enr['raw_payload'];
-                    }
-                }
-                unset($oRef);
-            }
-        }
-
-        // Format angka dan tanggal untuk respons ringkas & kompatibel
+        // Format angka dan tanggal untuk respons ringkas & kompatibel langsung dari database lokal ocs_orders
         foreach ($orders as &$ord) {
             $price = computeOrderPrice($ord);
             $ord['platform']               = $ord['commerce_platform'] ?? '-';

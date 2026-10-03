@@ -1037,144 +1037,81 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                     </div>
                 </div>
 
-                <!-- Ringkasan Statistik Cepat Orders OCS -->
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div class="bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-2xs flex items-center justify-between">
-                        <div>
-                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Total Orders OCS</span>
-                            <span id="statOcsTotalOrders" class="font-black text-slate-800 text-lg font-mono">Memuat...</span>
-                        </div>
-                        <span class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-sm font-bold shadow-2xs">
-                            <i class="fa-solid fa-cart-shopping"></i>
-                        </span>
-                    </div>
-                    <div class="bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-2xs flex items-center justify-between">
-                        <div>
-                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Pesanan Ada Resi</span>
-                            <span id="statOcsWithResi" class="font-black text-emerald-700 text-lg font-mono">Memuat...</span>
-                        </div>
-                        <span class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm font-bold shadow-2xs">
-                            <i class="fa-solid fa-barcode"></i>
-                        </span>
-                    </div>
-                    <div class="bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-2xs flex items-center justify-between">
-                        <div>
-                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Potensi Nilai Klaim</span>
-                            <span id="statOcsClaimValue" class="font-black text-amber-700 text-lg font-mono">Memuat...</span>
-                        </div>
-                        <span class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-sm font-bold shadow-2xs">
-                            <i class="fa-solid fa-shield-halved"></i>
-                        </span>
-                    </div>
-                </div>
-
                 <!-- Table Data Orders Container -->
                 <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
-                    <!-- Filter Toolbar -->
-                    <div class="p-4 border-b border-slate-200 bg-slate-50/70 space-y-3">
-                        <!-- Baris 1: Pencarian & Dimensi Utama -->
-                        <div class="flex flex-wrap items-center gap-2.5">
+                    <!-- Filter Toolbar 1 Baris Tanpa Icon -->
+                    <div class="p-3 border-b border-slate-200 bg-slate-50/70 overflow-x-auto">
+                        <div class="flex items-center gap-2 min-w-max">
                             <!-- Search -->
-                            <div class="relative flex-1 min-w-[240px] sm:max-w-md">
-                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
-                                    <i class="fa-solid fa-magnifying-glass"></i>
-                                </span>
-                                <input type="text" id="orderSearchInput" onkeyup="debounceOrderSearch()" placeholder="Cari Resi, Order ID, SKU, Produk, Toko, Customer..." 
-                                    class="w-full pl-8 pr-8 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs">
-                                <button type="button" id="btnClearOrderSearch" onclick="clearOrderSearch()" class="hidden absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 text-xs">
-                                    <i class="fa-solid fa-circle-xmark"></i>
-                                </button>
-                            </div>
+                            <input type="text" id="orderSearchInput" onkeyup="debounceOrderSearch()" placeholder="Cari Resi, Order ID, SKU, Toko..." 
+                                class="w-48 sm:w-56 px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs shrink-0">
 
                             <!-- Filter Platform -->
-                            <select id="orderPlatformFilter" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs">
-                                <option value="ALL">🌐 Semua Platform</option>
+                            <select id="orderPlatformFilter" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs shrink-0">
+                                <option value="ALL">Semua Platform</option>
                                 <option value="SHOPEE">Shopee</option>
                                 <option value="TIKTOK_SHOP">TikTok Shop</option>
                                 <option value="TOKOPEDIA">Tokopedia</option>
                                 <option value="LAZADA">Lazada</option>
                             </select>
 
-                            <!-- Filter Toko (Shop Name) -->
-                            <select id="orderShopFilter" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs max-w-[170px] truncate">
-                                <option value="ALL">🏪 Semua Toko</option>
+                            <!-- Filter Toko -->
+                            <select id="orderShopFilter" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs max-w-[150px] truncate shrink-0">
+                                <option value="ALL">Semua Toko</option>
                             </select>
 
-                            <!-- Filter Ekspedisi (Shipping Provider) -->
-                            <select id="orderShippingFilter" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs max-w-[170px] truncate">
-                                <option value="ALL">🚚 Semua Ekspedisi</option>
+                            <!-- Filter Ekspedisi -->
+                            <select id="orderShippingFilter" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs max-w-[150px] truncate shrink-0">
+                                <option value="ALL">Semua Ekspedisi</option>
                             </select>
 
                             <!-- Filter Status Order -->
-                            <select id="orderStatusFilter" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs max-w-[160px] truncate">
-                                <option value="ALL">📋 Semua Status</option>
+                            <select id="orderStatusFilter" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs max-w-[140px] truncate shrink-0">
+                                <option value="ALL">Semua Status</option>
                             </select>
-                        </div>
 
-                        <!-- Baris 2: Filter Tambahan, Periode Tanggal, Urutan & Aksi -->
-                        <div class="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-200/80">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <!-- Filter Status Resi -->
-                                <select id="orderResiFilter" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs">
-                                    <option value="ALL">📦 Semua Resi</option>
-                                    <option value="with_resi">✓ Sudah Ada Resi</option>
-                                    <option value="no_resi">✕ Belum Ada Resi</option>
-                                </select>
+                            <!-- Filter Status Resi -->
+                            <select id="orderResiFilter" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs shrink-0">
+                                <option value="ALL">Semua Resi</option>
+                                <option value="with_resi">Ada Resi</option>
+                                <option value="no_resi">Tanpa Resi</option>
+                            </select>
 
-                                <!-- Filter Kelayakan / Nilai Klaim -->
-                                <select id="orderClaimFilter" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs">
-                                    <option value="ALL">💰 Semua Nilai</option>
-                                    <option value="has_claim">Bernilai Klaim (> Rp 0)</option>
-                                    <option value="zero_claim">Tanpa Klaim (Rp 0)</option>
-                                </select>
+                            <!-- Filter Periode Tanggal -->
+                            <select id="orderDateFilter" onchange="onOrderDateFilterChanged()" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs shrink-0">
+                                <option value="">Semua Periode</option>
+                                <option value="today">Hari Ini</option>
+                                <option value="yesterday">Hari Kemarin</option>
+                                <option value="last7">7 Hari Terakhir</option>
+                                <option value="last30">30 Hari Terakhir</option>
+                                <option value="custom">Pilih Tanggal...</option>
+                            </select>
 
-                                <!-- Filter Periode Tanggal -->
-                                <select id="orderDateFilter" onchange="onOrderDateFilterChanged()" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs">
-                                    <option value="">📅 Semua Periode</option>
-                                    <option value="today">Hari Ini</option>
-                                    <option value="yesterday">Hari Kemarin</option>
-                                    <option value="last7">7 Hari Terakhir</option>
-                                    <option value="last30">30 Hari Terakhir</option>
-                                    <option value="custom">Pilih Tanggal Kustom...</option>
-                                </select>
-
-                                <div id="orderCustomDateBox" class="hidden flex items-center gap-1.5">
-                                    <input type="date" id="orderStartDate" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs text-slate-700">
-                                    <span class="text-xs text-slate-400">s/d</span>
-                                    <input type="date" id="orderEndDate" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs text-slate-700">
-                                </div>
-
-                                <!-- Urutan (Sort) -->
-                                <select id="orderSortSelect" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs">
-                                    <option value="date_desc">Tgl Order: Terbaru</option>
-                                    <option value="date_asc">Tgl Order: Terlama</option>
-                                    <option value="price_desc">Harga: Tertinggi</option>
-                                    <option value="price_asc">Harga: Terendah</option>
-                                </select>
-
-                                <!-- Tombol Reset Filter -->
-                                <button type="button" onclick="resetOrderFilters()" class="px-2.5 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition flex items-center gap-1" title="Reset Semua Filter ke Default">
-                                    <i class="fa-solid fa-filter-circle-xmark"></i>
-                                    <span>Reset</span>
-                                </button>
+                            <div id="orderCustomDateBox" class="hidden flex items-center gap-1 shrink-0">
+                                <input type="date" id="orderStartDate" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2 py-1 text-xs text-slate-700">
+                                <span class="text-xs text-slate-400">s/d</span>
+                                <input type="date" id="orderEndDate" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2 py-1 text-xs text-slate-700">
                             </div>
 
-                            <div class="flex items-center gap-2">
-                                <span class="text-xs text-slate-400">Tampilkan:</span>
-                                <select id="orderLimitSelect" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700">
-                                    <option value="25">25 Baris</option>
-                                    <option value="50">50 Baris</option>
-                                    <option value="100">100 Baris</option>
-                                    <option value="250">250 Baris</option>
-                                    <option value="500">500 Baris</option>
-                                    <option value="1000">1.000 Baris</option>
-                                    <option value="5000">5.000 Baris</option>
-                                    <option value="50000">Semua Data (Maks)</option>
-                                </select>
-                                <button onclick="loadOrdersTable(1)" class="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs transition" title="Refresh Data">
-                                    <i class="fa-solid fa-arrows-rotate"></i>
-                                </button>
-                            </div>
+                            <!-- Limit Baris -->
+                            <select id="orderLimitSelect" onchange="loadOrdersTable(1)" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 shrink-0">
+                                <option value="25">25 Baris</option>
+                                <option value="50">50 Baris</option>
+                                <option value="100">100 Baris</option>
+                                <option value="250">250 Baris</option>
+                                <option value="500">500 Baris</option>
+                                <option value="1000">1.000 Baris</option>
+                            </select>
+
+                            <!-- Tombol Reset -->
+                            <button type="button" onclick="resetOrderFilters()" class="px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition shrink-0" title="Reset Semua Filter">
+                                Reset
+                            </button>
+
+                            <!-- Tombol Refresh / Terapkan -->
+                            <button type="button" onclick="loadOrdersTable(1)" class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition shrink-0" title="Refresh / Cari Data">
+                                Terapkan
+                            </button>
                         </div>
                     </div>
 
@@ -1740,11 +1677,16 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                         <i class="fa-solid fa-box-archive"></i>
                     </div>
                     <div>
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
                             <h3 class="font-bold text-base tracking-tight" id="modalDetailInvoice">INV-XXXXXX</h3>
                             <span id="modalDetailExpedition" class="bg-indigo-500/20 text-indigo-300 text-[10px] font-semibold px-2 py-0.5 rounded border border-indigo-500/30">Kurir</span>
+                            <span id="modalDetailConditionBadge" class="hidden text-[10px] font-bold px-2.5 py-0.5 rounded-lg border font-mono shadow-2xs"></span>
                         </div>
                         <p class="text-[11px] text-slate-400" id="modalDetailMeta">Operator &bull; Waktu Transaksi</p>
+                        <div id="modalDetailDamageAlert" class="hidden mt-1 px-2.5 py-1 bg-rose-500/20 border border-rose-500/40 rounded-lg text-rose-200 text-[11px] font-medium flex items-center gap-1.5">
+                            <i class="fa-solid fa-triangle-exclamation text-rose-400 text-xs"></i>
+                            <span>Catatan Kerusakan: <b id="modalDetailDamageText" class="text-white">-</b></span>
+                        </div>
                     </div>
                 </div>
                 <button onclick="closeDetailModal()" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition">
