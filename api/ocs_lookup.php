@@ -175,6 +175,45 @@ try {
         ]);
         $cached = $stmtCache->fetch(PDO::FETCH_ASSOC);
 
+        // Jika belum langsung ditemukan di ocs_orders, coba cari padanan resi/invoice dari data receiving / unboxing lokal
+        if (!$cached) {
+            try {
+                $stmtLocalLink = $pdo->prepare("
+                    SELECT p.package_barcode, rs.invoice_number 
+                    FROM packages p 
+                    LEFT JOIN return_sessions rs ON (rs.invoice_number = p.package_barcode OR rs.invoice_number LIKE CONCAT('%', p.package_barcode, '%'))
+                    WHERE p.package_barcode = :q1 OR rs.invoice_number = :q2 
+                       OR p.package_barcode LIKE :q3 OR rs.invoice_number LIKE :q4
+                    LIMIT 1
+                ");
+                $stmtLocalLink->execute([
+                    ':q1' => $query,
+                    ':q2' => $query,
+                    ':q3' => '%' . $cleanQuery . '%',
+                    ':q4' => '%' . $cleanQuery . '%'
+                ]);
+                $link = $stmtLocalLink->fetch(PDO::FETCH_ASSOC);
+                if ($link) {
+                    $altQuery = !empty($link['package_barcode']) ? $link['package_barcode'] : $link['invoice_number'];
+                    if ($altQuery && $altQuery !== $query) {
+                        $stmtCache2 = $pdo->prepare("
+                            SELECT * FROM ocs_orders 
+                            WHERE order_id = :q1 OR tracking_number = :q2 
+                               OR tracking_number LIKE :q3 OR order_id LIKE :q4 
+                            LIMIT 1
+                        ");
+                        $stmtCache2->execute([
+                            ':q1' => $altQuery,
+                            ':q2' => $altQuery,
+                            ':q3' => '%' . $altQuery . '%',
+                            ':q4' => '%' . $altQuery . '%'
+                        ]);
+                        $cached = $stmtCache2->fetch(PDO::FETCH_ASSOC);
+                    }
+                }
+            } catch (Exception $eLink) {}
+        }
+
         if ($cached) {
             $itemsDecoded = !empty($cached['order_items_json']) ? json_decode($cached['order_items_json'], true) : [];
             $pkgPrice = (float)($cached['total_amount'] > 0 ? $cached['total_amount'] : ($cached['package_price'] > 0 ? $cached['package_price'] : ($cached['nmv'] > 0 ? $cached['nmv'] : $cached['gmv'])));
@@ -218,7 +257,7 @@ try {
                     'TotalAmount'               => $totalClaim
                 ],
                 'CreatedAt'              => $cached['order_created_at'],
-                '_source'                => 'local_cache'
+                '_source'                => 'local_server_orders'
             ];
         }
     }

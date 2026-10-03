@@ -2570,52 +2570,28 @@ window.executeClaimLookup = async function(e) {
 
     const originalBtnHtml = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mencari...';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Memeriksa Server...';
 
     try {
-        // 1. Ambil data dossier dari OCS / DB lokal terlebih dahulu
+        // 1. Ambil data dossier dari server lokal terlebih dahulu (database ocs_orders & cross-reference gudang)
         const ocsRes = await fetch(`api/ocs_lookup.php?q=${encodeURIComponent(query)}`);
         const data = await ocsRes.json();
 
         if (!data || !data.success) {
-            // Tampilkan pesan lebih informatif + hint
-            let errMsg = data?.message || 'Gagal mencari data bukti klaim di OCS/Database';
+            let errMsg = data?.message || 'Data tidak ditemukan di database server maupun OCS';
             if (data?.hint) errMsg += '\n\n💡 ' + data.hint;
-            if (data?.clean_query && data.clean_query !== query) {
-                errMsg += `\n\nQuery yang dicoba: "${data.clean_query}" & "${data.alpha_query || ''}"`;
-            }
             showToast('error', errMsg, 'Pencarian Gagal');
             return;
         }
 
-        // 2. Ambil video NAS dengan menggabungkan query, Order ID, dan Tracking Number hasil verifikasi OCS/Gudang
-        const nasParams = new URLSearchParams({ action: 'search', q: query });
-        if (data.order?.Id) nasParams.append('order_id', data.order.Id);
-        if (data.order?.TrackingNumber) nasParams.append('tracking_number', data.order.TrackingNumber);
-        if (data.reception?.package_barcode) nasParams.append('package_barcode', data.reception.package_barcode);
-        if (data.unboxing?.invoice_number) nasParams.append('alt_query', data.unboxing.invoice_number);
-
-        try {
-            const nasRes = await fetch(`api/nas_video.php?${nasParams.toString()}`);
-            const nasData = await nasRes.json();
-            if (nasData) {
-                data.packing_video = nasData;
-            }
-        } catch (eNas) {
-            console.warn('[NAS Video] Gagal memuat video:', eNas);
-        }
-
-        window.currentClaimDossier = data;
-        renderClaimDossier(data);
-
-        // Toast informatif tergantung sumber data
-        const src = data.ocs_source || '';
-        if (src === 'ocs_order_detail') {
-            showToast('success', 'Data ditemukan langsung dari OCS IEG System & diverifikasi!', 'OCS: Data Ditemukan');
-        } else if (src === 'local_cache') {
-            showToast('info', 'Data diambil dari cache OCS lokal. Klik Refresh untuk data terbaru.', 'Cache OCS');
+        // 2. Jika ditemukan, buka di halaman baru (claim_dossier.php)
+        const targetUrl = `claim_dossier.php?q=${encodeURIComponent(query)}`;
+        const newWin = window.open(targetUrl, '_blank');
+        
+        if (newWin) {
+            showToast('success', `Data #${query} ditemukan! Berkas klaim dibuka di halaman baru.`, 'Membuka Berkas Klaim');
         } else {
-            showToast('warning', 'Data ditemukan di gudang lokal, tapi TIDAK ditemukan di OCS. Harga mungkin tidak tersedia.', 'Data Lokal Saja');
+            showToast('info', `Popup diblokir browser. <a href="${targetUrl}" target="_blank" class="underline font-bold text-white ml-1">Klik di sini untuk membuka Berkas Klaim ↗</a>`, 'Buka Halaman Baru');
         }
     } catch (err) {
         showToast('error', 'Terjadi kesalahan: ' + err.message, 'Gagal');
@@ -3373,17 +3349,8 @@ window.searchClaimDossier = function(e) {
 };
 
 window.lookupClaimCandidate = function(identifier) {
-    const input = document.getElementById('claimSearchInput');
-    if (input) {
-        input.value = identifier;
-        if (window.executeClaimLookup) {
-            window.executeClaimLookup();
-        }
-        const resEl = document.getElementById('claimResultContainer');
-        if (resEl) {
-            resEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    }
+    if (!identifier) return;
+    window.open(`claim_dossier.php?q=${encodeURIComponent(identifier)}`, '_blank');
 };
 
 // -------------------------------------------------------------
@@ -3837,6 +3804,14 @@ window.loadOrdersTable = async function(page = 1) {
         if (data.shipping_providers) populateOrderFilterDropdown('orderShippingFilter', data.shipping_providers, '🚚 Semua Ekspedisi', shipping);
         if (data.statuses) populateOrderFilterDropdown('orderStatusFilter', data.statuses, '📋 Semua Status', status);
 
+        // Update KPI mini cards
+        const elTot = document.getElementById('statOcsTotalOrders');
+        const elResi = document.getElementById('statOcsWithResi');
+        const elClaim = document.getElementById('statOcsClaimValue');
+        if (elTot && data.pagination) elTot.innerText = Number(data.pagination.total_records || 0).toLocaleString('id-ID') + ' Pesanan';
+        if (elResi && data.summary) elResi.innerText = Number(data.summary.total_with_resi || 0).toLocaleString('id-ID') + ' Resi';
+        if (elClaim && data.summary) elClaim.innerText = data.summary.total_claim_fmt || ('Rp ' + Number(data.summary.total_claim_amount || 0).toLocaleString('id-ID'));
+
         renderOrdersTable(data.orders || [], data.pagination || {});
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-rose-500 font-semibold">Terjadi kesalahan koneksi: ${err.message}</td></tr>`;
@@ -4097,21 +4072,11 @@ window.closeOrderDetailModal = function() {
     }
 };
 
-// 7. Beralih ke Halaman Klaim & Cari Resi
+// 7. Buka Berkas Klaim di Halaman Baru
 window.viewOrderInClaims = function(identifier) {
+    if (!identifier || identifier === '-') return;
     closeOrderDetailModal();
-    switchTab('claims');
-    const claimInput = document.getElementById('claimSearchInput');
-    if (claimInput) {
-        claimInput.value = identifier;
-        if (typeof executeClaimLookup === 'function') {
-            executeClaimLookup();
-        }
-        const resEl = document.getElementById('claimResultContainer');
-        if (resEl) {
-            resEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    }
+    window.open(`claim_dossier.php?q=${encodeURIComponent(identifier)}`, '_blank');
 };
 
 // 8. Salin Teks ke Clipboard

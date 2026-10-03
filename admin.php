@@ -453,7 +453,6 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 <h3 class="font-bold text-base text-slate-800">Receiving Inbound Ekspedisi</h3>
                                 <span class="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">Serah Terima Paket</span>
                             </div>
-                            <p class="text-xs text-slate-500 mt-0.5">Daftar tanda terima dan serah terima paket dari kurir ekspedisi sebelum unboxing</p>
                         </div>
                         <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto">
                             <!-- Filter Tanggal (Flatpickr) -->
@@ -672,7 +671,6 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 </span>
                                 <div>
                                     <h3 class="font-bold text-base text-slate-800">Pusat Klaim & Banding Ekspedisi</h3>
-                                    <p class="text-[11px] text-slate-500">Cross-reference bukti unboxing, resi & data order OCS lengkap</p>
                                 </div>
                             </div>
                         </div>
@@ -1019,7 +1017,6 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             </span>
                             <div>
                                 <h3 class="font-black text-slate-800 text-base">Data Orders OCS (Sinkronisasi Pesanan)</h3>
-                                <p class="text-xs text-slate-500">Database lengkap No. Resi, Invoice, Rincian SKU Produk, Biaya & Total Klaim tersinkron</p>
                             </div>
                         </div>
 
@@ -1040,6 +1037,36 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                     </div>
                 </div>
 
+                <!-- Ringkasan Statistik Cepat Orders OCS -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-2xs flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Total Orders OCS</span>
+                            <span id="statOcsTotalOrders" class="font-black text-slate-800 text-lg font-mono">Memuat...</span>
+                        </div>
+                        <span class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-sm font-bold shadow-2xs">
+                            <i class="fa-solid fa-cart-shopping"></i>
+                        </span>
+                    </div>
+                    <div class="bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-2xs flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Pesanan Ada Resi</span>
+                            <span id="statOcsWithResi" class="font-black text-emerald-700 text-lg font-mono">Memuat...</span>
+                        </div>
+                        <span class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm font-bold shadow-2xs">
+                            <i class="fa-solid fa-barcode"></i>
+                        </span>
+                    </div>
+                    <div class="bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-2xs flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Potensi Nilai Klaim</span>
+                            <span id="statOcsClaimValue" class="font-black text-amber-700 text-lg font-mono">Memuat...</span>
+                        </div>
+                        <span class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-sm font-bold shadow-2xs">
+                            <i class="fa-solid fa-shield-halved"></i>
+                        </span>
+                    </div>
+                </div>
 
                 <!-- Table Data Orders Container -->
                 <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
