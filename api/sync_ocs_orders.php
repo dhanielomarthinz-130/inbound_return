@@ -80,9 +80,22 @@ $detailsLimit   = isset($params['details_limit']) ? (int)$params['details_limit'
 date_default_timezone_set('Asia/Jakarta');
 
 if (!empty($startParam) && !empty($endParam)) {
-    $startWib = date('Y-m-d H:i:s', strtotime($startParam));
-    $endWib   = date('Y-m-d H:i:s', strtotime($endParam));
+    $startWib = date('Y-m-d 00:00:00', strtotime($startParam));
+    $endWib   = date('Y-m-d 23:59:59', strtotime($endParam));
     $targetDateLabel = date('Y-m-d', strtotime($startWib)) . ' s/d ' . date('Y-m-d', strtotime($endWib));
+    $diffDays = (strtotime($endWib) - strtotime($startWib)) / 86400;
+    if ($diffDays > 3 && !isset($params['details_limit'])) {
+        $detailsLimit = 100; // Optimal & cepat untuk rentang multi-hari / 1 bulan
+    }
+} elseif ($dateParam === 'month' || $dateParam === 'last_30_days' || $dateParam === '1_month' || $dateParam === '30_days') {
+    $todayStr = date('Y-m-d');
+    $thirtyDaysAgo = date('Y-m-d', strtotime('-30 days'));
+    $startWib = "{$thirtyDaysAgo} 00:00:00";
+    $endWib   = "{$todayStr} 23:59:59";
+    $targetDateLabel = "{$thirtyDaysAgo} s/d {$todayStr} (1 Bulan Terakhir)";
+    if (!isset($params['details_limit'])) {
+        $detailsLimit = 100; // Optimal & cepat untuk 1 bulan
+    }
 } elseif ($dateParam === 'today') {
     $todayStr = date('Y-m-d');
     $startWib = "{$todayStr} 00:00:00";
@@ -559,7 +572,7 @@ try {
                     ],
                     CURLOPT_SSL_VERIFYPEER => false,
                     CURLOPT_SSL_VERIFYHOST => false,
-                    CURLOPT_TIMEOUT        => 25
+                    CURLOPT_TIMEOUT        => 12
                 ]);
                 curl_multi_add_handle($mh, $ch);
                 $handles[$oid] = $ch;

@@ -4556,7 +4556,15 @@ window.openOcsSyncModal = function(mode = null) {
         modal.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
     }
-    if (mode === 'picklist') {
+    if (mode === 'month') {
+        const radios = document.getElementsByName('syncPeriodType');
+        for (const r of radios) {
+            r.checked = (r.value === 'month');
+        }
+        if (typeof toggleSyncDateInput === 'function') {
+            toggleSyncDateInput();
+        }
+    } else if (mode === 'picklist') {
         const radios = document.getElementsByName('syncPeriodType');
         for (const r of radios) {
             r.checked = (r.value === 'picklist');
@@ -4590,10 +4598,11 @@ window.toggleSyncDateInput = function() {
     const picklistContainer = document.getElementById('syncPicklistContainer');
     const labelYesterday = document.getElementById('labelSyncYesterday');
     const labelToday = document.getElementById('labelSyncToday');
+    const labelMonth = document.getElementById('labelSyncMonth');
     const labelCustom = document.getElementById('labelSyncCustom');
     const labelPicklist = document.getElementById('labelSyncPicklist');
 
-    [labelYesterday, labelToday, labelCustom, labelPicklist].forEach(l => {
+    [labelYesterday, labelToday, labelMonth, labelCustom, labelPicklist].forEach(l => {
         if (l) {
             l.classList.remove('border-indigo-600', 'bg-indigo-50/50', 'border-blue-600', 'bg-blue-50/50');
             l.classList.add('border-slate-200', 'bg-white');
@@ -4609,6 +4618,9 @@ window.toggleSyncDateInput = function() {
     } else if (selected === 'today' && labelToday) {
         labelToday.classList.add('border-indigo-600', 'bg-indigo-50/50');
         labelToday.classList.remove('border-slate-200', 'bg-white');
+    } else if (selected === 'month' && labelMonth) {
+        labelMonth.classList.add('border-indigo-600', 'bg-indigo-50/50');
+        labelMonth.classList.remove('border-slate-200', 'bg-white');
     } else if (selected === 'custom' && labelCustom) {
         labelCustom.classList.add('border-indigo-600', 'bg-indigo-50/50');
         labelCustom.classList.remove('border-slate-200', 'bg-white');
@@ -4655,21 +4667,35 @@ window.executeOcsOrderSync = async function() {
         }
         url = `api/sync_ocs_orders.php?keyword=${encodeURIComponent(keyword)}`;
         targetLabel = `No. Resi / Order ID: <b>${keyword}</b> via Picklist OCS`;
+    } else if (selected === 'month') {
+        url = `api/sync_ocs_orders.php?date=month`;
+        targetLabel = '1 Bulan Terakhir (30 Hari)';
     } else if (selected === 'custom') {
-        const customDateInput = document.getElementById('syncCustomDateInput');
-        const dateParam = customDateInput ? customDateInput.value : '';
-        if (!dateParam) {
-            showToast('warning', 'Harap pilih tanggal sinkronisasi terlebih dahulu.', 'Peringatan');
+        const startDateInput = document.getElementById('syncStartDateInput');
+        const endDateInput = document.getElementById('syncEndDateInput');
+        const startDate = startDateInput ? startDateInput.value : '';
+        const endDate = endDateInput ? endDateInput.value : '';
+        if (!startDate || !endDate) {
+            showToast('warning', 'Harap tentukan tanggal mulai dan tanggal selesai terlebih dahulu.', 'Peringatan');
             return;
         }
-        url = `api/sync_ocs_orders.php?date=${encodeURIComponent(dateParam)}`;
-        targetLabel = `tanggal ${dateParam}`;
+        url = `api/sync_ocs_orders.php?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`;
+        targetLabel = `rentang ${startDate} s/d ${endDate}`;
     } else {
         url = `api/sync_ocs_orders.php?date=${encodeURIComponent(selected)}`;
         targetLabel = selected === 'yesterday' ? 'hari kemarin (00:00 - 23:59 WIB)' : 'hari ini';
     }
 
-    // Tampilkan progress UI
+    // Tampilkan Global Loading Spinner Berwarna (Merah, Kuning, Hijau Berputar)
+    if (typeof showGlobalLoading === 'function') {
+        const cleanLabel = targetLabel.replace(/<[^>]*>?/gm, '');
+        showGlobalLoading(
+            'Sinkronisasi Orders OCS...', 
+            `Sedang menarik dan menyinkronkan data orders ${cleanLabel} dari OCS IEG System. Mohon tunggu, proses cepat dan otomatis.`
+        );
+    }
+
+    // Tampilkan progress UI di dalam modal
     if (progressContainer) progressContainer.classList.remove('hidden');
     if (statsBox) statsBox.classList.add('hidden');
     if (progressBadge) {
@@ -4677,7 +4703,7 @@ window.executeOcsOrderSync = async function() {
         progressBadge.innerText = 'PROSES';
     }
     if (progressTitle) {
-        progressTitle.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin text-indigo-400"></i> Sinkronisasi Orders Sedang Berjalan...`;
+        progressTitle.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin text-indigo-400"></i> Sinkronisasi Sedang Berjalan...`;
     }
     if (progressDetail) {
         progressDetail.innerHTML = `Menghubungkan ke OCS IEG System untuk ${targetLabel}...`;
@@ -4717,7 +4743,7 @@ window.executeOcsOrderSync = async function() {
                 if (result.mode === 'single_order_picklist' || result.source === 'picklist_find_order') {
                     progressDetail.innerHTML = `Order <b>${result.order_id}</b> (Resi: <b>${result.tracking_number || '-'}</b>) dari <b>${result.shop_name || '-'}</b> (${result.platform || '-'}) berhasil disinkronisasi lengkap dengan ${result.skus_count || 1} SKU!`;
                 } else {
-                    progressDetail.innerHTML = `Periode: <b>${result.target_date || selected}</b> (${result.start_wib} s/d ${result.end_wib})<br>Semua invoice, resi, detail item SKU & biaya klaim telah tersimpan ke sistem.`;
+                    progressDetail.innerHTML = `Periode: <b>${result.target_date || selected}</b> (${result.start_wib} s/d ${result.end_wib})<br>Total <b>${(result.total_synced || result.total_orders_found || 0).toLocaleString('id-ID')}</b> pesanan tersimpan ke MySQL.`;
                 }
             }
 
@@ -4726,7 +4752,7 @@ window.executeOcsOrderSync = async function() {
             if (statWithResi) statWithResi.innerText = (result.total_with_resi || (result.tracking_number ? 1 : 0)).toLocaleString('id-ID');
             if (statTotalClaim) statTotalClaim.innerText = result.total_claim_amount_fmt || `Rp ${(result.total_claim_amount || 0).toLocaleString('id-ID')}`;
 
-            showToast('success', `Berhasil menyinkron order dari Picklist OCS (Nilai Klaim: ${result.total_claim_amount_fmt || 'Rp 0'})!`, 'Sinkronisasi Selesai');
+            showToast('success', `Berhasil menyinkron order dari OCS (Total: ${(result.total_synced || 0).toLocaleString('id-ID')} orders)!`, 'Sinkronisasi Selesai');
 
             // Refresh data setelah sync sukses
             if (typeof loadClaimCandidates === 'function') loadClaimCandidates(true);
@@ -4748,6 +4774,9 @@ window.executeOcsOrderSync = async function() {
         }
         showToast('error', err.message, 'Gagal Sinkronisasi');
     } finally {
+        if (typeof hideGlobalLoading === 'function') {
+            hideGlobalLoading();
+        }
         if (btnStart) {
             btnStart.disabled = false;
             btnStart.innerHTML = `<i class="fa-solid fa-rotate"></i> Sinkron Ulang`;

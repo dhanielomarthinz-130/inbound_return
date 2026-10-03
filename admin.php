@@ -913,18 +913,22 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             </div>
                         </div>
 
-                        <div class="flex items-center gap-2 w-full sm:w-auto">
+                        <div class="flex items-center gap-2 w-full sm:w-auto flex-wrap">
                             <button onclick="exportOrdersExcel()" type="button" class="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2.5 rounded-xl font-bold transition flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/20">
                                 <i class="fa-solid fa-file-excel"></i>
                                 <span>Export Excel</span>
+                            </button>
+                            <button onclick="openOcsSyncModal('month')" type="button" class="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2.5 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-sm shadow-indigo-600/20" title="Sync Semua Orders / Picklist 1 Bulan Terakhir (30 Hari)">
+                                <i class="fa-solid fa-calendar-days text-sm"></i>
+                                <span>Sync 1 Bulan</span>
                             </button>
                             <button onclick="openOcsSyncModal('picklist')" type="button" class="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white text-xs px-3.5 py-2.5 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-sm shadow-blue-600/20" title="Sync via No. Resi atau Order ID menggunakan Picklist OCS">
                                 <i class="fa-solid fa-barcode"></i>
                                 <span>Sync Resi/Order (Picklist)</span>
                             </button>
-                            <button onclick="openOcsSyncModal()" type="button" class="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-2.5 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-sm shadow-indigo-600/25">
+                            <button onclick="openOcsSyncModal()" type="button" class="flex-1 sm:flex-none bg-slate-800 hover:bg-slate-900 text-white text-xs px-4 py-2.5 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-sm shadow-slate-800/25">
                                 <i class="fa-solid fa-cloud-arrow-down text-sm"></i>
-                                <span>Sinkronisasi OCS</span>
+                                <span>Pilihan Sync OCS</span>
                             </button>
                         </div>
                     </div>
@@ -2367,47 +2371,69 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
             <div class="space-y-4">
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-2">Pilih Metode & Periode Sinkronisasi:</label>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                        <label class="cursor-pointer border-2 border-indigo-600 bg-indigo-50/50 rounded-2xl p-3 flex flex-col justify-between transition hover:border-indigo-600" id="labelSyncYesterday">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                        <label class="cursor-pointer border-2 border-indigo-600 bg-indigo-50/50 rounded-2xl p-2.5 flex flex-col justify-between transition hover:border-indigo-600" id="labelSyncYesterday">
                             <div class="flex items-center justify-between mb-1">
-                                <span class="text-xs font-black text-indigo-900">Hari Kemarin</span>
+                                <span class="text-xs font-black text-indigo-900">Kemarin</span>
                                 <input type="radio" name="syncPeriodType" value="yesterday" checked onchange="toggleSyncDateInput()" class="text-indigo-600 focus:ring-indigo-500">
                             </div>
-                            <span class="text-[10px] text-indigo-700 font-semibold leading-tight">00:00:00 s/d 23:59:59 WIB</span>
+                            <span class="text-[10px] text-indigo-700 font-semibold leading-tight">24 Jam Penuh</span>
                         </label>
 
-                        <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-2xl p-3 flex flex-col justify-between transition hover:border-slate-300" id="labelSyncToday">
+                        <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-2xl p-2.5 flex flex-col justify-between transition hover:border-slate-300" id="labelSyncToday">
                             <div class="flex items-center justify-between mb-1">
                                 <span class="text-xs font-bold text-slate-800">Hari Ini</span>
                                 <input type="radio" name="syncPeriodType" value="today" onchange="toggleSyncDateInput()" class="text-indigo-600 focus:ring-indigo-500">
                             </div>
-                            <span class="text-[10px] text-slate-500 leading-tight">00:00 s/d Sekarang</span>
+                            <span class="text-[10px] text-slate-500 leading-tight">Hingga Sekarang</span>
                         </label>
 
-                        <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-2xl p-3 flex flex-col justify-between transition hover:border-slate-300" id="labelSyncCustom">
-                            <div class="flex items-center justify-between mb-1">
-                                <span class="text-xs font-bold text-slate-800">Pilih Tanggal</span>
-                                <input type="radio" name="syncPeriodType" value="custom" onchange="toggleSyncDateInput()" class="text-indigo-600 focus:ring-indigo-500">
-                            </div>
-                            <span class="text-[10px] text-slate-500 leading-tight">Tanggal Tertentu</span>
-                        </label>
-
-                        <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-2xl p-3 flex flex-col justify-between transition hover:border-slate-300" id="labelSyncPicklist">
+                        <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-2xl p-2.5 flex flex-col justify-between transition hover:border-slate-300" id="labelSyncMonth">
                             <div class="flex items-center justify-between mb-1">
                                 <span class="text-xs font-bold text-slate-800 flex items-center gap-1">
-                                    <i class="fa-solid fa-barcode text-blue-500"></i> No. Resi/Order
+                                    <i class="fa-solid fa-calendar-days text-indigo-600"></i> 1 Bulan
+                                </span>
+                                <input type="radio" name="syncPeriodType" value="month" onchange="toggleSyncDateInput()" class="text-indigo-600 focus:ring-indigo-500">
+                            </div>
+                            <span class="text-[10px] text-slate-500 leading-tight">30 Hari Terakhir</span>
+                        </label>
+
+                        <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-2xl p-2.5 flex flex-col justify-between transition hover:border-slate-300" id="labelSyncCustom">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs font-bold text-slate-800">Rentang</span>
+                                <input type="radio" name="syncPeriodType" value="custom" onchange="toggleSyncDateInput()" class="text-indigo-600 focus:ring-indigo-500">
+                            </div>
+                            <span class="text-[10px] text-slate-500 leading-tight">Pilih Tanggal</span>
+                        </label>
+
+                        <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-2xl p-2.5 flex flex-col justify-between transition hover:border-slate-300 col-span-2 sm:col-span-1" id="labelSyncPicklist">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs font-bold text-slate-800 flex items-center gap-1">
+                                    <i class="fa-solid fa-barcode text-blue-500"></i> Resi / ID
                                 </span>
                                 <input type="radio" name="syncPeriodType" value="picklist" onchange="toggleSyncDateInput()" class="text-indigo-600 focus:ring-indigo-500">
                             </div>
-                            <span class="text-[10px] text-slate-500 leading-tight">Picklist FindOrder</span>
+                            <span class="text-[10px] text-slate-500 leading-tight">FindOrder OCS</span>
                         </label>
                     </div>
                 </div>
 
-                <!-- Input Tanggal Tertentu (Hidden by default) -->
-                <div id="syncCustomDateContainer" class="hidden">
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Tentukan Tanggal (WIB):</label>
-                    <input type="date" id="syncCustomDateInput" value="<?= date('Y-m-d', strtotime('-1 day')) ?>" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <!-- Input Rentang Tanggal Tertentu (Hidden by default) -->
+                <div id="syncCustomDateContainer" class="hidden space-y-2 bg-slate-50 border border-slate-200 rounded-2xl p-3.5">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold text-slate-700">Tentukan Rentang Tanggal (WIB):</label>
+                        <span class="text-[10px] text-indigo-600 font-semibold bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">Rentang Bebas (Maks. 31 Hari)</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Tanggal Mulai:</label>
+                            <input type="date" id="syncStartDateInput" value="<?= date('Y-m-d', strtotime('-30 days')) ?>" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Tanggal Selesai:</label>
+                            <input type="date" id="syncEndDateInput" value="<?= date('Y-m-d') ?>" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Input Resi / Order ID Khusus Picklist OCS (Hidden by default) -->
@@ -2433,16 +2459,22 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             <li>Nomor Resi & Nomor Invoice lengkap dengan platform (Shopee, TikTok, Lazada, dll)</li>
                             <li>Rincian SKU item, kuantiti, harga satuan, dan diskon per produk</li>
                             <li>Biaya ongkir, biaya layanan (service fee), dan total tuntutan klaim</li>
-                            <li>Nama & nomor telepon pembeli untuk bukti banding</li>
+                            <li>Proses otomatis dan cepat: Header di-stream dalam detik, rincian biaya langsung tersinkron</li>
                         </ul>
                     </div>
                 </div>
 
                 <!-- Status & Hasil Sinkronisasi -->
-                <div id="syncProgressContainer" class="hidden bg-slate-900 text-white rounded-2xl p-4 space-y-2.5">
+                <div id="syncProgressContainer" class="hidden bg-slate-900 text-white rounded-2xl p-4 space-y-3">
+                    <!-- Traffic Loader Spinner Warna (Merah, Kuning, Hijau Berputar) -->
+                    <div class="traffic-loader py-2 flex items-center justify-center gap-3" id="syncTrafficLoader">
+                        <div class="traffic-ball traffic-ball-red"></div>
+                        <div class="traffic-ball traffic-ball-yellow"></div>
+                        <div class="traffic-ball traffic-ball-green"></div>
+                    </div>
                     <div class="flex items-center justify-between">
                         <span id="syncProgressTitle" class="text-xs font-bold text-indigo-300 flex items-center gap-2">
-                            <i class="fa-solid fa-circle-notch fa-spin"></i> Sedang Menghubungkan ke OCS IEG...
+                            Sedang Menghubungkan ke OCS IEG...
                         </span>
                         <span id="syncProgressBadge" class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 font-mono">PROSES</span>
                     </div>
