@@ -802,323 +802,39 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
 
             <!-- TAB BARU: PUSAT KLAIM & BANDING (CLAIM DOSSIER) -->
             <div id="tab-claims" class="tab-content hidden space-y-6">
-                <!-- Search & Quick Actions -->
-                <div class="bg-white rounded-2xl shadow-xs border border-slate-200 p-5">
-                    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-                        <div>
-                            <div class="flex items-center gap-2.5">
-                                <span class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold text-base shrink-0">
-                                    <i class="fa-solid fa-shield-halved"></i>
-                                </span>
-                                <div>
-                                    <h3 class="font-bold text-base text-slate-800">Pusat Klaim & Banding Ekspedisi</h3>
-                                </div>
+                <!-- Data Table Card: Pusat Klaim & Banding (Daftar Paket Rusak / Layak Klaim) -->
+                <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+                    <div class="p-4 sm:p-5 border-b border-slate-200 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white">
+                        <div class="flex items-center gap-3">
+                            <span class="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold text-lg shadow-sm shrink-0 border border-amber-500/20">
+                                <i class="fa-solid fa-shield-halved"></i>
+                            </span>
+                            <div>
+                                <h3 class="font-black text-slate-800 text-base">Pusat Klaim & Banding Ekspedisi</h3>
+                                <p class="text-xs text-slate-500">Daftar paket unboxing yang terindikasi rusak atau cacat fisik untuk pengajuan klaim ekspedisi & marketplace</p>
                             </div>
                         </div>
 
-                        <!-- Form Pencarian Resi / Order & Tombol Sync -->
-                        <div class="w-full lg:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                            <form id="formClaimLookup" onsubmit="executeClaimLookup(event)" class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                                <div class="relative flex-1 sm:w-80">
-                                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs">
-                                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <!-- Quick Scan / Resi Lookup & Refresh Button -->
+                        <div class="flex items-center gap-2 w-full lg:w-auto">
+                            <form id="formClaimLookup" onsubmit="executeClaimLookup(event)" class="flex items-center gap-1.5 flex-1 lg:flex-none">
+                                <div class="relative flex-1 sm:w-72">
+                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+                                        <i class="fa-solid fa-barcode text-amber-500"></i>
                                     </span>
-                                    <input type="text" id="claimSearchInput" placeholder="Masukkan / scan No. Resi atau No. Pesanan (Order ID)..." required
-                                        class="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 transition shadow-2xs">
-                                    <span class="text-[10px] text-slate-400 mt-1.5 block leading-tight">
-                                        <i class="fa-solid fa-barcode text-amber-500 mr-1"></i>
-                                        Scan <b>Barcode Resi Atas</b> (SPXID...) atau <b>No. Pesanan Tengah</b> (261001F8TF1NF4).
-                                    </span>
+                                    <input type="text" id="claimSearchInput" placeholder="Scan Resi / Order ID..." 
+                                        class="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 transition shadow-2xs">
                                 </div>
-                                <button type="submit" id="btnClaimSearch" class="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm shadow-amber-500/20 shrink-0 self-start">
-                                    <i class="fa-solid fa-search"></i>
-                                    <span>Cari Bukti Klaim</span>
+                                <button type="submit" id="btnClaimSearch" class="bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-amber-500/20 shrink-0" title="Cari berkas klaim">
+                                    <i class="fa-solid fa-magnifying-glass"></i>
+                                    <span class="hidden sm:inline">Cari</span>
                                 </button>
                             </form>
+                            <button onclick="loadClaimCandidates(true)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-slate-300 shadow-2xs shrink-0" title="Refresh Daftar Paket Rusak">
+                                <i class="fa-solid fa-arrows-rotate text-amber-600" id="iconRefreshCandidates"></i>
+                                <span class="hidden sm:inline">Refresh</span>
+                            </button>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Hasil Dossier Klaim (Muncul setelah pencarian) -->
-                <div id="claimResultContainer" class="hidden space-y-6">
-                    <!-- Skor Kelengkapan Bukti -->
-                    <div class="bg-gradient-to-r from-slate-900 to-indigo-950 rounded-2xl p-5 text-white shadow-md">
-                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                            <div>
-                                <div class="flex flex-wrap items-center gap-2 mb-1.5">
-                                    <span class="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 font-bold text-[10px] uppercase tracking-wider">Berkas Klaim Resmi</span>
-                                    <span id="claimMarketplaceBadge" class="px-2 py-0.5 rounded-md bg-white/10 text-white font-bold text-[10px] uppercase">Marketplace</span>
-                                    <span id="claimOcsBadge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-300" title="Status sumber data OCS"><i class="fa-solid fa-circle-question"></i> Sumber Data</span>
-                                    <span id="claimPriceBadge" class="px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-bold text-xs border border-emerald-400/30 flex items-center gap-1.5 shadow-xs">
-                                        <i class="fa-solid fa-money-bill-wave text-emerald-400 text-xs"></i> Nilai Paket: <span id="claimPriceText" class="font-black text-white">Rp -</span>
-                                    </span>
-                                    <span id="claimTotalClaimBadge" class="px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-400/30 flex items-center gap-1.5 shadow-xs">
-                                        <i class="fa-solid fa-shield-halved text-amber-400 text-xs"></i> Tuntutan Klaim: <span id="claimTotalClaimText" class="font-black text-white">Rp -</span>
-                                    </span>
-                                </div>
-                                <h4 id="claimOrderTitle" class="text-lg font-black tracking-tight">Order # - Resi #</h4>
-                                <p id="claimShopSubtitle" class="text-xs text-slate-300">Toko: - | Ekspedisi: -</p>
-                            </div>
-
-                            <div class="flex items-center gap-3">
-                                <button onclick="printClaimDossier()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm">
-                                    <i class="fa-solid fa-print"></i> Cetak Berkas Klaim (PDF)
-                                </button>
-                                <button onclick="copyClaimPacketSummary()" class="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
-                                    <i class="fa-solid fa-copy"></i> Salin Ringkasan
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- 4 Indikator Kelengkapan Checklist -->
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 pt-4 border-t border-white/10 text-xs">
-                            <div id="checkOrder" class="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 border border-white/10">
-                                <i class="fa-solid fa-circle-check text-emerald-400 text-base" id="iconCheckOrder"></i>
-                                <div>
-                                    <span class="font-bold block text-white text-[11px]">Invoice & Resi</span>
-                                    <span id="labelCheckOrder" class="text-[10px] text-slate-300">Terverifikasi</span>
-                                </div>
-                            </div>
-                            <div id="checkReception" class="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 border border-white/10">
-                                <i class="fa-solid fa-circle-check text-emerald-400 text-base" id="iconCheckRec"></i>
-                                <div>
-                                    <span class="font-bold block text-white text-[11px]">Tanda Terima Kurir</span>
-                                    <span id="labelCheckRec" class="text-[10px] text-slate-300">Diterima Fisik</span>
-                                </div>
-                            </div>
-                            <div id="checkUnboxVideo" class="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 border border-white/10">
-                                <i class="fa-solid fa-circle-check text-emerald-400 text-base" id="iconCheckUnbox"></i>
-                                <div>
-                                    <span class="font-bold block text-white text-[11px]">Video Unboxing Retur</span>
-                                    <span id="labelCheckUnbox" class="text-[10px] text-slate-300">Terekam Lengkap</span>
-                                </div>
-                            </div>
-                            <div id="checkPhotos" class="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 border border-white/10">
-                                <i class="fa-solid fa-circle-check text-emerald-400 text-base" id="iconCheckPhotos"></i>
-                                <div>
-                                    <span class="font-bold block text-white text-[11px]">Foto Bukti Barang</span>
-                                    <span id="labelCheckPhotos" class="text-[10px] text-slate-300">Tersedia</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Banner Status Kelayakan Klaim (Hanya Paket Rusak / Bukan Good) -->
-                    <div id="claimEligibilityBanner" class="p-4 rounded-2xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
-                        <div class="flex items-center gap-3">
-                            <span id="claimEligibilityIcon" class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0">
-                                <i class="fa-solid fa-triangle-exclamation"></i>
-                            </span>
-                            <div>
-                                <b id="claimEligibilityTitle" class="text-xs font-black block">Status Kelayakan Klaim</b>
-                                <span id="claimEligibilitySubtitle" class="text-[11px]">-</span>
-                            </div>
-                        </div>
-                        <span id="claimEligibilityTag" class="px-3 py-1 rounded-lg text-white font-black text-[10px] uppercase tracking-wider shrink-0 self-start sm:self-center">Status</span>
-                    </div>
-
-                    <!-- Media Bukti Lengkap: Video Packing (NAS-IEG) + Video Unboxing + Galeri Foto Bukti -->
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                        <!-- 1. Video Packing Outbound (Stasiun Packing / NAS-IEG File Station) -->
-                        <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden flex flex-col">
-                            <div class="p-3 bg-slate-900 text-white flex items-center justify-between text-xs">
-                                <div class="flex items-center gap-2">
-                                    <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
-                                    <span class="font-bold">1. Video Packing Outbound</span>
-                                </div>
-                                <div class="flex items-center gap-1.5">
-                                    <a id="btnLinkNasFileStation" href="https://192.168.30.5:5001/#/signin" target="_blank" title="Buka Synology NAS File Station" class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 hover:bg-amber-500 hover:text-white text-[10px] font-bold transition flex items-center gap-1">
-                                        <i class="fa-solid fa-server"></i> NAS: PACKER
-                                    </a>
-                                    <button type="button" onclick="openNasConfigModal()" title="Konfigurasi Akun Synology NAS" class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 hover:text-white text-[10px] transition">
-                                        <i class="fa-solid fa-gear"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="relative bg-black aspect-video flex items-center justify-center">
-                                <video id="playerPackingVideo" controls class="w-full h-full object-contain hidden"></video>
-                                <div id="noPackingVideoPlaceholder" class="text-center p-5 text-slate-400 space-y-2">
-                                    <i class="fa-solid fa-box-open text-3xl mb-1 text-amber-400/80 block"></i>
-                                    <span id="packingVideoStatusText" class="text-xs block text-slate-300">Mencari video packing di NAS 192.168.30.5...</span>
-                                    <div class="flex flex-wrap items-center justify-center gap-2 pt-1">
-                                        <a id="btnOpenNasStationDirect" href="https://192.168.30.5:5001/#/signin" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-[11px] rounded-lg shadow-sm transition">
-                                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Buka File Station (PACKER)
-                                        </a>
-                                        <button type="button" onclick="openNasConfigModal()" class="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white font-medium text-[11px] rounded-lg transition">
-                                            <i class="fa-solid fa-key"></i> Atur Login NAS
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-600">
-                                <span>File: <b id="packingFileNameText" class="text-slate-800 truncate max-w-[120px] inline-block align-bottom">-</b></span>
-                                <span id="packingFileDateText" class="text-slate-500">NAS 192.168.30.5:5001</span>
-                            </div>
-                        </div>
-
-                        <!-- 2. Video Unboxing Retur (Saat Diterima Kembali di Gudang) -->
-                        <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden flex flex-col">
-                            <div class="p-3 bg-slate-900 text-white flex items-center justify-between text-xs">
-                                <div class="flex items-center gap-2">
-                                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                    <span class="font-bold">2. Video Unboxing Retur</span>
-                                </div>
-                                <span class="text-[10px] text-slate-400">Stasiun Unboxing</span>
-                            </div>
-                            <div class="relative bg-black aspect-video flex items-center justify-center">
-                                <video id="playerUnboxingVideo" controls class="w-full h-full object-contain hidden"></video>
-                                <div id="noUnboxingVideoPlaceholder" class="text-center p-5 text-slate-400">
-                                    <i class="fa-solid fa-video-slash text-3xl mb-2 text-slate-600 block"></i>
-                                    <span class="text-xs">Video unboxing belum tersedia atau belum direkam di stasiun retur.</span>
-                                </div>
-                            </div>
-                            <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-600">
-                                <span>Operator: <b id="unboxingOperatorText" class="text-slate-800">-</b></span>
-                                <span id="unboxingTimestampText" class="text-slate-500">-</span>
-                            </div>
-                        </div>
-
-                        <!-- 3. Galeri Foto Bukti Retur & Serah Terima -->
-                        <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden flex flex-col">
-                            <div class="p-3 bg-slate-900 text-white flex items-center justify-between text-xs">
-                                <div class="flex items-center gap-2">
-                                    <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
-                                    <span class="font-bold">3. Galeri Foto Bukti</span>
-                                </div>
-                                <span id="claimPhotoCountBadge" class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold">0 Foto</span>
-                            </div>
-                            <div class="flex-1 p-3 bg-slate-950/5 flex flex-col justify-center min-h-[200px]">
-                                <div id="claimPhotoGallery" class="hidden grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[240px] overflow-y-auto pr-1">
-                                    <!-- Thumbnail foto bukti diinject via JS -->
-                                </div>
-                                <div id="noPhotosPlaceholder" class="text-center p-5 text-slate-400">
-                                    <i class="fa-solid fa-images text-3xl mb-2 text-slate-300 block"></i>
-                                    <span class="text-xs">Belum ada foto bukti tersimpan untuk paket / resi ini.</span>
-                                </div>
-                            </div>
-                            <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-600">
-                                <span><i class="fa-solid fa-circle-info text-indigo-500 mr-1"></i> Klik foto untuk perbesar</span>
-                                <span id="claimPhotoTotalText" class="text-slate-500 font-semibold">-</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Rincian Data Komparasi Klaim -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <!-- 1. BIAYA & FINANSIAL KLAIM -->
-                        <div class="bg-white rounded-2xl shadow-xs border border-slate-200 p-4 space-y-3 flex flex-col justify-between">
-                            <div class="flex items-center gap-2 pb-2 border-b border-slate-100 text-xs font-bold text-slate-800">
-                                <i class="fa-solid fa-money-bill-transfer text-emerald-600"></i>
-                                <span>Rincian Biaya & Tuntutan Klaim</span>
-                            </div>
-                            <div class="space-y-2.5 text-xs">
-                                <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Nilai / Harga Barang (NMV OCS)</span>
-                                    <span id="detailPackagePrice" class="font-black text-emerald-700 text-base">Rp -</span>
-                                </div>
-                                <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Biaya Kirim / Ongkos Ekspedisi</span>
-                                    <span id="detailShippingFee" class="font-bold text-slate-800">Rp -</span>
-                                </div>
-                                <div class="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
-                                    <span class="text-[10px] text-emerald-800 uppercase font-black block">Total Estimasi Tuntutan Ganti Rugi</span>
-                                    <span id="detailTotalClaim" class="font-black text-emerald-700 text-base">Rp -</span>
-                                    <span class="text-[10px] text-emerald-600 block mt-0.5">Nilai barang yang diajukan banding ke ekspedisi</span>
-                                </div>
-                                <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Nilai Gross GMV</span>
-                                    <span id="detailGmvPrice" class="text-slate-600 font-medium">Rp -</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- 2. DETAIL EKSPEDISI -->
-                        <div class="bg-white rounded-2xl shadow-xs border border-slate-200 p-4 space-y-3 flex flex-col justify-between">
-                            <div class="flex items-center gap-2 pb-2 border-b border-slate-100 text-xs font-bold text-slate-800">
-                                <i class="fa-solid fa-truck-fast text-indigo-600"></i>
-                                <span>Detail Ekspedisi & Serah Terima</span>
-                            </div>
-                            <div class="grid grid-cols-1 gap-2.5 text-xs">
-                                <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Jasa Ekspedisi Pengiriman</span>
-                                    <span id="detailShippingProvider" class="font-bold text-indigo-700 text-sm">-</span>
-                                </div>
-                                <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Nomor Resi Paket (AWB)</span>
-                                    <span id="detailTrackingNumber" class="font-mono font-bold text-slate-800 text-xs bg-slate-100 px-2 py-1 rounded inline-block">-</span>
-                                </div>
-                                <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Kurir / Driver Pengantar (Receiving)</span>
-                                    <span id="detailCourier" class="font-semibold text-slate-700">-</span>
-                                </div>
-                                <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">No. Tanda Terima Ekspedisi</span>
-                                    <span id="detailReceiptNo" class="font-mono font-bold text-emerald-700">-</span>
-                                </div>
-                                <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Waktu Fisik Diterima di Gudang</span>
-                                    <span id="detailReceivedAt" class="text-slate-600">-</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- 3. DETAIL PAKET & UNBOXING -->
-                        <div class="bg-white rounded-2xl shadow-xs border border-slate-200 p-4 space-y-3 flex flex-col justify-between">
-                            <div class="flex items-center gap-2 pb-2 border-b border-slate-100 text-xs font-bold text-slate-800">
-                                <i class="fa-solid fa-boxes-packing text-amber-600"></i>
-                                <span>Detail Paket & Hasil Unboxing</span>
-                            </div>
-                            <div class="space-y-2.5 text-xs">
-                                <div class="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <span class="text-[10px] text-slate-400 uppercase font-bold block">No. Order / Invoice</span>
-                                        <span id="detailOrderId" class="font-bold text-slate-800 text-xs">-</span>
-                                    </div>
-                                    <div>
-                                        <span class="text-[10px] text-slate-400 uppercase font-bold block">Marketplace / Toko</span>
-                                        <span id="detailShopName" class="font-semibold text-slate-700 text-xs truncate block">-</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Status Unboxing Retur</span>
-                                    <span id="detailUnboxStatus" class="font-bold text-slate-800">-</span>
-                                </div>
-                                <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Rincian Produk di Paket &amp; Qty</span>
-                                    <div id="detailOrderProductName" class="text-slate-700 font-medium block bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs max-h-32 overflow-y-auto space-y-1.5">-</div>
-                                </div>
-                                <div>
-                                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Kondisi Barang &amp; Alasan Retur</span>
-                                    <div id="detailConditionNotes" class="font-semibold text-slate-800 bg-amber-50 p-2.5 rounded-xl border border-amber-200 text-xs max-h-24 overflow-y-auto">-</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Placeholder Belum Ada Pencarian -->
-                <div id="claimEmptyPlaceholder" class="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-                    <div class="w-16 h-16 rounded-2xl bg-amber-50 text-amber-500 mx-auto flex items-center justify-center text-2xl mb-3 shadow-inner">
-                        <i class="fa-solid fa-magnifying-glass-location"></i>
-                    </div>
-                    <h4 class="font-bold text-base text-slate-800">Siap Mencari Bukti Klaim & Banding</h4>
-                </div>
-
-                <!-- Tabel Kandidat Paket Layak Klaim (Kondisi BUKAN GOOD) -->
-                <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
-                    <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                        <div class="flex items-center gap-2.5">
-                            <span class="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-sm">
-                                <i class="fa-solid fa-box-tissue"></i>
-                            </span>
-                            <div>
-                                <h4 class="font-bold text-sm text-slate-800">Daftar Paket Rusak / Layak Klaim</h4>
-                                <p class="text-[11px] text-slate-400">Paket yang terindikasi rusak atau cacat saat unboxing untuk diajukan kompensasi</p>
-                            </div>
-                        </div>
-                        <button onclick="loadClaimCandidates(true)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-slate-300 shadow-2xs">
-                            <i class="fa-solid fa-arrows-rotate text-amber-600" id="iconRefreshCandidates"></i> Refresh Daftar
-                        </button>
                     </div>
 
                     <!-- Filter Toolbar 1 Baris Rapi -->

@@ -62,9 +62,12 @@ try {
         }
     }
 
-    // Set Timezone WIB (+07:00)
+    // Set Timezone WIB (+07:00) & Hindari pembatasan MAX_JOIN_SIZE di MySQL/MariaDB
     date_default_timezone_set('Asia/Jakarta');
     $pdo->exec("SET time_zone = '+07:00'");
+    try {
+        $pdo->exec("SET SESSION SQL_BIG_SELECTS=1");
+    } catch (Exception $e) {}
 
     // 2. Fungsi Skema & Migrasi (Hanya berjalan sekali saat pertama install atau saat api/migrate.php dipanggil)
     function ensureDatabaseSchema($pdo) {

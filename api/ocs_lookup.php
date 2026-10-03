@@ -15,6 +15,11 @@ $refresh = isset($_GET['refresh']) && $_GET['refresh'] == '1';
 // JIKA TANPA QUERY ATAU MEMINTA LIST KANDIDAT KLAIM: Tampilkan semua paket unboxing yang kondisinya BUKAN GOOD
 if ($query === '' || $action === 'list_claimable') {
     try {
+        // 1. Pastikan SQL_BIG_SELECTS aktif pada sesi database
+        try {
+            $pdo->exec("SET SESSION SQL_BIG_SELECTS=1");
+        } catch (Exception $e) {}
+
         // Pastikan tabel ocs_orders ada
         $hasOcsTable = false;
         try {
@@ -29,94 +34,101 @@ if ($query === '' || $action === 'list_claimable') {
             }
         } catch (Exception $e) {}
 
-        if ($hasOcsTable) {
-            $sqlDamaged = "
-                SELECT rs.id, rs.invoice_number, rs.expedition, rs.operator_name, rs.status, 
-                       rs.total_items, rs.total_good, rs.total_damaged, rs.notes, rs.video_path, rs.created_at,
-                       COUNT(ri.id) as item_count,
-                       SUM(CASE WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
-                                  OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
-                                  OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') THEN 1 ELSE 0 END) as damaged_items_count,
-                       SUM(CASE WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
-                                  OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
-                                  OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') THEN ri.qty ELSE 0 END) as damaged_qty_sum,
-                       GROUP_CONCAT(DISTINCT CASE 
-                           WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
-                             OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
-                             OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') 
-                           THEN CONCAT(ri.product_name, ' (x', ri.qty, ')') 
-                           ELSE NULL 
-                       END SEPARATOR ', ') as damaged_product_names,
-                       GROUP_CONCAT(DISTINCT CONCAT(ri.product_name, ' (x', ri.qty, ')') SEPARATOR ', ') as all_product_names,
-                       GROUP_CONCAT(DISTINCT CASE 
-                           WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
-                             OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
-                             OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') 
-                           THEN NULLIF(COALESCE(NULLIF(ri.seller_sku, ''), NULLIF(ri.sku, '')), '') 
-                           ELSE NULL 
-                       END SEPARATOR ', ') as damaged_skus,
-                       GROUP_CONCAT(DISTINCT NULLIF(COALESCE(NULLIF(ri.seller_sku, ''), NULLIF(ri.sku, '')), '') SEPARATOR ', ') as all_skus,
-                       GROUP_CONCAT(DISTINCT CASE WHEN ri.damage_reason IS NOT NULL AND ri.damage_reason != '' THEN ri.damage_reason ELSE NULL END SEPARATOR '; ') as damage_reasons,
-                       MAX(o.package_price) as package_price, 
-                       MAX(o.commerce_platform) as commerce_platform, 
-                       MAX(o.shop_name) as shop_name, 
-                       MAX(o.product_name) as ocs_product_name,
-                       MAX(o.seller_sku) as ocs_seller_sku,
-                       MAX(o.has_packing_video) as has_packing_video
-                FROM return_sessions rs
-                LEFT JOIN return_items ri ON ri.session_id = rs.id
-                LEFT JOIN ocs_orders o ON (o.order_id = rs.invoice_number OR o.tracking_number = rs.invoice_number)
-                GROUP BY rs.id, rs.invoice_number, rs.expedition, rs.operator_name, rs.status, 
-                         rs.total_items, rs.total_good, rs.total_damaged, rs.notes, rs.video_path, rs.created_at
-                HAVING rs.total_damaged > 0 OR damaged_items_count > 0
-                ORDER BY rs.id DESC
-            ";
-        } else {
-            // Fallback query jika ocs_orders belum siap
-            $sqlDamaged = "
-                SELECT rs.id, rs.invoice_number, rs.expedition, rs.operator_name, rs.status, 
-                       rs.total_items, rs.total_good, rs.total_damaged, rs.notes, rs.video_path, rs.created_at,
-                       COUNT(ri.id) as item_count,
-                       SUM(CASE WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
-                                  OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
-                                  OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') THEN 1 ELSE 0 END) as damaged_items_count,
-                       SUM(CASE WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
-                                  OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
-                                  OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') THEN ri.qty ELSE 0 END) as damaged_qty_sum,
-                       GROUP_CONCAT(DISTINCT CASE 
-                           WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
-                             OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
-                             OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') 
-                           THEN CONCAT(ri.product_name, ' (x', ri.qty, ')') 
-                           ELSE NULL 
-                       END SEPARATOR ', ') as damaged_product_names,
-                       GROUP_CONCAT(DISTINCT CONCAT(ri.product_name, ' (x', ri.qty, ')') SEPARATOR ', ') as all_product_names,
-                       GROUP_CONCAT(DISTINCT CASE 
-                           WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
-                             OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
-                             OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') 
-                           THEN NULLIF(COALESCE(NULLIF(ri.seller_sku, ''), NULLIF(ri.sku, '')), '') 
-                           ELSE NULL 
-                       END SEPARATOR ', ') as damaged_skus,
-                       GROUP_CONCAT(DISTINCT NULLIF(COALESCE(NULLIF(ri.seller_sku, ''), NULLIF(ri.sku, '')), '') SEPARATOR ', ') as all_skus,
-                       GROUP_CONCAT(DISTINCT CASE WHEN ri.damage_reason IS NOT NULL AND ri.damage_reason != '' THEN ri.damage_reason ELSE NULL END SEPARATOR '; ') as damage_reasons,
-                       0 as package_price, 
-                       NULL as commerce_platform, 
-                       NULL as shop_name, 
-                       NULL as ocs_product_name,
-                       NULL as ocs_seller_sku,
-                       0 as has_packing_video
-                FROM return_sessions rs
-                LEFT JOIN return_items ri ON ri.session_id = rs.id
-                GROUP BY rs.id, rs.invoice_number, rs.expedition, rs.operator_name, rs.status, 
-                         rs.total_items, rs.total_good, rs.total_damaged, rs.notes, rs.video_path, rs.created_at
-                HAVING rs.total_damaged > 0 OR damaged_items_count > 0
-                ORDER BY rs.id DESC
-            ";
-        }
+        // Query kandidat paket rusak langsung dari return_sessions & return_items (Sangat cepat & aman dari MAX_JOIN_SIZE)
+        $sqlDamaged = "
+            SELECT rs.id, rs.invoice_number, rs.expedition, rs.operator_name, rs.status, 
+                   rs.total_items, rs.total_good, rs.total_damaged, rs.notes, rs.video_path, rs.created_at,
+                   COUNT(ri.id) as item_count,
+                   SUM(CASE WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
+                              OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
+                              OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') THEN 1 ELSE 0 END) as damaged_items_count,
+                   SUM(CASE WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
+                              OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
+                              OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') THEN ri.qty ELSE 0 END) as damaged_qty_sum,
+                   GROUP_CONCAT(DISTINCT CASE 
+                       WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
+                         OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
+                         OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') 
+                       THEN CONCAT(ri.product_name, ' (x', ri.qty, ')') 
+                       ELSE NULL 
+                   END SEPARATOR ', ') as damaged_product_names,
+                   GROUP_CONCAT(DISTINCT CONCAT(ri.product_name, ' (x', ri.qty, ')') SEPARATOR ', ') as all_product_names,
+                   GROUP_CONCAT(DISTINCT CASE 
+                       WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
+                         OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
+                         OR (ri.damage_reason IS NOT NULL AND ri.damage_reason != '') 
+                       THEN NULLIF(COALESCE(NULLIF(ri.seller_sku, ''), NULLIF(ri.sku, '')), '') 
+                       ELSE NULL 
+                   END SEPARATOR ', ') as damaged_skus,
+                   GROUP_CONCAT(DISTINCT NULLIF(COALESCE(NULLIF(ri.seller_sku, ''), NULLIF(ri.sku, '')), '') SEPARATOR ', ') as all_skus,
+                   GROUP_CONCAT(DISTINCT CASE WHEN ri.damage_reason IS NOT NULL AND ri.damage_reason != '' THEN ri.damage_reason ELSE NULL END SEPARATOR '; ') as damage_reasons,
+                   0 as package_price, 
+                   NULL as commerce_platform, 
+                   NULL as shop_name, 
+                   NULL as ocs_product_name,
+                   NULL as ocs_seller_sku,
+                   0 as has_packing_video
+            FROM return_sessions rs
+            LEFT JOIN return_items ri ON ri.session_id = rs.id
+            GROUP BY rs.id, rs.invoice_number, rs.expedition, rs.operator_name, rs.status, 
+                     rs.total_items, rs.total_good, rs.total_damaged, rs.notes, rs.video_path, rs.created_at
+            HAVING rs.total_damaged > 0 OR damaged_items_count > 0
+            ORDER BY rs.id DESC
+            LIMIT 500
+        ";
 
         $stmtDamaged = $pdo->query($sqlDamaged);
         $candidates = $stmtDamaged->fetchAll(PDO::FETCH_ASSOC);
+
+        // Jika tabel ocs_orders ada, lengkapi data harga, toko, & video packing secara efisien (Batch indexed query)
+        if (!empty($candidates) && $hasOcsTable) {
+            $invList = array_values(array_unique(array_filter(array_column($candidates, 'invoice_number'))));
+            if (!empty($invList)) {
+                $chunks = array_chunk($invList, 100);
+                $ocsMap = [];
+                foreach ($chunks as $chunk) {
+                    $inPlaceholders = implode(',', array_fill(0, count($chunk), '?'));
+                    
+                    // Match by order_id
+                    try {
+                        $stmtOcs1 = $pdo->prepare("SELECT order_id, tracking_number, package_price, commerce_platform, shop_name, product_name, seller_sku, has_packing_video FROM ocs_orders WHERE order_id IN ($inPlaceholders)");
+                        $stmtOcs1->execute($chunk);
+                        while ($row = $stmtOcs1->fetch(PDO::FETCH_ASSOC)) {
+                            if (!empty($row['order_id'])) $ocsMap[$row['order_id']] = $row;
+                            if (!empty($row['tracking_number'])) $ocsMap[$row['tracking_number']] = $row;
+                        }
+                    } catch (Exception $eOcs1) {}
+
+                    // Match by tracking_number
+                    try {
+                        $stmtOcs2 = $pdo->prepare("SELECT order_id, tracking_number, package_price, commerce_platform, shop_name, product_name, seller_sku, has_packing_video FROM ocs_orders WHERE tracking_number IN ($inPlaceholders)");
+                        $stmtOcs2->execute($chunk);
+                        while ($row = $stmtOcs2->fetch(PDO::FETCH_ASSOC)) {
+                            if (!empty($row['tracking_number']) && !isset($ocsMap[$row['tracking_number']])) {
+                                $ocsMap[$row['tracking_number']] = $row;
+                            }
+                            if (!empty($row['order_id']) && !isset($ocsMap[$row['order_id']])) {
+                                $ocsMap[$row['order_id']] = $row;
+                            }
+                        }
+                    } catch (Exception $eOcs2) {}
+                }
+
+                foreach ($candidates as &$c) {
+                    $inv = $c['invoice_number'];
+                    if (isset($ocsMap[$inv])) {
+                        $o = $ocsMap[$inv];
+                        $c['package_price']     = (float)($o['package_price'] ?? 0);
+                        $c['commerce_platform'] = $o['commerce_platform'] ?? null;
+                        $c['shop_name']         = $o['shop_name'] ?? null;
+                        $c['ocs_product_name']  = $o['product_name'] ?? null;
+                        $c['ocs_seller_sku']    = $o['seller_sku'] ?? null;
+                        $c['has_packing_video'] = (int)($o['has_packing_video'] ?? 0);
+                    }
+                }
+                unset($c);
+            }
+        }
 
         // Format data kandidat
         foreach ($candidates as &$c) {

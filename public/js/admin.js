@@ -3304,7 +3304,6 @@ window.executeClaimLookup = async function(e) {
     if (e && e.preventDefault) e.preventDefault();
 
     const input = document.getElementById('claimSearchInput');
-    const btn = document.getElementById('btnClaimSearch');
     const query = input ? input.value.trim() : '';
 
     if (!query) {
@@ -3312,32 +3311,8 @@ window.executeClaimLookup = async function(e) {
         return;
     }
 
-    const originalBtnHtml = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Memeriksa Server...';
-
-    try {
-        // 1. Ambil data dossier dari server lokal terlebih dahulu (database ocs_orders & cross-reference gudang)
-        const ocsRes = await fetch(`api/ocs_lookup.php?q=${encodeURIComponent(query)}`);
-        const data = await ocsRes.json();
-
-        if (!data || !data.success) {
-            let errMsg = data?.message || 'Data tidak ditemukan di database server maupun OCS';
-            if (data?.hint) errMsg += '\n\n💡 ' + data.hint;
-            showToast('error', errMsg, 'Pencarian Gagal');
-            return;
-        }
-
-        // 2. Render di tampilan bawah dan tampilkan popup modal detail klaim
-        renderClaimDossier(data);
-        openClaimDetailModal(query);
-        showToast('success', `Data #${query} ditemukan! Berkas detail klaim ditampilkan.`, 'Berkas Ditemukan');
-    } catch (err) {
-        showToast('error', 'Terjadi kesalahan: ' + err.message, 'Gagal');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalBtnHtml;
-    }
+    // Langsung buka modal popup detail berkas klaim!
+    openClaimDetailModal(query);
 };
 
 function renderClaimDossier(data) {
@@ -4209,7 +4184,15 @@ window.openClaimDetailModal = async function(identifier) {
     }
 
     modal.classList.remove('hidden');
-    if (loading) loading.classList.remove('hidden');
+    if (loading) {
+        loading.innerHTML = `
+            <div class="py-12 text-center text-slate-500 space-y-3">
+                <i class="fa-solid fa-spinner fa-spin text-3xl text-amber-500"></i>
+                <p class="font-bold">Memuat berkas dossier klaim...</p>
+            </div>
+        `;
+        loading.classList.remove('hidden');
+    }
     if (body) body.classList.add('hidden');
 
     try {
