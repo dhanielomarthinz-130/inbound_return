@@ -29,7 +29,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
         @media print {
             @page {
                 size: A4 portrait;
-                margin: 10mm 15mm;
+                margin: 8mm 12mm;
             }
             body * { visibility: hidden !important; }
             #printableReceivingReceiptArea, #printableReceivingReceiptArea * { visibility: visible !important; }
@@ -41,7 +41,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 max-width: 100% !important;
                 background: white !important;
                 color: #0f172a !important;
-                padding: 10px !important;
+                padding: 4px !important;
                 margin: 0 !important;
                 box-shadow: none !important;
                 border: none !important;
@@ -50,64 +50,87 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
+            #printableReceivingReceiptArea img {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            #printableReceivingReceiptArea .sj-header {
+                border-bottom: 2px solid #0f172a !important;
+                padding-bottom: 8px !important;
+                margin-bottom: 10px !important;
+            }
+            #printableReceivingReceiptArea .sj-info-table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+                border: 1px solid #cbd5e1 !important;
+                margin-bottom: 8px !important;
+                font-size: 8.5pt !important;
+            }
+            #printableReceivingReceiptArea .sj-info-table td {
+                padding: 4px 8px !important;
+                border: 1px solid #cbd5e1 !important;
+            }
             #printableReceivingReceiptArea #adminSlipPackageList {
                 display: grid !important;
-                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-                gap: 4px 8px !important;
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+                gap: 3px 5px !important;
                 max-height: none !important;
                 overflow: visible !important;
                 height: auto !important;
-                background-color: #f8fafc !important;
-                border: 1px solid #cbd5e1 !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
+                background-color: transparent !important;
+                border: none !important;
+                padding: 0 !important;
             }
             #printableReceivingReceiptArea #adminSlipPackageList > div {
                 break-inside: avoid !important;
                 page-break-inside: avoid !important;
+                border: 1px solid #cbd5e1 !important;
+                background-color: #f8fafc !important;
+                padding: 2px 4px !important;
+                font-size: 7.5pt !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
             #printableReceivingReceiptArea #adminSlipSackBreakdownSection {
-                break-inside: avoid !important;
-                page-break-inside: avoid !important;
                 background-color: #fffbeb !important;
                 border: 1px solid #fde68a !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+                padding: 6px 10px !important;
+                margin-bottom: 8px !important;
             }
             #printableReceivingReceiptArea #adminSlipSackBreakdownList {
                 display: grid !important;
-                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-                gap: 4px 6px !important;
+                grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+                gap: 4px !important;
             }
             #printableReceivingReceiptArea #adminSlipSackBreakdownList > div {
                 break-inside: avoid !important;
                 page-break-inside: avoid !important;
-                background-color: #ffffff !important;
                 border: 1px solid #fcd34d !important;
+                background-color: #ffffff !important;
+                padding: 3px 6px !important;
+                font-size: 8pt !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
-            #printableReceivingReceiptArea .bg-emerald-500 {
-                background-color: #10b981 !important;
+            #printableReceivingReceiptArea .total-banner {
+                background: #059669 !important;
                 color: #ffffff !important;
                 padding: 6px 12px !important;
+                border-radius: 6px !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
+                margin-bottom: 8px !important;
             }
-            #printableReceivingReceiptArea .bg-emerald-50 {
-                background-color: #ecfdf5 !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-            #printableReceivingReceiptArea .border-emerald-300 {
-                border-color: #6ee7b7 !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-            #printableReceivingReceiptArea .bg-slate-50 {
-                background-color: #f8fafc !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
+            #printableReceivingReceiptArea .signatures-box {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+                margin-top: 12px !important;
+                padding-top: 8px !important;
+                border-top: 1px solid #94a3b8 !important;
             }
             ::-webkit-scrollbar {
                 display: none !important;
@@ -1906,77 +1929,116 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 </button>
             </div>
 
-            <!-- Content Area (Printable) -->
-            <div id="printableReceivingReceiptArea" class="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
-                <!-- Header Slip -->
-                <div class="text-center border-b border-dashed border-slate-300 pb-3">
-                    <h2 class="font-black text-base tracking-tight text-slate-900">IEG</h2>
-                    <p class="text-[10px] text-slate-500 font-medium">INBOUND WAREHOUSE RETURN RECEPTION</p>
-                    <p id="adminSlipReceiptNo" class="font-mono font-bold text-xs text-emerald-600 mt-1">-</p>
+            <!-- Content Area (Printable: FORMAT SURAT JALAN INBOUND RETUR RESMI) -->
+            <div id="printableReceivingReceiptArea" class="p-6 overflow-y-auto space-y-3.5 flex-1 text-xs">
+                <!-- Header Surat Jalan dengan Logo IEG Resmi -->
+                <div class="sj-header border-b-2 border-slate-900 pb-3 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <img src="assets/image/logo-IEG.png" alt="Logo IEG" class="h-14 w-auto object-contain shrink-0">
+                        <div>
+                            <h2 class="font-black text-sm sm:text-base tracking-tight text-slate-900 leading-tight">IEG Inovasi Eka Gemilang</h2>
+                            <p class="text-[10px] text-slate-600 font-bold uppercase tracking-wider">Warehouse Return &amp; Dispute Logistics Center</p>
+                            <p class="text-[9px] text-slate-400">Inbound Reception Department • Tanda Terima Fisik Barang Retur</p>
+                        </div>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <div class="inline-block bg-slate-900 text-white font-black text-[10px] sm:text-[11px] px-2.5 py-0.5 rounded tracking-wider uppercase mb-1 shadow-2xs">
+                            SURAT JALAN INBOUND RETUR
+                        </div>
+                        <div class="font-mono font-black text-xs sm:text-sm text-emerald-700" id="adminSlipReceiptNo">RCV-20260929-0001</div>
+                        <div class="text-[9px] text-slate-500 font-medium">Status: <span class="text-emerald-700 font-bold">VERIFIKASI SAH</span></div>
+                    </div>
                 </div>
 
-                <!-- Info Grid -->
-                <div class="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 p-3 rounded-xl border border-slate-200">
-                    <div>
-                        <span class="text-slate-400 block text-[9px] uppercase font-bold">Ekspedisi</span>
-                        <span id="adminSlipExpedition" class="font-bold text-slate-800 text-xs">-</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-400 block text-[9px] uppercase font-bold">Waktu Penerimaan</span>
-                        <span id="adminSlipDateTime" class="font-semibold text-slate-700">-</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-400 block text-[9px] uppercase font-bold">Driver / Kurir</span>
-                        <span id="adminSlipCourier" class="font-semibold text-slate-700">-</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-400 block text-[9px] uppercase font-bold">Nomor Karung / Bag</span>
-                        <span id="adminSlipSackNumber" class="font-bold text-amber-700 text-xs">-</span>
-                    </div>
-                    <div class="col-span-2 sm:col-span-1">
-                        <span class="text-slate-400 block text-[9px] uppercase font-bold">Operator Penerima</span>
-                        <span id="adminSlipOperator" class="font-bold text-slate-800">-</span>
-                    </div>
+                <!-- Info Grid: Tabel Detail Serah Terima Formal -->
+                <div class="border border-slate-300 rounded-xl overflow-hidden shadow-2xs">
+                    <table class="sj-info-table w-full text-xs">
+                        <tr class="border-b border-slate-200">
+                            <td class="w-1/4 bg-slate-50 py-2 px-3 text-[10px] text-slate-500 font-bold uppercase">Jasa Ekspedisi</td>
+                            <td class="w-1/4 py-2 px-3 font-bold text-slate-900 text-xs" id="adminSlipExpedition">-</td>
+                            <td class="w-1/4 bg-slate-50 py-2 px-3 text-[10px] text-slate-500 font-bold uppercase">Waktu Serah Terima</td>
+                            <td class="w-1/4 py-2 px-3 font-mono font-semibold text-slate-800" id="adminSlipDateTime">-</td>
+                        </tr>
+                        <tr class="border-b border-slate-200">
+                            <td class="bg-slate-50 py-2 px-3 text-[10px] text-slate-500 font-bold uppercase">Driver / Kurir Pengantar</td>
+                            <td class="py-2 px-3 font-semibold text-slate-800" id="adminSlipCourier">-</td>
+                            <td class="bg-slate-50 py-2 px-3 text-[10px] text-slate-500 font-bold uppercase">Petugas Penerima (Gudang)</td>
+                            <td class="py-2 px-3 font-bold text-slate-900" id="adminSlipOperator">-</td>
+                        </tr>
+                        <tr>
+                            <td class="bg-slate-50 py-2 px-3 text-[10px] text-slate-500 font-bold uppercase">Nomor Karung Terdaftar</td>
+                            <td class="py-2 px-3 font-mono font-bold text-amber-800" id="adminSlipSackNumber">-</td>
+                            <td class="bg-slate-50 py-2 px-3 text-[10px] text-slate-500 font-bold uppercase">Total Karung / Bag</td>
+                            <td class="py-2 px-3 font-mono font-black text-amber-900" id="adminSlipTotalSacksCount">0 Karung</td>
+                        </tr>
+                    </table>
                 </div>
 
                 <!-- Total Count Banner -->
-                <div class="bg-emerald-500 text-white rounded-xl p-3 text-center">
-                    <span class="text-[10px] uppercase font-bold opacity-80 block">Jumlah Paket Diterima</span>
-                    <span id="adminSlipTotalPackages" class="font-black text-2xl">0</span>
-                    <span class="text-xs font-semibold"> Paket</span>
+                <div class="total-banner bg-emerald-600 text-white rounded-xl p-3 flex items-center justify-between shadow-2xs">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                            <i class="fa-solid fa-boxes-packing"></i>
+                        </span>
+                        <div>
+                            <span class="text-[10px] uppercase font-bold tracking-wider text-emerald-100 block">TOTAL KUANTITAS PAKET DITERIMA FISIK:</span>
+                            <span class="text-[11px] text-emerald-50">Seluruh paket fisik telah dihitung &amp; diverifikasi via scan barcode di stasiun receiving inbound.</span>
+                        </div>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <span id="adminSlipTotalPackages" class="font-black text-2xl font-mono leading-none">0</span>
+                        <span class="text-xs font-bold text-emerald-100 ml-1">Paket</span>
+                    </div>
                 </div>
 
                 <!-- Rekap Total Paket Per Karung (Tampil di Layar & Cetak Fisik) -->
-                <div id="adminSlipSackBreakdownSection" class="border border-amber-200 bg-amber-50/60 rounded-xl p-3">
+                <div id="adminSlipSackBreakdownSection" class="border border-amber-200 bg-amber-50/70 rounded-xl p-3">
                     <div class="flex items-center justify-between mb-2">
-                        <h4 class="font-bold text-amber-900 text-[11px] uppercase flex items-center gap-1.5">
+                        <h4 class="font-bold text-amber-950 text-[11px] uppercase flex items-center gap-1.5">
                             <i class="fa-solid fa-boxes-stacked text-amber-600"></i>
-                            <span>Total Paket Per Karung:</span>
+                            <span>Rekapitulasi Paket Per Karung / Bag:</span>
                         </h4>
-                        <span id="adminSlipTotalSacksCount" class="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full font-mono">0 Karung</span>
                     </div>
-                    <div id="adminSlipSackBreakdownList" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <div id="adminSlipSackBreakdownList" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         <!-- Dynamic items -->
                     </div>
                 </div>
 
                 <!-- Daftar Resi Paket -->
-                <div>
-                    <h4 class="font-bold text-slate-700 mb-1.5 text-[11px] uppercase">Rincian Nomor Resi / Barcode:</h4>
+                <div class="space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <h4 class="font-bold text-slate-800 text-[11px] uppercase flex items-center gap-1.5">
+                            <i class="fa-solid fa-barcode text-indigo-600"></i>
+                            <span>Lampiran Rincian Nomor Resi / Barcode Paket:</span>
+                        </h4>
+                        <span class="text-[10px] text-slate-500 font-medium">Status Seluruh Resi: <b class="text-emerald-700">DITERIMA LENGKAP</b></span>
+                    </div>
                     <div id="adminSlipPackageList" class="bg-slate-50 rounded-xl p-2.5 max-h-56 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-1.5 font-mono text-[11px] border border-slate-200">
                         <!-- List Resi -->
                     </div>
                 </div>
 
-                <!-- Tanda Tangan Serah Terima (Untuk Cetak Fisik) -->
-                <div class="grid grid-cols-2 gap-4 text-center pt-4 border-t border-dashed border-slate-300">
-                    <div>
-                        <p class="text-[10px] text-slate-400 font-semibold mb-10">Yang Menyerahkan (Kurir)</p>
-                        <p class="text-[10px] font-bold text-slate-700 border-t border-slate-300 mx-4 pt-1">( ........................... )</p>
+                <!-- Tanda Tangan Serah Terima 3 Pihak (Untuk Cetak Fisik Formal) -->
+                <div class="signatures-box pt-3 space-y-2.5">
+                    <div class="grid grid-cols-3 gap-3 text-center">
+                        <div class="border border-slate-200 rounded-xl p-2 bg-slate-50/60">
+                            <p class="text-[9px] text-slate-500 font-bold uppercase mb-12">Yang Menyerahkan (Kurir/Driver)</p>
+                            <p class="text-[10px] font-bold text-slate-800 border-t border-slate-400 mx-2 pt-1">( .................................... )</p>
+                            <p class="text-[8px] text-slate-400 mt-0.5">Tanda Tangan &amp; Nama Terang</p>
+                        </div>
+                        <div class="border border-slate-200 rounded-xl p-2 bg-slate-50/60">
+                            <p class="text-[9px] text-slate-500 font-bold uppercase mb-12">Yang Memeriksa &amp; Menerima</p>
+                            <p id="adminSlipSignOperator" class="text-[10px] font-bold text-slate-800 border-t border-slate-400 mx-2 pt-1">Gudang</p>
+                            <p class="text-[8px] text-slate-400 mt-0.5">Petugas Inbound Warehouse</p>
+                        </div>
+                        <div class="border border-slate-200 rounded-xl p-2 bg-slate-50/60">
+                            <p class="text-[9px] text-slate-500 font-bold uppercase mb-12">Mengetahui / Disetujui</p>
+                            <p class="text-[10px] font-bold text-slate-800 border-t border-slate-400 mx-2 pt-1">( .................................... )</p>
+                            <p class="text-[8px] text-slate-400 mt-0.5">Supervisor Inbound / WH Lead</p>
+                        </div>
                     </div>
-                    <div>
-                        <p class="text-[10px] text-slate-400 font-semibold mb-10">Yang Menerima (Gudang)</p>
-                        <p id="adminSlipSignOperator" class="text-[10px] font-bold text-slate-700 border-t border-slate-300 mx-4 pt-1">-</p>
+                    <div class="text-[8.5px] text-slate-400 text-center italic leading-tight pt-1">
+                        * Dokumen Surat Jalan ini sah dan mengikat sebagai bukti serah terima fisik paket retur antara pihak Ekspedisi dan Gudang Inbound IEG Inovasi Eka Gemilang.
                     </div>
                 </div>
             </div>

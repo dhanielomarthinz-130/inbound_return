@@ -3124,9 +3124,13 @@ window.printClaimDossier = function() {
     </head>
     <body>
         <div class="header">
-            <div>
-                <b style="font-size: 12pt;">IEG RETURN INBOUND & CLAIMS</b><br>
-                <span style="font-size: 8.5pt; color: #64748b;">Warehouse Management & Expedition Dispute Department</span>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <img src="assets/image/logo-IEG.png" alt="Logo IEG" style="height: 48px; width: auto; object-fit: contain;">
+                <div>
+                    <b style="font-size: 12pt; color: #0f172a; text-transform: uppercase;">IEG Inovasi Eka Gemilang</b><br>
+                    <span style="font-size: 8.5pt; color: #475569; font-weight: 600;">Warehouse Return &amp; Dispute Logistics Center</span><br>
+                    <span style="font-size: 7.5pt; color: #64748b;">Expedition Dispute &amp; Insurance Claim Management</span>
+                </div>
             </div>
             <div style="text-align: right; font-size: 8.5pt; color: #64748b;">
                 Tanggal: <b>${new Date().toLocaleDateString('id-ID')}</b><br>
