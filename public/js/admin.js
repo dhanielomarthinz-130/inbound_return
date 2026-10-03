@@ -4643,6 +4643,7 @@ window.executeOcsOrderSync = async function() {
     const progressTitle = document.getElementById('syncProgressTitle');
     const progressBadge = document.getElementById('syncProgressBadge');
     const progressDetail = document.getElementById('syncProgressDetail');
+    const syncTrafficLoader = document.getElementById('syncTrafficLoader');
     const statsBox = document.getElementById('syncStatsBox');
     const statTotalOrders = document.getElementById('statTotalOrders');
     const statWithResi = document.getElementById('statWithResi');
@@ -4654,22 +4655,53 @@ window.executeOcsOrderSync = async function() {
         if (r.checked) selected = r.value;
     }
 
-    let url = '';
-    let targetLabel = '';
+    // Helper format YYYY-MM-DD
+    const formatDateYMD = (d) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    // Bangun antrian chunk (agar anti 504 Gateway Timeout pada rentang besar)
+    let chunks = [];
+    let isSinglePicklist = false;
+    let singlePicklistKeyword = '';
 
     if (selected === 'picklist') {
         const inputKey = document.getElementById('syncPicklistKeywordInput');
-        const keyword = inputKey ? inputKey.value.trim() : '';
-        if (!keyword) {
+        singlePicklistKeyword = inputKey ? inputKey.value.trim() : '';
+        if (!singlePicklistKeyword) {
             showToast('warning', 'Harap masukkan No. Resi atau Order ID terlebih dahulu.', 'Peringatan');
             if (inputKey) inputKey.focus();
             return;
         }
-        url = `api/sync_ocs_orders.php?keyword=${encodeURIComponent(keyword)}`;
-        targetLabel = `No. Resi / Order ID: <b>${keyword}</b> via Picklist OCS`;
+        isSinglePicklist = true;
+        chunks.push({
+            url: `api/sync_ocs_orders.php?keyword=${encodeURIComponent(singlePicklistKeyword)}`,
+            label: `No. Resi / Order ID: ${singlePicklistKeyword}`
+        });
     } else if (selected === 'month') {
-        url = `api/sync_ocs_orders.php?date=month`;
-        targetLabel = '1 Bulan Terakhir (30 Hari)';
+        // Bagi 30 hari ke dalam 6 batch (masing-masing 5 hari) agar responsif & bebas gateway timeout
+        const now = new Date();
+        const totalDays = 30;
+        const stepDays = 5;
+        for (let i = totalDays; i > 0; i -= stepDays) {
+            const startD = new Date(now);
+            startD.setDate(now.getDate() - i);
+            const endD = new Date(now);
+            endD.setDate(now.getDate() - (i - stepDays));
+            if (endD > now) endD.setTime(now.getTime());
+            
+            const sStr = formatDateYMD(startD);
+            const eStr = formatDateYMD(endD);
+            chunks.push({
+                url: `api/sync_ocs_orders.php?start=${encodeURIComponent(sStr)}&end=${encodeURIComponent(eStr)}&details=0`,
+                label: `${sStr} s/d ${eStr}`,
+                start: sStr,
+                end: eStr
+            });
+        }
     } else if (selected === 'custom') {
         const startDateInput = document.getElementById('syncStartDateInput');
         const endDateInput = document.getElementById('syncEndDateInput');
@@ -4679,34 +4711,55 @@ window.executeOcsOrderSync = async function() {
             showToast('warning', 'Harap tentukan tanggal mulai dan tanggal selesai terlebih dahulu.', 'Peringatan');
             return;
         }
-        url = `api/sync_ocs_orders.php?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`;
-        targetLabel = `rentang ${startDate} s/d ${endDate}`;
+        const d1 = new Date(startDate);
+        const d2 = new Date(endDate);
+        if (d1 > d2) {
+            showToast('warning', 'Tanggal mulai tidak boleh lebih besar dari tanggal selesai.', 'Peringatan');
+            return;
+        }
+        const diffDays = Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
+        if (diffDays > 5) {
+            // Bagi per 5 hari jika rentang lebih dari 5 hari
+            let cur = new Date(d1);
+            while (cur < d2) {
+                const chunkStart = new Date(cur);
+                const chunkEnd = new Date(cur);
+                chunkEnd.setDate(chunkEnd.getDate() + 5);
+                if (chunkEnd > d2) chunkEnd.setTime(d2.getTime());
+                
+                const sStr = formatDateYMD(chunkStart);
+                const eStr = formatDateYMD(chunkEnd);
+                chunks.push({
+                    url: `api/sync_ocs_orders.php?start=${encodeURIComponent(sStr)}&end=${encodeURIComponent(eStr)}&details=0`,
+                    label: `${sStr} s/d ${eStr}`,
+                    start: sStr,
+                    end: eStr
+                });
+                cur.setDate(cur.getDate() + 5);
+            }
+        } else {
+            chunks.push({
+                url: `api/sync_ocs_orders.php?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}&details=0`,
+                label: `${startDate} s/d ${endDate}`,
+                start: startDate,
+                end: endDate
+            });
+        }
     } else {
-        url = `api/sync_ocs_orders.php?date=${encodeURIComponent(selected)}`;
-        targetLabel = selected === 'yesterday' ? 'hari kemarin (00:00 - 23:59 WIB)' : 'hari ini';
+        // Kemarin / Hari ini (1 hari = 1 request cepat)
+        chunks.push({
+            url: `api/sync_ocs_orders.php?date=${encodeURIComponent(selected)}`,
+            label: selected === 'yesterday' ? 'Kemarin' : 'Hari Ini'
+        });
     }
 
-    // Tampilkan Global Loading Spinner Berwarna (Merah, Kuning, Hijau Berputar)
-    if (typeof showGlobalLoading === 'function') {
-        const cleanLabel = targetLabel.replace(/<[^>]*>?/gm, '');
-        showGlobalLoading(
-            'Sinkronisasi Orders OCS...', 
-            `Sedang menarik dan menyinkronkan data orders ${cleanLabel} dari OCS IEG System. Mohon tunggu, proses cepat dan otomatis.`
-        );
-    }
-
-    // Tampilkan progress UI di dalam modal
+    // Persiapkan UI Loading
     if (progressContainer) progressContainer.classList.remove('hidden');
+    if (syncTrafficLoader) syncTrafficLoader.classList.remove('hidden');
     if (statsBox) statsBox.classList.add('hidden');
     if (progressBadge) {
         progressBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 font-mono';
         progressBadge.innerText = 'PROSES';
-    }
-    if (progressTitle) {
-        progressTitle.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin text-indigo-400"></i> Sinkronisasi Sedang Berjalan...`;
-    }
-    if (progressDetail) {
-        progressDetail.innerHTML = `Menghubungkan ke OCS IEG System untuk ${targetLabel}...`;
     }
 
     if (btnStart) {
@@ -4716,51 +4769,94 @@ window.executeOcsOrderSync = async function() {
     }
     if (btnCancel) btnCancel.disabled = true;
 
+    let accumulatedOrders = 0;
+    let accumulatedWithResi = 0;
+    let accumulatedClaim = 0;
+    let lastResult = null;
+
     try {
-        const response = await fetch(url);
-        const rawText = await response.text();
-        if (!rawText || rawText.trim() === '') {
-            throw new Error('Server mengembalikan respons kosong. Kemungkinan timeout atau OCS tidak dapat dihubungi. Coba lagi dalam beberapa saat.');
-        }
+        const totalSteps = chunks.length;
 
-        let result;
-        try {
-            result = JSON.parse(rawText);
-        } catch (jsonErr) {
-            console.error('[sync_ocs_orders] Non-JSON response:', rawText.substring(0, 500));
-            throw new Error(`Server mengembalikan respons tidak valid. Preview: ${rawText.substring(0, 120)}`);
-        }
+        for (let i = 0; i < totalSteps; i++) {
+            const chunk = chunks[i];
+            const currentStep = i + 1;
+            const progressPercent = Math.round((currentStep / totalSteps) * 100);
 
-        if (result && result.success) {
             if (progressTitle) {
-                progressTitle.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> Sinkronisasi Berhasil Selesai!`;
-            }
-            if (progressBadge) {
-                progressBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-300 font-mono';
-                progressBadge.innerText = 'SELESAI';
+                progressTitle.innerHTML = totalSteps > 1
+                    ? `Sinkronisasi Bagian ${currentStep}/${totalSteps} (${chunk.label})...`
+                    : `Sinkronisasi Orders Sedang Berjalan...`;
             }
             if (progressDetail) {
-                if (result.mode === 'single_order_picklist' || result.source === 'picklist_find_order') {
-                    progressDetail.innerHTML = `Order <b>${result.order_id}</b> (Resi: <b>${result.tracking_number || '-'}</b>) dari <b>${result.shop_name || '-'}</b> (${result.platform || '-'}) berhasil disinkronisasi lengkap dengan ${result.skus_count || 1} SKU!`;
-                } else {
-                    progressDetail.innerHTML = `Periode: <b>${result.target_date || selected}</b> (${result.start_wib} s/d ${result.end_wib})<br>Total <b>${(result.total_synced || result.total_orders_found || 0).toLocaleString('id-ID')}</b> pesanan tersimpan ke MySQL.`;
-                }
+                progressDetail.innerHTML = totalSteps > 1
+                    ? `Menghubungkan ke OCS untuk rentang <b>${chunk.label}</b>...<br>Tersinkron sejauh ini: <b>${accumulatedOrders.toLocaleString('id-ID')}</b> orders.`
+                    : `Menghubungkan ke OCS IEG System untuk ${chunk.label}...`;
             }
 
+            if (typeof showGlobalLoading === 'function') {
+                showGlobalLoading(
+                    totalSteps > 1 ? `Sinkronisasi Orders OCS (${progressPercent}%)...` : 'Sinkronisasi Orders OCS...',
+                    totalSteps > 1 
+                        ? `Sedang memproses bagian ${currentStep} dari ${totalSteps} (${chunk.label}). Total tersimpan: ${accumulatedOrders.toLocaleString('id-ID')} orders.`
+                        : `Sedang menarik dan menyinkronkan data orders dari OCS IEG System. Mohon tunggu sebentar...`
+                );
+            }
+
+            const response = await fetch(chunk.url);
+            const rawText = await response.text();
+
+            if (!rawText || rawText.trim() === '') {
+                throw new Error(`Server mengembalikan respons kosong pada tahap ${currentStep}. Kemungkinan koneksi internet terputus.`);
+            }
+
+            let result;
+            try {
+                result = JSON.parse(rawText);
+            } catch (jsonErr) {
+                console.error('[sync_ocs_orders] Non-JSON response on step', currentStep, rawText.substring(0, 500));
+                throw new Error(`Server mengembalikan respons tidak valid pada tahap ${currentStep}. Preview: ${rawText.substring(0, 120)}`);
+            }
+
+            if (!result || !result.success) {
+                throw new Error(result?.error || result?.message || `Gagal menyinkron data orders pada tahap ${currentStep}`);
+            }
+
+            lastResult = result;
+            accumulatedOrders += (result.total_synced || result.total_orders_found || 1);
+            accumulatedWithResi += (result.total_with_resi || (result.tracking_number ? 1 : 0));
+            accumulatedClaim += (result.total_claim_amount || 0);
+
+            // Update stats realtime
             if (statsBox) statsBox.classList.remove('hidden');
-            if (statTotalOrders) statTotalOrders.innerText = (result.total_synced || result.total_orders_found || 1).toLocaleString('id-ID');
-            if (statWithResi) statWithResi.innerText = (result.total_with_resi || (result.tracking_number ? 1 : 0)).toLocaleString('id-ID');
-            if (statTotalClaim) statTotalClaim.innerText = result.total_claim_amount_fmt || `Rp ${(result.total_claim_amount || 0).toLocaleString('id-ID')}`;
-
-            showToast('success', `Berhasil menyinkron order dari OCS (Total: ${(result.total_synced || 0).toLocaleString('id-ID')} orders)!`, 'Sinkronisasi Selesai');
-
-            // Refresh data setelah sync sukses
-            if (typeof loadClaimCandidates === 'function') loadClaimCandidates(true);
-            if (typeof loadOrdersStats === 'function') loadOrdersStats();
-            if (typeof loadOrdersTable === 'function') loadOrdersTable(1);
-        } else {
-            throw new Error(result.error || result.message || 'Gagal menyinkron data orders dari OCS');
+            if (statTotalOrders) statTotalOrders.innerText = accumulatedOrders.toLocaleString('id-ID');
+            if (statWithResi) statWithResi.innerText = accumulatedWithResi.toLocaleString('id-ID');
+            if (statTotalClaim) statTotalClaim.innerText = `Rp ${accumulatedClaim.toLocaleString('id-ID')}`;
         }
+
+        // SEMUA CHUNK SELESAI
+        if (progressTitle) {
+            progressTitle.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> Sinkronisasi Berhasil Selesai!`;
+        }
+        if (progressBadge) {
+            progressBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-300 font-mono';
+            progressBadge.innerText = 'SELESAI';
+        }
+        if (progressDetail) {
+            if (isSinglePicklist && lastResult) {
+                progressDetail.innerHTML = `Order <b>${lastResult.order_id}</b> (Resi: <b>${lastResult.tracking_number || '-'}</b>) dari <b>${lastResult.shop_name || '-'}</b> (${lastResult.platform || '-'}) berhasil disinkronisasi lengkap dengan ${lastResult.skus_count || 1} SKU!`;
+            } else {
+                const labelSummary = selected === 'month' ? '1 Bulan Terakhir (30 Hari)' : (selected === 'yesterday' ? 'Kemarin' : (selected === 'today' ? 'Hari Ini' : 'Rentang Tanggal'));
+                progressDetail.innerHTML = `Periode: <b>${labelSummary}</b><br>Total <b>${accumulatedOrders.toLocaleString('id-ID')}</b> pesanan tersimpan ke MySQL secara aman tanpa timeout.`;
+            }
+        }
+
+        showToast('success', `Berhasil menyinkronkan total ${accumulatedOrders.toLocaleString('id-ID')} orders dari OCS!`, 'Sinkronisasi Selesai');
+
+        // Refresh data setelah sync sukses
+        if (typeof loadClaimCandidates === 'function') loadClaimCandidates(true);
+        if (typeof loadOrdersStats === 'function') loadOrdersStats();
+        if (typeof loadOrdersTable === 'function') loadOrdersTable(1);
+
     } catch (err) {
         if (progressTitle) {
             progressTitle.innerHTML = `<i class="fa-solid fa-circle-xmark text-rose-400"></i> Gagal Menyinkron Orders`;

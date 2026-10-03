@@ -74,8 +74,13 @@ $startParam     = trim($params['start'] ?? $params['start_date'] ?? '');
 $endParam       = trim($params['end'] ?? $params['end_date'] ?? '');
 $limitParam     = isset($params['limit']) ? (int)$params['limit'] : 0; // 0 = tanpa batas (ambil semua orders dari rentang tanggal)
 $dryRun         = !empty($params['dry_run']);
-$fetchDetails   = !isset($params['details']) || $params['details'] === '1' || $params['details'] === 'true' || $params['details'] === 'auto';
-$detailsLimit   = isset($params['details_limit']) ? (int)$params['details_limit'] : 250; // default perkaya 250 detail per run
+$fetchDetailsParam = $params['details'] ?? null;
+if ($fetchDetailsParam === '0' || $fetchDetailsParam === 'false' || !empty($params['fast'])) {
+    $fetchDetails = false;
+} else {
+    $fetchDetails = true;
+}
+$detailsLimit = isset($params['details_limit']) ? (int)$params['details_limit'] : 250;
 
 date_default_timezone_set('Asia/Jakarta');
 
@@ -84,8 +89,8 @@ if (!empty($startParam) && !empty($endParam)) {
     $endWib   = date('Y-m-d 23:59:59', strtotime($endParam));
     $targetDateLabel = date('Y-m-d', strtotime($startWib)) . ' s/d ' . date('Y-m-d', strtotime($endWib));
     $diffDays = (strtotime($endWib) - strtotime($startWib)) / 86400;
-    if ($diffDays > 3 && !isset($params['details_limit'])) {
-        $detailsLimit = 100; // Optimal & cepat untuk rentang multi-hari / 1 bulan
+    if ($diffDays > 1 && !isset($params['details'])) {
+        $fetchDetails = false; // Fast stream headers mode untuk rentang multi-hari (anti gateway timeout)
     }
 } elseif ($dateParam === 'month' || $dateParam === 'last_30_days' || $dateParam === '1_month' || $dateParam === '30_days') {
     $todayStr = date('Y-m-d');
@@ -93,8 +98,8 @@ if (!empty($startParam) && !empty($endParam)) {
     $startWib = "{$thirtyDaysAgo} 00:00:00";
     $endWib   = "{$todayStr} 23:59:59";
     $targetDateLabel = "{$thirtyDaysAgo} s/d {$todayStr} (1 Bulan Terakhir)";
-    if (!isset($params['details_limit'])) {
-        $detailsLimit = 100; // Optimal & cepat untuk 1 bulan
+    if (!isset($params['details'])) {
+        $fetchDetails = false; // Fast mode untuk 1 bulan (bebas 504 gateway timeout)
     }
 } elseif ($dateParam === 'today') {
     $todayStr = date('Y-m-d');
@@ -389,12 +394,14 @@ try {
     // 3. QUERY ODATA DTO_Orders & STREAM UPSERT KE DATABASE
     // -------------------------------------------------------------
     $filterOdata = "CreatedAt ge {$startUtc} and CreatedAt le {$endUtc}";
-    $pageSize = 100;
+    $pageSize = 150;
     $skip = 0;
     $totalFetched = 0;
     $totalUpserted = 0;
     $totalWithResi = 0;
     $ordersForDetailEnrichment = [];
+    $syncStartTime = microtime(true);
+    $maxExecSeconds = 22; // Batas aman ketat agar gateway/proxy Cloudflare/Apache tidak pernah 504 Timeout
 
     // Pastikan skema ocs_orders up to date
     $hasIsSyncedCol = false;
@@ -432,6 +439,12 @@ try {
     ");
 
     while (true) {
+        // Safety guard batas waktu gateway proxy
+        if ((microtime(true) - $syncStartTime) > $maxExecSeconds) {
+            writeOcsSyncLog("Waktu eksekusi mendekati batas aman gateway ({$maxExecSeconds}s). Selesai sementara pada {$totalFetched} orders agar bebas 504.");
+            break;
+        }
+
         $urlOdata = "{$ocsBaseUrl}/odata/DTO_Orders?\$filter=" . urlencode($filterOdata) . "&\$orderby=CreatedAt%20asc&\$top={$pageSize}&\$skip={$skip}";
         
         $chOrd = curl_init($urlOdata);
@@ -443,7 +456,7 @@ try {
             ],
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_SSL_VERIFYHOST => false,
-            CURLOPT_TIMEOUT        => 35
+            CURLOPT_TIMEOUT        => 15
         ]);
 
         $resOrd = curl_exec($chOrd);
