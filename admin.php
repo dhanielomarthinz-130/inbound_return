@@ -782,11 +782,9 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             <thead class="bg-slate-100 text-slate-600 uppercase font-semibold text-[11px]">
                                 <tr>
                                     <th class="p-3 whitespace-nowrap">Tanggal & Waktu</th>
-                                    <th class="p-3 whitespace-nowrap">Invoice</th>
-                                    <th class="p-3 whitespace-nowrap">Ekspedisi</th>
+                                    <th class="p-3 whitespace-nowrap">Invoice & Ekspedisi</th>
                                     <th class="p-3 whitespace-nowrap">Operator</th>
-                                    <th class="p-3 whitespace-nowrap">Seller SKU</th>
-                                    <th class="p-3 min-w-[200px] max-w-[340px]">Nama Produk</th>
+                                    <th class="p-3 min-w-[220px] max-w-[360px]">Nama Produk & SKU</th>
                                     <th class="p-3 whitespace-nowrap">Batch</th>
                                     <th class="p-3 whitespace-nowrap">Exp Date</th>
                                     <th class="p-3 text-center whitespace-nowrap">Qty</th>
@@ -796,7 +794,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 </tr>
                             </thead>
                             <tbody id="transactionsTableBody" class="divide-y divide-slate-100">
-                                <tr><td colspan="12" class="text-center py-8 text-slate-400">Memuat data transaksi unboxing...</td></tr>
+                                <tr><td colspan="10" class="text-center py-8 text-slate-400">Memuat data transaksi unboxing...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1964,12 +1962,30 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                     </div>
                 </div>
 
-                <!-- Lightbox Foto Full -->
-                <div id="modalPhotoLightbox" class="fixed inset-0 bg-black/90 z-[60] hidden items-center justify-center p-4" onclick="this.classList.add('hidden'); this.classList.remove('flex')">
-                    <img id="modalPhotoLightboxImg" src="" alt="Foto Unboxing" class="max-w-full max-h-[90vh] rounded-xl object-contain shadow-2xl">
-                    <button class="absolute top-4 right-4 text-white text-2xl bg-black/40 rounded-full w-10 h-10 flex items-center justify-center hover:bg-black/60 transition" onclick="document.getElementById('modalPhotoLightbox').classList.add('hidden'); document.getElementById('modalPhotoLightbox').classList.remove('flex')">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
+                <!-- Lightbox Foto Full dengan Header Status Kondisi -->
+                <div id="modalPhotoLightbox" class="fixed inset-0 bg-black/95 z-[60] hidden flex-col items-center justify-center p-3 sm:p-5" onclick="if(event.target === this || event.target.id === 'modalPhotoLightboxBackdrop') { this.classList.add('hidden'); this.classList.remove('flex'); }">
+                    <div id="modalPhotoLightboxBackdrop" class="absolute inset-0"></div>
+                    <div class="relative z-10 max-w-5xl w-full max-h-[95vh] flex flex-col items-center bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-700/80">
+                        <!-- Header Lightbox: Status Kondisi & Actions -->
+                        <div class="w-full bg-slate-900/95 text-white px-4 py-2.5 flex items-center justify-between gap-3 border-b border-slate-800 text-xs shrink-0">
+                            <div class="flex items-center gap-2 truncate">
+                                <span id="modalPhotoLightboxTag" class="px-2.5 py-0.5 rounded-lg font-mono font-bold text-[10px] bg-rose-600 text-white shadow-2xs">KONDISI: RUSAK</span>
+                                <span id="modalPhotoLightboxTitle" class="font-bold truncate text-slate-200">Foto Bukti Unboxing</span>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <a id="modalPhotoLightboxDownload" href="#" download="foto_unboxing.jpg" target="_blank" class="bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition shadow-2xs">
+                                    <i class="fa-solid fa-download text-[11px]"></i> Unduh Foto
+                                </a>
+                                <button type="button" class="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 text-sm w-7 h-7 rounded-lg flex items-center justify-center transition" onclick="document.getElementById('modalPhotoLightbox').classList.add('hidden'); document.getElementById('modalPhotoLightbox').classList.remove('flex');">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Frame Gambar Utama -->
+                        <div class="w-full flex-1 min-h-0 bg-black flex items-center justify-center p-1 sm:p-2 overflow-hidden">
+                            <img id="modalPhotoLightboxImg" src="" alt="Foto Unboxing" class="max-w-full max-h-[82vh] object-contain rounded-lg">
+                        </div>
+                    </div>
                 </div>
 
                 <!-- TABEL DETAIL PRODUK YANG DI-RETURN -->

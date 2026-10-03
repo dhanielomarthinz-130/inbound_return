@@ -739,7 +739,7 @@ async function loadTransactions() {
         if (tbody) {
             tbody.innerHTML = '';
             if (!rows || rows.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="12" class="text-center py-8 text-slate-400">Tidak ada riwayat transaksi unboxing ditemukan.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-slate-400">Tidak ada riwayat transaksi unboxing ditemukan.</td></tr>`;
             } else {
                 rows.forEach(r => tbody.appendChild(createTransactionRow(r, false)));
             }
@@ -747,7 +747,7 @@ async function loadTransactions() {
     } catch (err) {
         console.error("Gagal load transaksi:", err);
         if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="12" class="text-center py-8 text-rose-500 font-semibold">Gagal memuat transaksi: ${err.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-rose-500 font-semibold">Gagal memuat transaksi: ${err.message}</td></tr>`;
         }
     }
 }
@@ -886,18 +886,26 @@ function createTransactionRow(r, isPreview = false) {
                 <span>${time} WIB</span>
             </div>
         </td>
-        <td class="p-3 font-mono font-bold whitespace-nowrap">
-            <button type="button" onclick="viewDetails(${r.session_id || r.id}, '${escapeHtml(condCode)}')" class="inline-flex items-center gap-1.5 font-bold font-mono text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg border border-indigo-200/80 transition text-xs shadow-2xs group cursor-pointer" title="Klik untuk lihat detail barang, foto & video unboxing kondisi ${escapeHtml(condCode)}">
-                <i class="fa-solid fa-file-invoice text-indigo-500 group-hover:scale-110 transition"></i>
-                <span class="underline decoration-indigo-300 underline-offset-2">${r.invoice_number}</span>
-            </button>
+        <td class="p-3 whitespace-nowrap">
+            <!-- Baris 1: Tombol Link Invoice -->
+            <div>
+                <button type="button" onclick="viewDetails(${r.session_id || r.id}, '${escapeHtml(condCode)}')" class="inline-flex items-center gap-1.5 font-bold font-mono text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg border border-indigo-200/80 transition text-xs shadow-2xs group cursor-pointer" title="Klik untuk lihat detail invoice & foto bukti">
+                    <i class="fa-solid fa-file-invoice text-indigo-500 group-hover:scale-110 transition"></i>
+                    <span class="underline decoration-indigo-300 underline-offset-2">${r.invoice_number}</span>
+                </button>
+            </div>
+            <!-- Baris 2: Badge Ekspedisi -->
+            <div class="mt-1">
+                ${expBadge}
+            </div>
         </td>
-        <td class="p-3 whitespace-nowrap">${expBadge}</td>
         <td class="p-3 font-semibold text-slate-700 whitespace-nowrap">${r.operator_name}</td>
-        <td class="p-3 whitespace-nowrap">${skuBadge}</td>
-        <td class="p-3 min-w-[200px] max-w-[340px]">
+        <td class="p-3 min-w-[220px] max-w-[360px]">
             <div class="text-xs font-semibold text-slate-800 leading-snug whitespace-normal break-words">${r.product_name}</div>
-            <div class="text-[10px] font-mono text-slate-400 mt-0.5">${r.barcode || ''}</div>
+            <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                ${r.seller_sku ? `<span class="font-mono font-bold text-indigo-700 bg-indigo-50/90 border border-indigo-200/80 px-2 py-0.5 rounded-md text-[10px] tracking-tight inline-flex items-center gap-1" title="Seller SKU"><i class="fa-solid fa-tag text-[9px] text-indigo-500"></i> ${escapeHtml(r.seller_sku)}</span>` : ''}
+                ${r.barcode ? `<span class="text-[10px] font-mono text-slate-400 inline-flex items-center gap-1" title="Barcode"><i class="fa-solid fa-barcode text-[9px]"></i> ${escapeHtml(r.barcode)}</span>` : ''}
+            </div>
         </td>
         <td class="p-3 whitespace-nowrap">${batchDisplay}</td>
         <td class="p-3 whitespace-nowrap">${expDisplay}</td>
@@ -943,12 +951,18 @@ window.viewDetails = async function(id, focusCondition) {
     const targetSessionId = r.session_id || r.id;
     const condCode = (focusCondition || r.raw_type || r.condition_type || 'GOOD').toUpperCase();
 
+    const initCond = (focusCondition || r.raw_type || r.condition_type || '').toUpperCase().trim();
+    const isInitGood = (initCond === 'GOOD' || initCond === 'BAGUS' || initCond === 'LAYAK' || initCond === '');
+    const initQty = parseInt(r.total_qty || r.qty || 1, 10);
+    const initGood = parseInt(r.total_good !== undefined ? r.total_good : (isInitGood ? initQty : 0), 10);
+    const initDamaged = parseInt(r.total_damaged !== undefined ? r.total_damaged : (!isInitGood ? initQty : 0), 10);
+
     document.getElementById('modalDetailInvoice').innerText = r.invoice_number;
     document.getElementById('modalDetailExpedition').innerText = r.expedition || 'Reguler';
     document.getElementById('modalDetailMeta').innerText = `Operator: ${r.operator_name} • ${new Date(r.created_at).toLocaleString('id-ID')}`;
-    document.getElementById('modalTotalUnit').innerText = r.qty || 1;
-    document.getElementById('modalTotalGood').innerText = (r.condition_type === 'GOOD') ? (r.qty || 1) : 0;
-    document.getElementById('modalTotalDamaged').innerText = (r.condition_type === 'RUSAK') ? (r.qty || 1) : 0;
+    document.getElementById('modalTotalUnit').innerText = initQty;
+    document.getElementById('modalTotalGood').innerText = initGood;
+    document.getElementById('modalTotalDamaged').innerText = initDamaged;
     document.getElementById('modalNotes').innerText = r.notes || 'Tidak ada catatan.';
 
     // Tampilkan Badge Tipe Kondisi pada Header Modal
@@ -1088,8 +1102,22 @@ window.viewDetails = async function(id, focusCondition) {
             imgWrap.onclick = () => {
                 const lb = document.getElementById('modalPhotoLightbox');
                 const lbImg = document.getElementById('modalPhotoLightboxImg');
+                const lbTitle = document.getElementById('modalPhotoLightboxTitle');
+                const lbTag = document.getElementById('modalPhotoLightboxTag');
+                const lbDl = document.getElementById('modalPhotoLightboxDownload');
                 if (lb && lbImg) {
                     lbImg.src = photo.url;
+                    if (lbDl) {
+                        lbDl.href = photo.url;
+                        lbDl.setAttribute('download', `unboxing_${r.invoice_number || 'photo'}_${photo.type || 'bukti'}.jpg`);
+                    }
+                    if (lbTitle) lbTitle.innerText = `${photo.label} • Invoice: ${r.invoice_number || '-'}`;
+                    if (lbTag) {
+                        lbTag.className = isDamagedPhoto 
+                            ? "px-2.5 py-0.5 rounded-lg font-mono font-bold text-[10px] bg-rose-600 text-white shadow-2xs" 
+                            : "px-2.5 py-0.5 rounded-lg font-mono font-bold text-[10px] bg-emerald-600 text-white shadow-2xs";
+                        lbTag.innerText = isDamagedPhoto ? `KONDISI: ${condCode || 'RUSAK'}` : `KONDISI: ${condCode || 'GOOD'}`;
+                    }
                     lb.classList.remove('hidden');
                     lb.classList.add('flex');
                 }
@@ -1126,6 +1154,24 @@ window.viewDetails = async function(id, focusCondition) {
         }
 
         document.getElementById('modalItemCount').innerText = items.length;
+
+        // Hitung ulang akumulasi Total Unit, Good, dan Rusak dari seluruh item sesi ini
+        let sumTotal = 0;
+        let sumGood = 0;
+        let sumDamaged = 0;
+        items.forEach(it => {
+            const q = parseInt(it.qty, 10) || 1;
+            sumTotal += q;
+            const itCond = (it.type || it.condition || 'GOOD').toUpperCase().trim();
+            if (itCond === 'GOOD' || itCond === 'BAGUS' || itCond === 'LAYAK') {
+                sumGood += q;
+            } else {
+                sumDamaged += q;
+            }
+        });
+        document.getElementById('modalTotalUnit').innerText = sumTotal;
+        document.getElementById('modalTotalGood').innerText = sumGood;
+        document.getElementById('modalTotalDamaged').innerText = sumDamaged;
         items.forEach(it => {
             const tr = document.createElement('tr');
             const itCond = (it.type || it.condition || 'GOOD').toUpperCase();
