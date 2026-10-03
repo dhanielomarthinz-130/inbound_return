@@ -2297,7 +2297,12 @@ function renderReceivingTable(data) {
         rowsHtml += `
             <tr class="hover:bg-slate-50 transition border-b border-slate-100">
                 <td class="py-3 px-4 font-bold text-slate-400 text-center">${idx + 1}</td>
-                <td class="py-3 px-4 font-mono font-bold text-slate-900">${escapeHtml(item.receipt_number)}</td>
+                <td class="py-3 px-4 font-mono font-bold">
+                    <button type="button" onclick="viewReceivingPackagesList(${item.id})" class="inline-flex items-center gap-1.5 font-bold font-mono text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200/80 transition text-xs shadow-2xs group cursor-pointer" title="Klik untuk lihat detail paket history receiving & foto">
+                        <i class="fa-solid fa-receipt text-emerald-600 group-hover:scale-110 transition"></i>
+                        <span class="underline decoration-emerald-300 underline-offset-2">${escapeHtml(item.receipt_number)}</span>
+                    </button>
+                </td>
                 <td class="py-3 px-4">
                     <span class="bg-emerald-50 text-emerald-700 font-bold px-2.5 py-1 rounded-lg border border-emerald-200 text-xs inline-block">
                         ${escapeHtml(item.expedition)}
@@ -2322,8 +2327,9 @@ function renderReceivingTable(data) {
                             <i class="fa-solid fa-file-invoice text-emerald-600"></i>
                             <span>Bukti Serah Terima</span>
                         </button>
-                        <button onclick="viewReceivingPackagesList(${item.id})" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-2.5 py-1.5 rounded-xl border border-indigo-200 text-xs flex items-center gap-1 transition" title="Lihat Daftar Resi Paket">
-                            <i class="fa-solid fa-list-check"></i>
+                        <button onclick="viewReceivingPackagesList(${item.id})" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-2.5 py-1.5 rounded-xl border border-indigo-200 text-xs flex items-center gap-1.5 transition shadow-2xs" title="Lihat Detail Paket & Foto">
+                            <i class="fa-solid fa-boxes-stacked"></i>
+                            <span>Detail Paket</span>
                         </button>
                         <button onclick="deleteReceivingRecord(${item.id}, '${escapeHtml(item.receipt_number)}')" class="bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold p-1.5 rounded-xl border border-rose-200 text-xs flex items-center transition" title="Hapus Data">
                             <i class="fa-solid fa-trash-can"></i>
@@ -2423,9 +2429,9 @@ window.closeReceivingReceiptModal = function() {
     if (modal) modal.classList.add('hidden');
 };
 
-// Buka Modal Daftar Resi Paket Lengkap
+// Buka Modal Detail Paket & Foto History Receiving
 window.viewReceivingPackagesList = async function(id) {
-    showGlobalLoading("Memuat Daftar Resi...", "Mengambil nomor resi...");
+    showGlobalLoading("Memuat Detail Paket...", "Mengambil rincian resi dan dokumentasi foto...");
     try {
         const res = await fetch(`api/reception.php?action=detail&id=${id}`);
         const data = await res.json();
@@ -2433,30 +2439,143 @@ window.viewReceivingPackagesList = async function(id) {
 
         if (data && data.success && data.reception) {
             const r = data.reception;
-            document.getElementById('pkgModalTitle').innerText = `Daftar Resi ${r.receipt_number}`;
-            document.getElementById('pkgModalTotal').innerText = data.packages ? data.packages.length : 0;
-
+            window._activeReceivingId = id;
+            window._currentReceivingPackagesData = data.packages || [];
             window._currentReceivingPackages = (data.packages || []).map(p => p.package_barcode);
 
-            const listEl = document.getElementById('pkgModalList');
-            let html = '';
-            (data.packages || []).forEach((p, idx) => {
-                const sackTag = p.sack_number ? `<span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-200 ml-1.5">${escapeHtml(p.sack_number)}</span>` : '';
-                html += `
-                    <div class="py-1.5 px-2 flex justify-between items-center hover:bg-slate-100/80 transition">
-                        <span class="flex items-center gap-1">${idx + 1}. <b class="text-slate-800">${escapeHtml(p.package_barcode)}</b> ${sackTag}</span>
-                        <span class="text-[10px] text-slate-400">${(p.scanned_at || '').split(' ')[1] || ''}</span>
-                    </div>
-                `;
-            });
-            listEl.innerHTML = html || '<div class="text-slate-400 text-center py-4">Belum ada barcode paket.</div>';
-            document.getElementById('modalReceivingPackages').classList.remove('hidden');
+            const titleEl = document.getElementById('pkgModalTitle');
+            if (titleEl) titleEl.innerText = `Detail History Receiving ${r.receipt_number}`;
+            
+            const subTitleEl = document.getElementById('pkgModalSubtitle');
+            if (subTitleEl) subTitleEl.innerText = `Petugas: ${r.operator_name || '-'} • Diterima: ${r.created_at || '-'}`;
+
+            const rcptNoEl = document.getElementById('pkgModalReceiptNo');
+            if (rcptNoEl) rcptNoEl.innerText = r.receipt_number || '-';
+
+            const expCourEl = document.getElementById('pkgModalExpeditionCourier');
+            if (expCourEl) expCourEl.innerText = `${r.expedition || '-'} • ${r.courier_name || '-'}`;
+
+            const timeEl = document.getElementById('pkgModalTime');
+            if (timeEl) timeEl.innerText = r.created_at || '-';
+
+            const totalEl = document.getElementById('pkgModalTotal');
+            if (totalEl) totalEl.innerText = `${data.packages ? data.packages.length : (r.total_packages || 0)} Paket`;
+
+            const photoCount = (data.packages || []).filter(p => !!p.photo_path).length;
+            const photoCountEl = document.getElementById('pkgModalPhotoCount');
+            if (photoCountEl) photoCountEl.innerText = `${photoCount} Berfoto`;
+
+            // Courier photo section
+            const courierSec = document.getElementById('pkgModalCourierPhotoSection');
+            const courierImg = document.getElementById('pkgModalCourierImg');
+            const courierTxt = document.getElementById('pkgModalCourierText');
+            if (r.courier_photo) {
+                if (courierSec) courierSec.classList.remove('hidden');
+                if (courierImg) courierImg.src = r.courier_photo;
+                if (courierTxt) courierTxt.innerText = `${r.courier_name || '-'} (${r.expedition || '-'}) • Nopol: ${r.vehicle_no || '-'}`;
+            } else {
+                if (courierSec) courierSec.classList.add('hidden');
+            }
+
+            // Reset search input
+            const searchInput = document.getElementById('pkgModalSearchInput');
+            if (searchInput) searchInput.value = '';
+
+            renderReceivingPackageCards(window._currentReceivingPackagesData);
+
+            const modal = document.getElementById('modalReceivingPackages');
+            if (modal) modal.classList.remove('hidden');
         } else {
-            showToast('error', data.error || 'Gagal memuat daftar resi', 'Gagal');
+            showToast('error', data.error || 'Gagal memuat detail receiving', 'Gagal');
         }
     } catch (e) {
         hideGlobalLoading();
         showToast('error', e.message, 'Gagal');
+    }
+};
+
+window.renderReceivingPackageCards = function(packages) {
+    const listEl = document.getElementById('pkgModalList');
+    if (!listEl) return;
+
+    if (!packages || packages.length === 0) {
+        listEl.innerHTML = `
+            <div class="col-span-full py-8 text-center text-slate-400">
+                <i class="fa-solid fa-boxes-packing text-2xl mb-2 text-slate-300"></i>
+                <p>Tidak ada paket yang cocok atau terdaftar dalam sesi ini.</p>
+            </div>
+        `;
+        return;
+    }
+
+    let html = '';
+    packages.forEach((p, idx) => {
+        const barcode = escapeHtml(p.package_barcode || '-');
+        const photoPath = p.photo_path ? escapeHtml(p.photo_path) : '';
+        const sackTag = p.sack_number ? `<span class="bg-amber-50 text-amber-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-200 font-mono"><i class="fa-solid fa-box-archive text-[9px] mr-1"></i>${escapeHtml(p.sack_number)}</span>` : '';
+        const scanTime = p.scanned_at ? (p.scanned_at.includes(' ') ? p.scanned_at.split(' ')[1] : p.scanned_at) : '';
+
+        const photoHtml = photoPath ? `
+            <div class="relative group w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden border border-slate-200 bg-black shrink-0 cursor-pointer shadow-2xs hover:border-emerald-500 transition" onclick="openClaimPhotoModal('${photoPath}', 'Foto Paket ${barcode}')" title="Klik untuk zoom foto paket">
+                <img src="${photoPath}" alt="Foto Paket ${barcode}" class="w-full h-full object-cover group-hover:scale-110 transition duration-300">
+                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-white text-xs">
+                    <i class="fa-solid fa-magnifying-glass-plus"></i>
+                </div>
+            </div>
+        ` : `
+            <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-slate-100 border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 shrink-0 select-none" title="Belum ada foto fisik paket">
+                <i class="fa-solid fa-camera text-base text-slate-300"></i>
+                <span class="text-[8px] font-semibold text-slate-400 mt-0.5">No Foto</span>
+            </div>
+        `;
+
+        html += `
+            <div class="bg-white rounded-2xl border border-slate-200/90 p-2.5 flex items-center gap-3 hover:border-emerald-300 hover:shadow-xs transition group">
+                ${photoHtml}
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center justify-between gap-1 mb-1">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            <span class="w-5 h-5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-black flex items-center justify-center shrink-0 border border-slate-200">${idx + 1}</span>
+                            <span class="font-mono font-black text-slate-900 text-xs tracking-wider truncate select-all" title="${barcode}">${barcode}</span>
+                        </div>
+                        <button type="button" onclick="navigator.clipboard.writeText('${barcode}'); showToast('success', 'Nomor resi berhasil disalin: ' + '${barcode}', 'Tersalin');" class="text-slate-400 hover:text-indigo-600 p-1 rounded-lg hover:bg-slate-100 transition shrink-0" title="Salin No Resi">
+                            <i class="fa-regular fa-copy text-xs"></i>
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        ${sackTag}
+                        ${scanTime ? `<span class="text-[10px] text-slate-400 font-mono"><i class="fa-regular fa-clock text-[9px] mr-0.5"></i>${escapeHtml(scanTime)}</span>` : ''}
+                        <span class="text-[9px] bg-emerald-50 text-emerald-700 font-bold px-1.5 py-0.2 rounded border border-emerald-200 shrink-0">TERIMA OK</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    listEl.innerHTML = html;
+};
+
+window.filterReceivingPackagesModal = function(term) {
+    if (!window._currentReceivingPackagesData) return;
+    const query = (term || '').trim().toLowerCase();
+    if (!query) {
+        renderReceivingPackageCards(window._currentReceivingPackagesData);
+        return;
+    }
+
+    const filtered = window._currentReceivingPackagesData.filter(p => {
+        const b = (p.package_barcode || '').toLowerCase();
+        const s = (p.sack_number || '').toLowerCase();
+        return b.includes(query) || s.includes(query);
+    });
+
+    renderReceivingPackageCards(filtered);
+};
+
+window.printCurrentReceivingFromModal = function() {
+    if (window._activeReceivingId) {
+        closeReceivingPackagesModal();
+        viewReceivingReceipt(window._activeReceivingId);
     }
 };
 

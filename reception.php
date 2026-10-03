@@ -2270,7 +2270,7 @@ try {
                 hideElement(courierSec);
             }
 
-            // List Barcode Resi
+            // List Barcode Resi & Foto Paket
             const listEl = document.getElementById('slipPackageList');
             if (listEl) {
                 let listHtml = '';
@@ -2278,19 +2278,41 @@ try {
                     const bCode = (typeof item === 'object') ? (item.package_barcode || item.barcode || '') : item;
                     const pPath = (typeof item === 'object') ? (item.photo_path || item.photo || null) : null;
                     const sNum  = (typeof item === 'object') ? (item.sack_number || '') : '';
-                    const photoThumb = pPath ? `<img src="${escapeHtml(pPath)}" class="w-6 h-6 rounded object-cover border border-slate-200 cursor-pointer shadow-2xs shrink-0" onclick="previewImageDirect('${escapeHtml(pPath)}')">` : '';
-                    const sackTag = sNum ? `<span class="text-[9px] bg-amber-50 text-amber-800 font-bold px-1.5 py-0.2 rounded border border-amber-200 font-mono">${escapeHtml(sNum)}</span>` : '';
+                    const scanTimeStr = (typeof item === 'object' && item.scanned_at) ? (item.scanned_at.includes(' ') ? item.scanned_at.split(' ')[1] : item.scanned_at) : '';
+                    const sackTag = sNum ? `<span class="text-[9px] bg-amber-50 text-amber-800 font-bold px-1.5 py-0.5 rounded border border-amber-200 font-mono">${escapeHtml(sNum)}</span>` : '';
+                    const timeTag = scanTimeStr ? `<span class="text-[9px] text-slate-400 font-mono font-medium">${escapeHtml(scanTimeStr)}</span>` : '';
+
+                    const photoThumb = pPath ? `
+                        <div class="relative group cursor-pointer shrink-0" onclick="previewImageDirect('${escapeHtml(pPath)}')">
+                            <img src="${escapeHtml(pPath)}" class="w-11 h-11 rounded-lg object-cover border border-slate-300 shadow-2xs group-hover:scale-105 group-hover:border-emerald-500 transition" alt="Foto Paket">
+                            <span class="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg transition text-white text-[10px]">
+                                <i class="fa-solid fa-magnifying-glass-plus"></i>
+                            </span>
+                        </div>
+                    ` : `
+                        <div class="w-11 h-11 rounded-lg bg-slate-100 border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 shrink-0" title="Belum ada foto fisik">
+                            <i class="fa-solid fa-camera text-[10px]"></i>
+                            <span class="text-[8px] font-sans">No Foto</span>
+                        </div>
+                    `;
 
                     listHtml += `
-                        <div class="flex items-center justify-between bg-white rounded-lg border border-slate-200/90 py-1.5 px-2 text-xs">
-                            <div class="flex items-center gap-1.5 flex-1 min-w-0 pr-1">
-                                <span class="w-5 h-5 rounded-md bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">${i + 1}</span>
-                                <span class="font-mono font-bold text-slate-900 text-xs tracking-tight break-all select-all whitespace-normal leading-tight">${escapeHtml(bCode)}</span>
-                                ${sackTag}
+                        <div class="flex items-center justify-between gap-2 bg-white rounded-xl border border-slate-200/90 p-2 text-xs hover:border-emerald-300 transition shadow-2xs">
+                            <div class="flex items-center gap-2 flex-1 min-w-0">
+                                <span class="w-5 h-5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0 border border-slate-200">${i + 1}</span>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span class="font-mono font-bold text-slate-900 text-xs tracking-tight break-all select-all whitespace-normal leading-tight">${escapeHtml(bCode)}</span>
+                                        ${sackTag}
+                                        ${timeTag}
+                                    </div>
+                                    <div class="flex items-center gap-1 mt-0.5">
+                                        <span class="text-[9px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-300 inline-block">TERIMA OK</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="flex items-center gap-1 shrink-0">
+                            <div class="shrink-0 flex items-center gap-1">
                                 ${photoThumb}
-                                <span class="text-[9px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-300 shrink-0">TERIMA OK</span>
                             </div>
                         </div>
                     `;
@@ -2317,8 +2339,12 @@ try {
                 let photoHtml = '';
                 photosToDisplay.forEach((pUrl, idx) => {
                     photoHtml += `
-                        <div class="rounded-xl overflow-hidden border border-slate-200 aspect-video bg-black cursor-pointer shadow-xs" onclick="previewImageDirect('${escapeHtml(pUrl)}')">
-                            <img src="${escapeHtml(pUrl)}" alt="Foto Paket ${idx + 1}" class="w-full h-full object-cover hover:scale-105 transition">
+                        <div class="relative group rounded-xl overflow-hidden border border-slate-200 aspect-video bg-black cursor-pointer shadow-xs hover:border-emerald-500 transition" onclick="previewImageDirect('${escapeHtml(pUrl)}')">
+                            <img src="${escapeHtml(pUrl)}" alt="Foto Paket ${idx + 1}" class="w-full h-full object-cover group-hover:scale-105 transition">
+                            <div class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-white text-xs font-semibold gap-1">
+                                <i class="fa-solid fa-magnifying-glass-plus"></i>
+                                <span>Perbesar</span>
+                            </div>
                         </div>
                     `;
                 });
@@ -2632,7 +2658,12 @@ try {
                                         ${escapeHtml(item.sack_number || '-')}
                                     </span>
                                 </td>
-                                <td class="py-2.5 px-3 font-mono text-[11px] text-slate-500">${escapeHtml(item.receipt_number)}</td>
+                                <td class="py-2.5 px-3 font-mono text-[11px]">
+                                    <button type="button" onclick="viewReceptionDetail(${item.reception_id || item.id})" class="inline-flex items-center gap-1.5 font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200/80 transition text-[11px] group cursor-pointer shadow-2xs" title="Lihat detail paket history receiving & foto">
+                                        <i class="fa-solid fa-receipt text-emerald-600 group-hover:scale-110 transition"></i>
+                                        <span class="underline decoration-emerald-300 underline-offset-2">${escapeHtml(item.receipt_number)}</span>
+                                    </button>
+                                </td>
                                 <td class="py-2.5 px-3 font-mono text-[11px] text-slate-600">
                                     <span class="font-bold">${timeOnly}</span>
                                     <span class="text-[10px] text-slate-400 block">${scanTime.includes(' ') ? scanTime.split(' ')[0] : ''}</span>
@@ -2655,6 +2686,16 @@ try {
                 const res = await fetch(`api/reception.php?action=detail&id=${id}`);
                 const data = await res.json();
                 if (data && data.success && data.reception) {
+                    const packagePhotos = (data.packages || []).map(p => p.photo_path).filter(Boolean);
+                    if (data.reception.photo_path && !packagePhotos.includes(data.reception.photo_path)) {
+                        packagePhotos.unshift(data.reception.photo_path);
+                    }
+                    if (Array.isArray(data.reception.package_photos)) {
+                        data.reception.package_photos.forEach(ph => {
+                            if (ph && !packagePhotos.includes(ph)) packagePhotos.push(ph);
+                        });
+                    }
+
                     showReceiptModal({
                         receipt_number: data.reception.receipt_number,
                         expedition: data.reception.expedition,
@@ -2663,14 +2704,18 @@ try {
                         sack_number: data.reception.sack_number,
                         vehicle_no: data.reception.vehicle_no,
                         total_packages: data.reception.total_packages,
+                        operator_name: data.reception.operator_name,
                         packages: (data.packages || []).map(p => ({
                             package_barcode: p.package_barcode,
                             photo_path: p.photo_path,
-                            sack_number: p.sack_number
+                            sack_number: p.sack_number,
+                            scanned_at: p.scanned_at
                         })),
                         created_at: data.reception.created_at,
-                        photos: data.reception.package_photos || (data.reception.photo_path ? [data.reception.photo_path] : [])
+                        photos: packagePhotos
                     });
+                } else {
+                    alert('Data penerimaan tidak ditemukan.');
                 }
             } catch (e) {
                 alert('Gagal mengambil detail penerimaan: ' + e.message);

@@ -2089,31 +2089,93 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
         </div>
     </div>
 
-    <!-- MODAL DAFTAR RESI PAKET LENGKAP -->
+    <!-- MODAL DETAIL PAKET & FOTO HISTORY RECEIVING -->
     <div id="modalReceivingPackages" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white rounded-3xl max-w-md w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-slate-100">
+        <div class="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-100">
+            <!-- Header Modal -->
             <div class="p-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
-                <div class="flex items-center gap-2">
-                    <i class="fa-solid fa-barcode text-indigo-400 text-base"></i>
-                    <h3 class="font-bold text-sm" id="pkgModalTitle">Daftar Resi Paket</h3>
+                <div class="flex items-center gap-2.5">
+                    <span class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-sm border border-indigo-500/30">
+                        <i class="fa-solid fa-boxes-stacked"></i>
+                    </span>
+                    <div>
+                        <h3 class="font-bold text-sm leading-tight" id="pkgModalTitle">Detail Paket History Receiving</h3>
+                        <p class="text-[10px] text-slate-400 font-mono" id="pkgModalSubtitle">Rincian tanda terima fisik &amp; dokumentasi foto paket</p>
+                    </div>
                 </div>
-                <button onclick="closeReceivingPackagesModal()" class="text-slate-400 hover:text-white text-base">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-            <div class="p-4 overflow-y-auto space-y-2 flex-1 text-xs">
-                <div class="flex justify-between items-center text-slate-500 text-[11px] mb-1">
-                    <span>Total: <b id="pkgModalTotal" class="text-slate-800">0</b> Paket</span>
-                    <button onclick="copyAllReceivingBarcodes()" class="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1">
-                        <i class="fa-regular fa-copy"></i> Salin Semua
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="printCurrentReceivingFromModal()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700 shadow-2xs" title="Lihat Bukti Tanda Terima & Cetak">
+                        <i class="fa-solid fa-print text-indigo-400"></i>
+                        <span class="hidden sm:inline">Bukti Serah Terima</span>
+                    </button>
+                    <button onclick="closeReceivingPackagesModal()" class="text-slate-400 hover:text-white text-base p-1.5 rounded-lg hover:bg-slate-800 transition">
+                        <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
-                <div id="pkgModalList" class="divide-y divide-slate-100 font-mono text-xs max-h-80 overflow-y-auto border border-slate-200 rounded-xl bg-slate-50 p-2"></div>
             </div>
-            <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end">
-                <button onclick="closeReceivingPackagesModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition">
-                    Tutup
-                </button>
+
+            <!-- Reception Summary Card -->
+            <div class="p-4 bg-slate-50 border-b border-slate-200/80 shrink-0">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                    <div class="bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs">
+                        <span class="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">No. Tanda Terima</span>
+                        <div class="font-mono font-black text-emerald-700 text-xs truncate" id="pkgModalReceiptNo">-</div>
+                    </div>
+                    <div class="bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs">
+                        <span class="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Ekspedisi &amp; Kurir</span>
+                        <div class="font-bold text-slate-800 text-xs truncate" id="pkgModalExpeditionCourier">-</div>
+                    </div>
+                    <div class="bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs">
+                        <span class="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Waktu Serah Terima</span>
+                        <div class="font-mono text-slate-700 text-xs truncate" id="pkgModalTime">-</div>
+                    </div>
+                    <div class="bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs">
+                        <span class="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Total &amp; Foto</span>
+                        <div class="font-bold text-indigo-700 text-xs flex items-center justify-between">
+                            <span id="pkgModalTotal">0 Paket</span>
+                            <span class="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.2 rounded font-semibold border border-indigo-200/60" id="pkgModalPhotoCount">0 Foto</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Foto Kurir (Jika Tersedia) -->
+                <div id="pkgModalCourierPhotoSection" class="hidden mt-2.5 bg-white p-2 rounded-xl border border-slate-200 flex items-center gap-3 shadow-2xs">
+                    <img id="pkgModalCourierImg" src="" alt="Foto Kurir" class="w-10 h-10 rounded-lg object-cover border border-slate-200 cursor-pointer hover:scale-105 transition shrink-0" onclick="openClaimPhotoModal(this.src, 'Foto Kurir Serah Terima')">
+                    <div class="min-w-0 text-xs">
+                        <span class="text-[9px] uppercase font-bold text-slate-400 block">Identitas Driver / Kurir Terverifikasi:</span>
+                        <span id="pkgModalCourierText" class="font-bold text-slate-800 text-xs truncate block">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search Bar & Controls -->
+            <div class="px-4 pt-3 pb-2 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs shrink-0">
+                <div class="relative w-full sm:w-72">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input type="text" id="pkgModalSearchInput" oninput="filterReceivingPackagesModal(this.value)" placeholder="Cari resi paket / karung..." class="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <button type="button" onclick="copyAllReceivingBarcodes()" class="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200 text-xs flex items-center gap-1.5 transition shadow-2xs">
+                        <i class="fa-regular fa-copy"></i> Salin Semua Resi
+                    </button>
+                </div>
+            </div>
+
+            <!-- Package Cards with Photos -->
+            <div class="p-4 overflow-y-auto space-y-2 flex-1 text-xs">
+                <div id="pkgModalList" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <!-- Dynamic Package Cards -->
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+                <span class="text-[11px] text-slate-500 font-medium hidden sm:inline"><i class="fa-regular fa-circle-question mr-1 text-slate-400"></i>Klik foto paket untuk memperbesar resolusi tinggi</span>
+                <div class="flex items-center gap-2 ml-auto">
+                    <button onclick="closeReceivingPackagesModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition">
+                        Tutup
+                    </button>
+                </div>
             </div>
         </div>
     </div>

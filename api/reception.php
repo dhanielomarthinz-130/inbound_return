@@ -69,20 +69,26 @@ if ($method === 'GET') {
         }
     }
 
-    // B. Detail Penerimaan beserta daftar resi/paketnya
+    // B. Detail Penerimaan beserta daftar resi/paketnya (Dukung ID atau No. Tanda Terima)
     if ($action === 'detail') {
         $id = intval($_GET['id'] ?? 0);
-        if ($id <= 0) {
-            jsonResponse(['error' => 'ID Penerimaan tidak valid'], 400);
-        }
+        $receiptNumber = trim($_GET['receipt_number'] ?? $_GET['receipt_no'] ?? '');
 
-        $stmt = $pdo->prepare("SELECT * FROM expedition_receptions WHERE id = ? LIMIT 1");
-        $stmt->execute([$id]);
+        if ($id > 0) {
+            $stmt = $pdo->prepare("SELECT * FROM expedition_receptions WHERE id = ? LIMIT 1");
+            $stmt->execute([$id]);
+        } elseif (!empty($receiptNumber)) {
+            $stmt = $pdo->prepare("SELECT * FROM expedition_receptions WHERE receipt_number = ? LIMIT 1");
+            $stmt->execute([$receiptNumber]);
+        } else {
+            jsonResponse(['error' => 'ID atau No. Tanda Terima tidak valid'], 400);
+        }
         $reception = $stmt->fetch();
 
         if (!$reception) {
             jsonResponse(['error' => 'Data penerimaan tidak ditemukan'], 404);
         }
+        $id = intval($reception['id']);
 
         $stmtPkg = $pdo->prepare("
             SELECT id, package_barcode, sack_number, photo_path, scanned_at 
