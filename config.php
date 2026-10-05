@@ -455,6 +455,14 @@ try {
                     $needsMigration = true;
                 }
             }
+
+            // Verifikasi kolom return_items (wrong_barcode, wrong_product_name, photo_path, damage_reason)
+            if (!$needsMigration && in_array('return_items', $existingTables)) {
+                $itemCols = $pdo->query("SHOW COLUMNS FROM return_items")->fetchAll(PDO::FETCH_COLUMN);
+                if (!in_array('wrong_barcode', $itemCols) || !in_array('wrong_product_name', $itemCols) || !in_array('photo_path', $itemCols) || !in_array('damage_reason', $itemCols)) {
+                    $needsMigration = true;
+                }
+            }
         } catch (Exception $e) {
             $needsMigration = true;
         }

@@ -221,6 +221,7 @@ if (empty($productPhoto) && !empty($body['product_photo'])) {
 $photosJson = count($photosArr) > 0 ? json_encode($photosArr, JSON_UNESCAPED_SLASHES) : null;
 
 // 2. Cek apakah ada file video yang di-upload via $_FILES
+$videoPath = null;
 $videoStatus = 'no_video';
 if (isset($_FILES['video'])) {
     if ($_FILES['video']['error'] === UPLOAD_ERR_OK) {
@@ -290,6 +291,35 @@ try {
     }
 } catch (Exception $eDup) {}
 
+// Self-healing: Pastikan kolom return_sessions & return_items lengkap sebelum transaksi
+try {
+    $rSessCols = $pdo->query("SHOW COLUMNS FROM return_sessions")->fetchAll(PDO::FETCH_COLUMN);
+    if (!in_array('expedition', $rSessCols)) $pdo->exec("ALTER TABLE return_sessions ADD COLUMN expedition VARCHAR(100) NULL AFTER customer_name");
+    if (!in_array('video_path', $rSessCols)) $pdo->exec("ALTER TABLE return_sessions ADD COLUMN video_path VARCHAR(255) NULL AFTER notes");
+    if (!in_array('package_photo', $rSessCols)) $pdo->exec("ALTER TABLE return_sessions ADD COLUMN package_photo VARCHAR(255) NULL AFTER video_path");
+    if (!in_array('product_photo', $rSessCols)) $pdo->exec("ALTER TABLE return_sessions ADD COLUMN product_photo VARCHAR(255) NULL AFTER package_photo");
+    if (!in_array('photos', $rSessCols)) $pdo->exec("ALTER TABLE return_sessions ADD COLUMN photos TEXT NULL AFTER product_photo");
+
+    $rItemCols = $pdo->query("SHOW COLUMNS FROM return_items")->fetchAll(PDO::FETCH_COLUMN);
+    if (!in_array('wrong_barcode', $rItemCols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN wrong_barcode VARCHAR(100) NULL AFTER barcode");
+    if (!in_array('wrong_product_name', $rItemCols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN wrong_product_name VARCHAR(255) NULL AFTER wrong_barcode");
+    if (!in_array('damage_reason', $rItemCols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN damage_reason VARCHAR(255) NULL AFTER `condition`");
+    if (!in_array('photo_path', $rItemCols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN photo_path VARCHAR(255) NULL AFTER damage_reason");
+} catch (Exception $eSchemaFix) {
+    // Non-blocking schema auto-fix
+}
+
+// Cek ulang kolom yang aktif di return_items agar query INSERT tidak pernah crash
+$activeItemCols = [];
+try {
+    $activeItemCols = $pdo->query("SHOW COLUMNS FROM return_items")->fetchAll(PDO::FETCH_COLUMN);
+} catch (Exception $eColChk) {}
+
+$hasWrongBarcodeCol = in_array('wrong_barcode', $activeItemCols);
+$hasWrongProductCol = in_array('wrong_product_name', $activeItemCols);
+$hasPhotoPathCol    = in_array('photo_path', $activeItemCols);
+$hasDamageReasonCol = in_array('damage_reason', $activeItemCols);
+
 try {
     $pdo->beginTransaction();
 
@@ -314,10 +344,17 @@ try {
 
     $sessionId = $pdo->lastInsertId();
 
-    $stmtItem = $pdo->prepare("
-        INSERT INTO return_items (session_id, barcode, wrong_barcode, wrong_product_name, product_name, sku, seller_sku, sap_code, batch_no, exp_date, type, qty, `condition`, damage_reason, photo_path)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ");
+    if ($hasWrongBarcodeCol && $hasWrongProductCol) {
+        $stmtItem = $pdo->prepare("
+            INSERT INTO return_items (session_id, barcode, wrong_barcode, wrong_product_name, product_name, sku, seller_sku, sap_code, batch_no, exp_date, type, qty, `condition`, damage_reason, photo_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+    } else {
+        $stmtItem = $pdo->prepare("
+            INSERT INTO return_items (session_id, barcode, product_name, sku, seller_sku, sap_code, batch_no, exp_date, type, qty, `condition`, damage_reason, photo_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+    }
 
     foreach ($items as $item) {
         $qty = isset($item['qty']) ? (int)$item['qty'] : 1;
@@ -361,23 +398,41 @@ try {
             $itemPhoto = $damagedPhoto;
         }
 
-        $stmtItem->execute([
-            $sessionId,
-            $item['barcode'] ?? '',
-            $wrongBarcode ?: null,
-            $wrongProductName ?: null,
-            $item['product_name'] ?? '',
-            $item['sku'] ?? '',
-            $item['seller_sku'] ?? $item['sku'] ?? '',
-            $item['sap_code'] ?? '',
-            $item['batch_no'] ?? '',
-            $expDate,
-            $type,
-            $qty,
-            $cond,
-            $reason,
-            $itemPhoto ?: null
-        ]);
+        if ($hasWrongBarcodeCol && $hasWrongProductCol) {
+            $stmtItem->execute([
+                $sessionId,
+                $item['barcode'] ?? '',
+                $wrongBarcode ?: null,
+                $wrongProductName ?: null,
+                $item['product_name'] ?? '',
+                $item['sku'] ?? '',
+                $item['seller_sku'] ?? $item['sku'] ?? '',
+                $item['sap_code'] ?? '',
+                $item['batch_no'] ?? '',
+                $expDate,
+                $type,
+                $qty,
+                $cond,
+                $reason,
+                $itemPhoto ?: null
+            ]);
+        } else {
+            $stmtItem->execute([
+                $sessionId,
+                $item['barcode'] ?? '',
+                $item['product_name'] ?? '',
+                $item['sku'] ?? '',
+                $item['seller_sku'] ?? $item['sku'] ?? '',
+                $item['sap_code'] ?? '',
+                $item['batch_no'] ?? '',
+                $expDate,
+                $type,
+                $qty,
+                $cond,
+                $reason,
+                $itemPhoto ?: null
+            ]);
+        }
     }
 
     $pdo->commit();

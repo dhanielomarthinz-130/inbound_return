@@ -1972,15 +1972,27 @@ window.submitFinalSession = async function() {
     if (isSubmittingFinalSession) return;
     if (!activeInvoice || scannedProductsList.length === 0) return;
 
+    // Auto-fallback: Jika ada item kondisi bukan GOOD yang belum terikat foto individu,
+    // pasangkan otomatis foto dokumentasi yang sudah diambil di sesi ini
+    const sessionFallbackPhoto = currentActiveDamagedPhoto || capturedProductPhoto || capturedPackagePhoto || (capturedPhotosList.length > 0 ? (capturedPhotosList[0].dataUrl || capturedPhotosList[0].data) : null);
+    scannedProductsList.forEach(it => {
+        const c = (it.type || it.condition || '').toUpperCase().trim();
+        const isD = (c !== 'GOOD' && c !== 'BAGUS' && c !== 'LAYAK' && c !== '');
+        if (isD && !it.photo && !it.photo_path && sessionFallbackPhoto) {
+            it.photo = sessionFallbackPhoto;
+            it.photo_path = sessionFallbackPhoto;
+        }
+    });
+
     // VALIDASI WAJIB FOTO BARANG RUSAK: Setiap item kondisi bukan GOOD wajib punya foto!
     const unphotographedDamaged = scannedProductsList.find(it => {
         const c = (it.type || it.condition || '').toUpperCase().trim();
-        const isD = (c !== 'GOOD' && c !== 'BAGUS' && c !== '');
+        const isD = (c !== 'GOOD' && c !== 'BAGUS' && c !== 'LAYAK' && c !== '');
         return isD && !it.photo && !it.photo_path;
     });
     if (unphotographedDamaged) {
         playBeep('error');
-        showToast('error', `Produk [${unphotographedDamaged.product_name || unphotographedDamaged.barcode}] dengan kondisi ${unphotographedDamaged.type} belum memiliki foto bukti kerusakan! Silakan hapus item dan scan ulang dengan mengambil foto [F5].`, 'Wajib Foto Barang Rusak');
+        showToast('error', `Produk [${unphotographedDamaged.product_name || unphotographedDamaged.barcode}] dengan kondisi ${unphotographedDamaged.type} belum memiliki foto bukti fisik! Silakan ambil foto bukti terlebih dahulu.`, 'Wajib Foto Bukti');
         return;
     }
 
