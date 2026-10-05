@@ -384,7 +384,6 @@ $terbilangText = ($grandTotal > 0) ? terbilangRupiah($grandTotal) . ' Rupiah' : 
                         <div class="space-y-0.5">
                             <h1 class="font-black text-lg sm:text-xl text-slate-900 tracking-tight leading-tight">PT. INOVASI EKA GEMILANG</h1>
                             <p class="text-xs font-semibold text-slate-600">Reverse Logistics, Return Inbound &amp; Claims Settlement</p>
-                            <p class="text-[11px] text-slate-500">Pergudangan Retur IEG • Email: dispute-claims@ieg.co.id</p>
                         </div>
                     </div>
 
@@ -398,10 +397,6 @@ $terbilangText = ($grandTotal > 0) ? terbilangRupiah($grandTotal) . ' Rupiah' : 
                             <tr>
                                 <td class="text-slate-500 pr-3 py-0.5 font-medium">Tanggal:</td>
                                 <td class="font-bold text-slate-800 py-0.5"><?= date('d F Y') ?></td>
-                            </tr>
-                            <tr>
-                                <td class="text-slate-500 pr-3 py-0.5 font-medium">Jatuh Tempo:</td>
-                                <td class="font-bold text-slate-800 py-0.5">14 Hari Kalender</td>
                             </tr>
                         </table>
                     </div>
