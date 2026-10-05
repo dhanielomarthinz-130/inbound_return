@@ -433,6 +433,25 @@ $totalPages = count($pages);
 </head>
 <body class="bg-slate-200 min-h-screen text-slate-800 antialiased p-3 sm:p-6 lg:p-8">
 
+    <!-- SPINNER OVERLAY: MENAMPILKAN INDIKATOR RENDERING FOTO SEBELUM MEMBUKA CETAK -->
+    <div id="printLoadingOverlay" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-white no-print">
+        <div class="relative flex items-center justify-center mb-4">
+            <div class="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
+            <div class="absolute text-emerald-400 text-lg">
+                <i class="fa-solid fa-camera"></i>
+            </div>
+        </div>
+        <h3 class="text-base sm:text-lg font-black text-white tracking-tight text-center">
+            Menyiapkan Dokumen &amp; Merender Lampiran Foto...
+        </h3>
+        <p class="text-xs text-slate-300 mt-1.5 text-center font-medium max-w-sm">
+            Harap tunggu sebentar, sistem sedang memuat seluruh aset dan foto bukti unboxing agar hasil cetak jernih...
+        </p>
+        <div id="spinnerCounter" class="mt-3 text-[11px] font-mono text-emerald-300 font-bold bg-emerald-950/70 border border-emerald-600/50 px-4 py-1 rounded-full shadow-inner">
+            Memeriksa file foto...
+        </div>
+    </div>
+
     <div class="max-w-4xl mx-auto space-y-4">
         
         <!-- TOOLBAR AKSI ATAS (HANYA MUNCUL DI LAYAR WEB, TIDAK TERCETAK) -->
@@ -703,11 +722,11 @@ $totalPages = count($pages);
                                     </div>
                                 </div>
 
-                                <!-- 4. CO -->
+                                <!-- 4. CEO -->
                                 <div class="flex flex-col justify-between h-24 border border-slate-300 rounded p-1.5 bg-slate-50/50">
                                     <div>
                                         <span class="text-slate-500 block text-[9px] uppercase font-bold">Mengetahui</span>
-                                        <span class="font-black text-slate-800 text-[10px] sm:text-[11px]">CO / Ops</span>
+                                        <span class="font-black text-slate-800 text-[10px] sm:text-[11px]">CEO</span>
                                     </div>
                                     <div class="border-t border-slate-400 pt-1 font-bold text-slate-800 text-[10px]">
                                         ( ..................... )
@@ -881,11 +900,54 @@ $totalPages = count($pages);
             });
         }
 
-        // Otomatis langsung membuka dialog cetak (print dialog) browser saat halaman selesai dimuat
+        // Otomatis menunggu seluruh foto ter-render sebelum membuka print dialog browser
+        function waitForAllImages() {
+            return new Promise((resolve) => {
+                const images = Array.from(document.images);
+                if (images.length === 0) return resolve();
+
+                let loadedCount = 0;
+                const totalCount = images.length;
+                const counterEl = document.getElementById('spinnerCounter');
+
+                function updateProgress() {
+                    loadedCount++;
+                    if (counterEl) {
+                        counterEl.textContent = `Foto siap: ${loadedCount} / ${totalCount}`;
+                    }
+                    if (loadedCount >= totalCount) {
+                        resolve();
+                    }
+                }
+
+                images.forEach((img) => {
+                    if (img.complete && img.naturalHeight !== 0) {
+                        updateProgress();
+                    } else {
+                        img.addEventListener('load', updateProgress, { once: true });
+                        img.addEventListener('error', updateProgress, { once: true });
+                    }
+                });
+
+                // Fallback timeout maksimal 6 detik jika ada aset lambat
+                setTimeout(resolve, 6000);
+            });
+        }
+
         window.addEventListener('load', function() {
-            setTimeout(function() {
-                window.print();
-            }, 300);
+            waitForAllImages().then(() => {
+                const overlay = document.getElementById('printLoadingOverlay');
+                if (overlay) {
+                    overlay.classList.add('transition-opacity', 'duration-300', 'opacity-0');
+                    setTimeout(() => {
+                        overlay.remove();
+                    }, 350);
+                }
+
+                setTimeout(function() {
+                    window.print();
+                }, 300);
+            });
         });
     </script>
 </body>

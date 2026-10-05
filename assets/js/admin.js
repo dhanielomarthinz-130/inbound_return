@@ -72,7 +72,7 @@ const SLUG_TAB_MAP = {
 function updateBrowserUrl(pushHistory = false) {
     const slug = TAB_SLUG_MAP[currentTab] || currentTab;
     const params = new URLSearchParams();
-    
+
     // Selalu cantumkan nama halaman ?page=...
     params.set('page', slug);
 
@@ -133,7 +133,7 @@ function updateBrowserUrl(pushHistory = false) {
 }
 
 // Global Loading Overlay Controls (Bola-bola Merah, Kuning, Hijau)
-window.showGlobalLoading = function(title = 'Memuat Data...', desc = 'Mohon tunggu sebentar, sistem sedang memproses data.') {
+window.showGlobalLoading = function (title = 'Memuat Data...', desc = 'Mohon tunggu sebentar, sistem sedang memproses data.') {
     const el = document.getElementById('globalLoadingOverlay');
     if (!el) return;
     const t = document.getElementById('globalLoadingTitle');
@@ -143,7 +143,7 @@ window.showGlobalLoading = function(title = 'Memuat Data...', desc = 'Mohon tung
     el.classList.remove('hidden');
 };
 
-window.hideGlobalLoading = function() {
+window.hideGlobalLoading = function () {
     const el = document.getElementById('globalLoadingOverlay');
     if (el) el.classList.add('hidden');
 };
@@ -229,7 +229,7 @@ document.addEventListener('focusin', (e) => {
 });
 
 // Switch Tabs
-window.switchTab = function(tabName, updateUrl = true) {
+window.switchTab = function (tabName, updateUrl = true) {
     currentTab = tabName;
     clearAutofilledSearchInputs();
 
@@ -363,7 +363,7 @@ function renderRatioChart(good, damaged) {
     const total = good + damaged;
     const dataVals = total === 0 ? [1] : [good, damaged];
     const bgColors = total === 0 ? ['#e2e8f0'] : ['#10b981', '#f43f5e'];
-    const lbls     = total === 0 ? ['Tidak ada data'] : ['Good / Baik', 'Rusak / Defect'];
+    const lbls = total === 0 ? ['Tidak ada data'] : ['Good / Baik', 'Rusak / Defect'];
     ratioChartInstance = new Chart(ctx, {
         type: 'doughnut',
         data: { labels: lbls, datasets: [{ data: dataVals, backgroundColor: bgColors, borderWidth: 0, hoverOffset: 6 }] },
@@ -549,7 +549,7 @@ function renderDashExpeditionTable(list) {
     tbody.innerHTML = '';
     if (!list || list.length === 0) { tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 text-xs">Tidak ada data.</td></tr>`; return; }
     const totalAll = list.reduce((s, r) => s + parseInt(r.total_qty || 0), 0) || 1;
-    const colors = ['indigo','blue','violet','cyan','teal','emerald','amber'];
+    const colors = ['indigo', 'blue', 'violet', 'cyan', 'teal', 'emerald', 'amber'];
     list.forEach((row, i) => {
         const qty = parseInt(row.total_qty || 0);
         const pct = Math.round((qty / totalAll) * 100);
@@ -568,11 +568,11 @@ function renderDashExpeditionTable(list) {
 }
 
 const COND_COLOR = {
-    GOOD:    { dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    DAMAGED: { dot: 'bg-red-500',     badge: 'bg-red-50 text-red-700 border-red-200' },
-    MISSING: { dot: 'bg-amber-500',   badge: 'bg-amber-50 text-amber-700 border-amber-200' },
-    EXPIRED: { dot: 'bg-orange-500',  badge: 'bg-orange-50 text-orange-700 border-orange-200' },
-    WRONG:   { dot: 'bg-purple-500',  badge: 'bg-purple-50 text-purple-700 border-purple-200' },
+    GOOD: { dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    DAMAGED: { dot: 'bg-red-500', badge: 'bg-red-50 text-red-700 border-red-200' },
+    MISSING: { dot: 'bg-amber-500', badge: 'bg-amber-50 text-amber-700 border-amber-200' },
+    EXPIRED: { dot: 'bg-orange-500', badge: 'bg-orange-50 text-orange-700 border-orange-200' },
+    WRONG: { dot: 'bg-purple-500', badge: 'bg-purple-50 text-purple-700 border-purple-200' },
 };
 function getCondColor(code) { return COND_COLOR[code?.toUpperCase()] || { dot: 'bg-slate-400', badge: 'bg-slate-100 text-slate-600 border-slate-200' }; }
 
@@ -679,7 +679,7 @@ function initFlatpickr() {
             altInputClass: 'bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs transition w-56 sm:w-64 cursor-pointer',
             locale: (flatpickr.l10ns && flatpickr.l10ns.id) ? flatpickr.l10ns.id : 'default',
             allowInput: false,
-            onClose: function(selectedDates, dateStr, instance) {
+            onClose: function (selectedDates, dateStr, instance) {
                 activeInboundDateFilter = getDateStrFromInstance(instance);
                 updateInboundDateUI();
                 updateBrowserUrl(false);
@@ -702,7 +702,7 @@ function initFlatpickr() {
             altInputClass: 'bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs transition w-full sm:w-64 cursor-pointer',
             locale: (flatpickr.l10ns && flatpickr.l10ns.id) ? flatpickr.l10ns.id : 'default',
             allowInput: false,
-            onClose: function(selectedDates, dateStr, instance) {
+            onClose: function (selectedDates, dateStr, instance) {
                 activeDashboardDateFilter = getDateStrFromInstance(instance);
                 updateDashboardDateUI();
                 updateBrowserUrl(false);
@@ -714,7 +714,7 @@ function initFlatpickr() {
 }
 
 // Reset filter tanggal Inbound Unboxing
-window.clearDateFilter = function() {
+window.clearDateFilter = function () {
     if (flatpickrTransactionsInstance) flatpickrTransactionsInstance.clear();
     activeInboundDateFilter = '';
     updateInboundDateUI();
@@ -723,10 +723,10 @@ window.clearDateFilter = function() {
 };
 
 // Terapkan filter tanggal Dashboard
-window.applyDashboardDateFilter = function() {
+window.applyDashboardDateFilter = function () {
     const val = getDateStrFromInstance(flatpickrDashboardInstance)
-             || document.getElementById('dashboardFilterDate')?.value?.trim()
-             || '';
+        || document.getElementById('dashboardFilterDate')?.value?.trim()
+        || '';
     activeDashboardDateFilter = val;
     updateDashboardDateUI();
     updateBrowserUrl(false);
@@ -734,7 +734,7 @@ window.applyDashboardDateFilter = function() {
 };
 
 // Reset filter tanggal Dashboard
-window.clearDashboardDateFilter = function() {
+window.clearDashboardDateFilter = function () {
     if (flatpickrDashboardInstance) flatpickrDashboardInstance.clear();
     activeDashboardDateFilter = '';
     updateDashboardDateUI();
@@ -743,7 +743,7 @@ window.clearDashboardDateFilter = function() {
 };
 
 // Refresh Metrik Dashboard di Backend
-window.refreshDashboardMetrics = async function() {
+window.refreshDashboardMetrics = async function () {
     const btn = event?.currentTarget;
     if (btn) {
         btn.disabled = true;
@@ -779,7 +779,7 @@ async function loadTransactions() {
     const expedition = document.getElementById('filterExpedition')?.value || '';
     const condition = document.getElementById('filterCondition')?.value || '';
     const operator = document.getElementById('filterOperator')?.value || '';
-    
+
     let url = `api/admin/transactions?`;
     if (search) url += `search=${encodeURIComponent(search)}&`;
     if (date) url += `date=${encodeURIComponent(date)}&`;
@@ -797,7 +797,7 @@ async function loadTransactions() {
 
         // Isi opsi filter dropdown ekspedisi & operator secara dinamis
         populateTransactionFilterDropdowns(cachedTransactions);
-        
+
         // Render di tabel transaksi penuh (Tab Inbound Unboxing)
         if (tbody) {
             tbody.innerHTML = '';
@@ -868,23 +868,23 @@ function createTransactionRow(r, isPreview = false) {
 
     const { date, time } = formatDateTime(r.created_at);
 
-    const expBadge = r.expedition ? 
+    const expBadge = r.expedition ?
         `<span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-md font-semibold text-[11px] inline-flex items-center gap-1 whitespace-nowrap">
             <i class="fa-solid fa-truck-fast text-[10px]"></i> ${r.expedition}
-         </span>` : 
+         </span>` :
         `<span class="text-slate-400 italic text-[11px]">-</span>`;
 
     // Seller SKU Badge
-    const skuBadge = r.seller_sku ? 
+    const skuBadge = r.seller_sku ?
         `<span class="font-mono font-bold text-indigo-700 bg-indigo-50/80 border border-indigo-200/80 px-2.5 py-1 rounded-lg text-xs inline-block tracking-tight">${r.seller_sku}</span>` :
         `<span class="text-slate-400 font-mono text-xs italic">-</span>`;
 
     // Type / Kondisi Dinamis dari Master Kondisi
     const condCode = (r.raw_type || r.condition_type || 'GOOD').toUpperCase();
-    const matchedCond = (typeof allConditions !== 'undefined' && Array.isArray(allConditions)) 
-        ? allConditions.find(x => (x.code || '').toUpperCase() === condCode) 
+    const matchedCond = (typeof allConditions !== 'undefined' && Array.isArray(allConditions))
+        ? allConditions.find(x => (x.code || '').toUpperCase() === condCode)
         : null;
-    
+
     let typeBadge = '';
     if (matchedCond) {
         const clr = CONDITION_COLOR_MAP[matchedCond.color] || CONDITION_COLOR_MAP.slate;
@@ -931,11 +931,11 @@ function createTransactionRow(r, isPreview = false) {
         </button>
     `;
 
-    const batchDisplay = r.batch_no 
-        ? `<span class="font-mono text-slate-700 font-semibold text-xs whitespace-nowrap">${r.batch_no}</span>` 
+    const batchDisplay = r.batch_no
+        ? `<span class="font-mono text-slate-700 font-semibold text-xs whitespace-nowrap">${r.batch_no}</span>`
         : `<span class="text-slate-400 italic text-[11px]">-</span>`;
-    const expDisplay = r.exp_date 
-        ? `<span class="font-mono text-slate-600 text-xs font-semibold whitespace-nowrap">${formatExpDate(r.exp_date)}</span>` 
+    const expDisplay = r.exp_date
+        ? `<span class="font-mono text-slate-600 text-xs font-semibold whitespace-nowrap">${formatExpDate(r.exp_date)}</span>`
         : `<span class="text-slate-400 italic text-[11px]">-</span>`;
 
     tr.innerHTML = `
@@ -995,7 +995,7 @@ function createTransactionRow(r, isPreview = false) {
 }
 
 // Handler Reset Filter Inbound Unboxing
-window.resetTransactionFilters = function() {
+window.resetTransactionFilters = function () {
     if (typeof clearDateFilter === 'function') clearDateFilter();
     const exp = document.getElementById('filterExpedition');
     const cond = document.getElementById('filterCondition');
@@ -1011,7 +1011,7 @@ window.resetTransactionFilters = function() {
 };
 
 // Handler Edit Transaksi Unboxing
-window.editUnboxingTransaction = async function(sessionId, itemId) {
+window.editUnboxingTransaction = async function (sessionId, itemId) {
     if (!sessionId) return;
 
     showGlobalLoading("Memuat Data...", "Mengambil rincian transaksi unboxing untuk diedit...");
@@ -1149,19 +1149,19 @@ window.editUnboxingTransaction = async function(sessionId, itemId) {
     }
 };
 
-window.closeEditUnboxingModal = function() {
+window.closeEditUnboxingModal = function () {
     const modal = document.getElementById('modalEditUnboxing');
     if (modal) modal.classList.add('hidden');
 };
 
-window.editCurrentModalSession = function() {
+window.editCurrentModalSession = function () {
     if (currentModalSessionId) {
         closeDetailModal();
         editUnboxingTransaction(currentModalSessionId, 0);
     }
 };
 
-window.saveEditUnboxingTransaction = async function(event) {
+window.saveEditUnboxingTransaction = async function (event) {
     if (event) event.preventDefault();
 
     const sessionId = document.getElementById('editUnboxSessionId').value;
@@ -1250,10 +1250,10 @@ window.saveEditUnboxingTransaction = async function(event) {
 };
 
 // Handler Hapus Transaksi Unboxing
-window.deleteUnboxingTransaction = async function(sessionId, invoiceNumber) {
+window.deleteUnboxingTransaction = async function (sessionId, invoiceNumber) {
     if (!sessionId) return;
     const invText = invoiceNumber ? `[${invoiceNumber}]` : 'ini';
-    
+
     if (!confirm(`Apakah Anda yakin ingin menghapus data unboxing invoice ${invText}?\n\nSemua data produk, foto bukti, dan rekaman video unboxing terkait akan dihapus secara permanen.`)) {
         return;
     }
@@ -1281,14 +1281,14 @@ window.deleteUnboxingTransaction = async function(sessionId, invoiceNumber) {
     }
 };
 
-window.deleteCurrentModalSession = function() {
+window.deleteCurrentModalSession = function () {
     if (currentModalSessionId) {
         deleteUnboxingTransaction(currentModalSessionId, currentModalInvoice);
     }
 };
 
 // 2b. Putar Video Unboxing Langsung (Play Video Action)
-window.playTransactionVideo = async function(id) {
+window.playTransactionVideo = async function (id) {
     await viewDetails(id);
     const videoPlayer = document.getElementById('modalVideoPlayer');
     if (videoPlayer) {
@@ -1308,7 +1308,7 @@ let currentModalSessionId = null;
 let currentModalInvoice = '';
 
 // 2b. View Details & Video Player Modal Sesuai Tipe Kondisi
-window.viewDetails = async function(id, focusCondition) {
+window.viewDetails = async function (id, focusCondition) {
     const r = cachedTransactions.find(t => (t.session_id && t.session_id == id) || t.id == id);
     if (!r) return;
 
@@ -1339,8 +1339,8 @@ window.viewDetails = async function(id, focusCondition) {
     if (condBadge) {
         if (condCode) {
             const isGood = condCode === 'GOOD';
-            condBadge.className = isGood 
-                ? "text-[10px] font-bold px-2.5 py-0.5 rounded-lg border font-mono shadow-2xs bg-emerald-50 text-emerald-700 border-emerald-300" 
+            condBadge.className = isGood
+                ? "text-[10px] font-bold px-2.5 py-0.5 rounded-lg border font-mono shadow-2xs bg-emerald-50 text-emerald-700 border-emerald-300"
                 : "text-[10px] font-bold px-2.5 py-0.5 rounded-lg border font-mono shadow-2xs bg-rose-50 text-rose-700 border-rose-300";
             condBadge.innerText = `Kondisi: ${condCode}`;
             condBadge.classList.remove('hidden');
@@ -1351,7 +1351,7 @@ window.viewDetails = async function(id, focusCondition) {
 
     // Tampilkan Alert Alasan Kerusakan / Catatan Kondisi
     const dmgAlert = document.getElementById('modalDetailDamageAlert');
-    const dmgTxt   = document.getElementById('modalDetailDamageText');
+    const dmgTxt = document.getElementById('modalDetailDamageText');
     if (dmgAlert && dmgTxt) {
         const reason = r.damage_reason || (condCode !== 'GOOD' ? r.notes : '');
         if (reason && reason.trim()) {
@@ -1404,8 +1404,8 @@ window.viewDetails = async function(id, focusCondition) {
 
     // ---- RENDER FOTO DOKUMENTASI SESUAI TIPE KONDISI ----
     const photosSection = document.getElementById('modalPhotosSection');
-    const photosGrid    = document.getElementById('modalPhotosGrid');
-    const photoCount    = document.getElementById('modalPhotoCount');
+    const photosGrid = document.getElementById('modalPhotosGrid');
+    const photoCount = document.getElementById('modalPhotoCount');
 
     // Kumpulkan semua foto: photos (JSON array), package_photo, product_photo
     const allPhotos = [];
@@ -1425,7 +1425,7 @@ window.viewDetails = async function(id, focusCondition) {
     if (r.photos) {
         let extraPhotos = r.photos;
         if (typeof extraPhotos === 'string') {
-            try { extraPhotos = JSON.parse(extraPhotos); } catch(e) { extraPhotos = []; }
+            try { extraPhotos = JSON.parse(extraPhotos); } catch (e) { extraPhotos = []; }
         }
         if (Array.isArray(extraPhotos)) {
             extraPhotos.forEach((p, idx) => {
@@ -1440,9 +1440,9 @@ window.viewDetails = async function(id, focusCondition) {
                     else if (isObjDmg) label = `⚠️ Foto Bukti Barang Rusak #${idx + 1}`;
                     else label = `🏷️ Foto Produk Unboxing #${idx + 1}`;
                 }
-                addPhotoUnique({ 
-                    url: url.trim(), 
-                    label: label, 
+                addPhotoUnique({
+                    url: url.trim(),
+                    label: label,
                     type: isPkg ? 'PAKET' : (isObjDmg ? 'damaged' : pType),
                     isDamaged: isObjDmg
                 });
@@ -1463,9 +1463,9 @@ window.viewDetails = async function(id, focusCondition) {
         const hasProdOrDmg = allPhotos.some(p => p.type !== 'PAKET');
         if (!hasProdOrDmg) {
             const isDmgProduct = isSessionDamaged;
-            addPhotoUnique({ 
-                url: r.product_photo.trim(), 
-                label: isDmgProduct ? `⚠️ Foto Bukti Barang Rusak (${condCode || 'RUSAK'})` : `🏷️ Foto Produk (${condCode || 'GOOD'})`, 
+            addPhotoUnique({
+                url: r.product_photo.trim(),
+                label: isDmgProduct ? `⚠️ Foto Bukti Barang Rusak (${condCode || 'RUSAK'})` : `🏷️ Foto Produk (${condCode || 'GOOD'})`,
                 type: isDmgProduct ? 'damaged' : (condCode || 'GOOD'),
                 isDamaged: isDmgProduct
             });
@@ -1508,8 +1508,8 @@ window.viewDetails = async function(id, focusCondition) {
                     }
                     if (lbTitle) lbTitle.innerText = `${photo.label} • Invoice: ${r.invoice_number || '-'}`;
                     if (lbTag) {
-                        lbTag.className = isDamagedPhoto 
-                            ? "px-2.5 py-0.5 rounded-lg font-mono font-bold text-[10px] bg-rose-600 text-white shadow-2xs" 
+                        lbTag.className = isDamagedPhoto
+                            ? "px-2.5 py-0.5 rounded-lg font-mono font-bold text-[10px] bg-rose-600 text-white shadow-2xs"
                             : "px-2.5 py-0.5 rounded-lg font-mono font-bold text-[10px] bg-emerald-600 text-white shadow-2xs";
                         lbTag.innerText = isDamagedPhoto ? `KONDISI: ${condCode || 'RUSAK'}` : `KONDISI: ${condCode || 'GOOD'}`;
                     }
@@ -1628,7 +1628,7 @@ window.viewDetails = async function(id, focusCondition) {
             const isMatch = itCond === condCode;
             tr.className = `hover:bg-slate-50 border-b border-slate-100 text-xs ${isMatch ? 'bg-indigo-50/50' : ''}`;
             const isGood = itCond === 'GOOD' || itCond === 'BAGUS' || itCond === 'LAYAK';
-            const badgeCond = isGood ? 
+            const badgeCond = isGood ?
                 `<span class="bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded text-[10px] border border-emerald-200">GOOD</span>` :
                 `<span class="bg-rose-50 text-rose-700 font-bold px-2 py-0.5 rounded text-[10px] border border-rose-200">${escapeHtml(itCond)}</span>`;
 
@@ -1663,7 +1663,7 @@ window.viewDetails = async function(id, focusCondition) {
     }
 };
 
-window.openPhotoLightboxDirect = function(url, title, condition, isDamaged) {
+window.openPhotoLightboxDirect = function (url, title, condition, isDamaged) {
     const lb = document.getElementById('modalPhotoLightbox');
     const lbImg = document.getElementById('modalPhotoLightboxImg');
     const lbTitle = document.getElementById('modalPhotoLightboxTitle');
@@ -1677,8 +1677,8 @@ window.openPhotoLightboxDirect = function(url, title, condition, isDamaged) {
         }
         if (lbTitle) lbTitle.innerText = title || 'Foto Bukti Barang';
         if (lbTag) {
-            lbTag.className = isDamaged 
-                ? "px-2.5 py-0.5 rounded-lg font-mono font-bold text-[10px] bg-rose-600 text-white shadow-2xs" 
+            lbTag.className = isDamaged
+                ? "px-2.5 py-0.5 rounded-lg font-mono font-bold text-[10px] bg-rose-600 text-white shadow-2xs"
                 : "px-2.5 py-0.5 rounded-lg font-mono font-bold text-[10px] bg-emerald-600 text-white shadow-2xs";
             lbTag.innerText = `KONDISI: ${condition || 'RUSAK'}`;
         }
@@ -1687,7 +1687,7 @@ window.openPhotoLightboxDirect = function(url, title, condition, isDamaged) {
     }
 };
 
-window.closeDetailModal = function() {
+window.closeDetailModal = function () {
     const modal = document.getElementById('transactionDetailModal');
     if (modal) modal.classList.add('hidden');
     const videoPlayer = document.getElementById('modalVideoPlayer');
@@ -1769,14 +1769,14 @@ function renderFullProductsTable(products) {
         tr.className = 'hover:bg-slate-50 border-b border-slate-100 transition';
         const sellerSku = p.seller_sku || p.sku || '-';
         const shop = p.shop || p.category || '-';
-        const barcode = p.barcode 
-            ? `<span class="font-mono font-bold text-slate-800">${p.barcode}</span>` 
+        const barcode = p.barcode
+            ? `<span class="font-mono font-bold text-slate-800">${p.barcode}</span>`
             : `<span class="text-slate-400 italic text-[11px]">-</span>`;
-        const barcodeBpom = p.barcode_bpom 
-            ? `<span class="font-mono text-[11px] text-slate-600">${p.barcode_bpom}</span>` 
+        const barcodeBpom = p.barcode_bpom
+            ? `<span class="font-mono text-[11px] text-slate-600">${p.barcode_bpom}</span>`
             : `<span class="text-slate-400 italic text-[11px]">-</span>`;
-        const sapCode = (p.sap_code && p.sap_code !== '0') 
-            ? `<span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-mono font-bold text-[11px]">${p.sap_code}</span>` 
+        const sapCode = (p.sap_code && p.sap_code !== '0')
+            ? `<span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-mono font-bold text-[11px]">${p.sap_code}</span>`
             : `<span class="text-slate-400 italic text-[11px]">-</span>`;
 
         tr.innerHTML = `
@@ -1808,7 +1808,7 @@ function renderFullProductsTable(products) {
 }
 
 // Sinkronisasi data dari OCS WMS IEG System dengan Animasi Bola Merah Kuning Hijau
-window.syncProductsFromOCS = async function() {
+window.syncProductsFromOCS = async function () {
     const btn = document.getElementById('btnSyncOcs');
     const icon = document.getElementById('syncOcsIcon');
     if (btn) btn.disabled = true;
@@ -1842,7 +1842,7 @@ window.syncProductsFromOCS = async function() {
 };
 
 // Filter produk berdasarkan Keyword & Pilihan Toko / Shop
-window.filterProductTable = function() {
+window.filterProductTable = function () {
     const q = (document.getElementById('filterProductSearch')?.value || '').toLowerCase().trim();
     const selectedShop = (document.getElementById('filterProductShop')?.value || '').toLowerCase().trim();
 
@@ -1851,9 +1851,9 @@ window.filterProductTable = function() {
         const matchShop = !selectedShop || pShop === selectedShop;
 
         const matchQuery = !q || (
-            (p.name && p.name.toLowerCase().includes(q)) || 
-            (p.barcode && p.barcode.toLowerCase().includes(q)) || 
-            (p.barcode_bpom && p.barcode_bpom.toLowerCase().includes(q)) || 
+            (p.name && p.name.toLowerCase().includes(q)) ||
+            (p.barcode && p.barcode.toLowerCase().includes(q)) ||
+            (p.barcode_bpom && p.barcode_bpom.toLowerCase().includes(q)) ||
             (p.sku && p.sku.toLowerCase().includes(q)) ||
             (p.seller_sku && p.seller_sku.toLowerCase().includes(q)) ||
             (p.sap_code && p.sap_code.toLowerCase().includes(q)) ||
@@ -1869,17 +1869,17 @@ window.filterProductTable = function() {
 };
 
 // Modal Tambah Produk Baru
-window.openAddProductModal = function() {
+window.openAddProductModal = function () {
     document.getElementById('addProductModal').classList.remove('hidden');
     document.getElementById('newBarcode').focus();
 };
 
-window.closeAddProductModal = function() {
+window.closeAddProductModal = function () {
     document.getElementById('addProductModal').classList.add('hidden');
     document.getElementById('formAddProduct').reset();
 };
 
-window.submitNewProduct = async function(e) {
+window.submitNewProduct = async function (e) {
     e.preventDefault();
     const barcode = document.getElementById('newBarcode').value.trim();
     const name = document.getElementById('newName').value.trim();
@@ -1962,7 +1962,7 @@ function generateExcelFile(sheets, defaultFileName) {
 }
 
 // 1. Export Excel: Dashboard Overview (KPI + Transaksi Terkini)
-window.exportDashboardExcel = async function() {
+window.exportDashboardExcel = async function () {
     showGlobalLoading("Menyiapkan Excel...", "Mengumpulkan data dashboard dan transaksi...");
     try {
         const metricsUrl = activeDashboardDateFilter ? `api/admin/metrics?date=${encodeURIComponent(activeDashboardDateFilter)}` : 'api/admin/metrics';
@@ -2013,7 +2013,7 @@ window.exportDashboardExcel = async function() {
 };
 
 // 2. Export Excel: Inbound Unboxing (Audit Trail Lengkap Berdasarkan Seller SKU)
-window.exportInboundUnboxingExcel = async function() {
+window.exportInboundUnboxingExcel = async function () {
     const searchInput = document.getElementById('filterSearch');
     const dateInput = document.getElementById('filterDate');
     const expSelect = document.getElementById('filterExpedition');
@@ -2077,7 +2077,7 @@ window.exportInboundUnboxingExcel = async function() {
 };
 
 // 3. Export Excel: Master Data Produk
-window.exportProductsExcel = async function() {
+window.exportProductsExcel = async function () {
     showGlobalLoading("Menyiapkan Excel...", "Mengambil seluruh master data produk...");
     try {
         let list = cachedProducts;
@@ -2115,7 +2115,7 @@ window.exportProductsExcel = async function() {
 };
 
 // 4. Export Excel: Master Ekspedisi
-window.exportExpeditionsExcel = async function() {
+window.exportExpeditionsExcel = async function () {
     showGlobalLoading("Menyiapkan Excel...", "Mengambil daftar master ekspedisi...");
     try {
         let list = cachedExpeditions;
@@ -2176,11 +2176,11 @@ function renderExpeditionsTable(list) {
     }
 
     list.forEach((item, index) => {
-        const statusBadge = item.status === 'ACTIVE' 
+        const statusBadge = item.status === 'ACTIVE'
             ? `<span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold text-[10px]">Aktif</span>`
             : `<span class="bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-bold text-[10px]">Nonaktif</span>`;
 
-        const prefixBadge = item.prefix_pattern 
+        const prefixBadge = item.prefix_pattern
             ? `<div class="flex flex-wrap gap-1">${item.prefix_pattern.split(',').map(p => `<span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded font-mono font-bold text-[10px]">${p.trim()}</span>`).join('')}</div>`
             : `<span class="text-slate-400 italic text-[11px]">-</span>`;
 
@@ -2210,16 +2210,16 @@ function renderExpeditionsTable(list) {
     });
 }
 
-window.filterExpeditionTable = function() {
+window.filterExpeditionTable = function () {
     const q = (document.getElementById('filterExpeditionSearch').value || '').toLowerCase();
-    const filtered = cachedExpeditions.filter(item => 
-        item.name.toLowerCase().includes(q) || 
+    const filtered = cachedExpeditions.filter(item =>
+        item.name.toLowerCase().includes(q) ||
         item.code.toLowerCase().includes(q)
     );
     renderExpeditionsTable(filtered);
 };
 
-window.openAddExpeditionModal = function() {
+window.openAddExpeditionModal = function () {
     document.getElementById('expeditionModalTitle').innerText = 'Tambah Ekspedisi Baru';
     const sub = document.getElementById('expeditionModalSubtitle');
     if (sub) sub.innerText = 'Simpan data armada/kurir ke database MySQL';
@@ -2230,12 +2230,12 @@ window.openAddExpeditionModal = function() {
     document.getElementById('expeditionCode').focus();
 };
 
-window.closeExpeditionModal = function() {
+window.closeExpeditionModal = function () {
     document.getElementById('expeditionModal').classList.add('hidden');
     document.getElementById('formExpedition').reset();
 };
 
-window.editExpedition = function(id) {
+window.editExpedition = function (id) {
     const item = cachedExpeditions.find(x => x.id == id);
     if (!item) return;
 
@@ -2251,7 +2251,7 @@ window.editExpedition = function(id) {
     document.getElementById('expeditionName').focus();
 };
 
-window.submitExpedition = async function(e) {
+window.submitExpedition = async function (e) {
     e.preventDefault();
     const id = document.getElementById('expeditionId').value;
     const code = document.getElementById('expeditionCode').value.trim();
@@ -2289,7 +2289,7 @@ window.submitExpedition = async function(e) {
     }
 };
 
-window.deleteExpedition = async function(id, name) {
+window.deleteExpedition = async function (id, name) {
     if (!confirm(`Yakin ingin menghapus ekspedisi "${name}" dari master data?`)) return;
 
     try {
@@ -2309,7 +2309,7 @@ window.deleteExpedition = async function(id, name) {
 };
 
 // Refresh All Data function
-window.refreshAllData = function() {
+window.refreshAllData = function () {
     const icon = document.getElementById('refreshIcon');
     if (icon) icon.classList.add('fa-spin');
 
@@ -2401,10 +2401,10 @@ function renderUsersTable(list) {
     });
 }
 
-window.filterUserTable = function() {
+window.filterUserTable = function () {
     const q = (document.getElementById('filterUserSearch')?.value || '').toLowerCase().trim();
-    const filtered = cachedUsers.filter(u => 
-        u.username.toLowerCase().includes(q) || 
+    const filtered = cachedUsers.filter(u =>
+        u.username.toLowerCase().includes(q) ||
         u.name.toLowerCase().includes(q) ||
         u.role.toLowerCase().includes(q) ||
         (u.pin && u.pin.toLowerCase().includes(q))
@@ -2412,7 +2412,7 @@ window.filterUserTable = function() {
     renderUsersTable(filtered);
 };
 
-window.openAddUserModal = function() {
+window.openAddUserModal = function () {
     document.getElementById('userModalTitle').innerText = 'Tambah Pengguna Baru';
     const sub = document.getElementById('userModalSubtitle');
     if (sub) sub.innerText = 'Daftarkan akun operator atau admin';
@@ -2426,12 +2426,12 @@ window.openAddUserModal = function() {
     document.getElementById('userUsername').focus();
 };
 
-window.closeUserModal = function() {
+window.closeUserModal = function () {
     document.getElementById('userModal').classList.add('hidden');
     document.getElementById('formUser').reset();
 };
 
-window.editUser = function(id) {
+window.editUser = function (id) {
     const u = cachedUsers.find(x => x.id == id);
     if (!u) return;
 
@@ -2451,7 +2451,7 @@ window.editUser = function(id) {
     document.getElementById('userModal').classList.remove('hidden');
 };
 
-window.submitUser = async function(e) {
+window.submitUser = async function (e) {
     e.preventDefault();
     const id = document.getElementById('userId').value;
     const username = document.getElementById('userUsername').value.trim();
@@ -2488,7 +2488,7 @@ window.submitUser = async function(e) {
     }
 };
 
-window.deleteUser = async function(id, name) {
+window.deleteUser = async function (id, name) {
     if (!confirm(`Yakin ingin menghapus pengguna "${name}"?`)) return;
 
     try {
@@ -2568,9 +2568,9 @@ async function loadMaintenanceStatus() {
     }
 }
 
-window.toggleMaintenanceMode = async function() {
+window.toggleMaintenanceMode = async function () {
     const isActivating = (document.getElementById('maintModeTitle')?.innerText || '').includes('Normal');
-    const msg = isActivating 
+    const msg = isActivating
         ? "Yakin ingin MENGAKTIFKAN mode maintenance? Pengguna lain (operator & admin biasa) tidak akan bisa login sampai dinonaktifkan."
         : "Yakin ingin MENONAKTIFKAN mode maintenance dan kembali ke online normal?";
     if (!confirm(msg)) return;
@@ -2597,7 +2597,7 @@ window.toggleMaintenanceMode = async function() {
     }
 };
 
-window.optimizeDatabaseTables = async function() {
+window.optimizeDatabaseTables = async function () {
     showGlobalLoading("Mengoptimasi Database...", "Menjalankan perintah SQL OPTIMIZE TABLE untuk defragmentasi indeks...");
     try {
         const res = await fetch('api/maintenance.php', {
@@ -2619,7 +2619,7 @@ window.optimizeDatabaseTables = async function() {
     }
 };
 
-window.cleanTestTransactions = async function() {
+window.cleanTestTransactions = async function () {
     if (!confirm("Hapus semua transaksi uji coba bertanda 'INV-DEMO' atau 'TEST'?")) return;
     showGlobalLoading("Membersihkan Data...", "Menghapus transaksi retur uji coba...");
     try {
@@ -2799,12 +2799,12 @@ let allConditions = [];
 
 const CONDITION_COLOR_MAP = {
     emerald: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
-    red:     { bg: 'bg-red-50',     text: 'text-red-700',     border: 'border-red-200'     },
-    amber:   { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200'   },
-    orange:  { bg: 'bg-orange-50',  text: 'text-orange-700',  border: 'border-orange-200'  },
-    purple:  { bg: 'bg-purple-50',  text: 'text-purple-700',  border: 'border-purple-200'  },
-    blue:    { bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200'    },
-    slate:   { bg: 'bg-slate-100',  text: 'text-slate-700',   border: 'border-slate-200'   },
+    red: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
+    amber: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+    orange: { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
+    purple: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
+    blue: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
+    slate: { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-200' },
 };
 
 async function loadConditions() {
@@ -2874,7 +2874,7 @@ function renderConditionsTable(list) {
                         class="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-[10px] px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1">
                         <i class="fa-solid fa-pen text-[9px]"></i> Edit
                     </button>
-                    <button onclick="deleteCondition(${c.id}, '${c.code.replace(/'/g,"\\'")}', '${c.name.replace(/'/g,"\\'")}' )"
+                    <button onclick="deleteCondition(${c.id}, '${c.code.replace(/'/g, "\\'")}', '${c.name.replace(/'/g, "\\'")}' )"
                         class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-[10px] px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1">
                         <i class="fa-solid fa-trash-can text-[9px]"></i> Hapus
                     </button>
@@ -2922,11 +2922,11 @@ function closeConditionModal() {
 }
 
 async function saveCondition() {
-    const id   = document.getElementById('conditionId').value;
+    const id = document.getElementById('conditionId').value;
     const code = document.getElementById('conditionCode').value.trim().toUpperCase();
     const name = document.getElementById('conditionName').value.trim();
     const desc = document.getElementById('conditionDesc').value.trim();
-    const color= document.getElementById('conditionColor').value;
+    const color = document.getElementById('conditionColor').value;
     const sort = parseInt(document.getElementById('conditionSort').value) || 0;
 
     if (!code || !name) { showToast('warning', 'Kode dan Nama Kondisi wajib diisi!', 'Data Tidak Lengkap'); return; }
@@ -3003,7 +3003,7 @@ function initReceivingDatepicker() {
         altFormat: "j F Y",
         locale: "id",
         maxDate: "today",
-        onChange: function(selectedDates) {
+        onChange: function (selectedDates) {
             const btnClear = document.getElementById('btnClearReceivingDate');
             if (selectedDates.length === 2) {
                 const start = flatpickr.formatDate(selectedDates[0], "Y-m-d");
@@ -3020,7 +3020,7 @@ function initReceivingDatepicker() {
                 if (btnClear) btnClear.classList.add('hidden');
             }
         },
-        onClose: function(selectedDates) {
+        onClose: function (selectedDates) {
             if (selectedDates.length === 1) {
                 loadReceivingData();
             }
@@ -3044,7 +3044,7 @@ function initReceivingDatepicker() {
     }
 }
 
-window.clearReceivingDateFilter = function() {
+window.clearReceivingDateFilter = function () {
     if (flatpickrReceivingInstance) {
         flatpickrReceivingInstance.clear();
     }
@@ -3055,7 +3055,7 @@ window.clearReceivingDateFilter = function() {
 };
 
 // Muat data receiving dari API
-window.loadReceivingData = async function(forceRefresh = false) {
+window.loadReceivingData = async function (forceRefresh = false) {
     initReceivingDatepicker();
 
     const tbody = document.getElementById('receivingTableBody');
@@ -3213,7 +3213,7 @@ function renderReceivingTable(data) {
 }
 
 // Buka Modal Bukti Serah Terima Resmi
-window.viewReceivingReceipt = async function(id) {
+window.viewReceivingReceipt = async function (id) {
     showGlobalLoading("Memuat Bukti Serah Terima...", "Mengambil rincian nomor resi paket...");
     try {
         const res = await fetch(`api/reception.php?action=detail&id=${id}`);
@@ -3293,13 +3293,13 @@ window.viewReceivingReceipt = async function(id) {
     }
 };
 
-window.closeReceivingReceiptModal = function() {
+window.closeReceivingReceiptModal = function () {
     const modal = document.getElementById('modalReceivingReceipt');
     if (modal) modal.classList.add('hidden');
 };
 
 // Helper URL path gambar receiving yang aman
-window.formatReceivingImgUrl = function(path) {
+window.formatReceivingImgUrl = function (path) {
     if (!path || typeof path !== 'string') return '';
     path = path.trim();
     if (!path) return '';
@@ -3308,7 +3308,7 @@ window.formatReceivingImgUrl = function(path) {
     }
     let clean = path.replace(/^\/+/, '');
     clean = clean.replace(/^(retrun\.inboud|return\.inbound|inbound_return)\//i, '');
-    
+
     // Deteksi subdirektori proyek dari window.location.pathname
     // Contoh: /inbound_return/admin -> /inbound_return/
     //         /retrun.inboud/admin -> /retrun.inboud/
@@ -3316,7 +3316,7 @@ window.formatReceivingImgUrl = function(path) {
     const pathname = window.location.pathname;
     const segments = pathname.split('/').filter(Boolean);
     const knownPages = ['admin', 'admin.php', 'login', 'login.php', 'menu', 'menu.php', 'reception', 'reception.php', 'index.php', 'scanner', 'dossier', 'claim_dossier', 'index'];
-    
+
     if (segments.length > 0 && !knownPages.includes(segments[0].toLowerCase())) {
         return '/' + segments[0] + '/' + clean;
     }
@@ -3324,7 +3324,7 @@ window.formatReceivingImgUrl = function(path) {
 };
 
 // Buka Modal Detail Paket & Foto History Receiving
-window.viewReceivingPackagesList = async function(id) {
+window.viewReceivingPackagesList = async function (id) {
     showGlobalLoading("Memuat Detail Paket...", "Mengambil rincian resi dan dokumentasi foto...");
     try {
         const res = await fetch(`api/reception.php?action=detail&id=${id}`);
@@ -3339,7 +3339,7 @@ window.viewReceivingPackagesList = async function(id) {
 
             const titleEl = document.getElementById('pkgModalTitle');
             if (titleEl) titleEl.innerText = `Detail History Receiving ${r.receipt_number}`;
-            
+
             const subTitleEl = document.getElementById('pkgModalSubtitle');
             if (subTitleEl) subTitleEl.innerText = `Petugas: ${r.operator_name || '-'} • Diterima: ${r.created_at || '-'}`;
 
@@ -3398,7 +3398,7 @@ window.viewReceivingPackagesList = async function(id) {
                 if (courierImg) {
                     courierImg.src = formattedCourierPhoto;
                     courierImg.classList.remove('hidden');
-                    courierImg.onerror = function() {
+                    courierImg.onerror = function () {
                         this.classList.add('hidden');
                         if (courierAvatarPlaceholder) courierAvatarPlaceholder.classList.remove('hidden');
                     };
@@ -3438,7 +3438,7 @@ window.viewReceivingPackagesList = async function(id) {
     }
 };
 
-window.renderReceivingPackageCards = function(packages) {
+window.renderReceivingPackageCards = function (packages) {
     const listEl = document.getElementById('pkgModalList');
     if (!listEl) return;
 
@@ -3457,7 +3457,7 @@ window.renderReceivingPackageCards = function(packages) {
         const barcode = escapeHtml(p.package_barcode || '-');
         let photoPath = p.photo_path ? window.formatReceivingImgUrl(p.photo_path) : '';
         let isSessionFallback = false;
-        
+
         // Jika tidak ada foto individual per-barcode, gunakan foto dokumentasi sesi serah terima jika ada
         if (!photoPath && window._currentSessionPhotos && window._currentSessionPhotos.length > 0) {
             photoPath = window.formatReceivingImgUrl(window._currentSessionPhotos[0]);
@@ -3508,7 +3508,7 @@ window.renderReceivingPackageCards = function(packages) {
     listEl.innerHTML = html;
 };
 
-window.filterReceivingPackagesModal = function(term) {
+window.filterReceivingPackagesModal = function (term) {
     if (!window._currentReceivingPackagesData) return;
     const query = (term || '').trim().toLowerCase();
     if (!query) {
@@ -3525,19 +3525,19 @@ window.filterReceivingPackagesModal = function(term) {
     renderReceivingPackageCards(filtered);
 };
 
-window.printCurrentReceivingFromModal = function() {
+window.printCurrentReceivingFromModal = function () {
     if (window._activeReceivingId) {
         closeReceivingPackagesModal();
         viewReceivingReceipt(window._activeReceivingId);
     }
 };
 
-window.closeReceivingPackagesModal = function() {
+window.closeReceivingPackagesModal = function () {
     const m = document.getElementById('modalReceivingPackages');
     if (m) m.classList.add('hidden');
 };
 
-window.copyAllReceivingBarcodes = function() {
+window.copyAllReceivingBarcodes = function () {
     if (window._currentReceivingPackages && window._currentReceivingPackages.length) {
         navigator.clipboard.writeText(window._currentReceivingPackages.join('\n')).then(() => {
             showToast('success', `${window._currentReceivingPackages.length} nomor resi berhasil disalin ke clipboard!`, 'Berhasil Disalin');
@@ -3548,7 +3548,7 @@ window.copyAllReceivingBarcodes = function() {
 };
 
 // Hapus Data Penerimaan
-window.deleteReceivingRecord = async function(id, receiptNumber) {
+window.deleteReceivingRecord = async function (id, receiptNumber) {
     if (!confirm(`Yakin ingin menghapus data penerimaan "${receiptNumber}" beserta seluruh resi di dalamnya?\n\nTindakan ini tidak bisa dibatalkan.`)) {
         return;
     }
@@ -3574,7 +3574,7 @@ window.deleteReceivingRecord = async function(id, receiptNumber) {
 };
 
 // Export Excel Receiving
-window.exportReceivingExcel = function() {
+window.exportReceivingExcel = function () {
     if (!cachedReceivingData || cachedReceivingData.length === 0) {
         showToast('warning', 'Tidak ada data receiving untuk diekspor.', 'Data Kosong');
         return;
@@ -3628,7 +3628,7 @@ function populateReceivingExpeditionFilter(data) {
 // =========================================================================
 window.currentClaimDossier = null;
 
-window.executeClaimLookup = async function(e) {
+window.executeClaimLookup = async function (e) {
     if (e && e.preventDefault) e.preventDefault();
 
     const input = document.getElementById('claimSearchInput');
@@ -3872,8 +3872,8 @@ function renderClaimDossier(data) {
             const cond = String(i.condition || '').toUpperCase().trim();
             const typ = String(i.type || '').toUpperCase().trim();
             const isItemDmg = (cond !== '' && cond !== 'GOOD' && cond !== 'BAGUS') ||
-                              (typ !== '' && typ !== 'GOOD' && typ !== 'BAGUS') ||
-                              Boolean(i.damage_reason);
+                (typ !== '' && typ !== 'GOOD' && typ !== 'BAGUS') ||
+                Boolean(i.damage_reason);
             const badgeClass = isItemDmg ? 'bg-rose-100 text-rose-800 border-rose-300 font-bold' : 'bg-emerald-100 text-emerald-800 border-emerald-300';
             const condText = isItemDmg ? `⚠️ ${i.type || i.condition || 'RUSAK'}${i.damage_reason ? ' (' + i.damage_reason + ')' : ''}` : 'GOOD';
             return `
@@ -3911,8 +3911,8 @@ function renderClaimDossier(data) {
             const typ = String(i.type || '').toUpperCase().trim();
             const rsn = String(i.damage_reason || '').trim();
             return (cond !== '' && cond !== 'GOOD' && cond !== 'BAGUS') ||
-                   (typ !== '' && typ !== 'GOOD' && typ !== 'BAGUS') ||
-                   rsn !== '';
+                (typ !== '' && typ !== 'GOOD' && typ !== 'BAGUS') ||
+                rsn !== '';
         });
         if (damageItems.length > 0) {
             notes = damageItems.map(i => {
@@ -3941,7 +3941,7 @@ function renderClaimDossier(data) {
     }
 }
 
-window.openClaimPhotoModal = function(url, encodedTitle) {
+window.openClaimPhotoModal = function (url, encodedTitle) {
     const modal = document.getElementById('claimPhotoModal');
     const img = document.getElementById('claimPhotoModalImg');
     const titleEl = document.getElementById('claimPhotoModalTitle');
@@ -3958,22 +3958,22 @@ window.openClaimPhotoModal = function(url, encodedTitle) {
     modal.classList.remove('hidden');
 };
 
-window.closeClaimPhotoModal = function() {
+window.closeClaimPhotoModal = function () {
     const modal = document.getElementById('claimPhotoModal');
     if (modal) modal.classList.add('hidden');
 };
 
-window.openNasConfigModal = function() {
+window.openNasConfigModal = function () {
     const modal = document.getElementById('modalNasConfig');
     if (modal) modal.classList.remove('hidden');
 };
 
-window.closeNasConfigModal = function() {
+window.closeNasConfigModal = function () {
     const modal = document.getElementById('modalNasConfig');
     if (modal) modal.classList.add('hidden');
 };
 
-window.saveNasConfig = async function() {
+window.saveNasConfig = async function () {
     const user = document.getElementById('nasConfigUser')?.value || '';
     const pass = document.getElementById('nasConfigPass')?.value || '';
     const folder = document.getElementById('nasConfigFolder')?.value || '/PACKER';
@@ -4052,7 +4052,7 @@ function setElText(id, text) {
     if (el) el.innerText = text;
 }
 
-window.copyClaimPacketSummary = function() {
+window.copyClaimPacketSummary = function () {
     if (!window.currentClaimDossier) {
         showToast('warning', 'Belum ada data klaim yang dipilih', 'Peringatan');
         return;
@@ -4094,7 +4094,7 @@ window.copyClaimPacketSummary = function() {
     });
 };
 
-window.printClaimDossier = function() {
+window.printClaimDossier = function () {
     if (!window.currentClaimDossier) {
         showToast('warning', 'Belum ada data klaim untuk dicetak', 'Peringatan');
         return;
@@ -4230,12 +4230,12 @@ window.printClaimDossier = function() {
                                 <td style="padding: 4px; width: 20%;">Alasan / Catatan</td>
                             </tr>
                             ${unb.items.map((it, iIdx) => {
-                                const isD = (String(it.condition || '').toUpperCase() !== 'GOOD' && String(it.condition || '').toUpperCase() !== 'BAGUS') ||
-                                            (String(it.type || '').toUpperCase() !== 'GOOD' && String(it.type || '').toUpperCase() !== 'BAGUS') ||
-                                            Boolean(it.damage_reason);
-                                const rowBg = isD ? 'background: #fff1f2; font-weight: bold;' : '';
-                                const badgeC = isD ? 'badge-no' : 'badge-ok';
-                                return `
+        const isD = (String(it.condition || '').toUpperCase() !== 'GOOD' && String(it.condition || '').toUpperCase() !== 'BAGUS') ||
+            (String(it.type || '').toUpperCase() !== 'GOOD' && String(it.type || '').toUpperCase() !== 'BAGUS') ||
+            Boolean(it.damage_reason);
+        const rowBg = isD ? 'background: #fff1f2; font-weight: bold;' : '';
+        const badgeC = isD ? 'badge-no' : 'badge-ok';
+        return `
                                 <tr style="border-bottom: 1px solid #e2e8f0; ${rowBg}">
                                     <td style="padding: 4px;">${iIdx + 1}</td>
                                     <td style="padding: 4px;">${it.product_name || it.barcode} ${it.seller_sku ? '<br><small style="color: #64748b;">SKU: ' + it.seller_sku + '</small>' : ''}</td>
@@ -4244,7 +4244,7 @@ window.printClaimDossier = function() {
                                     <td style="padding: 4px; color: ${isD ? '#991b1b' : '#64748b'};">${it.damage_reason || (isD ? 'Barang Rusak' : '-')}</td>
                                 </tr>
                                 `;
-                            }).join('')}
+    }).join('')}
                         </table>
                     </td>
                 </tr>
@@ -4257,16 +4257,16 @@ window.printClaimDossier = function() {
             <div class="box-title">V. DOKUMENTASI FOTO BUKTI FISIK (${photos.length} FOTO)</div>
             <div class="photos-grid">
                 ${photos.slice(0, 6).map(p => {
-                    const isPhotoDmg = (p.is_damaged || p.badge === 'Barang Rusak' || (p.title && p.title.toLowerCase().includes('rusak')));
-                    const borderStyle = isPhotoDmg ? 'border: 2px solid #ef4444; background: #fff1f2;' : 'border: 1px solid #e2e8f0;';
-                    const tagStyle = isPhotoDmg ? 'color: #dc2626; font-weight: 900;' : 'color: #475569;';
-                    return `
+        const isPhotoDmg = (p.is_damaged || p.badge === 'Barang Rusak' || (p.title && p.title.toLowerCase().includes('rusak')));
+        const borderStyle = isPhotoDmg ? 'border: 2px solid #ef4444; background: #fff1f2;' : 'border: 1px solid #e2e8f0;';
+        const tagStyle = isPhotoDmg ? 'color: #dc2626; font-weight: 900;' : 'color: #475569;';
+        return `
                     <div class="photo-item" style="${borderStyle}">
                         <img src="${p.url}" alt="${p.title || 'Foto Bukti'}">
                         <span style="${tagStyle}">${isPhotoDmg ? '⚠️ ' : ''}${p.title || p.badge || 'Bukti Retur'}</span>
                     </div>
                     `;
-                }).join('')}
+    }).join('')}
             </div>
         </div>
         ` : ''}
@@ -4316,7 +4316,7 @@ function initClaimDatepicker() {
         altFormat: "j F Y",
         locale: "id",
         maxDate: "today",
-        onChange: function(selectedDates) {
+        onChange: function (selectedDates) {
             const btnClear = document.getElementById('btnClearClaimDate');
             if (selectedDates.length === 2) {
                 const start = flatpickr.formatDate(selectedDates[0], "Y-m-d");
@@ -4334,7 +4334,7 @@ function initClaimDatepicker() {
                 applyClaimCandidatesFilter();
             }
         },
-        onClose: function(selectedDates) {
+        onClose: function (selectedDates) {
             if (selectedDates.length === 1) {
                 applyClaimCandidatesFilter();
             }
@@ -4348,7 +4348,7 @@ function initClaimDatepicker() {
     }
 }
 
-window.clearClaimDateFilter = function() {
+window.clearClaimDateFilter = function () {
     if (flatpickrClaimInstance) {
         flatpickrClaimInstance.clear();
     }
@@ -4358,7 +4358,7 @@ window.clearClaimDateFilter = function() {
     applyClaimCandidatesFilter();
 };
 
-window.loadClaimCandidates = async function(force = false) {
+window.loadClaimCandidates = async function (force = false) {
     initClaimDatepicker();
 
     const tbody = document.getElementById('claimCandidatesTableBody');
@@ -4418,7 +4418,7 @@ function populateClaimExpeditionFilter(candidates) {
     sel.innerHTML = optHtml;
 }
 
-window.applyClaimCandidatesFilter = function() {
+window.applyClaimCandidatesFilter = function () {
     const tbody = document.getElementById('claimCandidatesTableBody');
     if (!tbody) return;
 
@@ -4569,14 +4569,14 @@ window.applyClaimCandidatesFilter = function() {
                 </td>
                 <td class="py-3 px-3 text-slate-500 text-[11px] whitespace-nowrap">${escapeHtml(c.created_at || '-')}</td>
                 <td class="py-3 px-3 text-center">
-                    ${hasVideo ? 
-                        `<span class="inline-flex items-center gap-1 text-[11px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                    ${hasVideo ?
+                `<span class="inline-flex items-center gap-1 text-[11px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                             <i class="fa-solid fa-video"></i> Ada
-                         </span>` : 
-                        `<span class="inline-flex items-center gap-1 text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
+                         </span>` :
+                `<span class="inline-flex items-center gap-1 text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
                             <i class="fa-solid fa-video-slash"></i> -
                          </span>`
-                    }
+            }
                 </td>
                 <td class="py-3 px-3 text-center">
                     <button onclick="openClaimDetailModal('${c.invoice_number}')" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[11px] font-bold transition shadow-2xs flex items-center gap-1.5 mx-auto" title="Buka popup berkas detail klaim">
@@ -4596,7 +4596,7 @@ window.applyClaimCandidatesFilter = function() {
     updateSelectedClaimsBar();
 };
 
-window.resetClaimCandidatesFilter = function() {
+window.resetClaimCandidatesFilter = function () {
     const searchInput = document.getElementById('filterClaimSearch');
     const expSelect = document.getElementById('filterClaimExpedition');
 
@@ -4605,7 +4605,7 @@ window.resetClaimCandidatesFilter = function() {
     clearClaimDateFilter();
 };
 
-window.syncSingleClaimPrice = async function(invoice, btnEl) {
+window.syncSingleClaimPrice = async function (invoice, btnEl) {
     if (!invoice) return;
     const origText = btnEl ? btnEl.innerHTML : '';
     if (btnEl) {
@@ -4650,7 +4650,7 @@ window.syncSingleClaimPrice = async function(invoice, btnEl) {
 // ==========================================
 // POPUP MODAL DETAIL KLAIM (BERKAS LENGKAP)
 // ==========================================
-window.openClaimDetailModal = async function(identifier) {
+window.openClaimDetailModal = async function (identifier) {
     if (!identifier) return;
     activeClaimCandidateInvoice = identifier;
 
@@ -4728,7 +4728,7 @@ function renderClaimDetailModalContent(data) {
 
     if (invTitle) invTitle.innerText = `Invoice #${invNo} • Resi #${trackingNo}`;
     if (subtitle) subtitle.innerText = `Toko: ${order.ShopName || '-'} | Ekspedisi: ${order.ShippingProvider || unboxing.expedition || '-'}`;
-    
+
     if (statusBadge) {
         if (data.is_claimable) {
             statusBadge.className = 'px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-rose-600 text-white';
@@ -4856,10 +4856,10 @@ function renderClaimDetailModalContent(data) {
                 const cond = String(item.condition || '').toUpperCase().trim();
                 const typ = String(item.type || '').toUpperCase().trim();
                 const isDmg = (cond !== '' && cond !== 'GOOD' && cond !== 'BAGUS') ||
-                              (typ !== '' && typ !== 'GOOD' && typ !== 'BAGUS') ||
-                              Boolean(item.damage_reason);
+                    (typ !== '' && typ !== 'GOOD' && typ !== 'BAGUS') ||
+                    Boolean(item.damage_reason);
 
-                const badgeCond = isDmg ? 
+                const badgeCond = isDmg ?
                     `<span class="bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded text-[10px] border border-rose-200">⚠️ ${escapeHtml(item.type || item.condition || 'RUSAK')}</span>` :
                     `<span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px] border border-emerald-200">GOOD</span>`;
 
@@ -4890,7 +4890,7 @@ function renderClaimDetailModalContent(data) {
     }
 }
 
-window.closeClaimDetailModal = function() {
+window.closeClaimDetailModal = function () {
     const modal = document.getElementById('modalClaimDetail');
     if (modal) modal.classList.add('hidden');
     const video = document.getElementById('mClaimVideoPlayer');
@@ -4900,7 +4900,7 @@ window.closeClaimDetailModal = function() {
     }
 };
 
-window.printClaimFromModal = function() {
+window.printClaimFromModal = function () {
     const inv = activeClaimCandidateInvoice || document.getElementById('claimSearchInput')?.value?.trim();
     if (!inv) {
         showToast('warning', 'Pilih berkas klaim terlebih dahulu', 'Invoice Kosong');
@@ -4913,7 +4913,7 @@ window.printClaimFromModal = function() {
     }
 };
 
-window.openClaimDossierFullTab = function() {
+window.openClaimDossierFullTab = function () {
     const inv = activeClaimCandidateInvoice || document.getElementById('claimSearchInput')?.value?.trim();
     if (!inv) {
         showToast('warning', 'Pilih berkas klaim terlebih dahulu', 'Invoice Kosong');
@@ -4929,7 +4929,7 @@ window.openClaimDossierFullTab = function() {
 // ==========================================
 // FITUR MULTIPLE SELECT & INVOICE TAGIHAN KLAIM KOLEKTIF
 // ==========================================
-window.handleClaimCheckboxChange = function(invoiceNumber, cbEl) {
+window.handleClaimCheckboxChange = function (invoiceNumber, cbEl) {
     if (cbEl.checked) {
         selectedClaimInvoices.add(invoiceNumber);
     } else {
@@ -4951,7 +4951,7 @@ window.handleClaimCheckboxChange = function(invoiceNumber, cbEl) {
     updateSelectedClaimsBar();
 };
 
-window.toggleSelectAllClaims = function(masterCb) {
+window.toggleSelectAllClaims = function (masterCb) {
     const isChecked = masterCb.checked;
     const checkboxes = document.querySelectorAll('.claim-item-checkbox');
     checkboxes.forEach(cb => {
@@ -4969,7 +4969,7 @@ window.toggleSelectAllClaims = function(masterCb) {
     updateSelectedClaimsBar();
 };
 
-window.clearSelectedClaims = function() {
+window.clearSelectedClaims = function () {
     selectedClaimInvoices.clear();
     const checkboxes = document.querySelectorAll('.claim-item-checkbox');
     checkboxes.forEach(cb => {
@@ -4982,7 +4982,7 @@ window.clearSelectedClaims = function() {
     updateSelectedClaimsBar();
 };
 
-window.updateSelectedClaimsBar = function() {
+window.updateSelectedClaimsBar = function () {
     const bar = document.getElementById('selectedClaimsActionCard');
     const countEl = document.getElementById('selectedClaimsCount');
     const dmgQtyEl = document.getElementById('selectedClaimsDamagedQty');
@@ -5018,7 +5018,7 @@ window.updateSelectedClaimsBar = function() {
     if (btnPrintCostEl) btnPrintCostEl.innerText = formattedPrice;
 };
 
-window.openCollectiveClaimInvoiceModal = function() {
+window.openCollectiveClaimInvoiceModal = function () {
     if (selectedClaimInvoices.size === 0) {
         showToast('warning', 'Pilih minimal 1 paket klaim untuk membuat invoice tagihan.', 'Peringatan');
         return;
@@ -5052,7 +5052,7 @@ window.openCollectiveClaimInvoiceModal = function() {
     });
 
     const expText = expSet.size > 0 ? Array.from(expSet).join(', ') : 'Ekspedisi Terkait';
-    const docNo = 'INV-CLM-' + new Date().toISOString().slice(0,10).replace(/-/g, '') + '-' + String(selectedList.length).padStart(3, '0');
+    const docNo = 'INV-CLM-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + String(selectedList.length).padStart(3, '0');
 
     let tableRows = '';
     selectedList.forEach((it, idx) => {
@@ -5138,7 +5138,7 @@ window.openCollectiveClaimInvoiceModal = function() {
     if (modal) modal.classList.remove('hidden');
 };
 
-window.closeCollectiveClaimModal = function() {
+window.closeCollectiveClaimModal = function () {
     const modal = document.getElementById('modalCollectiveClaimInvoice');
     if (modal) modal.classList.add('hidden');
 };
@@ -5168,7 +5168,7 @@ function submitInvoicePostForm(invoices, autoPrint = false) {
     }, 1200);
 }
 
-window.printCollectiveClaimInvoice = function() {
+window.printCollectiveClaimInvoice = function () {
     if (selectedClaimInvoices.size === 0) {
         showToast('warning', 'Pilih minimal 1 paket klaim untuk dicetak invoice tagihannya.', 'Peringatan');
         return;
@@ -5176,7 +5176,7 @@ window.printCollectiveClaimInvoice = function() {
     submitInvoicePostForm(Array.from(selectedClaimInvoices), false);
 };
 
-window.openCollectiveClaimFullTab = function() {
+window.openCollectiveClaimFullTab = function () {
     if (selectedClaimInvoices.size === 0) {
         showToast('warning', 'Pilih minimal 1 paket klaim untuk melihat invoice tagihannya.', 'Peringatan');
         return;
@@ -5184,7 +5184,7 @@ window.openCollectiveClaimFullTab = function() {
     submitInvoicePostForm(Array.from(selectedClaimInvoices), false);
 };
 
-window.copyCollectiveClaimText = function() {
+window.copyCollectiveClaimText = function () {
     if (selectedClaimInvoices.size === 0) return;
     const selectedList = [];
     selectedClaimInvoices.forEach(inv => {
@@ -5226,12 +5226,12 @@ window.copyCollectiveClaimText = function() {
     });
 };
 
-window.lookupClaimCandidate = function(identifier) {
+window.lookupClaimCandidate = function (identifier) {
     if (!identifier) return;
     openClaimDetailModal(identifier);
 };
 
-window.searchClaimDossier = function(e) {
+window.searchClaimDossier = function (e) {
     if (window.executeClaimLookup) return window.executeClaimLookup(e);
 };
 
@@ -5280,7 +5280,7 @@ setTimeout(() => {
 // -------------------------------------------------------------
 // SINKRONISASI ORDERS OCS (RESI, INVOICE, SKU, BIAYA, KLAIM)
 // -------------------------------------------------------------
-window.openOcsSyncModal = function(mode = null) {
+window.openOcsSyncModal = function (mode = null) {
     const modal = document.getElementById('modalOcsSync');
     if (modal) {
         modal.classList.remove('hidden');
@@ -5309,7 +5309,7 @@ window.openOcsSyncModal = function(mode = null) {
     }
 };
 
-window.closeOcsSyncModal = function() {
+window.closeOcsSyncModal = function () {
     const modal = document.getElementById('modalOcsSync');
     if (modal) {
         modal.classList.add('hidden');
@@ -5317,7 +5317,7 @@ window.closeOcsSyncModal = function() {
     }
 };
 
-window.toggleSyncDateInput = function() {
+window.toggleSyncDateInput = function () {
     const radios = document.getElementsByName('syncPeriodType');
     let selected = 'yesterday';
     for (const r of radios) {
@@ -5366,7 +5366,7 @@ window.toggleSyncDateInput = function() {
     }
 };
 
-window.executeOcsOrderSync = async function() {
+window.executeOcsOrderSync = async function () {
     const btnStart = document.getElementById('btnStartOcsSync');
     const btnCancel = document.getElementById('btnCancelOcsSync');
     const progressContainer = document.getElementById('syncProgressContainer');
@@ -5422,7 +5422,7 @@ window.executeOcsOrderSync = async function() {
             const endD = new Date(now);
             endD.setDate(now.getDate() - (i - stepDays));
             if (endD > now) endD.setTime(now.getTime());
-            
+
             const sStr = formatDateYMD(startD);
             const eStr = formatDateYMD(endD);
             chunks.push({
@@ -5456,7 +5456,7 @@ window.executeOcsOrderSync = async function() {
                 const chunkEnd = new Date(cur);
                 chunkEnd.setDate(chunkEnd.getDate() + 5);
                 if (chunkEnd > d2) chunkEnd.setTime(d2.getTime());
-                
+
                 const sStr = formatDateYMD(chunkStart);
                 const eStr = formatDateYMD(chunkEnd);
                 chunks.push({
@@ -5526,7 +5526,7 @@ window.executeOcsOrderSync = async function() {
             if (typeof showGlobalLoading === 'function') {
                 showGlobalLoading(
                     totalSteps > 1 ? `Sinkronisasi Orders OCS (${progressPercent}%)...` : 'Sinkronisasi Orders OCS...',
-                    totalSteps > 1 
+                    totalSteps > 1
                         ? `Sedang memproses bagian ${currentStep} dari ${totalSteps} (${chunk.label}). Total tersimpan: ${accumulatedOrders.toLocaleString('id-ID')} orders.`
                         : `Sedang menarik dan menyinkronkan data orders dari OCS IEG System. Mohon tunggu sebentar...`
                 );
@@ -5619,7 +5619,7 @@ let currentOrdersPage = 1;
 let orderSearchDebounceTimer = null;
 
 // 1. Memuat Statistik KPI Orders
-window.loadOrdersStats = async function() {
+window.loadOrdersStats = async function () {
     try {
         const res = await fetch('api/orders.php?action=stats');
         const data = await res.json();
@@ -5641,7 +5641,7 @@ window.loadOrdersStats = async function() {
 };
 
 // 2. Debounce Pencarian Orders
-window.debounceOrderSearch = function() {
+window.debounceOrderSearch = function () {
     const input = document.getElementById('orderSearchInput');
     const clearBtn = document.getElementById('btnClearOrderSearch');
     if (clearBtn) {
@@ -5657,7 +5657,7 @@ window.debounceOrderSearch = function() {
     }, 350);
 };
 
-window.clearOrderSearch = function() {
+window.clearOrderSearch = function () {
     const input = document.getElementById('orderSearchInput');
     const clearBtn = document.getElementById('btnClearOrderSearch');
     if (input) input.value = '';
@@ -5666,7 +5666,7 @@ window.clearOrderSearch = function() {
 };
 
 // 3. Handler Perubahan Filter Tanggal
-window.onOrderDateFilterChanged = function() {
+window.onOrderDateFilterChanged = function () {
     const filter = document.getElementById('orderDateFilter');
     const customBox = document.getElementById('orderCustomDateBox');
     if (!filter) return;
@@ -5702,7 +5702,7 @@ function populateOrderFilterDropdown(selectId, options, defaultLabel, currentVal
 }
 
 // 3b. Reset Semua Filter Orders ke Default
-window.resetOrderFilters = function() {
+window.resetOrderFilters = function () {
     const searchInput = document.getElementById('orderSearchInput');
     const clearBtn = document.getElementById('btnClearOrderSearch');
     const platformSelect = document.getElementById('orderPlatformFilter');
@@ -5736,7 +5736,7 @@ window.resetOrderFilters = function() {
 };
 
 // 4. Memuat Data Tabel Orders
-window.loadOrdersTable = async function(page = 1) {
+window.loadOrdersTable = async function (page = 1) {
     currentOrdersPage = page;
     const tbody = document.getElementById('ordersTableBody');
     if (!tbody) return;
@@ -5758,27 +5758,27 @@ window.loadOrdersTable = async function(page = 1) {
     `;
 
     try {
-        const searchInput    = document.getElementById('orderSearchInput');
-        const platformSelect  = document.getElementById('orderPlatformFilter');
-        const shopSelect      = document.getElementById('orderShopFilter');
-        const shippingSelect  = document.getElementById('orderShippingFilter');
-        const statusSelect    = document.getElementById('orderStatusFilter');
-        const resiSelect      = document.getElementById('orderResiFilter');
-        const claimSelect     = document.getElementById('orderClaimFilter');
-        const dateSelect      = document.getElementById('orderDateFilter');
-        const sortSelect      = document.getElementById('orderSortSelect');
-        const limitSelect     = document.getElementById('orderLimitSelect');
+        const searchInput = document.getElementById('orderSearchInput');
+        const platformSelect = document.getElementById('orderPlatformFilter');
+        const shopSelect = document.getElementById('orderShopFilter');
+        const shippingSelect = document.getElementById('orderShippingFilter');
+        const statusSelect = document.getElementById('orderStatusFilter');
+        const resiSelect = document.getElementById('orderResiFilter');
+        const claimSelect = document.getElementById('orderClaimFilter');
+        const dateSelect = document.getElementById('orderDateFilter');
+        const sortSelect = document.getElementById('orderSortSelect');
+        const limitSelect = document.getElementById('orderLimitSelect');
 
-        const search     = searchInput ? searchInput.value.trim() : '';
-        const platform   = platformSelect ? platformSelect.value : 'ALL';
-        const shop       = shopSelect ? shopSelect.value : 'ALL';
-        const shipping   = shippingSelect ? shippingSelect.value : 'ALL';
-        const status     = statusSelect ? statusSelect.value : 'ALL';
+        const search = searchInput ? searchInput.value.trim() : '';
+        const platform = platformSelect ? platformSelect.value : 'ALL';
+        const shop = shopSelect ? shopSelect.value : 'ALL';
+        const shipping = shippingSelect ? shippingSelect.value : 'ALL';
+        const status = statusSelect ? statusSelect.value : 'ALL';
         const resiStatus = resiSelect ? resiSelect.value : 'ALL';
-        const claimStatus= claimSelect ? claimSelect.value : 'ALL';
-        const dateType   = dateSelect ? dateSelect.value : '';
-        const sort       = sortSelect ? sortSelect.value : 'date_desc';
-        const limit      = limitSelect ? parseInt(limitSelect.value) || 25 : 25;
+        const claimStatus = claimSelect ? claimSelect.value : 'ALL';
+        const dateType = dateSelect ? dateSelect.value : '';
+        const sort = sortSelect ? sortSelect.value : 'date_desc';
+        const limit = limitSelect ? parseInt(limitSelect.value) || 25 : 25;
 
         let url = `api/orders.php?action=list&page=${page}&limit=${limit}`;
         if (search) url += `&search=${encodeURIComponent(search)}`;
@@ -5818,7 +5818,7 @@ window.loadOrdersTable = async function(page = 1) {
 };
 
 // 5. Render Tabel Data Orders
-window.renderOrdersTable = function(orders, pagination) {
+window.renderOrdersTable = function (orders, pagination) {
     const tbody = document.getElementById('ordersTableBody');
     const infoEl = document.getElementById('orderPaginationInfo');
     const controlsEl = document.getElementById('orderPaginationControls');
@@ -5984,7 +5984,7 @@ window.renderOrdersTable = function(orders, pagination) {
 };
 
 // 6. Modal Detail Order & SKU Breakdown
-window.openOrderDetailModal = async function(orderId) {
+window.openOrderDetailModal = async function (orderId) {
     const modal = document.getElementById('modalOrderDetail');
     if (!modal) return;
 
@@ -6054,7 +6054,7 @@ window.openOrderDetailModal = async function(orderId) {
         const btnClaim = document.getElementById('btnDtlCheckClaimDossier');
         if (btnClaim) {
             const resiToFind = o.tracking_number || o.order_id;
-            btnClaim.onclick = function() {
+            btnClaim.onclick = function () {
                 viewOrderInClaims(resiToFind);
             };
         }
@@ -6063,7 +6063,7 @@ window.openOrderDetailModal = async function(orderId) {
     }
 };
 
-window.closeOrderDetailModal = function() {
+window.closeOrderDetailModal = function () {
     const modal = document.getElementById('modalOrderDetail');
     if (modal) {
         modal.classList.add('hidden');
@@ -6072,14 +6072,14 @@ window.closeOrderDetailModal = function() {
 };
 
 // 7. Buka Berkas Klaim di Halaman Baru
-window.viewOrderInClaims = function(identifier) {
+window.viewOrderInClaims = function (identifier) {
     if (!identifier || identifier === '-') return;
     closeOrderDetailModal();
     window.open(`claim_dossier.php?q=${encodeURIComponent(identifier)}`, '_blank');
 };
 
 // 8. Salin Teks ke Clipboard
-window.copyOrderText = function(text, label = 'Teks') {
+window.copyOrderText = function (text, label = 'Teks') {
     if (!text || text === '-') return;
     navigator.clipboard.writeText(text).then(() => {
         showToast('info', `${label} "${text}" berhasil disalin ke clipboard!`, 'Disalin');
@@ -6096,18 +6096,18 @@ window.copyOrderText = function(text, label = 'Teks') {
 };
 
 // 9. Ekspor Data Orders ke Excel Native (.xlsx via SheetJS)
-window.exportOrdersExcel = async function() {
+window.exportOrdersExcel = async function () {
     showGlobalLoading("Mengekspor Excel...", "Mengambil seluruh data pesanan tersinkron dari server...");
     try {
-        const platform    = document.getElementById('orderPlatformFilter')?.value || 'ALL';
-        const shop        = document.getElementById('orderShopFilter')?.value || 'ALL';
-        const shipping    = document.getElementById('orderShippingFilter')?.value || 'ALL';
-        const status      = document.getElementById('orderStatusFilter')?.value || 'ALL';
-        const resiStatus  = document.getElementById('orderResiFilter')?.value || 'ALL';
+        const platform = document.getElementById('orderPlatformFilter')?.value || 'ALL';
+        const shop = document.getElementById('orderShopFilter')?.value || 'ALL';
+        const shipping = document.getElementById('orderShippingFilter')?.value || 'ALL';
+        const status = document.getElementById('orderStatusFilter')?.value || 'ALL';
+        const resiStatus = document.getElementById('orderResiFilter')?.value || 'ALL';
         const claimStatus = document.getElementById('orderClaimFilter')?.value || 'ALL';
-        const dateType    = document.getElementById('orderDateFilter')?.value || '';
-        const sort        = document.getElementById('orderSortSelect')?.value || 'date_desc';
-        const search      = document.getElementById('orderSearchInput')?.value.trim() || '';
+        const dateType = document.getElementById('orderDateFilter')?.value || '';
+        const sort = document.getElementById('orderSortSelect')?.value || 'date_desc';
+        const search = document.getElementById('orderSearchInput')?.value.trim() || '';
 
         let url = `api/orders.php?action=list&page=1&limit=10000`;
         if (search) url += `&search=${encodeURIComponent(search)}`;
