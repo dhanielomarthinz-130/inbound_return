@@ -73,12 +73,19 @@ window.isInvoiceFilled = function() {
 window.isProductDetailAndBatchExpFilled = function() {
     if (!window.isInvoiceAndExpeditionFilled()) return false;
     const hasProduct = Boolean(typeof currentDetectedProduct !== 'undefined' && currentDetectedProduct && (currentDetectedProduct.barcode || currentDetectedProduct.sku || currentDetectedProduct.name));
+    if (!hasProduct) return false;
+
+    // Jika produk tidak dikenal / tanda '-', izinkan foto langsung tanpa harus memaksa nomor batch / exp date valid
+    if (currentDetectedProduct && (currentDetectedProduct.barcode === '-' || currentDetectedProduct.is_unknown)) {
+        return true;
+    }
+
     const batchInput = document.getElementById('inputBatch');
     const hasBatch = Boolean(batchInput && batchInput.value && batchInput.value.trim().length > 0);
     const expInput = document.getElementById('inputExpDate');
     const expVal = expInput && expInput.value ? expInput.value.trim() : '';
     const hasExp = Boolean(expVal.length > 0 && expVal !== '-' && expVal !== 'dd-mm-yyyy');
-    return hasProduct && hasBatch && hasExp;
+    return hasBatch && hasExp;
 };
 
 window.isConditionDamaged = function() {
@@ -471,6 +478,40 @@ async function lookupWrongProduct(barcode) {
 
     if (loading) loading.classList.remove('hidden');
 
+    // Cek jika produk fisik salah kirim tanpa barcode / tanda '-'
+    if (cleanBarcode === '-' || cleanBarcode.toUpperCase() === 'NON_BARCODE' || cleanBarcode.toUpperCase() === 'TANPA_BARCODE') {
+        currentWrongProduct = {
+            barcode: '-',
+            name: 'Produk Fisik Tanpa Barcode (Salah Return)',
+            sku: '-',
+            seller_sku: '-',
+            sap_code: '-',
+            shop: '-',
+            bin_code: '',
+            is_master: false
+        };
+
+        if (detailBox) detailBox.classList.remove('hidden');
+        if (nameEl) {
+            nameEl.innerText = `Barang Fisik: [Tanpa Barcode / Salah Return]`;
+            nameEl.className = "text-xs sm:text-sm font-bold text-amber-900 leading-snug";
+        }
+        if (badgeEl) {
+            badgeEl.className = "text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300";
+            badgeEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-amber-600 mr-0.5"></i> Tanpa Barcode';
+        }
+        if (metaEl) {
+            metaEl.innerHTML = `
+                <span class="text-[10px] text-amber-700 italic">
+                    <i class="fa-solid fa-circle-info mr-0.5"></i> Fisik barang retur tidak ada barcode / salah return.
+                </span>
+            `;
+        }
+        playBeep('success');
+        if (loading) loading.classList.add('hidden');
+        return;
+    }
+
     try {
         const res = await fetch(`api/product/${encodeURIComponent(cleanBarcode)}`);
         if (!res.ok) {
@@ -571,6 +612,10 @@ setTimeout(() => {
                 clearWrongProductDisplayOnly();
                 return;
             }
+            if (code === '-') {
+                lookupWrongProduct(code);
+                return;
+            }
             if (code.length >= 6) {
                 wrongBarcodeDebounceTimer = setTimeout(() => {
                     if (code === wrongInpEl.value.trim()) {
@@ -592,12 +637,49 @@ window.quickFillBarcode = function(barcode) {
     lookupProduct(barcode);
 };
 
-// Deteksi Enter / Scan pada Kolom Barcode
+// Deteksi Enter / Scan / Input pada Kolom Barcode
+let barcodeDebounceTimer = null;
 inputBarcode.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         e.preventDefault();
         const code = inputBarcode.value.trim();
         if (code) lookupProduct(code);
+    }
+});
+
+inputBarcode.addEventListener('input', () => {
+    clearTimeout(barcodeDebounceTimer);
+    const code = inputBarcode.value.trim();
+    if (!code) {
+        currentDetectedProduct = null;
+        const nameEl = document.getElementById('detectedProductName');
+        if (nameEl) {
+            nameEl.innerText = "Silakan scan / ketik barcode...";
+            nameEl.className = "font-bold text-indigo-700 text-xs";
+        }
+        const skuEl = document.getElementById('detectedProductSku');
+        if (skuEl) skuEl.innerText = "";
+        if (typeof updatePhotoButtonsState === 'function') updatePhotoButtonsState();
+        return;
+    }
+    // Langsung deteksi tanda '-' tanpa harus tunggu Enter!
+    if (code === '-') {
+        lookupProduct(code);
+        return;
+    }
+    if (code.length >= 6) {
+        barcodeDebounceTimer = setTimeout(() => {
+            if (code === inputBarcode.value.trim() && (!currentDetectedProduct || currentDetectedProduct.barcode !== code)) {
+                lookupProduct(code);
+            }
+        }, 350);
+    }
+});
+
+inputBarcode.addEventListener('change', () => {
+    const code = inputBarcode.value.trim();
+    if (code && (!currentDetectedProduct || currentDetectedProduct.barcode !== code)) {
+        lookupProduct(code);
     }
 });
 
@@ -1412,19 +1494,68 @@ window.triggerVirtualEnter = function() {
 
 // Fungsi Lookup Produk dari Barcode ke Database MySQL
 async function lookupProduct(barcode) {
+    if (!barcode) return;
+    const cleanBarcode = barcode.trim();
+    if (!cleanBarcode) return;
+
     const loading = document.getElementById('barcodeLoadingIcon');
     if (loading) loading.classList.remove('hidden');
 
+    // Langsung handle tanda '-' / placeholder non-barcode untuk produk salah return tanpa barcode
+    if (cleanBarcode === '-' || cleanBarcode.toUpperCase() === 'NON_BARCODE' || cleanBarcode.toUpperCase() === 'TANPA_BARCODE') {
+        const unknownProd = {
+            id: 0,
+            barcode: '-',
+            name: 'Produk Tidak Dikenal (Salah Return / Tanpa Barcode)',
+            sku: '-',
+            seller_sku: '-',
+            sap_code: '-',
+            shop: '-',
+            bin_code: '-',
+            category: 'Salah Return',
+            is_unknown: true
+        };
+        currentDetectedProduct = unknownProd;
+        if (typeof updatePhotoButtonsState === 'function') updatePhotoButtonsState();
+        playBeep('success');
+
+        const nameEl = document.getElementById('detectedProductName');
+        if (nameEl) {
+            nameEl.innerText = unknownProd.name;
+            nameEl.className = "font-bold text-amber-700 ml-1 text-sm";
+        }
+        const skuEl = document.getElementById('detectedProductSku');
+        if (skuEl) {
+            skuEl.innerHTML = `
+                <span class="inline-flex flex-wrap items-center gap-1.5 ml-2 mt-1">
+                    <span class="bg-amber-100 text-amber-900 text-[11px] font-bold px-2 py-0.5 rounded border border-amber-300">
+                        <i class="fa-solid fa-triangle-exclamation text-amber-600 mr-1"></i> Salah Return / Tanpa Barcode
+                    </span>
+                    <span class="bg-slate-100 text-slate-700 text-[11px] font-mono px-2 py-0.5 rounded border border-slate-200">
+                        Barcode: -
+                    </span>
+                </span>
+            `;
+        }
+
+        setTimeout(() => {
+            if (inputBatch) inputBatch.focus();
+        }, 50);
+
+        if (loading) loading.classList.add('hidden');
+        return;
+    }
+
     try {
-        const res = await fetch(`api/product/${encodeURIComponent(barcode)}`);
+        const res = await fetch(`api/product/${encodeURIComponent(cleanBarcode)}`);
         if (!res.ok) {
             playBeep('error');
             currentDetectedProduct = null;
             if (typeof updatePhotoButtonsState === 'function') updatePhotoButtonsState();
-            document.getElementById('detectedProductName').innerText = `Produk [${barcode}] tidak ditemukan!`;
+            document.getElementById('detectedProductName').innerText = `Produk [${cleanBarcode}] tidak ditemukan!`;
             document.getElementById('detectedProductName').className = "font-bold text-rose-600 ml-1 text-sm";
             document.getElementById('detectedProductSku').innerText = "";
-            showToast('warning', `Barcode [${barcode}] belum terdaftar di master data produk!`, "Produk Tidak Ditemukan");
+            showToast('warning', `Barcode [${cleanBarcode}] belum terdaftar di master data produk!`, "Produk Tidak Ditemukan");
             inputBarcode.focus();
             inputBarcode.select();
             return;
@@ -1438,7 +1569,7 @@ async function lookupProduct(barcode) {
         // Tampilkan info produk terdeteksi (Seller SKU, SAP Code, Rak/Bin)
         const nameEl = document.getElementById('detectedProductName');
         nameEl.innerText = product.name;
-        nameEl.className = "font-bold text-emerald-700 ml-1 text-sm";
+        nameEl.className = product.is_unknown ? "font-bold text-amber-700 ml-1 text-sm" : "font-bold text-emerald-700 ml-1 text-sm";
         
         const sellerSku = product.seller_sku || product.sku || '-';
         const sapCode = product.sap_code || '-';
@@ -1447,20 +1578,21 @@ async function lookupProduct(barcode) {
 
         document.getElementById('detectedProductSku').innerHTML = `
             <span class="inline-flex flex-wrap items-center gap-1.5 ml-2 mt-1">
+                ${product.is_unknown ? `<span class="bg-amber-100 text-amber-900 text-[11px] font-bold px-2 py-0.5 rounded border border-amber-300"><i class="fa-solid fa-triangle-exclamation text-amber-600 mr-1"></i> Salah Return / Tanpa Barcode</span>` : ''}
                 <span class="bg-indigo-100 text-indigo-800 text-[11px] font-mono font-bold px-2 py-0.5 rounded border border-indigo-200">
                     <i class="fa-solid fa-tag text-[10px]"></i> Seller SKU: ${sellerSku}
                 </span>
                 <span class="bg-emerald-100 text-emerald-800 text-[11px] font-mono font-bold px-2 py-0.5 rounded border border-emerald-200">
                     <i class="fa-solid fa-barcode text-[10px]"></i> SAP: ${sapCode}
                 </span>
-                ${binCode ? `<span class="bg-amber-100 text-amber-800 text-[11px] font-mono font-bold px-2 py-0.5 rounded border border-amber-200"><i class="fa-solid fa-cubes-stacked text-[10px]"></i> Rak: ${binCode}</span>` : ''}
-                ${shop ? `<span class="bg-purple-100 text-purple-800 text-[11px] font-bold px-2 py-0.5 rounded border border-purple-200">${shop}</span>` : ''}
+                ${binCode && binCode !== '-' ? `<span class="bg-amber-100 text-amber-800 text-[11px] font-mono font-bold px-2 py-0.5 rounded border border-amber-200"><i class="fa-solid fa-cubes-stacked text-[10px]"></i> Rak: ${binCode}</span>` : ''}
+                ${shop && shop !== '-' ? `<span class="bg-purple-100 text-purple-800 text-[11px] font-bold px-2 py-0.5 rounded border border-purple-200">${shop}</span>` : ''}
             </span>
         `;
 
         // Pindahkan kursor otomatis ke NO. BATCH!
         setTimeout(() => {
-            inputBatch.focus();
+            if (inputBatch) inputBatch.focus();
         }, 50);
 
     } catch (err) {
@@ -1548,29 +1680,34 @@ function commitAddItem() {
     if (isWrong) {
         const wrongInput = document.getElementById('inputWrongBarcode');
         const enteredWrongBarcode = wrongInput ? wrongInput.value.trim() : '';
+        const isCurrentUnknown = Boolean(currentDetectedProduct && (currentDetectedProduct.barcode === '-' || currentDetectedProduct.is_unknown));
 
         if (!enteredWrongBarcode && (!currentWrongProduct || !currentWrongProduct.barcode)) {
-            playBeep('error');
-            showToast('warning', "Untuk kondisi Salah Kirim, WAJIB scan barcode fisik produk yang salah!", "Barcode Salah Kirim Diperlukan");
-            const containerWrong = document.getElementById('containerWrongProductSection');
-            if (containerWrong) containerWrong.classList.remove('hidden');
-            if (wrongInput) {
-                wrongInput.focus();
-                wrongInput.select();
+            if (!isCurrentUnknown) {
+                playBeep('error');
+                showToast('warning', "Untuk kondisi Salah Kirim, WAJIB scan barcode fisik produk yang salah!", "Barcode Salah Kirim Diperlukan");
+                const containerWrong = document.getElementById('containerWrongProductSection');
+                if (containerWrong) containerWrong.classList.remove('hidden');
+                if (wrongInput) {
+                    wrongInput.focus();
+                    wrongInput.select();
+                }
+                return;
+            } else {
+                wrongBarcodeVal = '-';
+                wrongProductNameVal = 'Produk Fisik Tanpa Barcode (Salah Return)';
+                wrongSkuVal = '-';
             }
-            return;
-        }
-
-        if (enteredWrongBarcode && (!currentWrongProduct || currentWrongProduct.barcode !== enteredWrongBarcode)) {
+        } else if (enteredWrongBarcode && (!currentWrongProduct || currentWrongProduct.barcode !== enteredWrongBarcode)) {
             lookupWrongProduct(enteredWrongBarcode).then(() => {
                 commitAddItem();
             });
             return;
+        } else {
+            wrongBarcodeVal = currentWrongProduct ? currentWrongProduct.barcode : enteredWrongBarcode;
+            wrongProductNameVal = currentWrongProduct ? currentWrongProduct.name : '';
+            wrongSkuVal = currentWrongProduct ? (currentWrongProduct.seller_sku || currentWrongProduct.sku || '') : '';
         }
-
-        wrongBarcodeVal = currentWrongProduct ? currentWrongProduct.barcode : enteredWrongBarcode;
-        wrongProductNameVal = currentWrongProduct ? currentWrongProduct.name : '';
-        wrongSkuVal = currentWrongProduct ? (currentWrongProduct.seller_sku || currentWrongProduct.sku || '') : '';
     }
 
     const isItemDamaged = (type !== 'GOOD' && type !== 'BAGUS' && type !== 'LAYAK');

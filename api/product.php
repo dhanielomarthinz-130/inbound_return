@@ -8,8 +8,26 @@ if (empty($barcode) && !empty($_SERVER['PATH_INFO'])) {
     $barcode = trim($_SERVER['PATH_INFO'], '/');
 }
 
-if (empty($barcode)) {
+$barcode = trim($barcode);
+
+if ($barcode === '') {
     jsonResponse(['error' => 'Barcode wajib diisi'], 400);
+}
+
+// Support tanda '-' atau placeholder non-barcode untuk produk tidak dikenal (salah return / fisik tanpa barcode)
+if ($barcode === '-' || strtoupper($barcode) === 'NON_BARCODE' || strtoupper($barcode) === 'TANPA_BARCODE' || strtoupper($barcode) === 'TIDAK_ADA') {
+    jsonResponse([
+        'id' => 0,
+        'barcode' => '-',
+        'name' => 'Produk Tidak Dikenal (Salah Return / Tanpa Barcode)',
+        'sku' => '-',
+        'seller_sku' => '-',
+        'sap_code' => '-',
+        'shop' => '-',
+        'bin_code' => '-',
+        'category' => 'Salah Return',
+        'is_unknown' => true
+    ]);
 }
 
 try {
