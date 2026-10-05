@@ -23,31 +23,31 @@ if (is_array($rawInvoices)) {
 
 // Terbilang dalam Bahasa Indonesia
 function terbilangRupiah($angka) {
-    $angka = (float)abs($angka);
+    $angka = (float)floor(abs((float)$angka));
     $bilangan = ['', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas'];
     $temp = '';
     if ($angka < 12) {
-        $temp = ' ' . $bilangan[(int)$angka];
+        $temp = $bilangan[(int)$angka];
     } else if ($angka < 20) {
         $temp = terbilangRupiah($angka - 10) . ' Belas';
     } else if ($angka < 100) {
-        $temp = terbilangRupiah($angka / 10) . ' Puluh' . terbilangRupiah($angka % 10);
+        $temp = terbilangRupiah(floor($angka / 10)) . ' Puluh ' . terbilangRupiah(fmod($angka, 10));
     } else if ($angka < 200) {
-        $temp = ' Seratus' . terbilangRupiah($angka - 100);
+        $temp = 'Seratus ' . terbilangRupiah($angka - 100);
     } else if ($angka < 1000) {
-        $temp = terbilangRupiah($angka / 100) . ' Ratus' . terbilangRupiah($angka % 100);
+        $temp = terbilangRupiah(floor($angka / 100)) . ' Ratus ' . terbilangRupiah(fmod($angka, 100));
     } else if ($angka < 2000) {
-        $temp = ' Seribu' . terbilangRupiah($angka - 1000);
+        $temp = 'Seribu ' . terbilangRupiah($angka - 1000);
     } else if ($angka < 1000000) {
-        $temp = terbilangRupiah($angka / 1000) . ' Ribu' . terbilangRupiah($angka % 1000);
+        $temp = terbilangRupiah(floor($angka / 1000)) . ' Ribu ' . terbilangRupiah(fmod($angka, 1000));
     } else if ($angka < 1000000000) {
-        $temp = terbilangRupiah($angka / 1000000) . ' Juta' . terbilangRupiah($angka % 1000000);
+        $temp = terbilangRupiah(floor($angka / 1000000)) . ' Juta ' . terbilangRupiah(fmod($angka, 1000000));
     } else if ($angka < 1000000000000) {
-        $temp = terbilangRupiah($angka / 1000000000) . ' Miliar' . terbilangRupiah(fmod($angka, 1000000000));
+        $temp = terbilangRupiah(floor($angka / 1000000000)) . ' Miliar ' . terbilangRupiah(fmod($angka, 1000000000));
     } else if ($angka < 1000000000000000) {
-        $temp = terbilangRupiah($angka / 1000000000000) . ' Triliun' . terbilangRupiah(fmod($angka, 1000000000000));
+        $temp = terbilangRupiah(floor($angka / 1000000000000)) . ' Triliun ' . terbilangRupiah(fmod($angka, 1000000000000));
     }
-    return trim($temp);
+    return preg_replace('/\s+/', ' ', trim($temp));
 }
 
 $itemsData = [];
@@ -379,13 +379,13 @@ $terbilangText = ($grandTotal > 0) ? terbilangRupiah($grandTotal) . ' Rupiah' : 
                 
                 <!-- KOP INVOICE: PERUSAHAAN & IDENTITAS SURAT TAGIHAN -->
                 <div class="flex flex-col sm:flex-row items-start justify-between gap-6 pb-5 border-b-2 border-slate-800">
-                    <div class="space-y-1">
-                        <div class="flex items-center gap-2">
-                            <span class="w-7 h-7 rounded bg-emerald-700 text-white font-black flex items-center justify-center text-xs">IEG</span>
-                            <h1 class="font-black text-lg sm:text-xl text-slate-900 tracking-tight">PT. INOVASI EKA GEMILANG</h1>
+                    <div class="flex items-center gap-3.5">
+                        <img src="assets/image/logo-IEG.png" alt="Logo IEG" class="h-14 sm:h-16 w-auto object-contain shrink-0">
+                        <div class="space-y-0.5">
+                            <h1 class="font-black text-lg sm:text-xl text-slate-900 tracking-tight leading-tight">PT. INOVASI EKA GEMILANG</h1>
+                            <p class="text-xs font-semibold text-slate-600">Reverse Logistics, Return Inbound &amp; Claims Settlement</p>
+                            <p class="text-[11px] text-slate-500">Pergudangan Retur IEG • Email: dispute-claims@ieg.co.id</p>
                         </div>
-                        <p class="text-xs font-semibold text-slate-600">Reverse Logistics, Return Inbound & Claims Settlement</p>
-                        <p class="text-[11px] text-slate-500">Pergudangan Retur IEG • Email: dispute-claims@ieg.co.id</p>
                     </div>
 
                     <div class="text-left sm:text-right shrink-0">
@@ -435,12 +435,10 @@ $terbilangText = ($grandTotal > 0) ? terbilangRupiah($grandTotal) . ' Rupiah' : 
                         <thead>
                             <tr>
                                 <th class="text-center w-8">#</th>
-                                <th class="w-36">No. Resi (AWB)</th>
-                                <th class="w-24">Ekspedisi</th>
-                                <th class="w-32">SKU Produk</th>
-                                <th>Nama Produk Retur</th>
+                                <th class="w-44">No. Resi &amp; Ekspedisi</th>
+                                <th>SKU &amp; Nama Produk</th>
                                 <th class="text-center w-16">Qty</th>
-                                <th class="w-36">Kondisi / Kerusakan</th>
+                                <th class="w-40">Kondisi / Kerusakan</th>
                                 <th class="text-right w-28">Harga Paket</th>
                             </tr>
                         </thead>
@@ -450,14 +448,22 @@ $terbilangText = ($grandTotal > 0) ? terbilangRupiah($grandTotal) . ' Rupiah' : 
                                     <td class="text-center font-bold text-slate-400"><?= $row['no'] ?></td>
                                     <td>
                                         <div class="font-mono font-bold text-slate-900 text-[11px] tracking-tight"><?= htmlspecialchars($row['tracking_number']) ?></div>
+                                        <div class="text-[10px] text-amber-800 font-bold bg-amber-50 border border-amber-200/80 px-1.5 py-0.5 rounded inline-block mt-0.5">
+                                            <i class="fa-solid fa-truck-fast text-[9px] text-amber-500"></i> <?= htmlspecialchars($row['expedition']) ?>
+                                        </div>
                                         <?php if ($row['invoice_number'] !== $row['tracking_number']): ?>
-                                            <div class="text-[10px] text-slate-400 font-mono">Ref: <?= htmlspecialchars($row['invoice_number']) ?></div>
+                                            <div class="text-[9px] text-slate-400 font-mono mt-0.5">Ref: <?= htmlspecialchars($row['invoice_number']) ?></div>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="font-semibold text-slate-800 text-[11px]"><?= htmlspecialchars($row['expedition']) ?></td>
-                                    <td class="font-mono font-bold text-slate-900 text-[11px]"><?= htmlspecialchars($row['sku']) ?></td>
                                     <td>
-                                        <div class="font-semibold text-slate-900 leading-snug"><?= htmlspecialchars($row['products']) ?></div>
+                                        <?php if (!empty($row['sku']) && $row['sku'] !== '-'): ?>
+                                            <div class="mb-1">
+                                                <span class="inline-flex items-center gap-1 font-mono font-bold text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-900">
+                                                    <i class="fa-solid fa-tag text-[8px] text-indigo-400"></i> SKU: <?= htmlspecialchars($row['sku']) ?>
+                                                </span>
+                                            </div>
+                                        <?php endif; ?>
+                                        <div class="font-semibold text-slate-900 leading-snug text-xs"><?= htmlspecialchars($row['products']) ?></div>
                                         <?php if (!empty($row['shop_name']) && $row['shop_name'] !== '-'): ?>
                                             <div class="text-[10px] text-slate-400 mt-0.5">Toko: <?= htmlspecialchars($row['shop_name']) ?></div>
                                         <?php endif; ?>
@@ -477,7 +483,7 @@ $terbilangText = ($grandTotal > 0) ? terbilangRupiah($grandTotal) . ' Rupiah' : 
                         </tbody>
                         <tfoot>
                             <tr class="bg-slate-100 font-bold">
-                                <td colspan="5" class="text-right uppercase text-slate-700 pr-3">
+                                <td colspan="3" class="text-right uppercase text-slate-700 pr-3">
                                     Total (<?= count($itemsData) ?> Paket):
                                 </td>
                                 <td class="text-center font-mono text-slate-900 font-black text-xs">
@@ -558,7 +564,7 @@ $terbilangText = ($grandTotal > 0) ? terbilangRupiah($grandTotal) . ' Rupiah' : 
 
     </div>
 
-    <!-- SCRIPT COPY FORMAT WA -->
+    <!-- SCRIPT COPY FORMAT WA & OTOMATIS BUKA PRINT DIALOG BROWSER -->
     <script>
         const invoiceDataItems = <?= json_encode($itemsData) ?>;
         const invoiceDocNumber = <?= json_encode($docNumber) ?>;
@@ -599,6 +605,13 @@ $terbilangText = ($grandTotal > 0) ? terbilangRupiah($grandTotal) . ' Rupiah' : 
                 prompt('Salin teks tagihan berikut:', text);
             });
         }
+
+        // Otomatis langsung membuka dialog cetak (print dialog) browser saat halaman selesai dimuat
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                window.print();
+            }, 300);
+        });
     </script>
 </body>
 </html>
