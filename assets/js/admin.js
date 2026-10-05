@@ -1390,6 +1390,7 @@ window.viewDetails = async function(id, focusCondition) {
                 <td class="p-2.5 font-mono font-bold text-slate-700">${escapeHtml(it.barcode || '-')}</td>
                 <td class="p-2.5">
                     <div class="font-medium text-slate-800">${escapeHtml(it.product_name || '-')}</div>
+                    ${it.wrong_barcode ? `<div class="text-[10px] text-purple-700 font-semibold mt-0.5"><i class="fa-solid fa-arrows-split-up-and-left mr-1 text-[9px]"></i>Fisik Salah Kirim: <b>${escapeHtml(it.wrong_product_name || '-')}</b> <span class="font-mono text-[9px]">(${escapeHtml(it.wrong_barcode)})</span></div>` : ''}
                     ${it.damage_reason ? `<div class="text-[10px] text-rose-600 font-medium italic mt-0.5"><i class="fa-solid fa-circle-exclamation mr-1 text-[9px]"></i>${escapeHtml(it.damage_reason)}</div>` : ''}
                     ${photoBtn}
                 </td>

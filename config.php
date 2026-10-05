@@ -122,6 +122,8 @@ try {
                 `id` INT AUTO_INCREMENT PRIMARY KEY,
                 `session_id` INT NOT NULL,
                 `barcode` VARCHAR(100) NOT NULL,
+                `wrong_barcode` VARCHAR(100) NULL,
+                `wrong_product_name` VARCHAR(255) NULL,
                 `product_name` VARCHAR(255) NOT NULL,
                 `sku` VARCHAR(100) NULL,
                 `seller_sku` VARCHAR(150) NULL,
@@ -136,6 +138,7 @@ try {
                 `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 INDEX idx_session (`session_id`),
                 INDEX idx_item_barcode (`barcode`),
+                INDEX idx_item_wrong_barcode (`wrong_barcode`),
                 INDEX idx_item_sku (`sku`),
                 INDEX idx_item_seller_sku (`seller_sku`),
                 INDEX idx_item_created (`created_at`),
@@ -271,6 +274,8 @@ try {
             if (!in_array('photo_path', $colsRecPkgs)) $pdo->exec("ALTER TABLE reception_packages ADD COLUMN photo_path VARCHAR(255) NULL AFTER package_barcode");
 
             $cols = $pdo->query("SHOW COLUMNS FROM return_items")->fetchAll(PDO::FETCH_COLUMN);
+            if (!in_array('wrong_barcode', $cols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN wrong_barcode VARCHAR(100) NULL AFTER barcode");
+            if (!in_array('wrong_product_name', $cols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN wrong_product_name VARCHAR(255) NULL AFTER wrong_barcode");
             if (!in_array('batch_no', $cols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN batch_no VARCHAR(100) NULL AFTER sku");
             if (!in_array('exp_date', $cols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN exp_date VARCHAR(50) NULL AFTER batch_no");
             if (!in_array('type', $cols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN type VARCHAR(50) NULL DEFAULT 'GOOD' AFTER exp_date");

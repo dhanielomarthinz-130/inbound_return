@@ -315,8 +315,8 @@ try {
     $sessionId = $pdo->lastInsertId();
 
     $stmtItem = $pdo->prepare("
-        INSERT INTO return_items (session_id, barcode, product_name, sku, seller_sku, sap_code, batch_no, exp_date, type, qty, `condition`, damage_reason, photo_path)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO return_items (session_id, barcode, wrong_barcode, wrong_product_name, product_name, sku, seller_sku, sap_code, batch_no, exp_date, type, qty, `condition`, damage_reason, photo_path)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     foreach ($items as $item) {
@@ -325,6 +325,18 @@ try {
         $type = strtoupper(trim($item['type'] ?? $item['condition'] ?? 'GOOD'));
         $cond = ($type === 'GOOD') ? 'GOOD' : 'RUSAK';
         $reason = ($cond === 'RUSAK') ? ($item['damage_reason'] ?? $type) : '';
+
+        $wrongBarcode = trim($item['wrong_barcode'] ?? '');
+        $wrongProductName = trim($item['wrong_product_name'] ?? '');
+
+        if (!empty($wrongBarcode)) {
+            $wrongInfo = "[SALAH KIRIM] Fisik: " . ($wrongProductName ?: $wrongBarcode) . " (Barcode: {$wrongBarcode})";
+            if (empty($reason)) {
+                $reason = $wrongInfo;
+            } elseif (strpos($reason, '[SALAH KIRIM]') === false) {
+                $reason = $wrongInfo . ' | ' . $reason;
+            }
+        }
 
         $expDate = trim($item['exp_date'] ?? '');
         if (!empty($expDate) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $expDate, $m)) {
@@ -352,6 +364,8 @@ try {
         $stmtItem->execute([
             $sessionId,
             $item['barcode'] ?? '',
+            $wrongBarcode ?: null,
+            $wrongProductName ?: null,
             $item['product_name'] ?? '',
             $item['sku'] ?? '',
             $item['seller_sku'] ?? $item['sku'] ?? '',

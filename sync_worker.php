@@ -218,15 +218,17 @@ function executeSyncRound($pdo) {
             // Insert Items
             $stmtInsItem = $pdo->prepare("
                 INSERT INTO return_items (
-                    session_id, barcode, product_name, sku, seller_sku, sap_code,
+                    session_id, barcode, wrong_barcode, wrong_product_name, product_name, sku, seller_sku, sap_code,
                     batch_no, exp_date, type, qty, `condition`, damage_reason, photo_path, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             foreach ($items as $it) {
                 $stmtInsItem->execute([
                     $newSessionId,
                     $it['barcode'] ?? '',
+                    $it['wrong_barcode'] ?? null,
+                    $it['wrong_product_name'] ?? null,
                     $it['product_name'] ?? '',
                     $it['sku'] ?? null,
                     $it['seller_sku'] ?? null,

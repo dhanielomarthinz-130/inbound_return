@@ -628,6 +628,68 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                         </div>
                     </div>
 
+                    <!-- CONTAINER SCAN BARCODE PRODUK SALAH KIRIM (MUNCUL OTOMATIS SAAT TIPE = SALAH KIRIM / WRONG) -->
+                    <div id="containerWrongProductSection" class="hidden mt-2 p-3 bg-gradient-to-r from-purple-50/95 via-fuchsia-50/70 to-purple-50/95 border-2 border-purple-400 rounded-2xl shadow-sm space-y-2.5 transition-all">
+                        <div class="flex items-center justify-between border-b border-purple-200/80 pb-1.5">
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-lg bg-purple-600 text-white flex items-center justify-center text-xs shadow-xs">
+                                    <i class="fa-solid fa-arrows-split-up-and-left"></i>
+                                </span>
+                                <div>
+                                    <span class="text-xs font-black text-purple-900 tracking-wide uppercase">Scan Barcode Fisik Salah Kirim</span>
+                                    <p class="text-[10px] text-purple-700 font-medium">Scan barcode produk fisik yang salah dikirimkan (yang diterima)</p>
+                                </div>
+                            </div>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-200/90 text-purple-900 border border-purple-300 flex items-center gap-1 shadow-2xs">
+                                <i class="fa-solid fa-triangle-exclamation text-amber-600"></i> Fisik Salah
+                            </span>
+                        </div>
+
+                        <!-- Input Barcode Fisik Salah Kirim -->
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-purple-600">
+                                <i class="fa-solid fa-barcode text-sm"></i>
+                            </span>
+                            <input type="text" id="inputWrongBarcode" autocomplete="off"
+                                placeholder="Scan / ketik barcode fisik barang yang salah di sini... (Enter)"
+                                class="w-full pl-9 pr-24 py-2 bg-white border-2 border-purple-300 focus:border-purple-600 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-900 placeholder:text-purple-400/80 focus:ring-2 focus:ring-purple-500/20 focus:outline-none transition shadow-inner">
+                            <div class="absolute inset-y-0 right-0 pr-2 flex items-center gap-1.5">
+                                <div id="wrongBarcodeLoadingIcon" class="hidden text-purple-600 animate-spin text-xs">
+                                    <i class="fa-solid fa-circle-notch"></i>
+                                </div>
+                                <button type="button" id="btnClearWrongBarcode" onclick="clearWrongProductInput(true)" class="text-slate-400 hover:text-rose-500 text-xs px-2 py-1 rounded-lg bg-slate-100 hover:bg-rose-50 transition cursor-pointer font-bold" title="Reset barcode salah">
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Card Detail Produk Salah (Muncul saat barcode terisi / ter-lookup) -->
+                        <div id="detailProductSalahBox" class="hidden bg-white/95 rounded-xl border border-purple-200 p-2.5 shadow-xs transition-all">
+                            <div class="flex items-center justify-between mb-1.5 pb-1 border-b border-purple-100">
+                                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                                    <i class="fa-solid fa-box-open text-purple-600"></i> Detail Produk Salah (Fisik Diterima)
+                                </span>
+                                <span id="badgeWrongProductStatus" class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                    <i class="fa-solid fa-circle-check text-emerald-600 mr-0.5"></i> Ditemukan di Master
+                                </span>
+                            </div>
+                            
+                            <div class="flex items-start gap-2.5">
+                                <div class="w-8 h-8 rounded-lg bg-purple-100 border border-purple-300 text-purple-700 flex items-center justify-center shrink-0 text-sm font-bold">
+                                    <i class="fa-solid fa-tags"></i>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <h4 id="wrongProductNameDisplay" class="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
+                                        -
+                                    </h4>
+                                    <div id="wrongProductMetaDisplay" class="flex flex-wrap items-center gap-1.5 mt-1">
+                                        <!-- SKU, SAP, Toko, Rak pills rendered dynamically -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- BANNER PERINGATAN WAJIB FOTO BARANG RUSAK / CACAT -->
                     <div id="damagedPhotoPromptBanner" class="hidden mt-2 p-2.5 bg-rose-50 border-2 border-rose-400 rounded-xl flex items-center justify-between gap-2 shadow-xs transition-all">
                         <div class="flex items-center gap-2 min-w-0">
