@@ -25,4 +25,6 @@ uploads/cache/
 uploads/logs/
 uploads/.db_ready
 cloudflared.exe
+ngrok.exe
+ngrok_domain.txt
 scratch/
