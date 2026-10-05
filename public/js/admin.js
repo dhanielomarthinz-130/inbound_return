@@ -2563,10 +2563,71 @@ async function loadMaintenanceStatus() {
             if (elUser) elUser.innerText = data.tables.users || 0;
         }
 
+        // Pengaturan Rekening Bank untuk Invoice Klaim
+        if (data.bank_settings) {
+            const elBank = document.getElementById('settingBankName');
+            const elAcc = document.getElementById('settingBankAccountNumber');
+            const elHolder = document.getElementById('settingBankAccountHolder');
+            const elNotes = document.getElementById('settingBankPaymentNotes');
+
+            if (elBank) elBank.value = data.bank_settings.bank_name || '';
+            if (elAcc) elAcc.value = data.bank_settings.bank_account_number || '';
+            if (elHolder) elHolder.value = data.bank_settings.bank_account_holder || '';
+            if (elNotes) elNotes.value = data.bank_settings.bank_payment_notes || '';
+        }
+
     } catch (err) {
         console.error("Gagal load status maintenance:", err);
     }
 }
+
+window.saveBankSettings = async function (e) {
+    if (e) e.preventDefault();
+    const btn = document.getElementById('btnSaveBankSettings');
+    const bankName = document.getElementById('settingBankName')?.value?.trim();
+    const accNum = document.getElementById('settingBankAccountNumber')?.value?.trim();
+    const accHolder = document.getElementById('settingBankAccountHolder')?.value?.trim();
+    const notes = document.getElementById('settingBankPaymentNotes')?.value?.trim();
+
+    if (!bankName || !accNum || !accHolder) {
+        showToast('warning', 'Nama Bank, No. Rekening, dan Atas Nama wajib diisi!', 'Data Belum Lengkap');
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...';
+    }
+
+    try {
+        const res = await fetch('api/maintenance.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'update_bank_settings',
+                bank_name: bankName,
+                bank_account_number: accNum,
+                bank_account_holder: accHolder,
+                bank_payment_notes: notes
+            })
+        });
+
+        const json = await res.json();
+        if (res.ok && json.success) {
+            showToast('success', json.message || 'No. Rekening berhasil diperbarui!', 'Berhasil Disimpan');
+        } else {
+            showToast('error', json.error || 'Gagal menyimpan pengaturan rekening bank', 'Gagal');
+        }
+    } catch (err) {
+        console.error(err);
+        showToast('error', 'Terjadi kesalahan koneksi ke server', 'Error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> <span>Simpan No. Rekening</span>';
+        }
+    }
+};
 
 window.toggleMaintenanceMode = async function () {
     const isActivating = (document.getElementById('maintModeTitle')?.innerText || '').includes('Normal');

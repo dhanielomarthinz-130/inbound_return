@@ -21,6 +21,24 @@ if (is_array($rawInvoices)) {
     $invoiceList = array_filter(array_map('trim', $parts));
 }
 
+// Ambil info rekening bank dari database system_settings
+$bankName    = 'BCA (Bank Central Asia)';
+$bankAccount = '873-098-1234';
+$bankHolder  = 'PT. INOVASI EKA GEMILANG';
+$bankNotes   = '*Mohon sertakan nomor invoice pada berita transfer saat pembayaran.';
+
+try {
+    $stmtBank = $pdo->query("SELECT key_name, key_value FROM system_settings WHERE key_name IN ('bank_name', 'bank_account_number', 'bank_account_holder', 'bank_payment_notes')");
+    if ($stmtBank) {
+        while ($bRow = $stmtBank->fetch()) {
+            if ($bRow['key_name'] === 'bank_name' && !empty($bRow['key_value'])) $bankName = $bRow['key_value'];
+            if ($bRow['key_name'] === 'bank_account_number' && !empty($bRow['key_value'])) $bankAccount = $bRow['key_value'];
+            if ($bRow['key_name'] === 'bank_account_holder' && !empty($bRow['key_value'])) $bankHolder = $bRow['key_value'];
+            if ($bRow['key_name'] === 'bank_payment_notes' && !empty($bRow['key_value'])) $bankNotes = $bRow['key_value'];
+        }
+    }
+} catch (Exception $eB) {}
+
 // Terbilang dalam Bahasa Indonesia
 function terbilangRupiah($angka) {
     $angka = (float)floor(abs((float)$angka));
@@ -670,10 +688,12 @@ $totalPages = count($pages);
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2.5 border-t border-slate-200 text-[11px] leading-relaxed">
                             <div>
                                 <b class="text-slate-800 block mb-0.5">Informasi Pembayaran (Transfer Bank):</b>
-                                <p class="text-slate-600">Bank: <b>BCA (Bank Central Asia)</b></p>
-                                <p class="text-slate-600">No. Rekening: <b class="font-mono text-slate-900">873-098-1234</b></p>
-                                <p class="text-slate-600">Atas Nama: <b>PT. INOVASI EKA GEMILANG</b></p>
-                                <p class="text-slate-400 text-[10px] mt-1">*Mohon sertakan nomor invoice pada berita transfer saat pembayaran.</p>
+                                <p class="text-slate-600">Bank: <b><?= htmlspecialchars($bankName) ?></b></p>
+                                <p class="text-slate-600">No. Rekening: <b class="font-mono text-slate-900"><?= htmlspecialchars($bankAccount) ?></b></p>
+                                <p class="text-slate-600">Atas Nama: <b><?= htmlspecialchars($bankHolder) ?></b></p>
+                                <?php if (!empty($bankNotes)): ?>
+                                <p class="text-slate-400 text-[10px] mt-1"><?= htmlspecialchars($bankNotes) ?></p>
+                                <?php endif; ?>
                             </div>
                             <div>
                                 <b class="text-slate-800 block mb-0.5">Catatan &amp; Ketentuan:</b>
@@ -683,17 +703,17 @@ $totalPages = count($pages);
                             </div>
                         </div>
 
-                        <!-- LEMBAR TANDA TANGAN (5 POSISI: Admin, SPV, Manager, CO, Accounting) -->
+                        <!-- LEMBAR TANDA TANGAN (5 POSISI: Admin Retrun, SPV, Manager, CEO, Accounting) -->
                         <div class="pt-5 border-t border-slate-300 mt-3 print-break-inside-avoid">
                             <div class="text-[10px] uppercase font-bold text-slate-400 mb-2 tracking-wider text-center">
                                 LEMBAR PENGESAHAN &amp; VERIFIKASI KLAIM
                             </div>
                             <div class="grid grid-cols-5 gap-2 text-center text-xs">
-                                <!-- 1. ADMIN -->
+                                <!-- 1. ADMIN RETRUN -->
                                 <div class="flex flex-col justify-between h-24 border border-slate-300 rounded p-1.5 bg-slate-50/50">
                                     <div>
                                         <span class="text-slate-500 block text-[9px] uppercase font-bold">Dibuat Oleh</span>
-                                        <span class="font-black text-slate-800 text-[10px] sm:text-[11px]">Admin Inbound</span>
+                                        <span class="font-black text-slate-800 text-[10px] sm:text-[11px]">Admin Retrun</span>
                                     </div>
                                     <div class="border-t border-slate-400 pt-1 font-bold text-slate-800 text-[10px] truncate">
                                         ( <?= htmlspecialchars($currentUser['username'] ?? 'Admin') ?> )
@@ -715,7 +735,7 @@ $totalPages = count($pages);
                                 <div class="flex flex-col justify-between h-24 border border-slate-300 rounded p-1.5 bg-slate-50/50">
                                     <div>
                                         <span class="text-slate-500 block text-[9px] uppercase font-bold">Disetujui Oleh</span>
-                                        <span class="font-black text-slate-800 text-[10px] sm:text-[11px]">Manager Inbound</span>
+                                        <span class="font-black text-slate-800 text-[10px] sm:text-[11px]">Manager</span>
                                     </div>
                                     <div class="border-t border-slate-400 pt-1 font-bold text-slate-800 text-[10px]">
                                         ( ..................... )

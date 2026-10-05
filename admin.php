@@ -1359,6 +1359,69 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             </div>
                         </div>
 
+                        <!-- Pengaturan Rekening Bank (Invoice Klaim) -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                                <div>
+                                    <h4 class="font-bold text-sm text-slate-800 flex items-center gap-2">
+                                        <i class="fa-solid fa-building-columns text-emerald-600"></i> Pengaturan Rekening Bank (Invoice Klaim)
+                                    </h4>
+                                    <p class="text-xs text-slate-500 mt-0.5">
+                                        Nomor rekening dan data bank yang akan tercetak otomatis pada lembar penagihan / invoice klaim.
+                                    </p>
+                                </div>
+                                <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                                    <i class="fa-solid fa-file-invoice-dollar mr-0.5"></i> Info Rekening
+                                </span>
+                            </div>
+
+                            <form id="formBankSettings" onsubmit="saveBankSettings(event)" class="space-y-3">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-700 mb-1">
+                                            Nama Bank <span class="text-rose-500">*</span>
+                                        </label>
+                                        <input type="text" id="settingBankName" name="bank_name" placeholder="Contoh: BCA (Bank Central Asia)" required
+                                            class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-700 mb-1">
+                                            Nomor Rekening <span class="text-rose-500">*</span>
+                                        </label>
+                                        <input type="text" id="settingBankAccountNumber" name="bank_account_number" placeholder="Contoh: 873-098-1234" required
+                                            class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-800 focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition">
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-700 mb-1">
+                                            Atas Nama (Pemilik Rekening) <span class="text-rose-500">*</span>
+                                        </label>
+                                        <input type="text" id="settingBankAccountHolder" name="bank_account_holder" placeholder="Contoh: PT. INOVASI EKA GEMILANG" required
+                                            class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-700 mb-1">
+                                            Catatan Transfer (Opsional)
+                                        </label>
+                                        <input type="text" id="settingBankPaymentNotes" name="bank_payment_notes" placeholder="Contoh: *Mohon sertakan no invoice saat transfer"
+                                            class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition">
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between pt-1">
+                                    <div class="text-[10px] text-slate-400">
+                                        <i class="fa-solid fa-circle-info mr-0.5"></i> Perubahan langsung tersimpan ke database &amp; tampil di cetak invoice klaim.
+                                    </div>
+                                    <button type="submit" id="btnSaveBankSettings" class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer">
+                                        <i class="fa-solid fa-floppy-disk"></i>
+                                        <span>Simpan No. Rekening</span>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
                         <!-- Database Maintenance & Optimization -->
                         <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
                             <h4 class="font-bold text-sm text-slate-800 flex items-center gap-2">

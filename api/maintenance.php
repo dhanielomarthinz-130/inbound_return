@@ -21,7 +21,23 @@ if ($method === 'GET') {
         $maintRow = $stmtMaint->fetch();
         $isMaintenance = ($maintRow && $maintRow['key_value'] == '1');
 
-        // 2. Statistik Tabel
+        // 2. Ambil pengaturan Rekening Bank untuk Invoice Klaim
+        $bankSettings = [
+            'bank_name' => 'BCA (Bank Central Asia)',
+            'bank_account_number' => '873-098-1234',
+            'bank_account_holder' => 'PT. INOVASI EKA GEMILANG',
+            'bank_payment_notes' => '*Mohon sertakan nomor invoice pada berita transfer saat pembayaran.'
+        ];
+        $stmtBank = $pdo->query("SELECT key_name, key_value FROM system_settings WHERE key_name IN ('bank_name', 'bank_account_number', 'bank_account_holder', 'bank_payment_notes')");
+        if ($stmtBank) {
+            while ($bRow = $stmtBank->fetch()) {
+                if ($bRow['key_value'] !== null && $bRow['key_value'] !== '') {
+                    $bankSettings[$bRow['key_name']] = $bRow['key_value'];
+                }
+            }
+        }
+
+        // 3. Statistik Tabel
         $tablesStats = [];
         $targetTables = ['master_products', 'return_sessions', 'return_items', 'master_expeditions', 'users'];
         foreach ($targetTables as $tbl) {
@@ -33,7 +49,7 @@ if ($method === 'GET') {
             }
         }
 
-        // 3. Info Server & Environment
+        // 4. Info Server & Environment
         $sysInfo = [
             'php_version' => PHP_VERSION,
             'server_software' => $_SERVER['SERVER_SOFTWARE'] ?? 'PHP CLI',
@@ -49,6 +65,7 @@ if ($method === 'GET') {
         jsonResponse([
             'success' => true,
             'maintenance_mode' => $isMaintenance,
+            'bank_settings' => $bankSettings,
             'tables' => $tablesStats,
             'system' => $sysInfo
         ]);
@@ -75,6 +92,39 @@ if ($method === 'POST') {
                 'message' => ($newStatus === '1') 
                     ? 'Mode Pemeliharaan (Maintenance) BERHASIL DIAKTIFKAN. Operator dan admin biasa tidak dapat mengakses sistem.' 
                     : 'Mode Pemeliharaan DINONAKTIFKAN. Sistem kembali beroperasi normal.'
+            ]);
+        }
+
+        if ($action === 'update_bank_settings') {
+            $bankName   = trim($input['bank_name'] ?? '');
+            $accNum     = trim($input['bank_account_number'] ?? '');
+            $accHolder  = trim($input['bank_account_holder'] ?? '');
+            $notes      = trim($input['bank_payment_notes'] ?? '');
+
+            if (empty($bankName) || empty($accNum) || empty($accHolder)) {
+                jsonResponse(['error' => 'Nama Bank, No. Rekening, dan Atas Nama wajib diisi!'], 400);
+            }
+
+            $stmtUpsert = $pdo->prepare("
+                INSERT INTO system_settings (key_name, key_value) 
+                VALUES (?, ?) 
+                ON DUPLICATE KEY UPDATE key_value = VALUES(key_value)
+            ");
+
+            $stmtUpsert->execute(['bank_name', $bankName]);
+            $stmtUpsert->execute(['bank_account_number', $accNum]);
+            $stmtUpsert->execute(['bank_account_holder', $accHolder]);
+            $stmtUpsert->execute(['bank_payment_notes', $notes]);
+
+            jsonResponse([
+                'success' => true,
+                'message' => 'Informasi No. Rekening & Rekening Bank berhasil disimpan!',
+                'bank_settings' => [
+                    'bank_name' => $bankName,
+                    'bank_account_number' => $accNum,
+                    'bank_account_holder' => $accHolder,
+                    'bank_payment_notes' => $notes
+                ]
             ]);
         }
 
