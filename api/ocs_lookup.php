@@ -82,43 +82,98 @@ if ($query === '' || $action === 'list_claimable') {
 
         // Jika tabel ocs_orders ada, lengkapi data harga, toko, & video packing secara efisien (Batch indexed query)
         if (!empty($candidates) && $hasOcsTable) {
-            $invList = array_values(array_unique(array_filter(array_column($candidates, 'invoice_number'))));
+            $rawInvs = array_filter(array_column($candidates, 'invoice_number'));
+            $lookupMap = [];
+            foreach ($rawInvs as $rinv) {
+                $trimInv = trim($rinv);
+                if ($trimInv !== '') {
+                    $lookupMap[$trimInv] = true;
+                    $clean = preg_replace('/[^a-zA-Z0-9]/', '', $trimInv);
+                    if ($clean !== '') $lookupMap[$clean] = true;
+                }
+            }
+            $invList = array_values(array_keys($lookupMap));
             if (!empty($invList)) {
                 $chunks = array_chunk($invList, 100);
                 $ocsMap = [];
+                $ocsSelectFields = "order_id, tracking_number, package_price, original_price, subtotal, total_amount, nmv, gmv, order_items_json, commerce_platform, shop_name, product_name, seller_sku, has_packing_video";
                 foreach ($chunks as $chunk) {
                     $inPlaceholders = implode(',', array_fill(0, count($chunk), '?'));
                     
                     // Match by order_id
                     try {
-                        $stmtOcs1 = $pdo->prepare("SELECT order_id, tracking_number, package_price, commerce_platform, shop_name, product_name, seller_sku, has_packing_video FROM ocs_orders WHERE order_id IN ($inPlaceholders)");
+                        $stmtOcs1 = $pdo->prepare("SELECT {$ocsSelectFields} FROM ocs_orders WHERE order_id IN ($inPlaceholders)");
                         $stmtOcs1->execute($chunk);
                         while ($row = $stmtOcs1->fetch(PDO::FETCH_ASSOC)) {
-                            if (!empty($row['order_id'])) $ocsMap[$row['order_id']] = $row;
-                            if (!empty($row['tracking_number'])) $ocsMap[$row['tracking_number']] = $row;
+                            if (!empty($row['order_id'])) {
+                                $ocsMap[trim($row['order_id'])] = $row;
+                                $cl = preg_replace('/[^a-zA-Z0-9]/', '', $row['order_id']);
+                                if ($cl) $ocsMap[$cl] = $row;
+                            }
+                            if (!empty($row['tracking_number'])) {
+                                $ocsMap[trim($row['tracking_number'])] = $row;
+                                $cl = preg_replace('/[^a-zA-Z0-9]/', '', $row['tracking_number']);
+                                if ($cl) $ocsMap[$cl] = $row;
+                            }
                         }
                     } catch (Exception $eOcs1) {}
 
                     // Match by tracking_number
                     try {
-                        $stmtOcs2 = $pdo->prepare("SELECT order_id, tracking_number, package_price, commerce_platform, shop_name, product_name, seller_sku, has_packing_video FROM ocs_orders WHERE tracking_number IN ($inPlaceholders)");
+                        $stmtOcs2 = $pdo->prepare("SELECT {$ocsSelectFields} FROM ocs_orders WHERE tracking_number IN ($inPlaceholders)");
                         $stmtOcs2->execute($chunk);
                         while ($row = $stmtOcs2->fetch(PDO::FETCH_ASSOC)) {
-                            if (!empty($row['tracking_number']) && !isset($ocsMap[$row['tracking_number']])) {
-                                $ocsMap[$row['tracking_number']] = $row;
+                            if (!empty($row['tracking_number'])) {
+                                $trTrim = trim($row['tracking_number']);
+                                if (!isset($ocsMap[$trTrim])) $ocsMap[$trTrim] = $row;
+                                $cl = preg_replace('/[^a-zA-Z0-9]/', '', $trTrim);
+                                if ($cl && !isset($ocsMap[$cl])) $ocsMap[$cl] = $row;
                             }
-                            if (!empty($row['order_id']) && !isset($ocsMap[$row['order_id']])) {
-                                $ocsMap[$row['order_id']] = $row;
+                            if (!empty($row['order_id'])) {
+                                $ordTrim = trim($row['order_id']);
+                                if (!isset($ocsMap[$ordTrim])) $ocsMap[$ordTrim] = $row;
+                                $cl = preg_replace('/[^a-zA-Z0-9]/', '', $ordTrim);
+                                if ($cl && !isset($ocsMap[$cl])) $ocsMap[$cl] = $row;
                             }
                         }
                     } catch (Exception $eOcs2) {}
                 }
 
                 foreach ($candidates as &$c) {
-                    $inv = $c['invoice_number'];
-                    if (isset($ocsMap[$inv])) {
-                        $o = $ocsMap[$inv];
-                        $c['package_price']     = (float)($o['package_price'] ?? 0);
+                    $inv = trim($c['invoice_number']);
+                    $cleanInv = preg_replace('/[^a-zA-Z0-9]/', '', $inv);
+                    $o = $ocsMap[$inv] ?? $ocsMap[$cleanInv] ?? null;
+
+                    if ($o) {
+                        // Cari harga terbaik dari semua kolom harga OCS
+                        $bestPrice = 0;
+                        if ((float)($o['package_price'] ?? 0) > 0) {
+                            $bestPrice = (float)$o['package_price'];
+                        } elseif ((float)($o['total_amount'] ?? 0) > 0) {
+                            $bestPrice = (float)$o['total_amount'];
+                        } elseif ((float)($o['subtotal'] ?? 0) > 0) {
+                            $bestPrice = (float)$o['subtotal'];
+                        } elseif ((float)($o['original_price'] ?? 0) > 0) {
+                            $bestPrice = (float)$o['original_price'];
+                        } elseif ((float)($o['nmv'] ?? 0) > 0) {
+                            $bestPrice = (float)$o['nmv'];
+                        } elseif ((float)($o['gmv'] ?? 0) > 0) {
+                            $bestPrice = (float)$o['gmv'];
+                        }
+
+                        // Jika masih 0, periksa dari rincian order_items_json
+                        if ($bestPrice <= 0 && !empty($o['order_items_json'])) {
+                            $itemsDec = json_decode($o['order_items_json'], true);
+                            if (is_array($itemsDec)) {
+                                foreach ($itemsDec as $it) {
+                                    $itPrice = (float)($it['PackagePrice'] ?? $it['package_price'] ?? $it['Price'] ?? $it['price'] ?? $it['OriginalPrice'] ?? 0);
+                                    $itQty   = (int)($it['Quantity'] ?? $it['total_qty'] ?? $it['qty'] ?? 1);
+                                    $bestPrice += ($itPrice * max(1, $itQty));
+                                }
+                            }
+                        }
+
+                        $c['package_price']     = $bestPrice;
                         $c['commerce_platform'] = $o['commerce_platform'] ?? null;
                         $c['shop_name']         = $o['shop_name'] ?? null;
                         $c['ocs_product_name']  = $o['product_name'] ?? null;
@@ -127,6 +182,53 @@ if ($query === '' || $action === 'list_claimable') {
                     }
                 }
                 unset($c);
+
+                // Fallback: Jika masih ada yang belum ada harganya, cari estimasi harga dari SKU sejenis di ocs_orders
+                $missingPriceSkus = [];
+                foreach ($candidates as $cIdx => $cand) {
+                    if ((float)($cand['package_price'] ?? 0) <= 0) {
+                        $skuStr = $cand['damaged_skus'] ?: $cand['all_skus'];
+                        if (!empty($skuStr)) {
+                            $skus = array_filter(array_map('trim', explode(',', $skuStr)));
+                            foreach ($skus as $sk) {
+                                if ($sk && $sk !== '-') {
+                                    $missingPriceSkus[$sk][] = $cIdx;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (!empty($missingPriceSkus)) {
+                    $skuKeys = array_slice(array_keys($missingPriceSkus), 0, 100);
+                    $inSkuHolders = implode(',', array_fill(0, count($skuKeys), '?'));
+                    try {
+                        $stmtSkuPrice = $pdo->prepare("
+                            SELECT seller_sku, 
+                                   MAX(CASE WHEN package_price > 0 THEN package_price / GREATEST(total_qty, 1) 
+                                            WHEN total_amount > 0 THEN total_amount / GREATEST(total_qty, 1) 
+                                            WHEN original_price > 0 THEN original_price / GREATEST(total_qty, 1) 
+                                            ELSE 0 END) as unit_price
+                            FROM ocs_orders 
+                            WHERE seller_sku IN ($inSkuHolders) AND (package_price > 0 OR total_amount > 0 OR original_price > 0)
+                            GROUP BY seller_sku
+                        ");
+                        $stmtSkuPrice->execute($skuKeys);
+                        while ($skuRow = $stmtSkuPrice->fetch(PDO::FETCH_ASSOC)) {
+                            $uPrice = (float)($skuRow['unit_price'] ?? 0);
+                            $sKey = $skuRow['seller_sku'];
+                            if ($uPrice > 0 && isset($missingPriceSkus[$sKey])) {
+                                foreach ($missingPriceSkus[$sKey] as $cIdx) {
+                                    if ((float)($candidates[$cIdx]['package_price'] ?? 0) <= 0) {
+                                        $dmgQ = (int)($candidates[$cIdx]['damaged_qty_sum'] ?? $candidates[$cIdx]['total_damaged'] ?? 1);
+                                        $candidates[$cIdx]['package_price'] = $uPrice * max(1, $dmgQ);
+                                        $candidates[$cIdx]['price_is_estimated'] = true;
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Exception $eSku) {}
+                }
             }
         }
 

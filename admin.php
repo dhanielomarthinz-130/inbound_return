@@ -854,10 +854,18 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 <option value="">Semua Ekspedisi</option>
                             </select>
 
-                            <!-- Filter Tanggal Unboxing -->
-                            <input type="date" id="filterClaimDate" value="<?= date('Y-m-d') ?>" onchange="applyClaimCandidatesFilter()" 
-                                class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:ring-2 focus:ring-amber-500 focus:outline-none transition shadow-2xs"
-                                title="Filter Tanggal Unboxing">
+                            <!-- Filter Tanggal Unboxing (Flatpickr Rentang) -->
+                            <div class="relative flex items-center">
+                                <span class="absolute left-2.5 text-amber-500 pointer-events-none text-xs z-10">
+                                    <i class="fa-regular fa-calendar-days"></i>
+                                </span>
+                                <input type="text" id="filterClaimDate" placeholder="Pilih Rentang Tanggal..." readonly
+                                    class="bg-white border border-slate-300 rounded-xl pl-8 pr-7 py-1.5 text-xs font-medium text-slate-700 focus:ring-2 focus:ring-amber-500 focus:outline-none transition shadow-2xs w-48 sm:w-56 cursor-pointer"
+                                    title="Filter Rentang Tanggal Unboxing">
+                                <button type="button" id="btnClearClaimDate" onclick="clearClaimDateFilter()" title="Hapus filter tanggal" class="absolute right-2 text-slate-400 hover:text-rose-500 transition text-xs hidden z-10">
+                                    <i class="fa-solid fa-circle-xmark"></i>
+                                </button>
+                            </div>
 
                             <!-- Reset Filter -->
                             <button type="button" onclick="resetClaimCandidatesFilter()" 

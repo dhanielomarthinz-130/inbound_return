@@ -2498,6 +2498,7 @@ window.addEventListener('popstate', () => {
 window.addEventListener('DOMContentLoaded', () => {
     initFlatpickr();
     initReceivingDatepicker();
+    initClaimDatepicker();
     initFromUrlParams();
 
     // Event listener search transaction (Inbound Unboxing)
@@ -4040,8 +4041,66 @@ window.printClaimDossier = function() {
 // ==========================================
 let cachedClaimCandidates = [];
 let activeClaimCandidateInvoice = '';
+let flatpickrClaimInstance = null;
+let activeClaimDateFilter = '';
+
+function initClaimDatepicker() {
+    const el = document.getElementById('filterClaimDate');
+    if (!el || flatpickrClaimInstance) return;
+    if (typeof flatpickr !== 'function') return;
+
+    flatpickrClaimInstance = flatpickr(el, {
+        mode: "range",
+        dateFormat: "Y-m-d",
+        altInput: true,
+        altFormat: "j F Y",
+        locale: "id",
+        maxDate: "today",
+        onChange: function(selectedDates) {
+            const btnClear = document.getElementById('btnClearClaimDate');
+            if (selectedDates.length === 2) {
+                const start = flatpickr.formatDate(selectedDates[0], "Y-m-d");
+                const end = flatpickr.formatDate(selectedDates[1], "Y-m-d");
+                activeClaimDateFilter = `${start} to ${end}`;
+                if (btnClear) btnClear.classList.remove('hidden');
+                applyClaimCandidatesFilter();
+            } else if (selectedDates.length === 1) {
+                const single = flatpickr.formatDate(selectedDates[0], "Y-m-d");
+                activeClaimDateFilter = single;
+                if (btnClear) btnClear.classList.remove('hidden');
+            } else {
+                activeClaimDateFilter = '';
+                if (btnClear) btnClear.classList.add('hidden');
+                applyClaimCandidatesFilter();
+            }
+        },
+        onClose: function(selectedDates) {
+            if (selectedDates.length === 1) {
+                applyClaimCandidatesFilter();
+            }
+        }
+    });
+
+    const btnClear = document.getElementById('btnClearClaimDate');
+    if (btnClear) {
+        if (activeClaimDateFilter) btnClear.classList.remove('hidden');
+        else btnClear.classList.add('hidden');
+    }
+}
+
+window.clearClaimDateFilter = function() {
+    if (flatpickrClaimInstance) {
+        flatpickrClaimInstance.clear();
+    }
+    activeClaimDateFilter = '';
+    const btnClear = document.getElementById('btnClearClaimDate');
+    if (btnClear) btnClear.classList.add('hidden');
+    applyClaimCandidatesFilter();
+};
 
 window.loadClaimCandidates = async function(force = false) {
+    initClaimDatepicker();
+
     const tbody = document.getElementById('claimCandidatesTableBody');
     const refreshIcon = document.getElementById('iconRefreshCandidates');
     if (!tbody) return;
@@ -4105,11 +4164,9 @@ window.applyClaimCandidatesFilter = function() {
 
     const searchInput = document.getElementById('filterClaimSearch');
     const expSelect = document.getElementById('filterClaimExpedition');
-    const dateInput = document.getElementById('filterClaimDate');
 
     const q = searchInput ? searchInput.value.trim().toLowerCase() : '';
     const exp = expSelect ? expSelect.value.trim().toLowerCase() : '';
-    const date = dateInput ? dateInput.value.trim() : '';
 
     let filtered = cachedClaimCandidates.filter(c => {
         // Filter Search (Invoice / Resi, Produk, SKU, Alasan Rusak, Operator)
@@ -4130,10 +4187,15 @@ window.applyClaimCandidatesFilter = function() {
             if (cExp !== exp) return false;
         }
 
-        // Filter Tanggal
-        if (date) {
+        // Filter Tanggal Rentang (Flatpickr)
+        if (activeClaimDateFilter) {
             const cDate = String(c.created_at || '').substring(0, 10);
-            if (cDate !== date) return false;
+            if (activeClaimDateFilter.includes(' to ')) {
+                const [start, end] = activeClaimDateFilter.split(' to ');
+                if (cDate < start || cDate > end) return false;
+            } else {
+                if (cDate !== activeClaimDateFilter) return false;
+            }
         }
 
         return true;
@@ -4159,7 +4221,25 @@ window.applyClaimCandidatesFilter = function() {
         const damagedCount = c.damaged_qty || (c.total_damaged > 0 ? c.total_damaged : (c.damaged_items_count || 1));
         const reason = c.damage_reasons || c.notes || 'Kondisi Rusak / Bukan Good';
         const prodName = c.product_names || '<span class="text-slate-400 italic">Produk Retur</span>';
-        const priceFormatted = c.package_price_formatted && c.package_price_formatted !== '-' ? c.package_price_formatted : (c.package_price > 0 ? 'Rp ' + Number(c.package_price).toLocaleString('id-ID') : '-');
+        const priceVal = Number(c.package_price || 0);
+        const priceFormatted = c.package_price_formatted && c.package_price_formatted !== '-' ? c.package_price_formatted : (priceVal > 0 ? 'Rp ' + priceVal.toLocaleString('id-ID') : '-');
+
+        let priceHtml = '';
+        if (priceVal > 0) {
+            const estBadge = c.price_is_estimated ? `<span class="block text-[9px] text-amber-600 font-semibold" title="Estimasi berdasarkan harga SKU sejenis di OCS">(Estimasi SKU)</span>` : '';
+            priceHtml = `<span class="font-mono font-bold text-emerald-700">${priceFormatted}</span>${estBadge}`;
+        } else {
+            priceHtml = `
+                <div class="inline-flex flex-col items-end gap-0.5">
+                    <span class="text-slate-400 font-mono text-[11px]">-</span>
+                    <button type="button" onclick="syncSingleClaimPrice('${escapeHtml(c.invoice_number)}', this)" 
+                        class="px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-300 rounded text-[10px] font-bold transition flex items-center gap-1 shadow-2xs" 
+                        title="Ambil harga langsung dari server OCS">
+                        <i class="fa-solid fa-arrows-rotate text-[9px]"></i> Cek OCS
+                    </button>
+                </div>
+            `;
+        }
 
         html += `
             <tr class="hover:bg-rose-50/40 transition border-b border-slate-100">
@@ -4198,8 +4278,8 @@ window.applyClaimCandidatesFilter = function() {
                         ${escapeHtml(reason)}
                     </span>
                 </td>
-                <td class="py-3 px-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
-                    ${priceFormatted}
+                <td class="py-3 px-3 text-right whitespace-nowrap">
+                    ${priceHtml}
                 </td>
                 <td class="py-3 px-3 text-slate-500 text-[11px] whitespace-nowrap">${escapeHtml(c.created_at || '-')}</td>
                 <td class="py-3 px-3 text-center">
@@ -4226,13 +4306,52 @@ window.applyClaimCandidatesFilter = function() {
 window.resetClaimCandidatesFilter = function() {
     const searchInput = document.getElementById('filterClaimSearch');
     const expSelect = document.getElementById('filterClaimExpedition');
-    const dateInput = document.getElementById('filterClaimDate');
 
     if (searchInput) searchInput.value = '';
     if (expSelect) expSelect.value = '';
-    if (dateInput) dateInput.value = '';
+    clearClaimDateFilter();
+};
 
-    applyClaimCandidatesFilter();
+window.syncSingleClaimPrice = async function(invoice, btnEl) {
+    if (!invoice) return;
+    const origText = btnEl ? btnEl.innerHTML : '';
+    if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-[9px]"></i>';
+    }
+
+    try {
+        const res = await fetch(`api/ocs_lookup.php?query=${encodeURIComponent(invoice)}&refresh=1`);
+        const json = await res.json();
+        if (json.success && json.data) {
+            const d = json.data;
+            const price = Number(d.PackagePrice || d.TotalClaimAmount || d.Payment?.TotalAmount || 0);
+            if (price > 0) {
+                const found = cachedClaimCandidates.find(x => x.invoice_number === invoice);
+                if (found) {
+                    found.package_price = price;
+                    found.package_price_formatted = 'Rp ' + price.toLocaleString('id-ID');
+                    found.price_is_estimated = false;
+                    if (d.ProductName && !found.product_names) found.product_names = d.ProductName;
+                    if (d.SellerSku && !found.sku) found.sku = d.SellerSku;
+                }
+                showToast('success', `Harga paket ${invoice} berhasil disinkronkan: Rp ${price.toLocaleString('id-ID')}`, 'Harga Ditemukan');
+                applyClaimCandidatesFilter();
+                return;
+            }
+        }
+        showToast('warning', `Harga untuk nomor ${invoice} tidak ditemukan di sistem OCS`, 'Data Belum Ada');
+        if (btnEl) {
+            btnEl.disabled = false;
+            btnEl.innerHTML = '<span class="text-rose-500"><i class="fa-solid fa-circle-exclamation text-[9px]"></i> N/A</span>';
+        }
+    } catch (e) {
+        showToast('error', `Gagal menghubungkan ke OCS: ${e.message}`, 'Koneksi Error');
+        if (btnEl) {
+            btnEl.disabled = false;
+            btnEl.innerHTML = origText;
+        }
+    }
 };
 
 // ==========================================
