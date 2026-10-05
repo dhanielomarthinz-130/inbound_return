@@ -1,10 +1,14 @@
 # server-tools/setup_tailscale.ps1
 # Jalankan di PC SERVER. Memasang Tailscale + membuat link HTTPS permanen untuk Sistem Inbound Return.
+#   Mode default : tailscale serve  -> hanya device yang login Tailscale (akun sama) yang bisa buka
+#   Mode -Public : tailscale funnel -> link publik, laptop/HP lain TIDAK perlu install apa pun
+param([switch]$Public)
 $ErrorActionPreference = "SilentlyContinue"
 
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
-    Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
+    $extra = if ($Public) { " -Public" } else { "" }
+    Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"$extra"
     exit
 }
 
@@ -63,8 +67,14 @@ if (-not (Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContin
 Write-Host "[3/4] Firewall port 80 siap" -ForegroundColor Green
 
 # 4. Aktifkan HTTPS permanen (wajib agar kamera scanner bisa dipakai di browser)
-Write-Host "[4/4] Mengaktifkan link HTTPS permanen (tailscale serve)..." -ForegroundColor Yellow
-$serveOut = & $ts serve --bg http://127.0.0.1:80 2>&1 | Out-String
+if ($Public) {
+    Write-Host "[4/4] Mengaktifkan link PUBLIK permanen (tailscale funnel)..." -ForegroundColor Yellow
+    & $ts serve reset 2>&1 | Out-Null
+    $serveOut = & $ts funnel --bg http://127.0.0.1:80 2>&1 | Out-String
+} else {
+    Write-Host "[4/4] Mengaktifkan link HTTPS permanen (tailscale serve)..." -ForegroundColor Yellow
+    $serveOut = & $ts serve --bg http://127.0.0.1:80 2>&1 | Out-String
+}
 Write-Host $serveOut -ForegroundColor DarkGray
 
 $dns = ($status.Self.DNSName).TrimEnd('.')
@@ -79,15 +89,20 @@ if ($httpsOk -and $dns) {
     Write-Host "  https://$dns/inbound_return/login" -ForegroundColor Yellow -BackgroundColor DarkBlue
     Write-Host "  https://$dns/inbound_return/scanner" -ForegroundColor Yellow -BackgroundColor DarkBlue
 } else {
-    Write-Host "  [!] HTTPS belum aktif. Buka https://login.tailscale.com/admin/dns lalu:" -ForegroundColor Red
+    Write-Host "  [!] HTTPS/Funnel belum aktif. Ikuti link 'login.tailscale.com/...' yang tampil di atas (jika ada), atau buka https://login.tailscale.com/admin/dns lalu:" -ForegroundColor Red
     Write-Host "      1) Aktifkan 'MagicDNS'   2) Klik 'Enable HTTPS'" -ForegroundColor Red
+    if ($Public) { Write-Host "      3) Izinkan Funnel untuk device ini (tautan izin muncul di output di atas)" -ForegroundColor Red }
     Write-Host "      Setelah itu jalankan script ini sekali lagi." -ForegroundColor Red
 }
 Write-Host ""
-Write-Host "  Cadangan (tanpa kamera, http biasa): http://$ip4/inbound_return/login" -ForegroundColor Gray
+if (-not $Public) { Write-Host "  Cadangan (tanpa kamera, http biasa): http://$ip4/inbound_return/login" -ForegroundColor Gray }
 Write-Host "================================================================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "Di laptop / HP lain: install aplikasi Tailscale, login dengan AKUN YANG SAMA, lalu buka link di atas." -ForegroundColor White
+if ($Public) {
+    Write-Host "Mode PUBLIK: laptop / HP lain cukup buka link di atas di browser - TIDAK perlu install Tailscale." -ForegroundColor White
+} else {
+    Write-Host "Di laptop / HP lain: install aplikasi Tailscale, login dengan AKUN YANG SAMA, lalu buka link di atas." -ForegroundColor White
+}
 Write-Host "Tailscale berjalan otomatis sebagai service - tidak perlu jendela yang dibiarkan terbuka." -ForegroundColor White
 
 if ($httpsOk -and $dns) {
@@ -98,7 +113,7 @@ LINK PERMANEN SISTEM INBOUND RETURN (via Tailscale)
 Login   : https://$dns/inbound_return/login
 Scanner : https://$dns/inbound_return/scanner
 
-Syarat di laptop/HP: install Tailscale (https://tailscale.com/download) dan login dengan akun yang sama.
+Syarat di laptop/HP: $(if ($Public) { 'tidak ada - cukup buka link di browser.' } else { 'install Tailscale (https://tailscale.com/download) dan login dengan akun yang sama.' })
 "@ | Set-Content -Path $desktopFile -Encoding UTF8
     try { Set-Clipboard -Value "https://$dns/inbound_return/login" } catch {}
     Write-Host "Link juga disimpan di Desktop: LINK_PERMANEN_TAILSCALE.txt (dan sudah di-copy)" -ForegroundColor Gray
