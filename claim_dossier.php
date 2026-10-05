@@ -7,10 +7,7 @@
 require_once __DIR__ . '/config.php';
 
 // Pastikan user login
-if (!isset($_SESSION['user_id'])) {
-    header('Location: login.php');
-    exit;
-}
+$currentUser = requireLogin();
 
 $query = trim($_GET['q'] ?? $_GET['query'] ?? $_GET['order_id'] ?? $_GET['tracking_number'] ?? '');
 ?>
@@ -403,6 +400,14 @@ $query = trim($_GET['q'] ?? $_GET['query'] ?? $_GET['order_id'] ?? $_GET['tracki
 
                 currentDossierData = data;
                 renderDossier(data);
+
+                // Otomatis Cetak jika dipanggil dari tombol Cetak PDF
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('autoprint') === '1' || urlParams.get('print') === '1') {
+                    setTimeout(() => {
+                        window.print();
+                    }, 650);
+                }
 
                 // Tarik video NAS Synology di background
                 fetchNasVideo(data, q);

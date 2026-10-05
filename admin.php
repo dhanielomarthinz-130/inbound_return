@@ -42,7 +42,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 display: block !important;
             }
             /* Hilangkan seluruh elemen halaman di luar modal cetak agar tidak memakan ruang / lembar kosong */
-            body > *:not(#modalReceivingReceipt) {
+            body > *:not(#modalReceivingReceipt):not(#modalClaimDetail):not(#modalCollectiveClaimInvoice) {
                 display: none !important;
             }
             #modalReceivingReceipt {
@@ -884,7 +884,13 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                         <table class="w-full text-left text-xs">
                             <thead class="bg-slate-50 text-slate-600 border-b border-slate-200 font-bold uppercase text-[10px]">
                                 <tr>
-                                    <th class="py-3 px-3 text-center w-10">#</th>
+                                    <th class="py-3 px-3 text-center w-14">
+                                        <div class="flex items-center justify-center gap-1.5">
+                                            <input type="checkbox" id="checkAllClaimCandidates" onchange="toggleSelectAllClaims(this)" 
+                                                class="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300 cursor-pointer" title="Pilih Semua Paket">
+                                            <span class="text-[9px] text-slate-400 font-mono">ALL</span>
+                                        </div>
+                                    </th>
                                     <th class="py-3 px-3">No. Resi / Invoice & Ekspedisi</th>
                                     <th class="py-3 px-3">Nama Produk & SKU</th>
                                     <th class="py-3 px-3 text-center">Qty Rusak</th>
@@ -903,6 +909,35 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+
+                    <!-- FLOATING STICKY ACTION BAR MULTIPLE SELECT KLAIM -->
+                    <div id="selectedClaimsActionCard" class="hidden p-3.5 sm:p-4 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white border-t border-slate-700/80 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg transition-all">
+                        <div class="flex items-center gap-3">
+                            <span class="w-10 h-10 rounded-2xl bg-amber-500 text-slate-950 font-black flex items-center justify-center text-base shadow-sm shrink-0">
+                                <i class="fa-solid fa-file-invoice-dollar"></i>
+                            </span>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs font-bold text-slate-300">Paket Klaim Terpilih:</span>
+                                    <span id="selectedClaimsCount" class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-mono font-black text-xs border border-amber-500/30">0 Paket</span>
+                                    <span id="selectedClaimsDamagedQty" class="text-[11px] text-rose-400 font-bold">(0 pcs rusak)</span>
+                                </div>
+                                <div class="text-xs text-slate-400 mt-0.5">
+                                    Total Estimasi Tagihan: <b id="selectedClaimsTotalPrice" class="text-emerald-400 font-mono text-sm sm:text-base font-black">Rp 0</b>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                            <button type="button" onclick="clearSelectedClaims()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition border border-slate-700 cursor-pointer">
+                                Batal
+                            </button>
+                            <button type="button" onclick="openCollectiveClaimInvoiceModal()" class="px-4 py-2 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 active:scale-95 text-slate-950 font-black rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-lg shadow-amber-500/30 cursor-pointer">
+                                <i class="fa-solid fa-file-invoice-dollar"></i>
+                                <span>Buat Invoice Tagihan (<span id="btnSelectedCount">0</span>)</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2259,6 +2294,63 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 </div>
                 <div class="flex items-center gap-2">
                     <button onclick="closeClaimDetailModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PREVIEW INVOICE TAGIHAN KLAIM KOLEKTIF -->
+    <div id="modalCollectiveClaimInvoice" class="hidden fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+        <div class="relative bg-white rounded-3xl border border-slate-200 max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-150">
+            <!-- Modal Header -->
+            <div class="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between bg-slate-900 text-white shrink-0">
+                <div class="flex items-center gap-3">
+                    <span class="w-10 h-10 rounded-2xl bg-amber-500 text-slate-950 font-black flex items-center justify-center text-lg shadow-sm">
+                        <i class="fa-solid fa-file-invoice-dollar"></i>
+                    </span>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-black text-sm sm:text-base leading-tight">Surat Tagihan Klaim Kolektif</h3>
+                            <span id="mColClaimBadgeCount" class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-500 text-slate-950">0 Paket</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 font-mono">Invoice kompilasi penggantian paket rusak untuk ekspedisi</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="printCollectiveClaimInvoice()" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-2xs cursor-pointer" title="Cetak Berkas Tagihan PDF">
+                        <i class="fa-solid fa-print"></i>
+                        <span class="hidden sm:inline">Cetak PDF</span>
+                    </button>
+                    <button type="button" onclick="openCollectiveClaimFullTab()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 transition border border-slate-700 cursor-pointer" title="Buka Halaman Penuh di Tab Baru">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    </button>
+                    <button type="button" onclick="closeCollectiveClaimModal()" class="text-slate-400 hover:text-white text-base p-1.5 rounded-lg hover:bg-slate-800 transition cursor-pointer">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scrollable Invoice Preview Body -->
+            <div class="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1 text-xs">
+                <div id="mColClaimPreviewContainer" class="space-y-4">
+                    <!-- Dynamic Invoice Content Rendered via JS -->
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 shrink-0">
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="copyCollectiveClaimText()" class="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer">
+                        <i class="fa-regular fa-copy"></i> Salin Format WA
+                    </button>
+                    <button type="button" onclick="openCollectiveClaimFullTab()" class="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition flex items-center gap-1.5 border border-indigo-200 cursor-pointer">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i> Buka Halaman Penuh
+                    </button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="closeCollectiveClaimModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition cursor-pointer">
                         Tutup
                     </button>
                 </div>

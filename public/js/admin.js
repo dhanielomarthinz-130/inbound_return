@@ -4042,6 +4042,7 @@ window.printClaimDossier = function() {
 // ==========================================
 let cachedClaimCandidates = [];
 let activeClaimCandidateInvoice = '';
+let selectedClaimInvoices = new Set();
 let flatpickrClaimInstance = null;
 let activeClaimDateFilter = '';
 
@@ -4242,9 +4243,18 @@ window.applyClaimCandidatesFilter = function() {
             `;
         }
 
+        const isChecked = selectedClaimInvoices.has(c.invoice_number);
         html += `
-            <tr class="hover:bg-rose-50/40 transition border-b border-slate-100">
-                <td class="py-3 px-3 font-bold text-slate-500 text-center">${idx + 1}</td>
+            <tr class="hover:bg-rose-50/40 transition border-b border-slate-100 ${isChecked ? 'bg-amber-50/60' : ''}">
+                <td class="py-3 px-3 text-center">
+                    <div class="flex items-center justify-center gap-1.5">
+                        <input type="checkbox" class="claim-item-checkbox w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300 cursor-pointer" 
+                            value="${escapeHtml(c.invoice_number)}" 
+                            ${isChecked ? 'checked' : ''}
+                            onchange="handleClaimCheckboxChange('${escapeHtml(c.invoice_number)}', this)">
+                        <span class="font-bold text-slate-400 text-xs">${idx + 1}</span>
+                    </div>
+                </td>
                 <td class="py-3 px-3">
                     <button onclick="openClaimDetailModal('${c.invoice_number}')" class="font-mono font-bold text-indigo-600 hover:text-indigo-800 text-left block hover:underline text-xs" title="Klik untuk melihat berkas detail klaim">
                         ${escapeHtml(c.invoice_number)}
@@ -4302,6 +4312,13 @@ window.applyClaimCandidatesFilter = function() {
         `;
     });
     tbody.innerHTML = html;
+
+    // Sinkronisasi status checkbox master (Select All)
+    const masterCb = document.getElementById('checkAllClaimCandidates');
+    if (masterCb) {
+        masterCb.checked = (filtered.length > 0 && filtered.every(c => selectedClaimInvoices.has(c.invoice_number)));
+    }
+    updateSelectedClaimsBar();
 };
 
 window.resetClaimCandidatesFilter = function() {
@@ -4609,19 +4626,302 @@ window.closeClaimDetailModal = function() {
 };
 
 window.printClaimFromModal = function() {
-    if (!activeClaimCandidateInvoice) {
+    const inv = activeClaimCandidateInvoice || document.getElementById('claimSearchInput')?.value?.trim();
+    if (!inv) {
         showToast('warning', 'Pilih berkas klaim terlebih dahulu', 'Invoice Kosong');
         return;
     }
-    window.open(`claim_dossier.php?q=${encodeURIComponent(activeClaimCandidateInvoice)}`, '_blank');
+    const url = `claim_dossier.php?q=${encodeURIComponent(inv)}&autoprint=1`;
+    const win = window.open(url, '_blank');
+    if (!win || win.closed || typeof win.closed === 'undefined') {
+        window.location.href = url;
+    }
 };
 
 window.openClaimDossierFullTab = function() {
-    if (!activeClaimCandidateInvoice) {
+    const inv = activeClaimCandidateInvoice || document.getElementById('claimSearchInput')?.value?.trim();
+    if (!inv) {
         showToast('warning', 'Pilih berkas klaim terlebih dahulu', 'Invoice Kosong');
         return;
     }
-    window.open(`claim_dossier.php?q=${encodeURIComponent(activeClaimCandidateInvoice)}`, '_blank');
+    const url = `claim_dossier.php?q=${encodeURIComponent(inv)}`;
+    const win = window.open(url, '_blank');
+    if (!win || win.closed || typeof win.closed === 'undefined') {
+        window.location.href = url;
+    }
+};
+
+// ==========================================
+// FITUR MULTIPLE SELECT & INVOICE TAGIHAN KLAIM KOLEKTIF
+// ==========================================
+window.handleClaimCheckboxChange = function(invoiceNumber, cbEl) {
+    if (cbEl.checked) {
+        selectedClaimInvoices.add(invoiceNumber);
+    } else {
+        selectedClaimInvoices.delete(invoiceNumber);
+    }
+
+    // Update highlight baris
+    const tr = cbEl.closest('tr');
+    if (tr) {
+        if (cbEl.checked) tr.classList.add('bg-amber-50/60');
+        else tr.classList.remove('bg-amber-50/60');
+    }
+
+    const masterCb = document.getElementById('checkAllClaimCandidates');
+    if (masterCb) {
+        const allCheckboxes = document.querySelectorAll('.claim-item-checkbox');
+        masterCb.checked = (allCheckboxes.length > 0 && Array.from(allCheckboxes).every(c => c.checked));
+    }
+    updateSelectedClaimsBar();
+};
+
+window.toggleSelectAllClaims = function(masterCb) {
+    const isChecked = masterCb.checked;
+    const checkboxes = document.querySelectorAll('.claim-item-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = isChecked;
+        const inv = cb.value;
+        const tr = cb.closest('tr');
+        if (isChecked) {
+            selectedClaimInvoices.add(inv);
+            if (tr) tr.classList.add('bg-amber-50/60');
+        } else {
+            selectedClaimInvoices.delete(inv);
+            if (tr) tr.classList.remove('bg-amber-50/60');
+        }
+    });
+    updateSelectedClaimsBar();
+};
+
+window.clearSelectedClaims = function() {
+    selectedClaimInvoices.clear();
+    const checkboxes = document.querySelectorAll('.claim-item-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = false;
+        const tr = cb.closest('tr');
+        if (tr) tr.classList.remove('bg-amber-50/60');
+    });
+    const masterCb = document.getElementById('checkAllClaimCandidates');
+    if (masterCb) masterCb.checked = false;
+    updateSelectedClaimsBar();
+};
+
+window.updateSelectedClaimsBar = function() {
+    const bar = document.getElementById('selectedClaimsActionCard');
+    const countEl = document.getElementById('selectedClaimsCount');
+    const dmgQtyEl = document.getElementById('selectedClaimsDamagedQty');
+    const priceEl = document.getElementById('selectedClaimsTotalPrice');
+    const btnCountEl = document.getElementById('btnSelectedCount');
+
+    if (!bar) return;
+
+    if (selectedClaimInvoices.size === 0) {
+        bar.classList.add('hidden');
+        return;
+    }
+
+    bar.classList.remove('hidden');
+
+    let totalNominal = 0;
+    let totalDmg = 0;
+
+    selectedClaimInvoices.forEach(inv => {
+        const item = cachedClaimCandidates.find(c => c.invoice_number === inv);
+        if (item) {
+            totalNominal += Number(item.package_price || 0);
+            totalDmg += Number(item.damaged_qty || item.total_damaged || item.damaged_items_count || 1);
+        }
+    });
+
+    if (countEl) countEl.innerText = `${selectedClaimInvoices.size} Paket`;
+    if (dmgQtyEl) dmgQtyEl.innerText = `(${totalDmg} pcs rusak)`;
+    if (priceEl) priceEl.innerText = 'Rp ' + totalNominal.toLocaleString('id-ID');
+    if (btnCountEl) btnCountEl.innerText = selectedClaimInvoices.size;
+};
+
+window.openCollectiveClaimInvoiceModal = function() {
+    if (selectedClaimInvoices.size === 0) {
+        showToast('warning', 'Pilih minimal 1 paket klaim untuk membuat invoice tagihan.', 'Peringatan');
+        return;
+    }
+
+    const modal = document.getElementById('modalCollectiveClaimInvoice');
+    const container = document.getElementById('mColClaimPreviewContainer');
+    const badgeCount = document.getElementById('mColClaimBadgeCount');
+
+    if (badgeCount) badgeCount.innerText = `${selectedClaimInvoices.size} Paket`;
+
+    // Ambil data terpilih dari cachedClaimCandidates
+    const selectedList = [];
+    selectedClaimInvoices.forEach(inv => {
+        const found = cachedClaimCandidates.find(c => c.invoice_number === inv);
+        if (found) {
+            selectedList.push(found);
+        } else {
+            selectedList.push({ invoice_number: inv, expedition: '-', package_price: 0, damaged_qty: 1 });
+        }
+    });
+
+    let grandTotal = 0;
+    let totalQty = 0;
+    const expSet = new Set();
+
+    selectedList.forEach(it => {
+        grandTotal += Number(it.package_price || 0);
+        totalQty += Number(it.damaged_qty || it.total_damaged || it.damaged_items_count || 1);
+        if (it.expedition) expSet.add(it.expedition);
+    });
+
+    const expText = expSet.size > 0 ? Array.from(expSet).join(', ') : 'Ekspedisi Terkait';
+    const docNo = 'INV-CLM-' + new Date().toISOString().slice(0,10).replace(/-/g, '') + '-' + String(selectedList.length).padStart(3, '0');
+
+    let tableRows = '';
+    selectedList.forEach((it, idx) => {
+        const pVal = Number(it.package_price || 0);
+        const pText = pVal > 0 ? ('Rp ' + pVal.toLocaleString('id-ID')) : '<span class="text-slate-400 italic">Rp 0</span>';
+        const qDmg = Number(it.damaged_qty || it.total_damaged || it.damaged_items_count || 1);
+        const rsn = it.damage_reasons || it.notes || 'Kondisi Rusak Saat Unboxing';
+
+        tableRows += `
+            <tr class="hover:bg-slate-50 border-b border-slate-100 text-xs">
+                <td class="p-2.5 text-center text-slate-400 font-bold">${idx + 1}</td>
+                <td class="p-2.5 font-mono font-bold text-slate-800">
+                    ${escapeHtml(it.invoice_number)}
+                    <div class="text-[10px] text-amber-600 font-semibold">${escapeHtml(it.expedition || '-')}</div>
+                </td>
+                <td class="p-2.5">
+                    <div class="font-bold text-slate-900">${escapeHtml(it.product_names || 'Produk Retur')}</div>
+                    ${it.sku ? `<div class="text-[10px] text-slate-500 font-mono">SKU: ${escapeHtml(it.sku)}</div>` : ''}
+                </td>
+                <td class="p-2.5 text-center font-bold text-rose-600 font-mono">${qDmg}</td>
+                <td class="p-2.5 text-slate-600">${escapeHtml(rsn)}</td>
+                <td class="p-2.5 text-right font-mono font-bold text-slate-900 whitespace-nowrap">${pText}</td>
+            </tr>
+        `;
+    });
+
+    if (container) {
+        container.innerHTML = `
+            <div class="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200/90 space-y-4">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-200 pb-3">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded bg-emerald-600 text-white flex items-center justify-center text-xs font-black">IEG</span>
+                            <span class="font-black text-sm text-slate-900">PT. INOVASI EKA GEMILANG</span>
+                        </div>
+                        <div class="text-[11px] text-slate-500">Reverse Logistics & Claims Department</div>
+                    </div>
+                    <div class="sm:text-right">
+                        <div class="text-[11px] font-mono font-bold text-rose-600">No: ${docNo}</div>
+                        <div class="text-[10px] text-slate-400">Ekspedisi: <b class="text-slate-700">${escapeHtml(expText)}</b></div>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-200 shadow-2xs">
+                    <table class="w-full text-left text-xs">
+                        <thead>
+                            <tr class="bg-slate-800 text-white font-bold text-[10px] uppercase">
+                                <th class="p-2.5 text-center w-8">#</th>
+                                <th class="p-2.5">Resi / Invoice</th>
+                                <th class="p-2.5">Produk & SKU</th>
+                                <th class="p-2.5 text-center w-14">Qty Rusak</th>
+                                <th class="p-2.5">Alasan Kerusakan</th>
+                                <th class="p-2.5 text-right w-28">Nilai Tagihan</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 bg-white">
+                            ${tableRows}
+                        </tbody>
+                        <tfoot>
+                            <tr class="bg-slate-100 font-bold border-t-2 border-slate-800 text-xs">
+                                <td colspan="3" class="p-2.5 text-right text-slate-700 uppercase">Total (${selectedList.length} Paket):</td>
+                                <td class="p-2.5 text-center font-mono text-rose-600 text-sm">${totalQty}</td>
+                                <td class="p-2.5 text-right text-slate-700 uppercase">Grand Total:</td>
+                                <td class="p-2.5 text-right font-mono font-black text-emerald-700 text-sm whitespace-nowrap">
+                                    Rp ${grandTotal.toLocaleString('id-ID')}
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-2xs">
+                    <div>
+                        <span class="text-emerald-800 font-bold block">Total Penggantian Tagihan Klaim:</span>
+                        <span class="text-[11px] text-emerald-600">Siap diajukan secara resmi ke pihak ekspedisi terkait</span>
+                    </div>
+                    <span class="font-mono font-black text-emerald-700 text-base sm:text-lg">Rp ${grandTotal.toLocaleString('id-ID')}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    if (modal) modal.classList.remove('hidden');
+};
+
+window.closeCollectiveClaimModal = function() {
+    const modal = document.getElementById('modalCollectiveClaimInvoice');
+    if (modal) modal.classList.add('hidden');
+};
+
+window.printCollectiveClaimInvoice = function() {
+    if (selectedClaimInvoices.size === 0) return;
+    const invList = Array.from(selectedClaimInvoices).join(',');
+    const url = `claim_invoice.php?invoices=${encodeURIComponent(invList)}&autoprint=1`;
+    const win = window.open(url, '_blank');
+    if (!win || win.closed || typeof win.closed === 'undefined') {
+        window.location.href = url;
+    }
+};
+
+window.openCollectiveClaimFullTab = function() {
+    if (selectedClaimInvoices.size === 0) return;
+    const invList = Array.from(selectedClaimInvoices).join(',');
+    const url = `claim_invoice.php?invoices=${encodeURIComponent(invList)}`;
+    const win = window.open(url, '_blank');
+    if (!win || win.closed || typeof win.closed === 'undefined') {
+        window.location.href = url;
+    }
+};
+
+window.copyCollectiveClaimText = function() {
+    if (selectedClaimInvoices.size === 0) return;
+    const selectedList = [];
+    selectedClaimInvoices.forEach(inv => {
+        const found = cachedClaimCandidates.find(c => c.invoice_number === inv);
+        if (found) selectedList.push(found);
+    });
+
+    let grandTotal = 0;
+    const expSet = new Set();
+    selectedList.forEach(it => {
+        grandTotal += Number(it.package_price || 0);
+        if (it.expedition) expSet.add(it.expedition);
+    });
+
+    let text = `*SURAT TAGIHAN KLAIM BARANG RUSAK EKSPEDISI*\n`;
+    text += `Ekspedisi: ${Array.from(expSet).join(', ') || '-'}\n`;
+    text += `Total Paket: ${selectedList.length} Paket\n`;
+    text += `Total Nominal Tagihan: *Rp ${grandTotal.toLocaleString('id-ID')}*\n\n`;
+    text += `*Daftar Resi & Kerusakan:*\n`;
+
+    selectedList.forEach((it, idx) => {
+        const pText = it.package_price > 0 ? ('Rp ' + Number(it.package_price).toLocaleString('id-ID')) : '-';
+        text += `${idx + 1}. Resi: ${it.invoice_number} (${it.expedition || '-'})\n`;
+        text += `   Barang: ${it.product_names || 'Produk Retur'}\n`;
+        text += `   Alasan: ${it.damage_reasons || 'Rusak'}\n`;
+        text += `   Nominal: ${pText}\n\n`;
+    });
+
+    text += `Mohon segera diverifikasi dan diproses penggantian klaimnya. Terima kasih.\n`;
+    text += `_PT. Inovasi Eka Gemilang - Reverse Logistics_`;
+
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('success', 'Format rekap tagihan berhasil disalin ke clipboard!', 'Tersalin');
+    }).catch(() => {
+        prompt('Salin teks tagihan:', text);
+    });
 };
 
 window.lookupClaimCandidate = function(identifier) {
