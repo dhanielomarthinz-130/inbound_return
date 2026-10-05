@@ -5173,7 +5173,7 @@ window.printCollectiveClaimInvoice = function() {
         showToast('warning', 'Pilih minimal 1 paket klaim untuk dicetak invoice tagihannya.', 'Peringatan');
         return;
     }
-    submitInvoicePostForm(Array.from(selectedClaimInvoices), true);
+    submitInvoicePostForm(Array.from(selectedClaimInvoices), false);
 };
 
 window.openCollectiveClaimFullTab = function() {
