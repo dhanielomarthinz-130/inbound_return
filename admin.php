@@ -707,36 +707,53 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
             <!-- TAB 2: INBOUND UNBOXING & RIWAYAT TRANSAKSI LENGKAP -->
             <div id="tab-transactions" class="tab-content hidden space-y-6">
                 <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
-                    <div class="p-4 border-b border-slate-200 flex flex-col lg:flex-row justify-between items-center gap-4">
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <h3 class="font-bold text-base text-slate-800">Inbound Unboxing</h3>
-                                <span class="bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-200">Video &amp; Audit Trail</span>
+                    <!-- Header Baris 1: Judul & Download Excel -->
+                    <div class="p-4 sm:p-5 border-b border-slate-200 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                        <div class="flex items-center gap-3">
+                            <span class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg shadow-sm border border-indigo-100 shrink-0">
+                                <i class="fa-solid fa-box-open"></i>
+                            </span>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="font-bold text-base text-slate-800">Inbound Unboxing</h3>
+                                    <span class="bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-200">Video &amp; Audit Trail</span>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-0.5">Riwayat hasil scan unboxing fisik paket, kondisi produk, dan rekaman audit trail</p>
                             </div>
                         </div>
-                        <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-                            <!-- Premium Datepicker (Flatpickr) -->
-                            <div class="relative flex items-center">
+                        <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                            <button onclick="exportInboundUnboxingExcel()" title="Download Seluruh Riwayat Inbound Unboxing ke Excel" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2.5 rounded-xl font-bold transition flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/20 w-full sm:w-auto cursor-pointer">
+                                <i class="fa-solid fa-file-excel text-xs"></i>
+                                <span>Download Excel</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Header Baris 2: Dedicated Responsive Filter Bar (Rapi & Tahan Zoom) -->
+                    <div class="p-3.5 sm:p-4 bg-slate-50/70 border-b border-slate-200">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5">
+                            <!-- 1. Premium Datepicker (Flatpickr) -->
+                            <div class="relative flex items-center w-full">
                                 <span class="absolute left-3 text-indigo-600 pointer-events-none text-xs z-10">
                                     <i class="fa-regular fa-calendar-days"></i>
                                 </span>
                                 <input type="text" id="filterDate" placeholder="Pilih Tanggal / Rentang..." readonly
-                                    class="bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs transition w-44 sm:w-56 cursor-pointer">
+                                    class="w-full bg-white hover:border-slate-400 focus:bg-white border border-slate-300 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs transition cursor-pointer">
                                 <button type="button" id="btnClearDate" onclick="clearDateFilter()" title="Hapus filter tanggal" class="absolute right-2.5 text-slate-400 hover:text-rose-500 transition text-xs hidden z-10">
                                     <i class="fa-solid fa-circle-xmark"></i>
                                 </button>
                             </div>
 
-                            <!-- Filter Ekspedisi -->
-                            <div class="relative">
-                                <select id="filterExpedition" onchange="loadTransactions()" class="bg-slate-50 hover:bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-2xs">
+                            <!-- 2. Filter Ekspedisi -->
+                            <div class="relative w-full">
+                                <select id="filterExpedition" onchange="loadTransactions()" class="w-full bg-white hover:border-slate-400 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-2xs cursor-pointer">
                                     <option value="">Semua Ekspedisi</option>
                                 </select>
                             </div>
 
-                            <!-- Filter Type (Kondisi) -->
-                            <div class="relative">
-                                <select id="filterCondition" onchange="loadTransactions()" class="bg-slate-50 hover:bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-2xs">
+                            <!-- 3. Filter Type (Kondisi) -->
+                            <div class="relative w-full">
+                                <select id="filterCondition" onchange="loadTransactions()" class="w-full bg-white hover:border-slate-400 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-2xs cursor-pointer">
                                     <option value="">Semua Kondisi</option>
                                     <?php
                                     if (isset($pdo)) {
@@ -751,28 +768,32 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 </select>
                             </div>
 
-                            <!-- Filter Operator -->
-                            <div class="relative">
-                                <select id="filterOperator" onchange="loadTransactions()" class="bg-slate-50 hover:bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-2xs">
+                            <!-- 4. Filter Operator -->
+                            <div class="relative w-full">
+                                <select id="filterOperator" onchange="loadTransactions()" class="w-full bg-white hover:border-slate-400 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-2xs cursor-pointer">
                                     <option value="">Semua Operator</option>
                                 </select>
                             </div>
 
-                            <!-- Search Input -->
-                            <div class="relative flex items-center">
+                            <!-- 5. Search Input -->
+                            <div class="relative flex items-center w-full">
                                 <span class="absolute left-3 text-slate-400 pointer-events-none text-xs">
                                     <i class="fa-solid fa-magnifying-glass"></i>
                                 </span>
                                 <input type="text" id="filterSearch" placeholder="Cari invoice/sku..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-                                    class="border border-slate-300 rounded-xl pl-8 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs w-36 sm:w-44">
+                                    class="w-full bg-white hover:border-slate-400 border border-slate-300 rounded-xl pl-8 pr-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs">
                             </div>
 
-                            <button id="btnApplyFilter" onclick="loadTransactions()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-sm shadow-indigo-600/30">
-                                <i class="fa-solid fa-filter text-[11px]"></i> Filter
-                            </button>
-                            <button onclick="exportInboundUnboxingExcel()" title="Download Seluruh Riwayat Inbound Unboxing ke Excel" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/20">
-                                <i class="fa-solid fa-file-excel text-[11px]"></i> Download Excel
-                            </button>
+                            <!-- 6. Action Button Group (Filter & Reset) -->
+                            <div class="flex items-center gap-2 w-full">
+                                <button id="btnApplyFilter" onclick="loadTransactions()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs py-2 px-3 rounded-xl font-bold transition flex items-center justify-center gap-1.5 shadow-sm shadow-indigo-600/30 cursor-pointer">
+                                    <i class="fa-solid fa-filter text-[11px]"></i>
+                                    <span>Filter</span>
+                                </button>
+                                <button type="button" onclick="resetTransactionFilters()" title="Reset semua filter ke default" class="bg-slate-200 hover:bg-slate-300 active:scale-95 text-slate-700 text-xs py-2 px-3 rounded-xl font-bold transition flex items-center justify-center cursor-pointer">
+                                    <i class="fa-solid fa-rotate-left text-xs"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -1780,13 +1801,109 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
 
             <!-- Modal Footer -->
             <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
-                <button type="button" onclick="deleteCurrentModalSession()" class="text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-300 px-3.5 py-2 rounded-xl text-xs font-semibold transition inline-flex items-center gap-1.5 shadow-2xs cursor-pointer">
-                    <i class="fa-solid fa-trash-can"></i> Hapus Sesi
-                </button>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="editCurrentModalSession()" class="text-amber-800 hover:text-white hover:bg-amber-600 bg-amber-50 border border-amber-300 px-3.5 py-2 rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-2xs cursor-pointer">
+                        <i class="fa-solid fa-pen-to-square"></i> Edit Transaksi
+                    </button>
+                    <button type="button" onclick="deleteCurrentModalSession()" class="text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-300 px-3.5 py-2 rounded-xl text-xs font-semibold transition inline-flex items-center gap-1.5 shadow-2xs cursor-pointer">
+                        <i class="fa-solid fa-trash-can"></i> Hapus Sesi
+                    </button>
+                </div>
                 <button type="button" onclick="closeDetailModal()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer">
                     Tutup
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- MODAL EDIT DATA TRANSAKSI UNBOXING & PRODUK -->
+    <div id="modalEditUnboxing" class="fixed inset-0 bg-black/80 backdrop-blur-xs z-50 flex items-center justify-center hidden p-3 md:p-6 overflow-y-auto">
+        <div class="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <!-- Modal Header -->
+            <div class="p-4 bg-slate-900 text-white flex justify-between items-center border-b border-slate-800 shrink-0">
+                <div class="flex items-center space-x-3">
+                    <div class="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold text-base shadow-sm">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-bold text-base tracking-tight">Edit Transaksi Unboxing</h3>
+                            <span id="badgeEditUnboxInvoice" class="bg-amber-500/20 text-amber-300 text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-amber-500/40">INV-XXX</span>
+                        </div>
+                        <p class="text-[11px] text-slate-400">Perbarui nomor resi, ekspedisi, operator, kondisi fisik atau rincian item unboxing</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeEditUnboxingModal()" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition cursor-pointer">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Modal Form Body -->
+            <form id="formEditUnboxing" onsubmit="saveEditUnboxingTransaction(event)" class="flex flex-col flex-1 min-h-0">
+                <input type="hidden" id="editUnboxSessionId" value="">
+
+                <div class="p-5 overflow-y-auto flex-1 space-y-5">
+                    <!-- Seksi 1: Data Sesi Header -->
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+                        <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fa-solid fa-file-invoice text-indigo-600"></i>
+                            <span>Informasi Sesi Transaksi</span>
+                        </h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Nomor Resi / Invoice <span class="text-rose-500">*</span></label>
+                                <input type="text" id="editUnboxInvoice" required class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Jasa Ekspedisi</label>
+                                <select id="editUnboxExpedition" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <option value="SPX">Shopee Xpress (SPX)</option>
+                                    <option value="J&T">J&T Express</option>
+                                    <option value="SiCepat">SiCepat Ekspres</option>
+                                    <option value="JNE">JNE Express</option>
+                                    <option value="GoSend">GoSend / Grab</option>
+                                    <option value="AnterAja">AnterAja</option>
+                                    <option value="Lainnya">Lainnya</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Petugas (Operator)</label>
+                                <input type="text" id="editUnboxOperator" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Catatan Keseluruhan Sesi Unboxing</label>
+                            <textarea id="editUnboxNotes" rows="2" placeholder="Catatan opsional..." class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Seksi 2: Rincian Produk Unboxing -->
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fa-solid fa-boxes-stacked text-indigo-600"></i>
+                                <span>Rincian Item Produk Unboxing</span>
+                            </h4>
+                            <span class="text-[11px] text-slate-500">Ubah kondisi, qty, atau alasan kerusakan barang</span>
+                        </div>
+                        
+                        <div id="editUnboxItemsList" class="space-y-3">
+                            <!-- Diisi secara dinamis oleh JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+                    <button type="button" onclick="closeEditUnboxingModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 active:scale-95 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer">
+                        Batal
+                    </button>
+                    <button type="submit" id="btnSaveEditUnboxing" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black rounded-xl transition flex items-center gap-2 shadow-sm shadow-indigo-600/30 cursor-pointer">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>Simpan Perubahan</span>
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 

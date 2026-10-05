@@ -80,6 +80,179 @@ if ($method === 'DELETE' || ($method === 'POST' && isset($_GET['action']) && $_G
     }
 }
 
+// Handle GET: Ambil Data Sesi & Item untuk Modal Edit
+if ($method === 'GET' && isset($_GET['action']) && $_GET['action'] === 'get_edit') {
+    $sessionUser = getSessionUser();
+    if (!in_array($sessionUser['role'] ?? '', ['admin', 'superadmin', 'operator'])) {
+        jsonResponse(['error' => 'Akses ditolak.'], 403);
+    }
+
+    $sessionId = intval($_GET['id'] ?? 0);
+    $itemId    = intval($_GET['item_id'] ?? 0);
+
+    if ($sessionId <= 0 && $itemId > 0) {
+        $stmtFindSess = $pdo->prepare("SELECT session_id FROM return_items WHERE id = ?");
+        $stmtFindSess->execute([$itemId]);
+        $sessionId = intval($stmtFindSess->fetchColumn());
+    }
+
+    if ($sessionId <= 0) {
+        jsonResponse(['error' => 'ID Transaksi Unboxing tidak valid'], 400);
+    }
+
+    try {
+        $stmtSess = $pdo->prepare("SELECT id, invoice_number, expedition, operator_name, customer_name, notes, total_items, total_good, total_damaged, created_at FROM return_sessions WHERE id = ?");
+        $stmtSess->execute([$sessionId]);
+        $session = $stmtSess->fetch(PDO::FETCH_ASSOC);
+
+        if (!$session) {
+            jsonResponse(['error' => 'Data sesi unboxing tidak ditemukan'], 404);
+        }
+
+        $stmtItems = $pdo->prepare("
+            SELECT id, session_id, barcode, wrong_barcode, wrong_product_name, product_name, sku, seller_sku, sap_code, batch_no, exp_date, type, qty, `condition`, damage_reason, photo_path 
+            FROM return_items 
+            WHERE session_id = ? 
+            ORDER BY id ASC
+        ");
+        $stmtItems->execute([$sessionId]);
+        $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
+
+        jsonResponse([
+            'success' => true,
+            'session' => $session,
+            'items'   => $items,
+            'focus_item_id' => $itemId
+        ]);
+    } catch (Exception $e) {
+        jsonResponse(['error' => 'Gagal mengambil data edit: ' . $e->getMessage()], 500);
+    }
+}
+
+// Handle POST: Update Data Sesi & Item Unboxing
+if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'update') {
+    $sessionUser = getSessionUser();
+    if (!in_array($sessionUser['role'] ?? '', ['admin', 'superadmin'])) {
+        jsonResponse(['error' => 'Akses ditolak. Hanya Admin yang dapat mengedit data transaksi unboxing.'], 403);
+    }
+
+    $raw = file_get_contents('php://input');
+    $payload = json_decode($raw, true);
+    if (!is_array($payload)) {
+        $payload = $_POST;
+    }
+
+    $sessionId = intval($payload['session_id'] ?? $payload['id'] ?? 0);
+    if ($sessionId <= 0) {
+        jsonResponse(['error' => 'ID Sesi Unboxing tidak valid'], 400);
+    }
+
+    $invoiceNumber = trim($payload['invoice_number'] ?? '');
+    $expedition    = trim($payload['expedition'] ?? '');
+    $operatorName  = trim($payload['operator_name'] ?? '');
+    $notes         = trim($payload['notes'] ?? '');
+    $items         = $payload['items'] ?? [];
+
+    if (empty($invoiceNumber)) {
+        jsonResponse(['error' => 'Nomor Invoice tidak boleh kosong'], 400);
+    }
+
+    try {
+        $pdo->beginTransaction();
+
+        // 1. Update return_sessions
+        $stmtUpdSess = $pdo->prepare("
+            UPDATE return_sessions 
+            SET invoice_number = ?, expedition = ?, operator_name = ?, notes = ? 
+            WHERE id = ?
+        ");
+        $stmtUpdSess->execute([
+            $invoiceNumber,
+            $expedition ?: 'Lainnya',
+            $operatorName ?: 'Gudang 01',
+            $notes,
+            $sessionId
+        ]);
+
+        // 2. Update masing-masing return_items jika ada
+        if (!empty($items) && is_array($items)) {
+            $stmtUpdItem = $pdo->prepare("
+                UPDATE return_items 
+                SET product_name = ?, 
+                    sku = ?, 
+                    seller_sku = ?, 
+                    barcode = ?, 
+                    type = ?, 
+                    `condition` = ?, 
+                    damage_reason = ?, 
+                    qty = ?, 
+                    batch_no = ?, 
+                    exp_date = ?
+                WHERE id = ? AND session_id = ?
+            ");
+
+            foreach ($items as $it) {
+                $itemId = intval($it['id'] ?? 0);
+                if ($itemId <= 0) continue;
+
+                $pName    = trim($it['product_name'] ?? '');
+                $sku      = trim($it['sku'] ?? '');
+                $sellerSku= trim($it['seller_sku'] ?? $sku);
+                $barcode  = trim($it['barcode'] ?? '');
+                $type     = strtoupper(trim($it['type'] ?? 'GOOD'));
+                $cond     = ($type === 'GOOD' || $type === 'BAGUS' || $type === 'LAYAK') ? 'GOOD' : 'RUSAK';
+                $reason   = ($cond === 'RUSAK') ? trim($it['damage_reason'] ?? $type) : '';
+                $qty      = max(1, intval($it['qty'] ?? 1));
+                $batchNo  = trim($it['batch_no'] ?? '-');
+                $expDate  = trim($it['exp_date'] ?? '-');
+
+                $stmtUpdItem->execute([
+                    $pName,
+                    $sku,
+                    $sellerSku,
+                    $barcode,
+                    $type,
+                    $cond,
+                    $reason,
+                    $qty,
+                    $batchNo,
+                    $expDate,
+                    $itemId,
+                    $sessionId
+                ]);
+            }
+        }
+
+        // 3. Rekalkulasi total unit, total good, total damaged
+        $pdo->prepare("
+            UPDATE return_sessions s
+            SET s.total_items = (SELECT COALESCE(SUM(qty), 0) FROM return_items WHERE session_id = s.id),
+                s.total_good  = (SELECT COALESCE(SUM(CASE WHEN UPPER(COALESCE(type, `condition`)) IN ('GOOD', 'BAGUS', 'LAYAK') THEN qty ELSE 0 END), 0) FROM return_items WHERE session_id = s.id),
+                s.total_damaged = (SELECT COALESCE(SUM(CASE WHEN UPPER(COALESCE(type, `condition`)) NOT IN ('GOOD', 'BAGUS', 'LAYAK') THEN qty ELSE 0 END), 0) FROM return_items WHERE session_id = s.id)
+            WHERE s.id = ?
+        ")->execute([$sessionId]);
+
+        $pdo->commit();
+
+        // 4. Bersihkan cache dashboard
+        $cacheDir = __DIR__ . '/../uploads/cache/';
+        if (is_dir($cacheDir)) {
+            @array_map('unlink', glob($cacheDir . '*.json'));
+        }
+
+        jsonResponse([
+            'success' => true,
+            'message' => "Data transaksi unboxing [{$invoiceNumber}] berhasil diperbarui!",
+            'session_id' => $sessionId
+        ]);
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        jsonResponse(['error' => 'Gagal memperbarui data transaksi: ' . $e->getMessage()], 500);
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonResponse(['error' => 'Metode tidak diizinkan'], 405);
 }

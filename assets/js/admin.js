@@ -982,6 +982,9 @@ function createTransactionRow(r, isPreview = false) {
                 <button type="button" onclick="viewDetails(${r.session_id || r.id}, '${escapeHtml(condCode)}')" title="Lihat Detail Transaksi Unboxing" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 border border-slate-200 flex items-center justify-center transition shadow-2xs cursor-pointer">
                     <i class="fa-solid fa-eye text-xs"></i>
                 </button>
+                <button type="button" onclick="editUnboxingTransaction(${r.session_id || r.id}, ${r.item_id || 0})" title="Edit Data Transaksi & Produk" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-amber-50 hover:text-amber-600 text-slate-600 border border-slate-200 flex items-center justify-center transition shadow-2xs cursor-pointer">
+                    <i class="fa-solid fa-pen-to-square text-xs"></i>
+                </button>
                 <button type="button" onclick="deleteUnboxingTransaction(${r.session_id || r.id}, '${escapeHtml(r.invoice_number || '')}')" title="Hapus Data Unboxing" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 border border-slate-200 flex items-center justify-center transition shadow-2xs cursor-pointer">
                     <i class="fa-solid fa-trash-can text-xs"></i>
                 </button>
@@ -990,6 +993,261 @@ function createTransactionRow(r, isPreview = false) {
     `;
     return tr;
 }
+
+// Handler Reset Filter Inbound Unboxing
+window.resetTransactionFilters = function() {
+    if (typeof clearDateFilter === 'function') clearDateFilter();
+    const exp = document.getElementById('filterExpedition');
+    const cond = document.getElementById('filterCondition');
+    const op = document.getElementById('filterOperator');
+    const search = document.getElementById('filterSearch');
+
+    if (exp) exp.value = '';
+    if (cond) cond.value = '';
+    if (op) op.value = '';
+    if (search) search.value = '';
+
+    loadTransactions();
+};
+
+// Handler Edit Transaksi Unboxing
+window.editUnboxingTransaction = async function(sessionId, itemId) {
+    if (!sessionId) return;
+
+    showGlobalLoading("Memuat Data...", "Mengambil rincian transaksi unboxing untuk diedit...");
+
+    try {
+        const res = await fetch(`api/returns.php?action=get_edit&id=${sessionId}&item_id=${itemId || 0}`);
+        const data = await res.json();
+        hideGlobalLoading();
+
+        if (!data.success || !data.session) {
+            showToast('error', data.error || 'Gagal memuat data transaksi untuk diedit', 'Gagal Memuat');
+            return;
+        }
+
+        const sess = data.session;
+        const items = data.items || [];
+        const focusItemId = data.focus_item_id || 0;
+
+        document.getElementById('editUnboxSessionId').value = sess.id;
+        document.getElementById('editUnboxInvoice').value = sess.invoice_number || '';
+        document.getElementById('badgeEditUnboxInvoice').innerText = sess.invoice_number || 'INV-XXX';
+        document.getElementById('editUnboxOperator').value = sess.operator_name || '';
+        document.getElementById('editUnboxNotes').value = sess.notes || '';
+
+        // Isi pilihan ekspedisi
+        const expSelect = document.getElementById('editUnboxExpedition');
+        if (expSelect) {
+            let found = false;
+            for (let opt of expSelect.options) {
+                if (opt.value.toLowerCase() === (sess.expedition || '').toLowerCase()) {
+                    opt.selected = true;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found && sess.expedition) {
+                const newOpt = document.createElement('option');
+                newOpt.value = sess.expedition;
+                newOpt.textContent = sess.expedition;
+                newOpt.selected = true;
+                expSelect.appendChild(newOpt);
+            }
+        }
+
+        // Render Daftar Item Produk
+        const itemsContainer = document.getElementById('editUnboxItemsList');
+        if (itemsContainer) {
+            itemsContainer.innerHTML = '';
+            if (items.length === 0) {
+                itemsContainer.innerHTML = `<div class="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center text-slate-400 text-xs italic">Tidak ada item tercatat dalam sesi ini.</div>`;
+            } else {
+                items.forEach((it, idx) => {
+                    const isFocused = (focusItemId > 0 && it.id == focusItemId);
+                    const condVal = (it.type || it.condition || 'GOOD').toUpperCase();
+
+                    // Bangun opsi kondisi dari allConditions
+                    let condOptions = `<option value="GOOD" ${condVal === 'GOOD' ? 'selected' : ''}>GOOD (Barang Bagus)</option>`;
+                    if (typeof allConditions !== 'undefined' && Array.isArray(allConditions)) {
+                        allConditions.forEach(c => {
+                            if (c.code.toUpperCase() !== 'GOOD') {
+                                const sel = (c.code.toUpperCase() === condVal) ? 'selected' : '';
+                                condOptions += `<option value="${escapeHtml(c.code)}" ${sel}>${escapeHtml(c.name)} (${escapeHtml(c.code)})</option>`;
+                            }
+                        });
+                    } else {
+                        condOptions += `
+                            <option value="RUSAK" ${condVal === 'RUSAK' ? 'selected' : ''}>RUSAK / CACAT</option>
+                            <option value="KARDUS PENYOK" ${condVal === 'KARDUS PENYOK' ? 'selected' : ''}>KARDUS PENYOK</option>
+                            <option value="PECAH" ${condVal === 'PECAH' ? 'selected' : ''}>PECAH / BOCOR</option>
+                            <option value="SALAH KIRIM" ${condVal === 'SALAH KIRIM' ? 'selected' : ''}>SALAH KIRIM</option>
+                        `;
+                    }
+
+                    const card = document.createElement('div');
+                    card.className = `p-4 rounded-2xl border transition ${isFocused ? 'bg-amber-50/50 border-amber-300 ring-2 ring-amber-400/40' : 'bg-slate-50/70 border-slate-200'}`;
+                    card.innerHTML = `
+                        <input type="hidden" class="edit-item-id" value="${it.id}">
+                        <div class="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-200">
+                            <span class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                <span class="w-5 h-5 rounded-md bg-indigo-600 text-white flex items-center justify-center text-[10px] font-black">${idx + 1}</span>
+                                <span>Item #${idx + 1}</span>
+                            </span>
+                            <span class="font-mono text-[10px] text-slate-400">Barcode: <b class="text-slate-700">${escapeHtml(it.barcode || '-')}</b></span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
+                            <div class="sm:col-span-2">
+                                <label class="block font-semibold text-slate-600 text-[11px] mb-1">Nama Produk</label>
+                                <input type="text" class="edit-item-name w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" value="${escapeHtml(it.product_name || '')}">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-600 text-[11px] mb-1">Seller SKU / SKU</label>
+                                <input type="text" class="edit-item-sku w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" value="${escapeHtml(it.seller_sku || it.sku || '')}">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-600 text-[11px] mb-1">Barcode Scan</label>
+                                <input type="text" class="edit-item-barcode w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" value="${escapeHtml(it.barcode || '')}">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-6 gap-2.5 text-xs mt-2.5">
+                            <div>
+                                <label class="block font-semibold text-slate-600 text-[11px] mb-1">Qty</label>
+                                <input type="number" min="1" class="edit-item-qty w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-black text-center text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" value="${it.qty || 1}">
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="block font-semibold text-slate-600 text-[11px] mb-1">Kondisi / Tipe</label>
+                                <select class="edit-item-type w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    ${condOptions}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-600 text-[11px] mb-1">Batch No</label>
+                                <input type="text" class="edit-item-batch w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" value="${escapeHtml(it.batch_no || '-')}">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-600 text-[11px] mb-1">Exp Date</label>
+                                <input type="text" class="edit-item-exp w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" value="${escapeHtml(it.exp_date || '-')}">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-600 text-[11px] mb-1">Detail Rusak / Note</label>
+                                <input type="text" class="edit-item-reason w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Catatan kerusakan..." value="${escapeHtml(it.damage_reason || '')}">
+                            </div>
+                        </div>
+                    `;
+                    itemsContainer.appendChild(card);
+                });
+            }
+        }
+
+        const modal = document.getElementById('modalEditUnboxing');
+        if (modal) modal.classList.remove('hidden');
+
+    } catch (err) {
+        hideGlobalLoading();
+        showToast('error', 'Gagal membuka form edit: ' + err.message, 'Koneksi Error');
+    }
+};
+
+window.closeEditUnboxingModal = function() {
+    const modal = document.getElementById('modalEditUnboxing');
+    if (modal) modal.classList.add('hidden');
+};
+
+window.editCurrentModalSession = function() {
+    if (currentModalSessionId) {
+        closeDetailModal();
+        editUnboxingTransaction(currentModalSessionId, 0);
+    }
+};
+
+window.saveEditUnboxingTransaction = async function(event) {
+    if (event) event.preventDefault();
+
+    const sessionId = document.getElementById('editUnboxSessionId').value;
+    const invoiceNumber = document.getElementById('editUnboxInvoice').value.trim();
+    const expedition = document.getElementById('editUnboxExpedition').value;
+    const operatorName = document.getElementById('editUnboxOperator').value.trim();
+    const notes = document.getElementById('editUnboxNotes').value.trim();
+
+    if (!sessionId || !invoiceNumber) {
+        showToast('warning', 'Nomor invoice wajib diisi!', 'Peringatan');
+        return;
+    }
+
+    const items = [];
+    const itemCards = document.querySelectorAll('#editUnboxItemsList > div');
+    itemCards.forEach(c => {
+        const id = c.querySelector('.edit-item-id')?.value;
+        const name = c.querySelector('.edit-item-name')?.value.trim();
+        const sku = c.querySelector('.edit-item-sku')?.value.trim();
+        const barcode = c.querySelector('.edit-item-barcode')?.value.trim();
+        const qty = parseInt(c.querySelector('.edit-item-qty')?.value || '1', 10);
+        const type = c.querySelector('.edit-item-type')?.value;
+        const batch = c.querySelector('.edit-item-batch')?.value.trim();
+        const exp = c.querySelector('.edit-item-exp')?.value.trim();
+        const reason = c.querySelector('.edit-item-reason')?.value.trim();
+
+        if (id) {
+            items.push({
+                id: id,
+                product_name: name,
+                sku: sku,
+                seller_sku: sku,
+                barcode: barcode,
+                qty: qty,
+                type: type,
+                batch_no: batch,
+                exp_date: exp,
+                damage_reason: reason
+            });
+        }
+    });
+
+    const payload = {
+        session_id: sessionId,
+        invoice_number: invoiceNumber,
+        expedition: expedition,
+        operator_name: operatorName,
+        notes: notes,
+        items: items
+    };
+
+    const btnSave = document.getElementById('btnSaveEditUnboxing');
+    if (btnSave) {
+        btnSave.disabled = true;
+        btnSave.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...`;
+    }
+
+    try {
+        const res = await fetch('api/returns.php?action=update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (btnSave) {
+            btnSave.disabled = false;
+            btnSave.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> <span>Simpan Perubahan</span>`;
+        }
+
+        if (data.success) {
+            showToast('success', data.message || `Data transaksi unboxing [${invoiceNumber}] berhasil disimpan!`, 'Perubahan Disimpan');
+            closeEditUnboxingModal();
+            loadTransactions();
+            if (typeof loadDashboardMetrics === 'function') loadDashboardMetrics();
+        } else {
+            showToast('error', data.error || 'Gagal menyimpan perubahan transaksi unboxing', 'Gagal Simpan');
+        }
+    } catch (err) {
+        if (btnSave) {
+            btnSave.disabled = false;
+            btnSave.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> <span>Simpan Perubahan</span>`;
+        }
+        showToast('error', 'Terjadi kesalahan koneksi: ' + err.message, 'Koneksi Terputus');
+    }
+};
 
 // Handler Hapus Transaksi Unboxing
 window.deleteUnboxingTransaction = async function(sessionId, invoiceNumber) {
