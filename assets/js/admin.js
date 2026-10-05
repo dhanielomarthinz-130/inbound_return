@@ -4713,6 +4713,7 @@ window.updateSelectedClaimsBar = function() {
     const dmgQtyEl = document.getElementById('selectedClaimsDamagedQty');
     const priceEl = document.getElementById('selectedClaimsTotalPrice');
     const btnCountEl = document.getElementById('btnSelectedCount');
+    const btnPrintCostEl = document.getElementById('btnPrintTotalCost');
 
     if (!bar) return;
 
@@ -4734,10 +4735,12 @@ window.updateSelectedClaimsBar = function() {
         }
     });
 
+    const formattedPrice = 'Rp ' + totalNominal.toLocaleString('id-ID');
     if (countEl) countEl.innerText = `${selectedClaimInvoices.size} Paket`;
     if (dmgQtyEl) dmgQtyEl.innerText = `(${totalDmg} pcs rusak)`;
-    if (priceEl) priceEl.innerText = 'Rp ' + totalNominal.toLocaleString('id-ID');
+    if (priceEl) priceEl.innerText = formattedPrice;
     if (btnCountEl) btnCountEl.innerText = selectedClaimInvoices.size;
+    if (btnPrintCostEl) btnPrintCostEl.innerText = formattedPrice;
 };
 
 window.openCollectiveClaimInvoiceModal = function() {

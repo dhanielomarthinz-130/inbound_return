@@ -9,8 +9,8 @@ require_once __DIR__ . '/config.php';
 // Pastikan user login
 $currentUser = requireLogin();
 
-// Ambil daftar invoice dari parameter GET atau POST
-$rawInvoices = $_REQUEST['invoices'] ?? '';
+// Ambil daftar invoice dari parameter GET atau POST (invoices atau resis)
+$rawInvoices = $_REQUEST['invoices'] ?? $_REQUEST['resis'] ?? '';
 $invoiceList = [];
 
 if (is_array($rawInvoices)) {

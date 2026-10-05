@@ -929,13 +929,17 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             </div>
                         </div>
 
-                        <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
-                            <button type="button" onclick="clearSelectedClaims()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition border border-slate-700 cursor-pointer">
+                        <div class="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+                            <button type="button" onclick="clearSelectedClaims()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition border border-slate-700 cursor-pointer">
                                 Batal
                             </button>
-                            <button type="button" onclick="openCollectiveClaimInvoiceModal()" class="px-4 py-2 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 active:scale-95 text-slate-950 font-black rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-lg shadow-amber-500/30 cursor-pointer">
-                                <i class="fa-solid fa-file-invoice-dollar"></i>
-                                <span>Buat Invoice Tagihan (<span id="btnSelectedCount">0</span>)</span>
+                            <button type="button" onclick="openCollectiveClaimInvoiceModal()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-amber-400 hover:text-amber-300 rounded-xl text-xs font-bold transition border border-amber-500/40 flex items-center gap-1.5 cursor-pointer" title="Pratinjau Rincian & Salin Format WhatsApp">
+                                <i class="fa-solid fa-eye"></i>
+                                <span>Preview & WA</span>
+                            </button>
+                            <button type="button" onclick="printCollectiveClaimInvoice()" class="px-4 py-2 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-700 active:scale-95 text-white font-black rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-lg shadow-emerald-600/30 cursor-pointer">
+                                <i class="fa-solid fa-print"></i>
+                                <span>Print Invoice Tagihan (<span id="btnPrintTotalCost">Rp 0</span>)</span>
                             </button>
                         </div>
                     </div>
