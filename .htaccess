@@ -1,10 +1,11 @@
 Options -MultiViews
 RewriteEngine On
 
-# 1. Redirect eksternal dari *.php ke Clean URL (hanya untuk non-API dan non-dossier)
+# 1. Redirect eksternal dari *.php ke Clean URL (hanya untuk non-API, non-dossier, dan non-invoice)
 RewriteCond %{THE_REQUEST} ^[A-Z]{3,}\s+([^?\s]+)\.php(\?[^\s]*)?\s [NC]
 RewriteCond %{THE_REQUEST} !/api/ [NC]
 RewriteCond %{THE_REQUEST} !claim_dossier [NC]
+RewriteCond %{THE_REQUEST} !claim_invoice [NC]
 RewriteRule ^ %1%2 [R=301,L]
 
 # 2. Izinkan akses langsung ke file aset statis (CSS, JS, gambar, video, fonts) dan direktori
@@ -33,6 +34,8 @@ RewriteRule ^login/?$ login.php [QSA,L]
 RewriteRule ^logout/?$ logout.php [QSA,L]
 RewriteRule ^claim_dossier/?$ claim_dossier.php [QSA,L]
 RewriteRule ^dossier/?$ claim_dossier.php [QSA,L]
+RewriteRule ^claim_invoice/?$ claim_invoice.php [QSA,L]
+RewriteRule ^invoice_klaim/?$ claim_invoice.php [QSA,L]
 
 # 6. Fallback jika ada file PHP lain yang diakses tanpa ekstensi
 RewriteCond %{REQUEST_FILENAME} !-d

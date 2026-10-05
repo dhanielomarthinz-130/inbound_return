@@ -858,30 +858,30 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                         </div>
                     </div>
 
-                    <!-- Filter Toolbar 1 Baris Rapi -->
-                    <div class="p-3 bg-slate-50/80 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2.5 text-xs">
-                        <div class="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
+                    <!-- Filter Toolbar 1 Baris Rapi & Rekap Total Realtime Mengikuti Filter -->
+                    <div class="p-3.5 bg-slate-50/90 border-b border-slate-200 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-3 text-xs">
+                        <div class="flex flex-wrap items-center gap-2 flex-1 w-full xl:w-auto">
                             <!-- Input Search -->
                             <div class="relative flex-1 min-w-[180px] max-w-xs">
                                 <input type="text" id="filterClaimSearch" placeholder="Cari Resi / Invoice / Produk..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                                     oninput="applyClaimCandidatesFilter()"
-                                    class="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none transition shadow-2xs">
+                                    class="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none transition shadow-2xs font-semibold">
                                 <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                             </div>
 
                             <!-- Dropdown Ekspedisi -->
                             <select id="filterClaimExpedition" onchange="applyClaimCandidatesFilter()" 
-                                class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:ring-2 focus:ring-amber-500 focus:outline-none transition shadow-2xs">
+                                class="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-amber-500 focus:outline-none transition shadow-2xs cursor-pointer">
                                 <option value="">Semua Ekspedisi</option>
                             </select>
 
                             <!-- Filter Tanggal Unboxing (Flatpickr Rentang) -->
                             <div class="relative flex items-center">
-                                <span class="absolute left-2.5 text-amber-500 pointer-events-none text-xs z-10">
+                                <span class="absolute left-3 text-amber-500 pointer-events-none text-xs z-10">
                                     <i class="fa-regular fa-calendar-days"></i>
                                 </span>
                                 <input type="text" id="filterClaimDate" placeholder="Pilih Rentang Tanggal..." readonly
-                                    class="bg-white border border-slate-300 rounded-xl pl-8 pr-7 py-1.5 text-xs font-medium text-slate-700 focus:ring-2 focus:ring-amber-500 focus:outline-none transition shadow-2xs w-48 sm:w-56 cursor-pointer"
+                                    class="bg-white border border-slate-300 rounded-xl pl-8 pr-7 py-2 text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-amber-500 focus:outline-none transition shadow-2xs w-48 sm:w-56 cursor-pointer"
                                     title="Filter Rentang Tanggal Unboxing">
                                 <button type="button" id="btnClearClaimDate" onclick="clearClaimDateFilter()" title="Hapus filter tanggal" class="absolute right-2 text-slate-400 hover:text-rose-500 transition text-xs hidden z-10">
                                     <i class="fa-solid fa-circle-xmark"></i>
@@ -890,14 +890,26 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
 
                             <!-- Reset Filter -->
                             <button type="button" onclick="resetClaimCandidatesFilter()" 
-                                class="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-xs transition" title="Reset Filter">
+                                class="px-3 py-2 bg-slate-200 hover:bg-slate-300 active:scale-95 text-slate-700 rounded-xl font-bold text-xs transition cursor-pointer" title="Reset Filter ke Default">
                                 <i class="fa-solid fa-rotate-left"></i>
                             </button>
                         </div>
 
-                        <!-- Info Counter -->
-                        <div class="text-slate-500 text-[11px] font-medium shrink-0">
-                            Menampilkan: <b id="countClaimFiltered" class="text-rose-600 font-bold">0</b> dari <span id="countClaimTotal">0</span> paket rusak
+                        <!-- Rekap Total Finansial Realtime Mengikuti Filter -->
+                        <div class="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-between xl:justify-end text-xs">
+                            <div class="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs">
+                                <span class="text-[11px] text-slate-500">Terfilter:</span>
+                                <b id="countClaimFiltered" class="text-indigo-600 font-bold">0</b>
+                                <span class="text-slate-400">/ <span id="countClaimTotal">0</span> paket</span>
+                            </div>
+                            <div class="flex items-center gap-1.5 bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-xl shadow-2xs">
+                                <span class="text-[11px] text-rose-600 font-medium">Qty Rusak:</span>
+                                <b id="sumClaimFilteredDamaged" class="text-rose-700 font-mono font-black">0 pcs</b>
+                            </div>
+                            <div class="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl shadow-2xs">
+                                <span class="text-[11px] text-emerald-700 font-medium">Total Nilai Tagihan:</span>
+                                <b id="sumClaimFilteredNominal" class="text-emerald-800 font-mono font-black text-xs sm:text-sm">Rp 0</b>
+                            </div>
                         </div>
                     </div>
 

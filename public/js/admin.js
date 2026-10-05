@@ -4461,17 +4461,34 @@ window.applyClaimCandidatesFilter = function() {
         return true;
     });
 
-    // Update Counter
+    // Hitung akumulasi total real-time dari seluruh item yang lolos filter
+    let sumFilteredNominal = 0;
+    let sumFilteredDamaged = 0;
+    filtered.forEach(c => {
+        sumFilteredNominal += Number(c.package_price || 0);
+        const dQty = Number(c.damaged_qty || (c.total_damaged > 0 ? c.total_damaged : (c.damaged_items_count || 1)));
+        sumFilteredDamaged += dQty;
+    });
+
+    // Update Counter & Rekap Finansial Hasil Filter di Toolbar
     const countEl = document.getElementById('countClaimFiltered');
     const totalEl = document.getElementById('countClaimTotal');
+    const sumDmgEl = document.getElementById('sumClaimFilteredDamaged');
+    const sumNomEl = document.getElementById('sumClaimFilteredNominal');
+
     if (countEl) countEl.innerText = filtered.length;
     if (totalEl) totalEl.innerText = cachedClaimCandidates.length;
+    if (sumDmgEl) sumDmgEl.innerText = `${sumFilteredDamaged} pcs`;
+    if (sumNomEl) sumNomEl.innerText = 'Rp ' + sumFilteredNominal.toLocaleString('id-ID');
 
     if (filtered.length === 0) {
         tbody.innerHTML = `<tr><td colspan="9" class="text-center py-10 text-slate-400">
             <i class="fa-solid fa-filter-circle-xmark text-2xl text-slate-300 mb-2 block"></i>
             Tidak ada paket rusak yang sesuai dengan filter pencarian yang diterapkan.
         </td></tr>`;
+        const masterCb = document.getElementById('checkAllClaimCandidates');
+        if (masterCb) masterCb.checked = false;
+        updateSelectedClaimsBar();
         return;
     }
 
@@ -5126,24 +5143,45 @@ window.closeCollectiveClaimModal = function() {
     if (modal) modal.classList.add('hidden');
 };
 
+function submitInvoicePostForm(invoices, autoPrint = false) {
+    if (!invoices || (Array.isArray(invoices) && invoices.length === 0)) return;
+    const invList = Array.isArray(invoices) ? invoices.join(',') : String(invoices);
+    if (!invList) return;
+
+    // Gunakan dynamic POST form dengan target="_blank" untuk mencegah batasan panjang URL (GET) dan error 403 Forbidden
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = autoPrint ? 'claim_invoice.php?autoprint=1' : 'claim_invoice.php';
+    form.target = '_blank';
+    form.style.display = 'none';
+
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'invoices';
+    input.value = invList;
+    form.appendChild(input);
+
+    document.body.appendChild(form);
+    form.submit();
+    setTimeout(() => {
+        if (form.parentNode) form.parentNode.removeChild(form);
+    }, 1200);
+}
+
 window.printCollectiveClaimInvoice = function() {
-    if (selectedClaimInvoices.size === 0) return;
-    const invList = Array.from(selectedClaimInvoices).join(',');
-    const url = `claim_invoice.php?invoices=${encodeURIComponent(invList)}&autoprint=1`;
-    const win = window.open(url, '_blank');
-    if (!win || win.closed || typeof win.closed === 'undefined') {
-        window.location.href = url;
+    if (selectedClaimInvoices.size === 0) {
+        showToast('warning', 'Pilih minimal 1 paket klaim untuk dicetak invoice tagihannya.', 'Peringatan');
+        return;
     }
+    submitInvoicePostForm(Array.from(selectedClaimInvoices), true);
 };
 
 window.openCollectiveClaimFullTab = function() {
-    if (selectedClaimInvoices.size === 0) return;
-    const invList = Array.from(selectedClaimInvoices).join(',');
-    const url = `claim_invoice.php?invoices=${encodeURIComponent(invList)}`;
-    const win = window.open(url, '_blank');
-    if (!win || win.closed || typeof win.closed === 'undefined') {
-        window.location.href = url;
+    if (selectedClaimInvoices.size === 0) {
+        showToast('warning', 'Pilih minimal 1 paket klaim untuk melihat invoice tagihannya.', 'Peringatan');
+        return;
     }
+    submitInvoicePostForm(Array.from(selectedClaimInvoices), false);
 };
 
 window.copyCollectiveClaimText = function() {
