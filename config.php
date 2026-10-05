@@ -538,3 +538,22 @@ function checkMaintenanceMode($pdo, $user = null) {
     } catch (Exception $e) {}
     return false;
 }
+
+/**
+ * Pastikan kolom status klaim tersedia di return_sessions (self-healing schema).
+ * PENDING = Belum Klaim, PROCESS = Proses Klaim, DONE = Done Claim
+ */
+function ensureClaimStatusColumn($pdo) {
+    static $checked = false;
+    if ($checked) return;
+    $checked = true;
+    try {
+        $cols = $pdo->query("SHOW COLUMNS FROM return_sessions")->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('claim_status', $cols)) {
+            $pdo->exec("ALTER TABLE return_sessions ADD COLUMN claim_status VARCHAR(20) NOT NULL DEFAULT 'PENDING' AFTER status");
+        }
+        if (!in_array('claim_updated_at', $cols)) {
+            $pdo->exec("ALTER TABLE return_sessions ADD COLUMN claim_updated_at DATETIME NULL AFTER claim_status");
+        }
+    } catch (Exception $e) {}
+}

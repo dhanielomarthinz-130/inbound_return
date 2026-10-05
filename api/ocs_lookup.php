@@ -34,9 +34,12 @@ if ($query === '' || $action === 'list_claimable') {
             }
         } catch (Exception $e) {}
 
+        // Pastikan kolom status klaim (PENDING / PROCESS / DONE) tersedia
+        ensureClaimStatusColumn($pdo);
+
         // Query kandidat paket rusak langsung dari return_sessions & return_items (Sangat cepat & aman dari MAX_JOIN_SIZE)
         $sqlDamaged = "
-            SELECT rs.id, rs.invoice_number, rs.expedition, rs.operator_name, rs.status, 
+            SELECT rs.id, rs.invoice_number, rs.expedition, rs.operator_name, rs.status, rs.claim_status,
                    rs.total_items, rs.total_good, rs.total_damaged, rs.notes, rs.video_path, rs.created_at,
                    COUNT(ri.id) as item_count,
                    SUM(CASE WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
@@ -70,7 +73,7 @@ if ($query === '' || $action === 'list_claimable') {
                    0 as has_packing_video
             FROM return_sessions rs
             LEFT JOIN return_items ri ON ri.session_id = rs.id
-            GROUP BY rs.id, rs.invoice_number, rs.expedition, rs.operator_name, rs.status, 
+            GROUP BY rs.id, rs.invoice_number, rs.expedition, rs.operator_name, rs.status, rs.claim_status,
                      rs.total_items, rs.total_good, rs.total_damaged, rs.notes, rs.video_path, rs.created_at
             HAVING rs.total_damaged > 0 OR damaged_items_count > 0
             ORDER BY rs.id DESC
@@ -254,6 +257,10 @@ if ($query === '' || $action === 'list_claimable') {
                 $dmgQty = (int)($c['damaged_items_count'] ?? 1);
             }
             $c['damaged_qty'] = $dmgQty;
+
+            // Status klaim (default PENDING = Belum Klaim)
+            $cs = strtoupper(trim($c['claim_status'] ?? ''));
+            $c['claim_status'] = in_array($cs, ['PENDING', 'PROCESS', 'DONE'], true) ? $cs : 'PENDING';
         }
 
         echo json_encode([

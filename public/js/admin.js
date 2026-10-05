@@ -4485,9 +4485,11 @@ window.applyClaimCandidatesFilter = function () {
 
     const searchInput = document.getElementById('filterClaimSearch');
     const expSelect = document.getElementById('filterClaimExpedition');
+    const statusSelect = document.getElementById('filterClaimStatus');
 
     const q = searchInput ? searchInput.value.trim().toLowerCase() : '';
     const exp = expSelect ? expSelect.value.trim().toLowerCase() : '';
+    const stFilter = statusSelect ? statusSelect.value.trim().toUpperCase() : '';
 
     let filtered = cachedClaimCandidates.filter(c => {
         // Filter Search (Invoice / Resi, Produk, SKU, Alasan Rusak, Operator)
@@ -4507,6 +4509,9 @@ window.applyClaimCandidatesFilter = function () {
             const cExp = String(c.expedition || '').toLowerCase();
             if (cExp !== exp) return false;
         }
+
+        // Filter Status Klaim
+        if (stFilter && (c.claim_status || 'PENDING') !== stFilter) return false;
 
         // Filter Tanggal Rentang (Flatpickr)
         if (activeClaimDateFilter) {
@@ -4603,12 +4608,12 @@ window.applyClaimCandidatesFilter = function () {
                     </div>
                 </td>
                 <td class="py-3 px-3">
-                    <div class="font-bold text-slate-800 text-xs truncate max-w-[240px]" title="${escapeHtml(c.product_names || '')}">
+                    <div class="font-bold text-slate-800 text-xs whitespace-normal break-words leading-snug min-w-[220px]">
                         ${prodName}
                     </div>
                     ${c.sku ? `
                         <div class="mt-0.5">
-                            <span class="inline-flex items-center gap-1 font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-1.5 py-0.5 rounded tracking-tight" title="Seller SKU">
+                            <span class="inline-flex items-center gap-1 font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-1.5 py-0.5 rounded tracking-tight whitespace-normal break-all" title="Seller SKU">
                                 <i class="fa-solid fa-tag text-[8px] text-indigo-400"></i> SKU: ${escapeHtml(c.sku)}
                             </span>
                         </div>
@@ -4640,9 +4645,7 @@ window.applyClaimCandidatesFilter = function () {
             }
                 </td>
                 <td class="py-3 px-3 text-center">
-                    <button onclick="openClaimDetailModal('${c.invoice_number}')" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[11px] font-bold transition shadow-2xs flex items-center gap-1.5 mx-auto" title="Buka popup berkas detail klaim">
-                        <i class="fa-solid fa-shield-halved"></i> Klaim
-                    </button>
+                    ${renderClaimStatusAction(c)}
                 </td>
             </tr>
         `;
@@ -4660,10 +4663,125 @@ window.applyClaimCandidatesFilter = function () {
 window.resetClaimCandidatesFilter = function () {
     const searchInput = document.getElementById('filterClaimSearch');
     const expSelect = document.getElementById('filterClaimExpedition');
+    const statusSelect = document.getElementById('filterClaimStatus');
 
     if (searchInput) searchInput.value = '';
     if (expSelect) expSelect.value = '';
+    if (statusSelect) statusSelect.value = '';
     clearClaimDateFilter();
+};
+
+// -------------------------------------------------------------
+// STATUS KLAIM: PENDING (Belum Klaim) -> PROCESS (Proses Klaim) -> DONE (Done Claim)
+// -------------------------------------------------------------
+function renderClaimStatusAction(c) {
+    const st = c.claim_status || 'PENDING';
+    const inv = escapeHtml(c.invoice_number);
+
+    if (st === 'PENDING') {
+        return `
+            <button onclick="openClaimDetailModal('${inv}')" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[11px] font-bold transition shadow-2xs flex items-center gap-1.5 mx-auto" title="Belum diklaim - buka berkas detail klaim">
+                <i class="fa-solid fa-shield-halved"></i> Klaim
+            </button>`;
+    }
+
+    const isDone = st === 'DONE';
+    const cls = isDone
+        ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+        : 'bg-blue-50 text-blue-700 border-blue-300';
+    return `
+        <div class="relative inline-flex items-center mx-auto" title="Ubah status klaim secara manual">
+            <i class="fa-solid ${isDone ? 'fa-circle-check' : 'fa-hourglass-half'} absolute left-2 text-[10px] pointer-events-none ${isDone ? 'text-emerald-600' : 'text-blue-600'}"></i>
+            <select onchange="changeSingleClaimStatus('${inv}', this)" class="appearance-none pl-6 pr-6 py-1 rounded-lg text-[11px] font-bold border cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500 ${cls}">
+                <option value="PROCESS" ${!isDone ? 'selected' : ''}>Proses Klaim</option>
+                <option value="DONE" ${isDone ? 'selected' : ''}>Done Claim</option>
+                <option value="PENDING">Batalkan Klaim</option>
+            </select>
+            <i class="fa-solid fa-chevron-down absolute right-2 text-[8px] pointer-events-none text-slate-500"></i>
+        </div>`;
+}
+
+async function updateClaimStatusRequest(invoices, status) {
+    const res = await fetch('api/claim_status.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoices, status })
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.success) throw new Error(json.error || 'Gagal memperbarui status klaim');
+
+    // Update cache lokal agar UI langsung berubah tanpa reload penuh
+    const invSet = new Set(invoices);
+    cachedClaimCandidates.forEach(c => {
+        if (invSet.has(c.invoice_number)) c.claim_status = status;
+    });
+    return json;
+}
+
+window.processSelectedClaims = async function () {
+    const pending = Array.from(selectedClaimInvoices).filter(inv => {
+        const c = cachedClaimCandidates.find(x => x.invoice_number === inv);
+        return c && (c.claim_status || 'PENDING') === 'PENDING';
+    });
+    if (pending.length === 0) {
+        showToast('info', 'Semua paket terpilih sudah dalam status Proses / Done Claim.', 'Info');
+        return;
+    }
+    if (!confirm(`Ajukan klaim untuk ${pending.length} paket terpilih?\nStatus akan berubah menjadi "Proses Klaim" dan tombol Print Invoice akan muncul.`)) return;
+
+    const btn = document.getElementById('btnBulkClaimProcess');
+    if (btn) btn.disabled = true;
+    try {
+        const json = await updateClaimStatusRequest(pending, 'PROCESS');
+        showToast('success', json.message || 'Paket berhasil diubah ke Proses Klaim', 'Proses Klaim');
+        applyClaimCandidatesFilter();
+    } catch (err) {
+        showToast('error', err.message, 'Gagal');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+};
+
+window.markSelectedClaimsDone = async function () {
+    const targets = Array.from(selectedClaimInvoices).filter(inv => {
+        const c = cachedClaimCandidates.find(x => x.invoice_number === inv);
+        return c && c.claim_status === 'PROCESS';
+    });
+    if (targets.length === 0) {
+        showToast('info', 'Tidak ada paket berstatus Proses Klaim pada pilihan Anda.', 'Info');
+        return;
+    }
+    if (!confirm(`Tandai ${targets.length} paket sebagai "Done Claim"?`)) return;
+    try {
+        const json = await updateClaimStatusRequest(targets, 'DONE');
+        showToast('success', json.message || 'Paket ditandai Done Claim', 'Done Claim');
+        applyClaimCandidatesFilter();
+    } catch (err) {
+        showToast('error', err.message, 'Gagal');
+    }
+};
+
+window.changeSingleClaimStatus = async function (invoice, selectEl) {
+    const newStatus = selectEl.value;
+    const c = cachedClaimCandidates.find(x => x.invoice_number === invoice);
+    const prev = c ? (c.claim_status || 'PENDING') : 'PENDING';
+    if (newStatus === prev) return;
+
+    const labels = { PENDING: 'Belum Klaim (batalkan klaim)', PROCESS: 'Proses Klaim', DONE: 'Done Claim' };
+    if (!confirm(`Ubah status klaim [${invoice}] menjadi "${labels[newStatus]}"?`)) {
+        selectEl.value = prev;
+        return;
+    }
+    selectEl.disabled = true;
+    try {
+        const json = await updateClaimStatusRequest([invoice], newStatus);
+        showToast('success', json.message || 'Status klaim diperbarui', 'Status Klaim');
+        applyClaimCandidatesFilter();
+    } catch (err) {
+        selectEl.value = prev;
+        selectEl.disabled = false;
+        showToast('error', err.message, 'Gagal');
+    }
 };
 
 window.syncSingleClaimPrice = async function (invoice, btnEl) {
@@ -5077,6 +5195,25 @@ window.updateSelectedClaimsBar = function () {
     if (priceEl) priceEl.innerText = formattedPrice;
     if (btnCountEl) btnCountEl.innerText = selectedClaimInvoices.size;
     if (btnPrintCostEl) btnPrintCostEl.innerText = formattedPrice;
+
+    // Alur tombol: wajib Klaim dulu (PENDING -> PROCESS), baru muncul Print Invoice
+    let pendingCount = 0, processCount = 0;
+    selectedClaimInvoices.forEach(inv => {
+        const item = cachedClaimCandidates.find(c => c.invoice_number === inv);
+        const st = item ? (item.claim_status || 'PENDING') : 'PENDING';
+        if (st === 'PENDING') pendingCount++;
+        else if (st === 'PROCESS') processCount++;
+    });
+
+    const btnClaim = document.getElementById('btnBulkClaimProcess');
+    const btnClaimCount = document.getElementById('btnBulkClaimCount');
+    const btnDone = document.getElementById('btnBulkClaimDone');
+    const btnPrint = document.getElementById('btnPrintClaimInvoice');
+
+    if (btnClaimCount) btnClaimCount.innerText = pendingCount;
+    if (btnClaim) btnClaim.classList.toggle('hidden', pendingCount === 0);
+    if (btnPrint) btnPrint.classList.toggle('hidden', pendingCount > 0);
+    if (btnDone) btnDone.classList.toggle('hidden', pendingCount > 0 || processCount === 0);
 };
 
 window.openCollectiveClaimInvoiceModal = function () {
@@ -5232,6 +5369,14 @@ function submitInvoicePostForm(invoices, autoPrint = false) {
 window.printCollectiveClaimInvoice = function () {
     if (selectedClaimInvoices.size === 0) {
         showToast('warning', 'Pilih minimal 1 paket klaim untuk dicetak invoice tagihannya.', 'Peringatan');
+        return;
+    }
+    const hasPending = Array.from(selectedClaimInvoices).some(inv => {
+        const c = cachedClaimCandidates.find(x => x.invoice_number === inv);
+        return !c || (c.claim_status || 'PENDING') === 'PENDING';
+    });
+    if (hasPending) {
+        showToast('warning', 'Klik tombol "Klaim" terlebih dahulu sebelum mencetak invoice tagihan.', 'Wajib Klaim Dulu');
         return;
     }
     submitInvoicePostForm(Array.from(selectedClaimInvoices), false);

@@ -875,6 +875,15 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 <option value="">Semua Ekspedisi</option>
                             </select>
 
+                            <!-- Dropdown Status Klaim -->
+                            <select id="filterClaimStatus" onchange="applyClaimCandidatesFilter()" 
+                                class="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-amber-500 focus:outline-none transition shadow-2xs cursor-pointer">
+                                <option value="">Semua Status</option>
+                                <option value="PENDING">Belum Klaim</option>
+                                <option value="PROCESS">Proses Klaim</option>
+                                <option value="DONE">Done Claim</option>
+                            </select>
+
                             <!-- Filter Tanggal Unboxing (Flatpickr Rentang) -->
                             <div class="relative flex items-center">
                                 <span class="absolute left-3 text-amber-500 pointer-events-none text-xs z-10">
@@ -966,11 +975,18 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             <button type="button" onclick="clearSelectedClaims()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition border border-slate-700 cursor-pointer">
                                 Batal
                             </button>
-                            <button type="button" onclick="openCollectiveClaimInvoiceModal()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-amber-400 hover:text-amber-300 rounded-xl text-xs font-bold transition border border-amber-500/40 flex items-center gap-1.5 cursor-pointer" title="Pratinjau Rincian & Salin Format WhatsApp">
-                                <i class="fa-solid fa-eye"></i>
-                                <span>Preview & WA</span>
+                            <!-- Step 1: Klaim (ubah status terpilih menjadi Proses Klaim) -->
+                            <button type="button" id="btnBulkClaimProcess" onclick="processSelectedClaims()" class="hidden px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 active:scale-95 text-slate-950 font-black rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-lg shadow-amber-500/30 cursor-pointer" title="Ubah status paket terpilih menjadi Proses Klaim">
+                                <i class="fa-solid fa-shield-halved"></i>
+                                <span>Klaim (<span id="btnBulkClaimCount">0</span>)</span>
                             </button>
-                            <button type="button" onclick="printCollectiveClaimInvoice()" class="px-4 py-2 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-700 active:scale-95 text-white font-black rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-lg shadow-emerald-600/30 cursor-pointer">
+                            <!-- Opsional: tandai Done Claim secara manual -->
+                            <button type="button" id="btnBulkClaimDone" onclick="markSelectedClaimsDone()" class="hidden px-3 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-emerald-400 hover:text-emerald-300 rounded-xl text-xs font-bold transition border border-emerald-500/40 flex items-center gap-1.5 cursor-pointer" title="Tandai paket terpilih sebagai Done Claim">
+                                <i class="fa-solid fa-circle-check"></i>
+                                <span>Done Claim</span>
+                            </button>
+                            <!-- Step 2: Print Invoice (muncul setelah diklaim) -->
+                            <button type="button" id="btnPrintClaimInvoice" onclick="printCollectiveClaimInvoice()" class="hidden px-4 py-2 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-700 active:scale-95 text-white font-black rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-lg shadow-emerald-600/30 cursor-pointer">
                                 <i class="fa-solid fa-print"></i>
                                 <span>Print Invoice Tagihan (<span id="btnPrintTotalCost">Rp 0</span>)</span>
                             </button>
