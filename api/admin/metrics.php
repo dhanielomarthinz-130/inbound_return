@@ -249,9 +249,8 @@ try {
     $sqlTrend = "
         SELECT
             DATE(s.created_at) AS tgl,
-            COALESCE(SUM(i.qty), 0) AS total_qty
+            COALESCE(SUM(s.total_items), 0) AS total_qty
         FROM return_sessions s
-        LEFT JOIN return_items i ON i.session_id = s.id
         WHERE s.created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
         GROUP BY DATE(s.created_at)
         ORDER BY tgl ASC

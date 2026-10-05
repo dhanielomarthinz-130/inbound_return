@@ -7,6 +7,9 @@ if (!$currentUser) {
 }
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+if ($method === 'GET') {
+    session_write_close();
+}
 
 // 1. GET USERS LIST
 if ($method === 'GET') {

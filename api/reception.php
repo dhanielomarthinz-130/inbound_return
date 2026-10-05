@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config.php';
 $user = requireLogin(['operator', 'admin', 'superadmin']);
+session_write_close();
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -147,12 +148,21 @@ if ($method === 'GET') {
         $params = [];
 
         if (!empty($startDate) && !empty($endDate)) {
-            $where[] = "DATE(COALESCE(p.scanned_at, r.created_at)) BETWEEN ? AND ?";
-            $params[] = $startDate;
-            $params[] = $endDate;
+            $where[] = "((p.scanned_at >= ? AND p.scanned_at <= ?) OR (p.scanned_at IS NULL AND r.created_at >= ? AND r.created_at <= ?))";
+            $sTs = $startDate . ' 00:00:00';
+            $eTs = $endDate . ' 23:59:59';
+            $params[] = $sTs;
+            $params[] = $eTs;
+            $params[] = $sTs;
+            $params[] = $eTs;
         } elseif (!empty($date)) {
-            $where[] = "DATE(COALESCE(p.scanned_at, r.created_at)) = ?";
-            $params[] = $date;
+            $where[] = "((p.scanned_at >= ? AND p.scanned_at <= ?) OR (p.scanned_at IS NULL AND r.created_at >= ? AND r.created_at <= ?))";
+            $sTs = $date . ' 00:00:00';
+            $eTs = $date . ' 23:59:59';
+            $params[] = $sTs;
+            $params[] = $eTs;
+            $params[] = $sTs;
+            $params[] = $eTs;
         }
 
         if (!empty($expedition)) {
@@ -256,21 +266,22 @@ if ($method === 'GET') {
     $params = [];
 
     if (!empty($startDate) && !empty($endDate)) {
-        $where[] = "DATE(created_at) BETWEEN ? AND ?";
-        $params[] = $startDate;
-        $params[] = $endDate;
+        $where[] = "r.created_at >= ? AND r.created_at <= ?";
+        $params[] = $startDate . ' 00:00:00';
+        $params[] = $endDate . ' 23:59:59';
     } elseif (!empty($date)) {
-        $where[] = "DATE(created_at) = ?";
-        $params[] = $date;
+        $where[] = "r.created_at >= ? AND r.created_at <= ?";
+        $params[] = $date . ' 00:00:00';
+        $params[] = $date . ' 23:59:59';
     }
 
     if (!empty($expedition)) {
-        $where[] = "expedition = ?";
+        $where[] = "r.expedition = ?";
         $params[] = $expedition;
     }
 
     if (!empty($search)) {
-        $where[] = "(receipt_number LIKE ? OR courier_name LIKE ? OR operator_name LIKE ? OR expedition LIKE ? OR sack_number LIKE ?)";
+        $where[] = "(r.receipt_number LIKE ? OR r.courier_name LIKE ? OR r.operator_name LIKE ? OR r.expedition LIKE ? OR r.sack_number LIKE ?)";
         $params[] = "%$search%";
         $params[] = "%$search%";
         $params[] = "%$search%";
@@ -280,12 +291,6 @@ if ($method === 'GET') {
 
     $whereSql = count($where) > 0 ? implode(' AND ', $where) : '1=1';
 
-    // Auto-backfill data penerimaan lama yang belum memiliki nomor karung
-    try {
-        $pdo->exec("UPDATE expedition_receptions SET sack_number = 'Karung 1' WHERE sack_number IS NULL OR TRIM(sack_number) = '' OR sack_number = '-'");
-        $pdo->exec("UPDATE reception_packages SET sack_number = 'Karung 1' WHERE sack_number IS NULL OR TRIM(sack_number) = '' OR sack_number = '-'");
-    } catch (Exception $eBf) {}
-
     $rows = [];
     try {
         $stmt = $pdo->prepare("
@@ -294,11 +299,7 @@ if ($method === 'GET') {
                 r.receipt_number, 
                 r.expedition, 
                 r.courier_name, 
-                COALESCE(
-                    NULLIF(TRIM(r.sack_number), ''),
-                    (SELECT GROUP_CONCAT(DISTINCT NULLIF(TRIM(p.sack_number), '') SEPARATOR ', ') FROM reception_packages p WHERE p.reception_id = r.id AND p.sack_number IS NOT NULL AND p.sack_number != ''),
-                    'Karung 1'
-                ) AS sack_number, 
+                COALESCE(NULLIF(TRIM(r.sack_number), ''), 'Karung 1') AS sack_number, 
                 r.courier_photo, 
                 r.vehicle_no, 
                 r.operator_name, 
@@ -330,11 +331,7 @@ if ($method === 'GET') {
                     r.receipt_number, 
                     r.expedition, 
                     r.courier_name, 
-                    COALESCE(
-                        NULLIF(TRIM(r.sack_number), ''),
-                        (SELECT GROUP_CONCAT(DISTINCT NULLIF(TRIM(p.sack_number), '') SEPARATOR ', ') FROM reception_packages p WHERE p.reception_id = r.id AND p.sack_number IS NOT NULL AND p.sack_number != ''),
-                        'Karung 1'
-                    ) AS sack_number, 
+                    COALESCE(NULLIF(TRIM(r.sack_number), ''), 'Karung 1') AS sack_number, 
                     r.courier_photo, 
                     r.vehicle_no, 
                     r.operator_name, 

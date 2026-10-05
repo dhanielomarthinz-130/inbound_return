@@ -186,7 +186,8 @@ try {
                 INDEX idx_receipt_number (`receipt_number`),
                 INDEX idx_reception_expedition (`expedition`),
                 INDEX idx_reception_sack (`sack_number`),
-                INDEX idx_reception_created (`created_at`)
+                INDEX idx_reception_created (`created_at`),
+                INDEX idx_reception_created_exp (`created_at`, `expedition`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
             CREATE TABLE IF NOT EXISTS `reception_packages` (
@@ -199,6 +200,7 @@ try {
                 INDEX idx_reception_id (`reception_id`),
                 INDEX idx_package_barcode (`package_barcode`),
                 INDEX idx_pkg_sack (`sack_number`),
+                INDEX idx_pkg_scanned (`scanned_at`),
                 CONSTRAINT fk_reception_packages FOREIGN KEY (`reception_id`) REFERENCES `expedition_receptions`(`id`) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -316,6 +318,17 @@ try {
 
             $colsUsers = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
             if (!in_array('pin', $colsUsers)) $pdo->exec("ALTER TABLE users ADD COLUMN pin VARCHAR(20) NULL DEFAULT '123456' AFTER role");
+
+            // Auto-patch index performa untuk Receiving dan Dashboard
+            try {
+                $idxPkg = $pdo->query("SHOW INDEX FROM reception_packages WHERE Key_name = 'idx_pkg_scanned'")->fetch();
+                if (!$idxPkg) $pdo->exec("ALTER TABLE reception_packages ADD INDEX idx_pkg_scanned (`scanned_at`)");
+            } catch (Exception $eIdx1) {}
+
+            try {
+                $idxRec = $pdo->query("SHOW INDEX FROM expedition_receptions WHERE Key_name = 'idx_reception_created_exp'")->fetch();
+                if (!$idxRec) $pdo->exec("ALTER TABLE expedition_receptions ADD INDEX idx_reception_created_exp (`created_at`, `expedition`)");
+            } catch (Exception $eIdx2) {}
         } catch (Exception $e) {}
 
         // Seed Ekspedisi

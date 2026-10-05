@@ -786,6 +786,9 @@ async function loadTransactions() {
     if (expedition) url += `expedition=${encodeURIComponent(expedition)}&`;
     if (condition) url += `condition=${encodeURIComponent(condition)}&`;
     if (operator) url += `operator=${encodeURIComponent(operator)}&`;
+    if (!date && !search && !expedition && !condition && !operator) {
+        url += `limit=200&`;
+    }
 
     try {
         const res = await fetch(url);
@@ -2051,8 +2054,14 @@ window.refreshAllData = function() {
     const icon = document.getElementById('refreshIcon');
     if (icon) icon.classList.add('fa-spin');
 
-    const promises = [loadMetrics(), loadTransactions(), loadProducts(), loadExpeditions(), loadConditions(), loadUsers()];
-    if (document.getElementById('tab-maintenance')) {
+    const promises = [loadMetrics(true)];
+    if (currentTab === 'transactions') promises.push(loadTransactions());
+    else if (currentTab === 'receiving') promises.push(loadReceivingData(true));
+    else if (currentTab === 'products') promises.push(loadProducts());
+    else if (currentTab === 'expeditions') promises.push(loadExpeditions());
+    else if (currentTab === 'conditions') promises.push(loadConditions());
+    else if (currentTab === 'users') promises.push(loadUsers());
+    if (document.getElementById('tab-maintenance') && currentTab === 'maintenance') {
         promises.push(loadMaintenanceStatus());
     }
 
@@ -2490,7 +2499,6 @@ window.addEventListener('DOMContentLoaded', () => {
     initFlatpickr();
     initReceivingDatepicker();
     initFromUrlParams();
-    refreshAllData();
 
     // Event listener search transaction (Inbound Unboxing)
     const filterSearchInput = document.getElementById('filterSearch');

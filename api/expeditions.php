@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../config.php';
+session_write_close();
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $rawInput = file_get_contents('php://input');
