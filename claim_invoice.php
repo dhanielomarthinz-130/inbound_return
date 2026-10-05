@@ -140,38 +140,68 @@ if (!empty($invoiceList)) {
                 }
             }
 
-            // Hitung total qty rusak
+            // Hitung total qty rusak, kumpulkan SKU, dan detail kondisi fisik
             $damagedQty = 0;
             $prodNames = [];
             $reasons = [];
+            $skus = [];
+            $conditions = [];
 
             if ($sess && !empty($sess['items'])) {
                 foreach ($sess['items'] as $it) {
                     $itCond = strtoupper(trim($it['type'] ?? $it['condition'] ?? ''));
-                    $isDmg = ($itCond !== 'GOOD' && $itCond !== 'BAGUS');
+                    $isDmg = ($itCond !== 'GOOD' && $itCond !== 'BAGUS' && $itCond !== 'LAYAK');
                     $q = (int)($it['qty'] ?? 1);
                     if ($isDmg || count($sess['items']) === 1) {
                         $damagedQty += $q;
+                        
+                        $skuVal = trim($it['seller_sku'] ?: ($it['sku'] ?: ''));
+                        if (!empty($skuVal)) {
+                            $skus[] = $skuVal;
+                        }
+
                         $pTitle = $it['product_name'] ?: ($it['sku'] ?: $it['barcode']);
                         if (!empty($it['wrong_barcode'])) {
-                            $pTitle .= " [Salah Kirim Fisik: " . ($it['wrong_product_name'] ?: $it['wrong_barcode']) . "]";
+                            $pTitle .= " [Salah Kirim: " . ($it['wrong_product_name'] ?: $it['wrong_barcode']) . "]";
                         }
                         $prodNames[] = $pTitle;
+
+                        $condName = ($itCond && $itCond !== 'GOOD' && $itCond !== 'BAGUS') ? $itCond : 'RUSAK';
                         if (!empty($it['damage_reason'])) {
                             $reasons[] = $it['damage_reason'];
-                        } elseif (!empty($itCond) && $itCond !== 'GOOD') {
-                            $reasons[] = $itCond;
+                            $conditions[] = $condName . ' (' . $it['damage_reason'] . ')';
+                        } else {
+                            $reasons[] = $condName;
+                            $conditions[] = $condName;
                         }
                     }
                 }
             }
 
             if ($damagedQty === 0) $damagedQty = 1;
+            if (empty($skus) && $ocs && !empty($ocs['seller_sku'])) {
+                $skus[] = $ocs['seller_sku'];
+            }
             if (empty($prodNames) && $ocs && !empty($ocs['product_name'])) {
                 $prodNames[] = $ocs['product_name'];
             }
             if (empty($reasons)) {
                 $reasons[] = 'Kondisi Rusak Saat Unboxing';
+            }
+            if (empty($conditions)) {
+                $conditions[] = 'RUSAK';
+            }
+
+            // Estimasi harga dari SKU sejenis jika harga paket masih 0
+            if ($price == 0 && !empty($skus)) {
+                try {
+                    $stmtEst = $pdo->prepare("SELECT package_price FROM ocs_orders WHERE seller_sku = ? AND package_price > 0 LIMIT 1");
+                    $stmtEst->execute([$skus[0]]);
+                    $estRow = $stmtEst->fetch(PDO::FETCH_ASSOC);
+                    if ($estRow && (float)$estRow['package_price'] > 0) {
+                        $price = (float)$estRow['package_price'];
+                    }
+                } catch (Exception $eEst) {}
             }
 
             $itemsData[] = [
@@ -181,8 +211,10 @@ if (!empty($invoiceList)) {
                 'expedition' => $exp,
                 'shop_name' => $ocs['shop_name'] ?? '-',
                 'platform' => $ocs['commerce_platform'] ?? '-',
-                'products' => implode(' + ', array_unique($prodNames)) ?: 'Produk Retur',
+                'sku' => !empty($skus) ? implode(', ', array_unique($skus)) : '-',
+                'products' => !empty($prodNames) ? implode(' + ', array_unique($prodNames)) : 'Produk Retur',
                 'damaged_qty' => $damagedQty,
+                'conditions' => implode(', ', array_unique($conditions)),
                 'reason' => implode(' | ', array_unique($reasons)),
                 'price' => $price,
                 'created_at' => $sess['created_at'] ?? date('Y-m-d H:i:s')
@@ -325,42 +357,63 @@ $terbilangText = ($grandTotal > 0) ? terbilangRupiah($grandTotal) . ' Rupiah' : 
                         <thead>
                             <tr class="bg-slate-800 text-white font-bold text-[10px] uppercase">
                                 <th class="p-2.5 text-center w-8">#</th>
-                                <th class="p-2.5">No. Resi (AWB)</th>
-                                <th class="p-2.5">No. Order / Invoice</th>
-                                <th class="p-2.5">Toko / Produk Rusak</th>
-                                <th class="p-2.5 text-center w-16">Qty</th>
-                                <th class="p-2.5">Alasan Kerusakan Fisik</th>
-                                <th class="p-2.5 text-right w-28">Nilai Tagihan</th>
+                                <th class="p-2.5 w-36">Ekspedisi &amp; No. Resi</th>
+                                <th class="p-2.5">SKU &amp; Produk Rusak</th>
+                                <th class="p-2.5 text-center w-20">Qty Rusak</th>
+                                <th class="p-2.5 w-44">Kondisi &amp; Alasan Kerusakan</th>
+                                <th class="p-2.5 text-right w-32">Harga Paket</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200">
                             <?php foreach ($itemsData as $row): ?>
                                 <tr class="hover:bg-slate-50/50 transition">
                                     <td class="p-2.5 text-center font-bold text-slate-400"><?= $row['no'] ?></td>
-                                    <td class="p-2.5 font-mono font-bold text-slate-800">
-                                        <?= htmlspecialchars($row['tracking_number']) ?>
-                                        <div class="text-[10px] text-amber-600 font-normal"><?= htmlspecialchars($row['expedition']) ?></div>
-                                    </td>
-                                    <td class="p-2.5 font-mono text-slate-600"><?= htmlspecialchars($row['invoice_number']) ?></td>
                                     <td class="p-2.5">
-                                        <div class="font-bold text-slate-900"><?= htmlspecialchars($row['products']) ?></div>
-                                        <div class="text-[10px] text-slate-400 font-medium">Toko: <?= htmlspecialchars($row['shop_name']) ?></div>
+                                        <div class="inline-flex items-center gap-1 font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] mb-1">
+                                            <i class="fa-solid fa-truck-fast text-[9px]"></i> <?= htmlspecialchars($row['expedition']) ?>
+                                        </div>
+                                        <div class="font-mono font-bold text-slate-800 text-xs tracking-tight">
+                                            AWB: <?= htmlspecialchars($row['tracking_number']) ?>
+                                        </div>
+                                        <?php if ($row['invoice_number'] !== $row['tracking_number']): ?>
+                                            <div class="text-[10px] text-slate-400 font-mono">Ref: <?= htmlspecialchars($row['invoice_number']) ?></div>
+                                        <?php endif; ?>
                                     </td>
-                                    <td class="p-2.5 text-center font-bold text-rose-600 font-mono"><?= $row['damaged_qty'] ?></td>
-                                    <td class="p-2.5 text-slate-700 font-medium"><?= htmlspecialchars($row['reason']) ?></td>
-                                    <td class="p-2.5 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
-                                        <?= ($row['price'] > 0) ? 'Rp ' . number_format($row['price'], 0, ',', '.') : '<span class="text-slate-400 italic">Rp 0</span>' ?>
+                                    <td class="p-2.5">
+                                        <div class="mb-1">
+                                            <span class="inline-flex items-center gap-1 font-mono font-bold text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-800">
+                                                <i class="fa-solid fa-tag text-[8px] text-indigo-400"></i> SKU: <?= htmlspecialchars($row['sku']) ?>
+                                            </span>
+                                        </div>
+                                        <div class="font-bold text-slate-900 leading-snug"><?= htmlspecialchars($row['products']) ?></div>
+                                        <?php if (!empty($row['shop_name']) && $row['shop_name'] !== '-'): ?>
+                                            <div class="text-[10px] text-slate-400 font-medium mt-0.5">Toko: <?= htmlspecialchars($row['shop_name']) ?></div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="p-2.5 text-center font-bold text-rose-700 font-mono text-xs">
+                                        <span class="px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 inline-block font-black">
+                                            <?= $row['damaged_qty'] ?> pcs
+                                        </span>
+                                    </td>
+                                    <td class="p-2.5">
+                                        <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 mb-0.5">
+                                            <?= htmlspecialchars($row['conditions']) ?>
+                                        </span>
+                                        <div class="text-[11px] text-slate-600 leading-tight"><?= htmlspecialchars($row['reason']) ?></div>
+                                    </td>
+                                    <td class="p-2.5 text-right font-mono font-black text-slate-900 whitespace-nowrap text-xs">
+                                        <?= ($row['price'] > 0) ? 'Rp ' . number_format($row['price'], 0, ',', '.') : '<span class="text-slate-400 italic font-normal text-[11px]">Rp 0</span>' ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
                         <tfoot>
                             <tr class="bg-slate-100 font-bold border-t-2 border-slate-800 text-xs">
-                                <td colspan="4" class="p-2.5 text-right text-slate-700 uppercase">
+                                <td colspan="3" class="p-2.5 text-right text-slate-700 uppercase">
                                     Total (<?= count($itemsData) ?> Paket):
                                 </td>
-                                <td class="p-2.5 text-center font-mono text-rose-700 text-sm">
-                                    <?= $totalDamagedQty ?>
+                                <td class="p-2.5 text-center font-mono text-rose-700 text-sm font-black">
+                                    <?= $totalDamagedQty ?> pcs
                                 </td>
                                 <td class="p-2.5 text-right text-slate-700 uppercase">
                                     Grand Total Tagihan:
@@ -452,8 +505,11 @@ $terbilangText = ($grandTotal > 0) ? terbilangRupiah($grandTotal) . ' Rupiah' : 
             invoiceDataItems.forEach((it, idx) => {
                 const pr = it.price > 0 ? ('Rp ' + Number(it.price).toLocaleString('id-ID')) : '-';
                 text += `${idx + 1}. Resi: ${it.tracking_number} (${it.invoice_number})\n`;
-                text += `   Barang: ${it.products}\n`;
-                text += `   Qty: ${it.damaged_qty} pcs | Alasan: ${it.reason}\n`;
+                text += `   Ekspedisi: ${it.expedition || '-'}\n`;
+                if (it.sku && it.sku !== '-') text += `   SKU: ${it.sku}\n`;
+                text += `   Produk: ${it.products}\n`;
+                text += `   Qty: ${it.damaged_qty} pcs\n`;
+                text += `   Kondisi/Alasan: ${it.conditions} - ${it.reason}\n`;
                 text += `   Nominal: ${pr}\n\n`;
             });
 

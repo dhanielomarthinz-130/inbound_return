@@ -5207,10 +5207,13 @@ window.copyCollectiveClaimText = function() {
 
     selectedList.forEach((it, idx) => {
         const pText = it.package_price > 0 ? ('Rp ' + Number(it.package_price).toLocaleString('id-ID')) : '-';
+        const dQty = it.damaged_qty || it.total_damaged || it.damaged_items_count || 1;
         text += `${idx + 1}. Resi: ${it.invoice_number} (${it.expedition || '-'})\n`;
+        if (it.sku) text += `   SKU: ${it.sku}\n`;
         text += `   Barang: ${it.product_names || 'Produk Retur'}\n`;
-        text += `   Alasan: ${it.damage_reasons || 'Rusak'}\n`;
-        text += `   Nominal: ${pText}\n\n`;
+        text += `   Qty Rusak: ${dQty} pcs\n`;
+        text += `   Kondisi/Alasan: ${it.damage_reasons || it.notes || 'Rusak'}\n`;
+        text += `   Harga Paket: ${pText}\n\n`;
     });
 
     text += `Mohon segera diverifikasi dan diproses penggantian klaimnya. Terima kasih.\n`;

@@ -25,8 +25,8 @@ $query = trim($_GET['q'] ?? $_GET['query'] ?? $_GET['order_id'] ?? $_GET['tracki
         .font-mono { font-family: 'JetBrains Mono', monospace; }
         @media print {
             @page { size: A4 portrait; margin: 8mm 10mm; }
-            body { background: white !important; color: #0f172a !important; padding: 0 !important; }
-            .no-print { display: none !important; }
+            body { background: white !important; color: #0f172a !important; padding: 0 !important; font-size: 11px !important; }
+            .no-print, video, .photo-evidence-section, #colCourierPhotoWrapper, .item-photo-btn { display: none !important; }
             .print-break-inside-avoid { break-inside: avoid !important; page-break-inside: avoid !important; }
             .print-border { border: 1px solid #cbd5e1 !important; }
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -232,7 +232,7 @@ $query = trim($_GET['q'] ?? $_GET['query'] ?? $_GET['order_id'] ?? $_GET['tracki
                                 <span class="text-[10px] text-slate-400 uppercase font-bold block">Waktu Diterima di Gudang</span>
                                 <span id="colRecTime" class="text-slate-700 font-mono text-[11px]">-</span>
                             </div>
-                            <div id="colCourierPhotoWrapper" class="hidden pt-1">
+                            <div id="colCourierPhotoWrapper" class="hidden pt-1 no-print">
                                 <span class="text-[10px] text-slate-400 uppercase font-bold block mb-1">Foto Bukti Driver / Kurir:</span>
                                 <img id="colCourierPhotoImg" src="" alt="Foto Kurir" class="w-14 h-14 rounded-lg object-cover border border-slate-300 cursor-pointer shadow-2xs" onclick="previewImageDirect(this.src)">
                             </div>
@@ -315,8 +315,8 @@ $query = trim($_GET['q'] ?? $_GET['query'] ?? $_GET['order_id'] ?? $_GET['tracki
                     </div>
                 </div>
 
-                <!-- Galeri Foto Bukti Fisik Barang Rusak / Cacat -->
-                <div class="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-2xs print-break-inside-avoid">
+                <!-- Galeri Foto Bukti Fisik Barang Rusak / Cacat (Hanya Ditampilkan di Layar, Tidak Dicetak Fisik) -->
+                <div class="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-2xs no-print photo-evidence-section">
                     <div class="p-3.5 bg-slate-900 text-white flex items-center justify-between text-xs">
                         <div class="flex items-center gap-2">
                             <i class="fa-solid fa-camera text-emerald-400"></i>
@@ -332,6 +332,42 @@ $query = trim($_GET['q'] ?? $_GET['query'] ?? $_GET['order_id'] ?? $_GET['tracki
                             <i class="fa-solid fa-images text-3xl text-slate-300 mb-2 block"></i>
                             <span class="text-xs">Tidak ada foto bukti unboxing untuk paket ini.</span>
                         </div>
+                    </div>
+                </div>
+
+                <!-- TABEL RINCIAN PRODUK RUSAK & KLAIM (RESMI UNTUK CETAK & VERIFIKASI EKSPEDISI) -->
+                <div class="border border-slate-300 rounded-2xl overflow-hidden bg-white shadow-2xs print-break-inside-avoid">
+                    <div class="p-3 bg-slate-800 text-white flex items-center justify-between text-xs">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-file-invoice-dollar text-amber-400"></i>
+                            <span class="font-bold">Rincian SKU Produk Rusak, Ekspedisi, Kondisi &amp; Harga Paket</span>
+                        </div>
+                        <span class="text-[10px] font-mono text-slate-300">Dokumen Verifikasi Ekspedisi</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-800 font-bold text-[10px] uppercase border-b border-slate-200">
+                                    <th class="p-2.5 text-center w-8">#</th>
+                                    <th class="p-2.5 w-36">Ekspedisi &amp; Resi</th>
+                                    <th class="p-2.5">SKU &amp; Nama Produk</th>
+                                    <th class="p-2.5 text-center w-20">Qty Rusak</th>
+                                    <th class="p-2.5 w-44">Kondisi &amp; Alasan Kerusakan</th>
+                                    <th class="p-2.5 text-right w-32">Harga Paket</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dossierDamagedTableBody" class="divide-y divide-slate-200">
+                                <!-- Populated dynamically via JS -->
+                            </tbody>
+                            <tfoot>
+                                <tr class="bg-slate-50 font-bold border-t-2 border-slate-700 text-xs">
+                                    <td colspan="3" class="p-2.5 text-right uppercase text-slate-600">Total Kerusakan:</td>
+                                    <td id="dossierTableTotalQty" class="p-2.5 text-center font-mono font-black text-rose-700">-</td>
+                                    <td class="p-2.5 text-right uppercase text-slate-600">Total Nominal Klaim:</td>
+                                    <td id="dossierTableTotalPrice" class="p-2.5 text-right font-mono font-black text-emerald-700 whitespace-nowrap text-sm">-</td>
+                                </tr>
+                            </tfoot>
+                        </table>
                     </div>
                 </div>
 
@@ -620,6 +656,109 @@ $query = trim($_GET['q'] ?? $_GET['query'] ?? $_GET['order_id'] ?? $_GET['tracki
                 photoGrid.innerHTML = '';
                 noPhotos.classList.remove('hidden');
             }
+
+            // Render Tabel Rincian SKU Produk Rusak, Ekspedisi, Kondisi & Harga Paket
+            const dTableBody = document.getElementById('dossierDamagedTableBody');
+            const expName = rec.expedition || ord.ShippingProvider || unb.expedition || '-';
+            const trackingNo = ord.TrackingNumber || unb.invoice_number || '-';
+            const priceFormatted = ord.TotalClaimAmountFormatted || ord.PackagePriceFormatted || (ord.PackagePrice > 0 ? 'Rp ' + Number(ord.PackagePrice).toLocaleString('id-ID') : 'Rp 0');
+
+            if (dTableBody) {
+                let rowsHtml = '';
+                let totalDmgQty = 0;
+
+                if (Array.isArray(unb.items) && unb.items.length > 0) {
+                    let rIdx = 1;
+                    unb.items.forEach(it => {
+                        const itC = (it.type || it.condition || 'GOOD').toUpperCase().trim();
+                        const isDmg = (itC !== 'GOOD' && itC !== 'BAGUS' && itC !== 'LAYAK');
+                        const q = parseInt(it.qty || 1, 10);
+                        
+                        if (isDmg || unb.items.length === 1) {
+                            totalDmgQty += q;
+                            const skuVal = it.seller_sku || it.sku || ord.SellerSku || '-';
+                            const pName = it.product_name || ord.ProductName || it.barcode || 'Produk Retur';
+                            const rsn = it.damage_reason || itC || 'Kondisi Rusak Saat Unboxing';
+                            const wrongInfo = it.wrong_barcode ? `<div class="text-[10px] text-amber-600 font-bold mt-0.5"><i class="fa-solid fa-triangle-exclamation"></i> Salah Kirim: ${escapeHtml(it.wrong_product_name || it.wrong_barcode)}</div>` : '';
+
+                            rowsHtml += `
+                                <tr class="hover:bg-slate-50 transition">
+                                    <td class="p-2.5 text-center font-bold text-slate-400">${rIdx++}</td>
+                                    <td class="p-2.5">
+                                        <div class="inline-flex items-center gap-1 font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] mb-1">
+                                            <i class="fa-solid fa-truck-fast text-[9px]"></i> ${escapeHtml(expName)}
+                                        </div>
+                                        <div class="font-mono font-bold text-slate-800 text-xs tracking-tight">AWB: ${escapeHtml(trackingNo)}</div>
+                                        ${unb.invoice_number && unb.invoice_number !== trackingNo ? `<div class="text-[10px] text-slate-400 font-mono">Ref: ${escapeHtml(unb.invoice_number)}</div>` : ''}
+                                    </td>
+                                    <td class="p-2.5">
+                                        <div class="mb-1">
+                                            <span class="inline-flex items-center gap-1 font-mono font-bold text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-800">
+                                                <i class="fa-solid fa-tag text-[8px] text-indigo-400"></i> SKU: ${escapeHtml(skuVal)}
+                                            </span>
+                                        </div>
+                                        <div class="font-bold text-slate-900 leading-snug">${escapeHtml(pName)}</div>
+                                        ${wrongInfo}
+                                        ${ord.ShopName ? `<div class="text-[10px] text-slate-400 font-medium mt-0.5">Toko: ${escapeHtml(ord.ShopName)}</div>` : ''}
+                                    </td>
+                                    <td class="p-2.5 text-center font-bold text-rose-700 font-mono text-xs">
+                                        <span class="px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 inline-block font-black">${q} pcs</span>
+                                    </td>
+                                    <td class="p-2.5">
+                                        <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${isDmg ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-slate-100 text-slate-700'} border mb-0.5">
+                                            ${escapeHtml(itC)}
+                                        </span>
+                                        <div class="text-[11px] text-slate-600 leading-tight">${escapeHtml(rsn)}</div>
+                                    </td>
+                                    <td class="p-2.5 text-right font-mono font-black text-slate-900 whitespace-nowrap text-xs">
+                                        ${priceFormatted}
+                                    </td>
+                                </tr>
+                            `;
+                        }
+                    });
+                } else {
+                    totalDmgQty = 1;
+                    rowsHtml = `
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="p-2.5 text-center font-bold text-slate-400">1</td>
+                            <td class="p-2.5">
+                                <div class="inline-flex items-center gap-1 font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] mb-1">
+                                    <i class="fa-solid fa-truck-fast text-[9px]"></i> ${escapeHtml(expName)}
+                                </div>
+                                <div class="font-mono font-bold text-slate-800 text-xs tracking-tight">AWB: ${escapeHtml(trackingNo)}</div>
+                            </td>
+                            <td class="p-2.5">
+                                <div class="mb-1">
+                                    <span class="inline-flex items-center gap-1 font-mono font-bold text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-800">
+                                        <i class="fa-solid fa-tag text-[8px] text-indigo-400"></i> SKU: ${escapeHtml(ord.SellerSku || '-')}
+                                    </span>
+                                </div>
+                                <div class="font-bold text-slate-900 leading-snug">${escapeHtml(ord.ProductName || 'Produk Retur')}</div>
+                                ${ord.ShopName ? `<div class="text-[10px] text-slate-400 font-medium mt-0.5">Toko: ${escapeHtml(ord.ShopName)}</div>` : ''}
+                            </td>
+                            <td class="p-2.5 text-center font-bold text-rose-700 font-mono text-xs">
+                                <span class="px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 inline-block font-black">1 pcs</span>
+                            </td>
+                            <td class="p-2.5">
+                                <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 mb-0.5">
+                                    ${escapeHtml(unb.condition || 'RUSAK')}
+                                </span>
+                                <div class="text-[11px] text-slate-600 leading-tight">${escapeHtml(unb.damaged_reasons || unb.notes || 'Kondisi Rusak Saat Unboxing')}</div>
+                            </td>
+                            <td class="p-2.5 text-right font-mono font-black text-slate-900 whitespace-nowrap text-xs">
+                                ${priceFormatted}
+                            </td>
+                        </tr>
+                    `;
+                }
+
+                dTableBody.innerHTML = rowsHtml;
+                const totalQtyEl = document.getElementById('dossierTableTotalQty');
+                const totalPriceEl = document.getElementById('dossierTableTotalPrice');
+                if (totalQtyEl) totalQtyEl.innerText = `${totalDmgQty} pcs`;
+                if (totalPriceEl) totalPriceEl.innerText = priceFormatted;
+            }
         }
 
         function setCheckStatus(id, ok) {
@@ -666,12 +805,28 @@ $query = trim($_GET['q'] ?? $_GET['query'] ?? $_GET['order_id'] ?? $_GET['tracki
             const unb = d.unboxing || {};
             const rec = d.reception || {};
 
+            let skuList = [];
+            let damagedQtyTotal = 0;
+            if (Array.isArray(unb.items) && unb.items.length > 0) {
+                unb.items.forEach(it => {
+                    const sku = it.seller_sku || it.sku || ord.SellerSku || '';
+                    if (sku) skuList.push(sku);
+                    damagedQtyTotal += parseInt(it.qty || 1, 10);
+                });
+            } else {
+                if (ord.SellerSku) skuList.push(ord.SellerSku);
+                damagedQtyTotal = 1;
+            }
+            const skuText = skuList.length > 0 ? Array.from(new Set(skuList)).join(', ') : '-';
+
             const text = `*BERKAS KLAIM EKSPEDISI - IEG INOVASI EKA GEMILANG*
 ----------------------------------------
 No. Resi: ${ord.TrackingNumber || unb.invoice_number || '-'}
 No. Order: ${ord.Id || '-'}
 Toko / Shop: ${ord.ShopName || '-'} (${ord.CommercePlatform || 'OCS'})
 Ekspedisi: ${rec.expedition || ord.ShippingProvider || unb.expedition || '-'}
+SKU Produk: ${skuText}
+Qty Rusak: ${damagedQtyTotal} pcs
 Status Barang: ${d.is_claimable ? 'RUSAK / CACAT (LAYAK KLAIM)' : 'BAIK'}
 Kerusakan: ${unb.damaged_reasons || unb.notes || '-'}
 Total Nilai Klaim: ${ord.TotalClaimAmountFormatted || ord.PackagePriceFormatted || 'Rp 0'}
