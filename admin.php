@@ -1,8 +1,7 @@
 <?php
 require_once __DIR__ . '/config.php';
 $currentUser = getSessionUser();
-checkMaintenanceMode($pdo, $currentUser);
-$user = requireLogin(['admin', 'superadmin']);
+$user = requireLogin(['admin', 'superadmin', 'management', 'accounting']);
 $isSuperAdmin = ($user['role'] === 'superadmin');
 ?>
 <!DOCTYPE html>
@@ -290,6 +289,20 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 <span>Kelola Pengguna</span>
             </button>
 
+            <?php if (in_array($user['role'], ['superadmin', 'admin'])): ?>
+            <button onclick="switchTab('roles')" id="nav-roles" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
+                <i class="fa-solid fa-user-shield w-5 text-center text-purple-600"></i>
+                <span>Kelola Role</span>
+            </button>
+            <?php endif; ?>
+
+            <?php if (in_array($user['role'], ['superadmin', 'management', 'accounting'])): ?>
+            <button onclick="switchTab('bank-settings')" id="nav-bank-settings" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
+                <i class="fa-solid fa-building-columns w-5 text-center text-emerald-600"></i>
+                <span>Pengaturan Bank</span>
+            </button>
+            <?php endif; ?>
+
             <?php if ($isSuperAdmin): ?>
             <button onclick="switchTab('maintenance')" id="nav-maintenance" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-amber-700 hover:text-amber-800 hover:bg-amber-100/70 border border-amber-300/80 bg-amber-50/60">
                 <i class="fa-solid fa-screwdriver-wrench w-5 text-center text-amber-600"></i>
@@ -298,6 +311,13 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
             <?php endif; ?>
 
             <div class="pt-4 px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Akses Langsung</div>
+
+            <?php if (in_array($user['role'], ['accounting', 'management', 'superadmin', 'admin'])): ?>
+            <a href="accounting_approval" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-rose-700 hover:text-rose-800 hover:bg-rose-100/70 border border-rose-300/80 bg-rose-50/60 transition mb-1">
+                <i class="fa-solid fa-stamp w-5 text-center text-rose-600"></i>
+                <span>Approval Klaim J&amp;T</span>
+            </a>
+            <?php endif; ?>
 
             <a href="scanner" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100/70 border border-emerald-300/80 bg-emerald-50/60 transition">
                 <i class="fa-solid fa-barcode w-5 text-center text-emerald-600"></i>
@@ -858,6 +878,19 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                         </div>
                     </div>
 
+                    <!-- TAB PEMISAH: KLAIM J&T (APPROVAL ACCOUNTING) VS EKSPEDISI LAIN (KLAIM MANUAL) -->
+                    <div class="px-4 pt-2.5 bg-slate-100 border-b border-slate-200 flex items-center gap-2 overflow-x-auto">
+                        <button type="button" onclick="setClaimExpeditionMode('jnt')" id="btnClaimModeJnt" class="px-4 py-2 rounded-t-xl font-bold text-xs transition border-t-2 border-rose-500 bg-white text-rose-700 shadow-2xs flex items-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-stamp text-rose-600"></i>
+                            <span>Klaim Ekspedisi J&amp;T (Approval Accounting via Web)</span>
+                            <span id="badgeJntPendingApproval" class="ml-1 px-1.5 py-0.2 rounded-full text-[9px] bg-rose-100 text-rose-800 font-extrabold hidden">0</span>
+                        </button>
+                        <button type="button" onclick="setClaimExpeditionMode('other')" id="btnClaimModeOther" class="px-4 py-2 rounded-t-xl font-bold text-xs transition text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 flex items-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-truck-fast text-slate-500"></i>
+                            <span>Klaim Ekspedisi Lain (Klaim Manual Admin)</span>
+                        </button>
+                    </div>
+
                     <!-- Filter Toolbar 1 Baris Rapi & Rekap Total Realtime Mengikuti Filter -->
                     <div class="p-3.5 bg-slate-50/90 border-b border-slate-200 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-3 text-xs">
                         <div class="flex flex-wrap items-center gap-2 flex-1 w-full xl:w-auto">
@@ -975,7 +1008,20 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             <button type="button" onclick="clearSelectedClaims()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition border border-slate-700 cursor-pointer">
                                 Batal
                             </button>
-                            <!-- Step 1: Klaim (ubah status terpilih menjadi Proses Klaim) -->
+
+                            <!-- KHUSUS MODE JNT: KIRIM KE ACCOUNTING (DATA TABLE ONLY TANPA FOTO) -->
+                            <button type="button" id="btnSendToAccounting" onclick="sendSelectedToAccounting()" class="hidden px-4 py-2 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 active:scale-95 text-white font-bold rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-lg shadow-rose-600/30 cursor-pointer" title="Kirim data tabel klaim J&T ke Accounting di InfinityFree untuk di-approval (Tanpa Foto)">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <span>Kirim ke Accounting (<span id="btnSendAccountingCount">0</span>)</span>
+                            </button>
+
+                            <!-- KHUSUS MODE JNT: TARIK STATUS APPROVAL DARI CLOUD -->
+                            <button type="button" id="btnPullAccounting" onclick="pullAccountingApproval()" class="hidden px-3.5 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-amber-400 hover:text-amber-300 rounded-xl text-xs font-bold transition border border-amber-500/40 flex items-center gap-1.5 cursor-pointer" title="Tarik status approval dari web InfinityFree">
+                                <i class="fa-solid fa-arrows-rotate"></i>
+                                <span>Tarik Approval Cloud</span>
+                            </button>
+
+                            <!-- KHUSUS MODE EKSPEDISI LAIN: KLAIM MANUAL -->
                             <button type="button" id="btnBulkClaimProcess" onclick="processSelectedClaims()" class="hidden px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 active:scale-95 text-slate-950 font-black rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-lg shadow-amber-500/30 cursor-pointer" title="Ubah status paket terpilih menjadi Proses Klaim">
                                 <i class="fa-solid fa-shield-halved"></i>
                                 <span>Klaim (<span id="btnBulkClaimCount">0</span>)</span>
@@ -985,10 +1031,10 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 <i class="fa-solid fa-circle-check"></i>
                                 <span>Done Claim</span>
                             </button>
-                            <!-- Step 2: Print Invoice (muncul setelah diklaim) -->
+                            <!-- Step 2: Print Invoice (muncul setelah di-approve atau diklaim) -->
                             <button type="button" id="btnPrintClaimInvoice" onclick="printCollectiveClaimInvoice()" class="hidden px-4 py-2 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-700 active:scale-95 text-white font-black rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-lg shadow-emerald-600/30 cursor-pointer">
                                 <i class="fa-solid fa-print"></i>
-                                <span>Print Invoice Tagihan (<span id="btnPrintTotalCost">Rp 0</span>)</span>
+                                <span>Print Tagihan (<span id="btnPrintTotalCost">Rp 0</span>)</span>
                             </button>
                         </div>
                     </div>
@@ -1375,67 +1421,23 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             </div>
                         </div>
 
-                        <!-- Pengaturan Rekening Bank (Invoice Klaim) -->
-                        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
-                            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <!-- Pengaturan Rekening Bank (Telah Dipisah) -->
+                        <div class="bg-emerald-50/50 rounded-2xl border border-emerald-200 p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-lg shrink-0">
+                                    <i class="fa-solid fa-building-columns"></i>
+                                </div>
                                 <div>
-                                    <h4 class="font-bold text-sm text-slate-800 flex items-center gap-2">
-                                        <i class="fa-solid fa-building-columns text-emerald-600"></i> Pengaturan Rekening Bank (Invoice Klaim)
-                                    </h4>
-                                    <p class="text-xs text-slate-500 mt-0.5">
-                                        Nomor rekening dan data bank yang akan tercetak otomatis pada lembar penagihan / invoice klaim.
+                                    <h4 class="font-bold text-sm text-slate-800">Pengaturan Rekening Bank (Invoice Klaim)</h4>
+                                    <p class="text-xs text-slate-500">
+                                        Pengaturan bank telah dipisahkan ke menu tersendiri agar dapat diakses khusus oleh Management &amp; Accounting.
                                     </p>
                                 </div>
-                                <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
-                                    <i class="fa-solid fa-file-invoice-dollar mr-0.5"></i> Info Rekening
-                                </span>
                             </div>
-
-                            <form id="formBankSettings" onsubmit="saveBankSettings(event)" class="space-y-3">
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div>
-                                        <label class="block text-[11px] font-bold text-slate-700 mb-1">
-                                            Nama Bank <span class="text-rose-500">*</span>
-                                        </label>
-                                        <input type="text" id="settingBankName" name="bank_name" placeholder="Contoh: BCA (Bank Central Asia)" required
-                                            class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition">
-                                    </div>
-                                    <div>
-                                        <label class="block text-[11px] font-bold text-slate-700 mb-1">
-                                            Nomor Rekening <span class="text-rose-500">*</span>
-                                        </label>
-                                        <input type="text" id="settingBankAccountNumber" name="bank_account_number" placeholder="Contoh: 873-098-1234" required
-                                            class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-800 focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition">
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div>
-                                        <label class="block text-[11px] font-bold text-slate-700 mb-1">
-                                            Atas Nama (Pemilik Rekening) <span class="text-rose-500">*</span>
-                                        </label>
-                                        <input type="text" id="settingBankAccountHolder" name="bank_account_holder" placeholder="Contoh: PT. INOVASI EKA GEMILANG" required
-                                            class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition">
-                                    </div>
-                                    <div>
-                                        <label class="block text-[11px] font-bold text-slate-700 mb-1">
-                                            Catatan Transfer (Opsional)
-                                        </label>
-                                        <input type="text" id="settingBankPaymentNotes" name="bank_payment_notes" placeholder="Contoh: *Mohon sertakan no invoice saat transfer"
-                                            class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition">
-                                    </div>
-                                </div>
-
-                                <div class="flex items-center justify-between pt-1">
-                                    <div class="text-[10px] text-slate-400">
-                                        <i class="fa-solid fa-circle-info mr-0.5"></i> Perubahan langsung tersimpan ke database &amp; tampil di cetak invoice klaim.
-                                    </div>
-                                    <button type="submit" id="btnSaveBankSettings" class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer">
-                                        <i class="fa-solid fa-floppy-disk"></i>
-                                        <span>Simpan No. Rekening</span>
-                                    </button>
-                                </div>
-                            </form>
+                            <button type="button" onclick="switchTab('bank-settings')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer">
+                                <span>Buka Pengaturan Bank</span>
+                                <i class="fa-solid fa-arrow-right"></i>
+                            </button>
                         </div>
 
                         <!-- Database Maintenance & Optimization -->
@@ -1511,6 +1513,123 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <!-- TAB: PENGATURAN BANK (KHUSUS MANAGEMENT & ACCOUNTING) -->
+            <?php if (in_array($user['role'], ['superadmin', 'management', 'accounting'])): ?>
+            <div id="tab-bank-settings" class="tab-content hidden space-y-5">
+                <div class="bg-white rounded-2xl shadow-xs border border-slate-200 p-6 space-y-6">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl shrink-0 border border-emerald-200">
+                                <i class="fa-solid fa-building-columns"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-base text-slate-800">Pengaturan Rekening Bank (Invoice Klaim)</h3>
+                                <p class="text-xs text-slate-500 mt-0.5">
+                                    Informasi rekening resmi yang akan tercetak otomatis pada lembar penagihan / invoice klaim ekspedisi.
+                                </p>
+                            </div>
+                        </div>
+                        <span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0 self-start sm:self-auto">
+                            <i class="fa-solid fa-shield-halved mr-1"></i> Khusus Management &amp; Accounting
+                        </span>
+                    </div>
+
+                    <form id="formBankSettingsStandalone" onsubmit="saveBankSettingsStandalone(event)" class="max-w-3xl space-y-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1.5">
+                                    Nama Bank <span class="text-rose-500">*</span>
+                                </label>
+                                <input type="text" id="standaloneBankName" name="bank_name" placeholder="Contoh: BCA (Bank Central Asia)" required
+                                    class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1.5">
+                                    Nomor Rekening <span class="text-rose-500">*</span>
+                                </label>
+                                <input type="text" id="standaloneBankAccountNumber" name="bank_account_number" placeholder="Contoh: 873-098-1234" required
+                                    class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-800 focus:bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1.5">
+                                    Atas Nama (Pemilik Rekening) <span class="text-rose-500">*</span>
+                                </label>
+                                <input type="text" id="standaloneBankAccountHolder" name="bank_account_holder" placeholder="Contoh: PT. INOVASI EKA GEMILANG" required
+                                    class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1.5">
+                                    Catatan Pembayaran / Transfer (Opsional)
+                                </label>
+                                <input type="text" id="standaloneBankPaymentNotes" name="bank_payment_notes" placeholder="Contoh: *Mohon sertakan no invoice saat transfer"
+                                    class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition">
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                            <span class="text-xs text-slate-400">
+                                <i class="fa-solid fa-circle-check text-emerald-500 mr-1"></i> Data langsung tersimpan ke database &amp; tampil di cetak invoice klaim.
+                            </span>
+                            <button type="submit" id="btnSaveStandaloneBank" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl transition shadow-md shadow-emerald-600/30 flex items-center gap-2 cursor-pointer">
+                                <i class="fa-solid fa-floppy-disk"></i>
+                                <span>Simpan Pengaturan Bank</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <!-- TAB: KELOLA ROLE (ADD, EDIT, DELETE ROLE) -->
+            <?php if (in_array($user['role'], ['superadmin', 'admin'])): ?>
+            <div id="tab-roles" class="tab-content hidden space-y-5">
+                <div class="bg-white rounded-2xl shadow-xs border border-slate-200 p-6 space-y-5">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl shrink-0 border border-purple-200">
+                                <i class="fa-solid fa-user-shield"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-base text-slate-800">Kelola Role &amp; Hak Akses</h3>
+                                <p class="text-xs text-slate-500 mt-0.5">
+                                    Tambah role baru, ubah nama, deskripsi, dan hapus role yang tidak lagi digunakan.
+                                </p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="openAddRoleModal()" class="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold text-xs rounded-xl transition shadow-md shadow-purple-600/30 flex items-center gap-2 shrink-0 cursor-pointer">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>Tambah Role Baru</span>
+                        </button>
+                    </div>
+
+                    <!-- Roles Table -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-50 text-slate-600 border-b border-slate-200 font-bold uppercase text-[10px]">
+                                <tr>
+                                    <th class="py-3 px-4">Kode Role (Key)</th>
+                                    <th class="py-3 px-4">Nama Role</th>
+                                    <th class="py-3 px-4">Deskripsi</th>
+                                    <th class="py-3 px-4 text-center">Jumlah Pengguna</th>
+                                    <th class="py-3 px-4 text-center">Tipe Role</th>
+                                    <th class="py-3 px-4 text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rolesTableBody" class="divide-y divide-slate-100">
+                                <tr>
+                                    <td colspan="6" class="text-center py-10 text-slate-400">
+                                        <i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat daftar role...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -1696,7 +1815,9 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                         <label class="block text-xs font-bold text-slate-600 mb-1">Role / Hak Akses *</label>
                         <select id="userRole" required class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                             <option value="operator">Operator Inbound</option>
-                            <option value="admin">Admin Gudang</option>
+                            <option value="admin">Admin Retrun</option>
+                            <option value="management">Management</option>
+                            <option value="accounting">Accounting</option>
                             <?php if ($isSuperAdmin): ?>
                             <option value="superadmin">Superadmin</option>
                             <?php endif; ?>
@@ -1718,6 +1839,55 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                     </button>
                     <button type="submit" id="btnSaveUser" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
                         <i class="fa-solid fa-save"></i> Simpan Pengguna
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL TAMBAH / EDIT ROLE -->
+    <div id="modalRole" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-start border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-base">
+                        <i class="fa-solid fa-user-shield"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-slate-800" id="modalRoleTitle">Tambah Role Baru</h3>
+                    </div>
+                </div>
+                <button onclick="closeRoleModal()" class="text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="formRole" onsubmit="saveRole(event)" class="space-y-3.5 text-xs">
+                <input type="hidden" id="roleEditId" value="">
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Kode Role (Key) <span class="text-rose-500">*</span></label>
+                    <input type="text" id="roleInputKey" required placeholder="Contoh: accounting, finance, supervisor"
+                        class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                    <p class="text-[10px] text-slate-400 mt-0.5">Hanya huruf kecil, angka, dan garis bawah (_).</p>
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Nama Tampilan Role <span class="text-rose-500">*</span></label>
+                    <input type="text" id="roleInputName" required placeholder="Contoh: Accounting, Management"
+                        class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Deskripsi Hak Akses</label>
+                    <textarea id="roleInputDesc" rows="2" placeholder="Jelaskan wewenang dan hak akses role ini..."
+                        class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none"></textarea>
+                </div>
+
+                <div class="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
+                    <button type="button" onclick="closeRoleModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition">
+                        Batal
+                    </button>
+                    <button type="submit" id="btnSubmitRole" class="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow-md shadow-purple-600/30 transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>Simpan Role</span>
                     </button>
                 </div>
             </form>

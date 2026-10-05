@@ -266,6 +266,8 @@ window.switchTab = function (tabName, updateUrl = true) {
         else if (tabName === 'expeditions') titleEl.innerText = 'Master Data Ekspedisi & Kurir';
         else if (tabName === 'conditions') titleEl.innerText = 'Master Data Kondisi Produk';
         else if (tabName === 'users') titleEl.innerText = 'Kelola Akun Pengguna';
+        else if (tabName === 'roles') titleEl.innerText = 'Kelola Role & Hak Akses Pengguna';
+        else if (tabName === 'bank-settings') titleEl.innerText = 'Pengaturan Rekening Bank Perusahaan';
         else if (tabName === 'maintenance') titleEl.innerText = 'Pemeliharaan Sistem & Database';
     }
 
@@ -287,6 +289,8 @@ window.switchTab = function (tabName, updateUrl = true) {
     if (tabName === 'expeditions') loadExpeditions();
     if (tabName === 'conditions') loadConditions();
     if (tabName === 'users') loadUsers();
+    if (tabName === 'roles') loadRoles();
+    if (tabName === 'bank-settings') loadStandaloneBankSettings();
     if (tabName === 'maintenance') loadMaintenanceStatus();
 
     // Sinkronisasikan URL browser
@@ -2320,6 +2324,8 @@ window.refreshAllData = function () {
     else if (currentTab === 'expeditions') promises.push(loadExpeditions());
     else if (currentTab === 'conditions') promises.push(loadConditions());
     else if (currentTab === 'users') promises.push(loadUsers());
+    else if (currentTab === 'roles') promises.push(loadRoles());
+    else if (currentTab === 'bank-settings') promises.push(loadStandaloneBankSettings());
     if (document.getElementById('tab-maintenance') && currentTab === 'maintenance') {
         promises.push(loadMaintenanceStatus());
     }
@@ -2370,6 +2376,12 @@ function renderUsersTable(list) {
             roleBadge = `<span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded font-mono font-bold text-[10px]">ADMIN</span>`;
         } else if (u.role === 'superadmin') {
             roleBadge = `<span class="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded font-mono font-bold text-[10px]"><i class="fa-solid fa-shield-halved text-[9px]"></i> SUPERADMIN</span>`;
+        } else if (u.role === 'management') {
+            roleBadge = `<span class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded font-mono font-bold text-[10px]"><i class="fa-solid fa-briefcase text-[9px]"></i> MANAGEMENT</span>`;
+        } else if (u.role === 'accounting') {
+            roleBadge = `<span class="bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded font-mono font-bold text-[10px]"><i class="fa-solid fa-calculator text-[9px]"></i> ACCOUNTING</span>`;
+        } else {
+            roleBadge = `<span class="bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded font-mono font-bold text-[10px]">${escapeHtml((u.role_name || u.role).toUpperCase())}</span>`;
         }
 
         const statusBadge = (u.status === 'ACTIVE')
@@ -2415,13 +2427,14 @@ window.filterUserTable = function () {
 window.openAddUserModal = function () {
     document.getElementById('userModalTitle').innerText = 'Tambah Pengguna Baru';
     const sub = document.getElementById('userModalSubtitle');
-    if (sub) sub.innerText = 'Daftarkan akun operator atau admin';
+    if (sub) sub.innerText = 'Daftarkan akun operator, admin, management, atau accounting';
     document.getElementById('formUser').reset();
     document.getElementById('userId').value = '';
     document.getElementById('userPasswordLabel').innerText = 'Password *';
     document.getElementById('userPassword').required = true;
     document.getElementById('userPasswordHelp').innerText = 'Wajib diisi saat membuat akun baru.';
     document.getElementById('userPin').value = '123456';
+    populateUserRoleDropdown('operator');
     document.getElementById('userModal').classList.remove('hidden');
     document.getElementById('userUsername').focus();
 };
@@ -2441,6 +2454,7 @@ window.editUser = function (id) {
     document.getElementById('userId').value = u.id;
     document.getElementById('userUsername').value = u.username;
     document.getElementById('userName').value = u.name;
+    populateUserRoleDropdown(u.role);
     document.getElementById('userRole').value = u.role;
     document.getElementById('userStatus').value = u.status;
     document.getElementById('userPin').value = u.pin || '123456';
@@ -2504,6 +2518,275 @@ window.deleteUser = async function (id, name) {
         }
     } catch (err) {
         showToast('error', 'Gagal koneksi ke server: ' + err.message, 'Koneksi Terputus');
+    }
+};
+
+// =============================================================
+// PENGATURAN BANK STANDALONE (MANAGEMENT & ACCOUNTING)
+// =============================================================
+async function loadStandaloneBankSettings() {
+    try {
+        const res = await fetch('api/bank_settings.php');
+        if (res.status === 401) {
+            window.location.href = 'login';
+            return;
+        }
+        const data = await res.json();
+        if (data.success && data.data) {
+            const b = data.data;
+            const elName = document.getElementById('standaloneBankName');
+            const elAcc = document.getElementById('standaloneBankAccountNumber');
+            const elHolder = document.getElementById('standaloneBankAccountHolder');
+            const elNotes = document.getElementById('standaloneBankPaymentNotes');
+
+            if (elName) elName.value = b.bank_name || '';
+            if (elAcc) elAcc.value = b.bank_account_number || '';
+            if (elHolder) elHolder.value = b.bank_account_holder || '';
+            if (elNotes) elNotes.value = b.bank_payment_notes || '';
+        }
+    } catch (e) {
+        console.error("Gagal memuat pengaturan bank:", e);
+    }
+}
+
+window.saveBankSettingsStandalone = async function (e) {
+    if (e) e.preventDefault();
+    const btn = document.getElementById('btnSaveStandaloneBank');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...`;
+    }
+
+    try {
+        const payload = {
+            bank_name: (document.getElementById('standaloneBankName')?.value || '').trim(),
+            bank_account_number: (document.getElementById('standaloneBankAccountNumber')?.value || '').trim(),
+            bank_account_holder: (document.getElementById('standaloneBankAccountHolder')?.value || '').trim(),
+            bank_payment_notes: (document.getElementById('standaloneBankPaymentNotes')?.value || '').trim()
+        };
+
+        const res = await fetch('api/bank_settings.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast('success', data.message || 'Pengaturan Rekening Bank berhasil disimpan!', 'Tersimpan');
+        } else {
+            showToast('error', data.error || 'Gagal menyimpan pengaturan bank.', 'Gagal');
+        }
+    } catch (err) {
+        showToast('error', 'Koneksi error: ' + err.message, 'Gagal');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
+    }
+};
+
+// =============================================================
+// KELOLA ROLE & HAK AKSES (CRUD)
+// =============================================================
+let cachedRoles = [];
+
+async function loadRoles() {
+    const tbody = document.getElementById('rolesTableBody');
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1.5 text-purple-600 text-base"></i>Memuat daftar role...</td></tr>`;
+    }
+
+    try {
+        const res = await fetch('api/roles.php');
+        if (res.status === 401) {
+            window.location.href = 'login';
+            return;
+        }
+        const data = await res.json();
+        if (data.success) {
+            cachedRoles = data.roles || [];
+            renderRolesTable(cachedRoles);
+            populateUserRoleDropdown();
+        } else {
+            if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-rose-500 font-semibold">${data.error || 'Gagal memuat role'}</td></tr>`;
+        }
+    } catch (err) {
+        console.error("Gagal load roles:", err);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-rose-500 font-semibold">Error: ${err.message}</td></tr>`;
+    }
+}
+
+function renderRolesTable(roles) {
+    const tbody = document.getElementById('rolesTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!roles || roles.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-slate-400">Tidak ada role ditemukan.</td></tr>`;
+        return;
+    }
+
+    roles.forEach(r => {
+        const isSystem = (r.is_system == 1 || r.is_system === true);
+        const typeBadge = isSystem
+            ? `<span class="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold text-[10px] border border-slate-200"><i class="fa-solid fa-lock text-[8px]"></i> Sistem</span>`
+            : `<span class="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-bold text-[10px] border border-purple-200"><i class="fa-solid fa-sparkles text-[8px]"></i> Kustom</span>`;
+
+        let colorKey = 'bg-slate-100 text-slate-800 border-slate-300';
+        if (r.role_key === 'superadmin') colorKey = 'bg-amber-100 text-amber-800 border-amber-300';
+        else if (r.role_key === 'admin') colorKey = 'bg-indigo-100 text-indigo-800 border-indigo-300';
+        else if (r.role_key === 'operator') colorKey = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+        else if (r.role_key === 'management') colorKey = 'bg-blue-100 text-blue-800 border-blue-300';
+        else if (r.role_key === 'accounting') colorKey = 'bg-rose-100 text-rose-800 border-rose-300';
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 border-b border-slate-100 transition';
+        tr.innerHTML = `
+            <td class="py-3 px-4">
+                <span class="font-mono font-bold text-xs px-2 py-0.5 rounded border ${colorKey}">${escapeHtml(r.role_key)}</span>
+            </td>
+            <td class="py-3 px-4 font-bold text-slate-800">${escapeHtml(r.role_name)}</td>
+            <td class="py-3 px-4 text-slate-500 max-w-xs truncate" title="${escapeHtml(r.description || '-')}">${escapeHtml(r.description || '-')}</td>
+            <td class="py-3 px-4 text-center">
+                <span class="font-bold text-slate-700 px-2 py-0.5 rounded-full bg-slate-100 text-[11px]">${r.user_count || 0} user</span>
+            </td>
+            <td class="py-3 px-4 text-center">${typeBadge}</td>
+            <td class="py-3 px-4 text-center">
+                <div class="flex items-center justify-center space-x-1.5">
+                    <button onclick="openEditRoleModal(${r.id})" title="Edit Role" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer">
+                        <i class="fa-solid fa-pen-to-square"></i> Edit
+                    </button>
+                    ${!isSystem ? `
+                    <button onclick="deleteRole(${r.id}, '${escapeHtml(r.role_name)}')" title="Hapus Role" class="bg-rose-50 hover:bg-rose-100 text-rose-600 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer">
+                        <i class="fa-solid fa-trash-can"></i> Hapus
+                    </button>
+                    ` : `
+                    <span class="text-slate-300 text-[11px] italic px-2">Protected</span>
+                    `}
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function populateUserRoleDropdown(selectedRole = null) {
+    const sel = document.getElementById('userRole');
+    if (!sel) return;
+    const currentVal = selectedRole || sel.value || 'operator';
+
+    // Jika belum load roles dari backend, coba fetch sekali
+    if (cachedRoles.length === 0) {
+        fetch('api/roles.php').then(r => r.json()).then(d => {
+            if (d.success && d.roles) {
+                cachedRoles = d.roles;
+                populateUserRoleDropdown(currentVal);
+            }
+        }).catch(() => {});
+        return;
+    }
+
+    let html = '';
+    cachedRoles.forEach(r => {
+        html += `<option value="${escapeHtml(r.role_key)}" ${r.role_key === currentVal ? 'selected' : ''}>${escapeHtml(r.role_name)}</option>`;
+    });
+    sel.innerHTML = html;
+}
+
+window.openAddRoleModal = function () {
+    document.getElementById('modalRoleTitle').innerText = 'Tambah Role Baru';
+    document.getElementById('formRole').reset();
+    document.getElementById('roleEditId').value = '';
+    const keyInput = document.getElementById('roleInputKey');
+    keyInput.readOnly = false;
+    keyInput.classList.remove('bg-slate-100', 'cursor-not-allowed');
+    document.getElementById('modalRole').classList.remove('hidden');
+    keyInput.focus();
+};
+
+window.openEditRoleModal = function (id) {
+    const r = cachedRoles.find(x => x.id == id);
+    if (!r) return;
+
+    document.getElementById('modalRoleTitle').innerText = `Edit Role: ${r.role_name}`;
+    document.getElementById('roleEditId').value = r.id;
+    const keyInput = document.getElementById('roleInputKey');
+    keyInput.value = r.role_key;
+    keyInput.readOnly = true;
+    keyInput.classList.add('bg-slate-100', 'cursor-not-allowed');
+
+    document.getElementById('roleInputName').value = r.role_name;
+    document.getElementById('roleInputDesc').value = r.description || '';
+    document.getElementById('modalRole').classList.remove('hidden');
+};
+
+window.closeRoleModal = function () {
+    document.getElementById('modalRole').classList.add('hidden');
+    document.getElementById('formRole').reset();
+};
+
+window.saveRole = async function (e) {
+    if (e) e.preventDefault();
+    const id = document.getElementById('roleEditId').value;
+    const role_key = document.getElementById('roleInputKey').value.trim().toLowerCase();
+    const role_name = document.getElementById('roleInputName').value.trim();
+    const description = document.getElementById('roleInputDesc').value.trim();
+
+    if (!role_key || !role_name) {
+        showToast('warning', 'Kode Role dan Nama Role wajib diisi.', 'Form Belum Lengkap');
+        return;
+    }
+
+    const btn = document.getElementById('btnSubmitRole');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...`;
+    }
+
+    try {
+        const payload = { id, role_key, role_name, description };
+        const res = await fetch('api/roles.php', {
+            method: id ? 'PUT' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+            closeRoleModal();
+            loadRoles();
+            showToast('success', data.message || 'Role berhasil disimpan!', 'Role Tersimpan');
+        } else {
+            showToast('error', data.error || 'Gagal menyimpan role', 'Gagal');
+        }
+    } catch (err) {
+        showToast('error', 'Koneksi error: ' + err.message, 'Gagal');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
+    }
+};
+
+window.deleteRole = async function (id, name) {
+    if (!confirm(`Yakin ingin menghapus role "${name}"?\nPengguna yang menggunakan role ini tidak akan bisa login sampai role diganti.`)) return;
+
+    try {
+        const res = await fetch(`api/roles.php?id=${id}`, {
+            method: 'DELETE'
+        });
+        const data = await res.json();
+        if (data.success) {
+            loadRoles();
+            showToast('success', data.message || 'Role berhasil dihapus.', 'Role Dihapus');
+        } else {
+            showToast('error', data.error || 'Tidak dapat menghapus role', 'Gagal Hapus');
+        }
+    } catch (err) {
+        showToast('error', 'Koneksi error: ' + err.message, 'Gagal');
     }
 };
 
@@ -4479,6 +4762,34 @@ function populateClaimExpeditionFilter(candidates) {
     sel.innerHTML = optHtml;
 }
 
+// State Mode Ekspedisi Klaim: 'jnt' (Approval Accounting via Web) vs 'other' (Klaim Manual Admin)
+let claimExpeditionMode = 'jnt';
+
+window.setClaimExpeditionMode = function (mode) {
+    claimExpeditionMode = mode;
+    const btnJnt = document.getElementById('btnClaimModeJnt');
+    const btnOther = document.getElementById('btnClaimModeOther');
+
+    if (mode === 'jnt') {
+        if (btnJnt) {
+            btnJnt.className = 'px-4 py-2 rounded-t-xl font-bold text-xs transition border-t-2 border-rose-500 bg-white text-rose-700 shadow-2xs flex items-center gap-1.5 cursor-pointer';
+        }
+        if (btnOther) {
+            btnOther.className = 'px-4 py-2 rounded-t-xl font-bold text-xs transition text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 flex items-center gap-1.5 cursor-pointer';
+        }
+    } else {
+        if (btnOther) {
+            btnOther.className = 'px-4 py-2 rounded-t-xl font-bold text-xs transition border-t-2 border-indigo-500 bg-white text-indigo-700 shadow-2xs flex items-center gap-1.5 cursor-pointer';
+        }
+        if (btnJnt) {
+            btnJnt.className = 'px-4 py-2 rounded-t-xl font-bold text-xs transition text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 flex items-center gap-1.5 cursor-pointer';
+        }
+    }
+
+    clearSelectedClaims();
+    applyClaimCandidatesFilter();
+};
+
 window.applyClaimCandidatesFilter = function () {
     const tbody = document.getElementById('claimCandidatesTableBody');
     if (!tbody) return;
@@ -4492,6 +4803,12 @@ window.applyClaimCandidatesFilter = function () {
     const stFilter = statusSelect ? statusSelect.value.trim().toUpperCase() : '';
 
     let filtered = cachedClaimCandidates.filter(c => {
+        // Filter Berdasarkan Mode Tab Ekspedisi (JNT Khusus Approval Accounting vs Ekspedisi Lain Klaim Manual)
+        const cExpUpper = String(c.expedition || '').toUpperCase();
+        const isJntExp = (cExpUpper.includes('JNT') || cExpUpper.includes('J&T'));
+        if (claimExpeditionMode === 'jnt' && !isJntExp) return false;
+        if (claimExpeditionMode === 'other' && isJntExp) return false;
+
         // Filter Search (Invoice / Resi, Produk, SKU, Alasan Rusak, Operator)
         if (q) {
             const inv = String(c.invoice_number || '').toLowerCase();
@@ -4504,7 +4821,7 @@ window.applyClaimCandidatesFilter = function () {
             }
         }
 
-        // Filter Ekspedisi
+        // Filter Ekspedisi Spesifik Dropdown
         if (exp) {
             const cExp = String(c.expedition || '').toLowerCase();
             if (cExp !== exp) return false;
@@ -4526,6 +4843,17 @@ window.applyClaimCandidatesFilter = function () {
 
         return true;
     });
+
+    // Hitung berapa klaim JNT yang perlu tindakan / pending approval
+    const jntPendingCount = cachedClaimCandidates.filter(c => {
+        const expU = String(c.expedition || '').toUpperCase();
+        return (expU.includes('JNT') || expU.includes('J&T')) && (!c.accounting_status || c.accounting_status === 'PENDING' || c.accounting_status === 'PENDING_APPROVAL');
+    }).length;
+    const badgeJnt = document.getElementById('badgeJntPendingApproval');
+    if (badgeJnt) {
+        badgeJnt.innerText = jntPendingCount;
+        badgeJnt.classList.toggle('hidden', jntPendingCount === 0);
+    }
 
     // Hitung akumulasi total real-time dari seluruh item yang lolos filter
     let sumFilteredNominal = 0;
@@ -4675,12 +5003,45 @@ window.resetClaimCandidatesFilter = function () {
 // STATUS KLAIM: PENDING (Belum Klaim) -> PROCESS (Proses Klaim) -> DONE (Done Claim)
 // -------------------------------------------------------------
 function renderClaimStatusAction(c) {
-    const st = c.claim_status || 'PENDING';
     const inv = escapeHtml(c.invoice_number);
+    const expUpper = String(c.expedition || '').toUpperCase();
+    const isJnt = (expUpper.includes('JNT') || expUpper.includes('J&T'));
+
+    // JIKA EKSPEDISI J&T: STATUS BERGANTUNG PADA APPROVAL ACCOUNTING VIA WEB
+    if (isJnt) {
+        const accSt = c.accounting_status || 'PENDING';
+        if (accSt === 'APPROVED') {
+            return `
+                <div class="inline-flex flex-col items-center gap-0.5">
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                        <i class="fa-solid fa-stamp text-emerald-600"></i> Approved Acc
+                    </span>
+                    ${c.accounting_approved_by ? `<span class="text-[9px] text-slate-400 font-medium">by ${escapeHtml(c.accounting_approved_by)}</span>` : ''}
+                </div>`;
+        } else if (accSt === 'PENDING_APPROVAL') {
+            return `
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                    <i class="fa-solid fa-clock text-amber-600"></i> Menunggu Acc
+                </span>`;
+        } else if (accSt === 'REJECTED') {
+            return `
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                    <i class="fa-solid fa-xmark text-rose-600"></i> Ditolak Acc
+                </span>`;
+        } else {
+            return `
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                    <i class="fa-solid fa-paper-plane text-slate-400"></i> Siap Kirim
+                </span>`;
+        }
+    }
+
+    // JIKA EKSPEDISI LAIN: KLAIM MANUAL OLEH ADMIN (PENDING -> PROCESS -> DONE)
+    const st = c.claim_status || 'PENDING';
 
     if (st === 'PENDING') {
         return `
-            <button onclick="openClaimDetailModal('${inv}')" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[11px] font-bold transition shadow-2xs flex items-center gap-1.5 mx-auto" title="Belum diklaim - buka berkas detail klaim">
+            <button onclick="openClaimDetailModal('${inv}')" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[11px] font-bold transition shadow-2xs flex items-center gap-1.5 mx-auto cursor-pointer" title="Belum diklaim - buka berkas detail klaim">
                 <i class="fa-solid fa-shield-halved"></i> Klaim
             </button>`;
     }
@@ -5196,24 +5557,131 @@ window.updateSelectedClaimsBar = function () {
     if (btnCountEl) btnCountEl.innerText = selectedClaimInvoices.size;
     if (btnPrintCostEl) btnPrintCostEl.innerText = formattedPrice;
 
-    // Alur tombol: wajib Klaim dulu (PENDING -> PROCESS), baru muncul Print Invoice
-    let pendingCount = 0, processCount = 0;
+    // Alur tombol: Terpisah antara Mode JNT (Approval Accounting) vs Ekspedisi Lain (Klaim Manual)
+    let pendingCount = 0, processCount = 0, approvedCount = 0;
     selectedClaimInvoices.forEach(inv => {
         const item = cachedClaimCandidates.find(c => c.invoice_number === inv);
         const st = item ? (item.claim_status || 'PENDING') : 'PENDING';
         if (st === 'PENDING') pendingCount++;
         else if (st === 'PROCESS') processCount++;
+
+        if (item && item.accounting_status === 'APPROVED') {
+            approvedCount++;
+        }
     });
 
+    const btnSendAcc = document.getElementById('btnSendToAccounting');
+    const btnSendAccCount = document.getElementById('btnSendAccountingCount');
+    const btnPullAcc = document.getElementById('btnPullAccounting');
     const btnClaim = document.getElementById('btnBulkClaimProcess');
     const btnClaimCount = document.getElementById('btnBulkClaimCount');
     const btnDone = document.getElementById('btnBulkClaimDone');
     const btnPrint = document.getElementById('btnPrintClaimInvoice');
 
-    if (btnClaimCount) btnClaimCount.innerText = pendingCount;
-    if (btnClaim) btnClaim.classList.toggle('hidden', pendingCount === 0);
-    if (btnPrint) btnPrint.classList.toggle('hidden', pendingCount > 0);
-    if (btnDone) btnDone.classList.toggle('hidden', pendingCount > 0 || processCount === 0);
+    if (claimExpeditionMode === 'jnt') {
+        // MODE JNT: Kirim ke Accounting & Tarik Approval
+        if (btnSendAcc) {
+            btnSendAcc.classList.remove('hidden');
+            if (btnSendAccCount) btnSendAccCount.innerText = selectedClaimInvoices.size;
+        }
+        if (btnPullAcc) btnPullAcc.classList.remove('hidden');
+
+        // Sembunyikan tombol klaim manual admin
+        if (btnClaim) btnClaim.classList.add('hidden');
+        if (btnDone) btnDone.classList.add('hidden');
+
+        // Tombol Print Invoice muncul jika ada item terpilih yang sudah di-approve oleh Accounting
+        if (btnPrint) {
+            btnPrint.classList.toggle('hidden', approvedCount === 0);
+        }
+    } else {
+        // MODE EKSPEDISI LAIN: Klaim Manual Admin
+        if (btnSendAcc) btnSendAcc.classList.add('hidden');
+        if (btnPullAcc) btnPullAcc.classList.add('hidden');
+
+        if (btnClaimCount) btnClaimCount.innerText = pendingCount;
+        if (btnClaim) btnClaim.classList.toggle('hidden', pendingCount === 0);
+        if (btnPrint) btnPrint.classList.toggle('hidden', pendingCount > 0);
+        if (btnDone) btnDone.classList.toggle('hidden', pendingCount > 0 || processCount === 0);
+    }
+};
+
+window.sendSelectedToAccounting = async function () {
+    if (selectedClaimInvoices.size === 0) {
+        showToast('warning', 'Pilih minimal 1 paket klaim J&T terlebih dahulu.', 'Peringatan');
+        return;
+    }
+
+    const invoices = Array.from(selectedClaimInvoices);
+    if (!confirm(`Kirim data tabel untuk ${invoices.length} klaim J&T ke Accounting via InfinityFree untuk di-approval?\n\nSesuai instruksi: Data yang dikirim hanya berupa DATA TABEL (Resi, Order ID OCS, Produk Rusak, Total Tagihan) TANPA FOTO.`)) {
+        return;
+    }
+
+    const btn = document.getElementById('btnSendToAccounting');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Mengirim...`;
+    }
+
+    try {
+        const res = await fetch('api/sync_jnt_claims.php?action=send_to_cloud', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ invoices })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast('success', data.message || `${invoices.length} klaim J&T berhasil dikirim ke Accounting!`, 'Terkirim ke Accounting');
+            const invSet = new Set(invoices);
+            cachedClaimCandidates.forEach(c => {
+                if (invSet.has(c.invoice_number)) {
+                    c.accounting_status = 'PENDING_APPROVAL';
+                }
+            });
+            applyClaimCandidatesFilter();
+        } else {
+            showToast('error', data.error || 'Gagal mengirim data klaim ke Accounting.', 'Gagal Kirim');
+        }
+    } catch (err) {
+        showToast('error', 'Koneksi error: ' + err.message, 'Gagal');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
+    }
+};
+
+window.pullAccountingApproval = async function () {
+    const btn = document.getElementById('btnPullAccounting');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Menarik...`;
+    }
+
+    try {
+        const res = await fetch('api/sync_jnt_claims.php?action=pull_from_cloud', {
+            method: 'POST'
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast('success', data.message || 'Status approval dari Accounting berhasil ditarik!', 'Approval Diterima');
+            loadClaimCandidates(true);
+        } else {
+            showToast('error', data.error || 'Gagal menarik status approval dari cloud.', 'Gagal Tarik');
+        }
+    } catch (err) {
+        showToast('error', 'Koneksi error: ' + err.message, 'Gagal');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
+    }
 };
 
 window.openCollectiveClaimInvoiceModal = function () {

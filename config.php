@@ -145,15 +145,51 @@ try {
                 CONSTRAINT fk_session_items FOREIGN KEY (`session_id`) REFERENCES `return_sessions`(`id`) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+            CREATE TABLE IF NOT EXISTS `roles` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `role_key` VARCHAR(50) NOT NULL UNIQUE,
+                `role_name` VARCHAR(100) NOT NULL,
+                `description` TEXT NULL,
+                `permissions` TEXT NULL,
+                `is_system` TINYINT(1) DEFAULT 0,
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
             CREATE TABLE IF NOT EXISTS `users` (
                 `id` INT AUTO_INCREMENT PRIMARY KEY,
                 `username` VARCHAR(50) NOT NULL UNIQUE,
                 `password` VARCHAR(255) NOT NULL,
                 `name` VARCHAR(100) NOT NULL,
-                `role` ENUM('superadmin', 'admin', 'operator') NOT NULL DEFAULT 'operator',
+                `role` VARCHAR(50) NOT NULL DEFAULT 'operator',
                 `pin` VARCHAR(20) NULL DEFAULT '123456',
                 `status` VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
                 `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+            CREATE TABLE IF NOT EXISTS `jnt_claim_approvals` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `invoice_number` VARCHAR(100) NOT NULL UNIQUE,
+                `order_id` VARCHAR(100) NULL,
+                `expedition` VARCHAR(50) DEFAULT 'J&T',
+                `unboxing_date` DATETIME NULL,
+                `operator_name` VARCHAR(100) NULL,
+                `customer_name` VARCHAR(150) NULL,
+                `damaged_reason` TEXT NULL,
+                `items_summary` TEXT NULL,
+                `total_claim_amount` DECIMAL(15,2) DEFAULT 0.00,
+                `total_claim_amount_fmt` VARCHAR(50) NULL,
+                `status` ENUM('PENDING', 'APPROVED', 'REJECTED') DEFAULT 'PENDING',
+                `approved_by` VARCHAR(100) NULL,
+                `approved_at` DATETIME NULL,
+                `esign_token` VARCHAR(100) NULL,
+                `notes` TEXT NULL,
+                `synced_back_to_local` TINYINT(1) DEFAULT 0,
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_jnt_status (`status`),
+                INDEX idx_jnt_invoice (`invoice_number`),
+                INDEX idx_jnt_sync (`synced_back_to_local`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
             CREATE TABLE IF NOT EXISTS `system_settings` (
@@ -540,14 +576,19 @@ function checkMaintenanceMode($pdo, $user = null) {
 }
 
 /**
- * Pastikan kolom status klaim tersedia di return_sessions (self-healing schema).
- * PENDING = Belum Klaim, PROCESS = Proses Klaim, DONE = Done Claim
+ * Pastikan kolom status klaim & accounting approval serta tabel roles tersedia (self-healing schema).
  */
-function ensureClaimStatusColumn($pdo) {
+function ensureClaimStatusColumn($pdo = null) {
+    global $pdo;
+    if (!$pdo && isset($GLOBALS['pdo'])) {
+        $pdo = $GLOBALS['pdo'];
+    }
+    if (!$pdo) return;
     static $checked = false;
     if ($checked) return;
     $checked = true;
     try {
+        // 1. Kolom Klaim & Approval di return_sessions
         $cols = $pdo->query("SHOW COLUMNS FROM return_sessions")->fetchAll(PDO::FETCH_COLUMN);
         if (!in_array('claim_status', $cols)) {
             $pdo->exec("ALTER TABLE return_sessions ADD COLUMN claim_status VARCHAR(20) NOT NULL DEFAULT 'PENDING' AFTER status");
@@ -555,5 +596,87 @@ function ensureClaimStatusColumn($pdo) {
         if (!in_array('claim_updated_at', $cols)) {
             $pdo->exec("ALTER TABLE return_sessions ADD COLUMN claim_updated_at DATETIME NULL AFTER claim_status");
         }
+        if (!in_array('accounting_status', $cols)) {
+            $pdo->exec("ALTER TABLE return_sessions ADD COLUMN accounting_status VARCHAR(30) NOT NULL DEFAULT 'NONE' AFTER claim_status");
+        }
+        if (!in_array('accounting_approved_by', $cols)) {
+            $pdo->exec("ALTER TABLE return_sessions ADD COLUMN accounting_approved_by VARCHAR(100) NULL AFTER accounting_status");
+        }
+        if (!in_array('accounting_approved_at', $cols)) {
+            $pdo->exec("ALTER TABLE return_sessions ADD COLUMN accounting_approved_at DATETIME NULL AFTER accounting_approved_by");
+        }
+        if (!in_array('accounting_notes', $cols)) {
+            $pdo->exec("ALTER TABLE return_sessions ADD COLUMN accounting_notes TEXT NULL AFTER accounting_approved_at");
+        }
+        if (!in_array('accounting_esign', $cols)) {
+            $pdo->exec("ALTER TABLE return_sessions ADD COLUMN accounting_esign VARCHAR(100) NULL AFTER accounting_notes");
+        }
+        if (!in_array('accounting_synced_at', $cols)) {
+            $pdo->exec("ALTER TABLE return_sessions ADD COLUMN accounting_synced_at DATETIME NULL AFTER accounting_esign");
+        }
+
+        // 2. Pastikan tabel roles ada dan berisi role default
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS `roles` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `role_key` VARCHAR(50) NOT NULL UNIQUE,
+                `role_name` VARCHAR(100) NOT NULL,
+                `description` TEXT NULL,
+                `permissions` TEXT NULL,
+                `is_system` TINYINT(1) DEFAULT 0,
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+
+        $defaultRoles = [
+            ['superadmin', 'Super Admin', 'Akses penuh ke seluruh menu dan pengaturan sistem', 1],
+            ['admin', 'Admin Retrun', 'Akses dashboard, receiving, scan unboxing, dan klaim manual ekspedisi', 1],
+            ['operator', 'Operator Inbound', 'Akses station scanner & input unboxing', 1],
+            ['management', 'Management', 'Akses dashboard monitoring, approval, dan pengaturan bank', 1],
+            ['accounting', 'Accounting', 'Akses approval klaim ekspedisi JNT, pengaturan bank, dan cetak invoice tagihan', 1]
+        ];
+
+        $stmtCheckRole = $pdo->prepare("SELECT id FROM roles WHERE role_key = ?");
+        $stmtInsertRole = $pdo->prepare("INSERT INTO roles (role_key, role_name, description, is_system) VALUES (?, ?, ?, ?)");
+        foreach ($defaultRoles as $r) {
+            $stmtCheckRole->execute([$r[0]]);
+            if (!$stmtCheckRole->fetch()) {
+                $stmtInsertRole->execute([$r[0], $r[1], $r[2], $r[3]]);
+            }
+        }
+
+        // 3. Pastikan kolom users.role bertipe VARCHAR(50) agar mendukung role dinamis
+        try {
+            $pdo->exec("ALTER TABLE users MODIFY COLUMN role VARCHAR(50) NOT NULL DEFAULT 'operator'");
+        } catch (Exception $eU) {}
+
+        // 4. Pastikan tabel jnt_claim_approvals ada (untuk sync & approval cloud)
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS `jnt_claim_approvals` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `invoice_number` VARCHAR(100) NOT NULL UNIQUE,
+                `order_id` VARCHAR(100) NULL,
+                `expedition` VARCHAR(50) DEFAULT 'J&T',
+                `unboxing_date` DATETIME NULL,
+                `operator_name` VARCHAR(100) NULL,
+                `customer_name` VARCHAR(150) NULL,
+                `damaged_reason` TEXT NULL,
+                `items_summary` TEXT NULL,
+                `total_claim_amount` DECIMAL(15,2) DEFAULT 0.00,
+                `total_claim_amount_fmt` VARCHAR(50) NULL,
+                `status` ENUM('PENDING', 'APPROVED', 'REJECTED') DEFAULT 'PENDING',
+                `approved_by` VARCHAR(100) NULL,
+                `approved_at` DATETIME NULL,
+                `esign_token` VARCHAR(100) NULL,
+                `notes` TEXT NULL,
+                `synced_back_to_local` TINYINT(1) DEFAULT 0,
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_jnt_status (`status`),
+                INDEX idx_jnt_invoice (`invoice_number`),
+                INDEX idx_jnt_sync (`synced_back_to_local`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
     } catch (Exception $e) {}
 }

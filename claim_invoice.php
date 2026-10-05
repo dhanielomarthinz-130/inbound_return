@@ -113,6 +113,7 @@ if (!empty($invoiceList)) {
         $sql = "
             SELECT rs.id AS session_id, rs.invoice_number, rs.expedition, rs.operator_name, rs.created_at,
                    rs.package_photo, rs.product_photo, rs.photos,
+                   rs.accounting_status, rs.accounting_approved_by, rs.accounting_approved_at, rs.accounting_esign, rs.accounting_notes,
                    ri.id AS item_id, ri.barcode, ri.product_name, ri.sku, ri.seller_sku, ri.type, ri.qty,
                    ri.condition, ri.damage_reason, ri.wrong_barcode, ri.wrong_product_name, ri.photo_path
             FROM return_sessions rs
@@ -126,9 +127,20 @@ if (!empty($invoiceList)) {
 
         // Map per invoice
         $sessionMap = [];
+        $isAccountingApproved = false;
+        $accountingApprovedBy = null;
+        $accountingApprovedAt = null;
+        $accountingEsign = null;
+
         foreach ($rawRows as $r) {
             $inv = $r['invoice_number'];
             if (!isset($sessionMap[$inv])) {
+                if (strtoupper($r['accounting_status'] ?? '') === 'APPROVED') {
+                    $isAccountingApproved = true;
+                    $accountingApprovedBy = $r['accounting_approved_by'] ?: $accountingApprovedBy;
+                    $accountingApprovedAt = $r['accounting_approved_at'] ?: $accountingApprovedAt;
+                    $accountingEsign = $r['accounting_esign'] ?: $accountingEsign;
+                }
                 $sessionMap[$inv] = [
                     'session_id' => $r['session_id'],
                     'invoice_number' => $inv,
@@ -138,6 +150,10 @@ if (!empty($invoiceList)) {
                     'package_photo' => $r['package_photo'] ?? null,
                     'product_photo' => $r['product_photo'] ?? null,
                     'photos' => $r['photos'] ?? null,
+                    'accounting_status' => $r['accounting_status'] ?? 'NONE',
+                    'accounting_approved_by' => $r['accounting_approved_by'] ?? null,
+                    'accounting_approved_at' => $r['accounting_approved_at'] ?? null,
+                    'accounting_esign' => $r['accounting_esign'] ?? null,
                     'items' => []
                 ];
             }
@@ -753,7 +769,24 @@ $totalPages = count($pages);
                                     </div>
                                 </div>
 
-                                <!-- 5. ACCOUNTING -->
+                                <!-- 5. ACCOUNTING (VERIFIKASI & DIGITAL E-SIGN) -->
+                                <?php if (!empty($isAccountingApproved)): ?>
+                                <div class="flex flex-col justify-between h-24 border-2 border-emerald-500 rounded p-1.5 bg-emerald-50/40 relative overflow-hidden text-center">
+                                    <div>
+                                        <span class="text-emerald-700 block text-[8px] uppercase font-black tracking-wider flex items-center justify-center gap-1">
+                                            <i class="fa-solid fa-certificate text-[9px]"></i> VERIFIED E-SIGN
+                                        </span>
+                                        <span class="font-black text-slate-900 text-[10px] sm:text-[11px] block leading-tight">Accounting</span>
+                                    </div>
+                                    <div class="my-auto py-0.5 text-[7.5px] text-emerald-800 font-mono leading-tight bg-white/80 rounded border border-emerald-200">
+                                        <div class="font-bold"><?= date('d/m/Y H:i', strtotime($accountingApprovedAt ?? 'now')) ?></div>
+                                        <div class="text-[7px] text-slate-500 truncate" title="<?= htmlspecialchars($accountingEsign ?? '') ?>"><?= htmlspecialchars($accountingEsign ?? 'DIGITAL-APPROVED') ?></div>
+                                    </div>
+                                    <div class="border-t border-emerald-400 pt-0.5 font-bold text-slate-900 text-[10px] truncate">
+                                        ( <?= htmlspecialchars($accountingApprovedBy ?? 'Accounting') ?> )
+                                    </div>
+                                </div>
+                                <?php else: ?>
                                 <div class="flex flex-col justify-between h-24 border border-slate-300 rounded p-1.5 bg-slate-50/50">
                                     <div>
                                         <span class="text-slate-500 block text-[9px] uppercase font-bold">Diverifikasi</span>
@@ -763,6 +796,7 @@ $totalPages = count($pages);
                                         ( ..................... )
                                     </div>
                                 </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                     <?php endif; ?>

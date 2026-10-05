@@ -53,7 +53,10 @@ if ($method === 'POST') {
         jsonResponse(['error' => 'Akses ditolak: Hanya Superadmin yang berhak mendaftarkan user dengan role Superadmin!'], 403);
     }
 
-    if (!in_array($role, ['superadmin', 'admin', 'operator'])) {
+    // Validasi Role dari tabel roles
+    $stmtRoleChk = $pdo->prepare("SELECT role_key FROM roles WHERE role_key = ?");
+    $stmtRoleChk->execute([$role]);
+    if (!$stmtRoleChk->fetch()) {
         $role = 'operator';
     }
 
@@ -115,6 +118,13 @@ if ($method === 'PUT') {
         // Jika admin biasa mencoba mengubah role user menjadi superadmin, TOLAK
         if ($role === 'superadmin' && $currentUser['role'] !== 'superadmin') {
             jsonResponse(['error' => 'Akses ditolak: Hanya Superadmin yang berhak menetapkan role Superadmin!'], 403);
+        }
+
+        // Validasi Role dari tabel roles
+        $stmtRoleChk = $pdo->prepare("SELECT role_key FROM roles WHERE role_key = ?");
+        $stmtRoleChk->execute([$role]);
+        if (!$stmtRoleChk->fetch()) {
+            $role = $targetUser['role'] ?: 'operator';
         }
 
         // Cek duplikasi username untuk user lain
