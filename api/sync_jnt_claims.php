@@ -201,9 +201,7 @@ if ($action === 'send_to_cloud') {
 
             if ($ocsData) {
                 $orderId = !empty($ocsData['order_id']) ? $ocsData['order_id'] : $inv;
-                $tot = (float)($ocsData['total_amount'] ?? 0);
-                if ($tot <= 0) $tot = (float)($ocsData['package_price'] ?? 0);
-                if ($tot <= 0) $tot = (float)($ocsData['original_price'] ?? 0);
+                $tot = isset($ocsData['total_amount']) ? (float)$ocsData['total_amount'] : (float)($ocsData['package_price'] ?? 0);
                 $totalClaimAmount = $tot;
             }
 

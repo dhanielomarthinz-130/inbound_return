@@ -19,44 +19,24 @@ $action = trim($_GET['action'] ?? $_POST['action'] ?? 'list');
  * Helper untuk menghitung total harga order dengan fallback bertingkat
  */
 function computeOrderPrice($ord) {
-    $price = (float)($ord['total_amount'] ?? 0);
-    if ($price <= 0) $price = (float)($ord['package_price'] ?? 0);
-    if ($price <= 0) $price = (float)($ord['subtotal'] ?? 0);
-    if ($price <= 0) $price = (float)($ord['original_price'] ?? 0);
-
-    // Fallback dari items detail
-    if ($price <= 0 && !empty($ord['order_items_json'])) {
-        $items = is_array($ord['order_items_json']) ? $ord['order_items_json'] : (json_decode($ord['order_items_json'], true) ?: []);
-        $sum = 0;
-        foreach ($items as $it) {
-            $qty = (int)($it['quantity'] ?? $it['Qty'] ?? 1);
-            $p = (float)($it['sale_price'] ?? $it['SalePrice'] ?? $it['price'] ?? $it['original_price'] ?? $it['OriginalPrice'] ?? 0);
-            $sum += ($p * $qty);
-        }
-        if ($sum > 0) $price = $sum;
+    // Sesuai instruksi: gunakan persis field Total dari tab Pembayaran OCS
+    if (isset($ord['total_amount']) && $ord['total_amount'] !== null && $ord['total_amount'] !== '') {
+        return (float)$ord['total_amount'];
     }
 
-    // Fallback dari raw_payload
-    if ($price <= 0 && !empty($ord['raw_payload'])) {
+    // Fallback dari raw_payload Payment.TotalAmount
+    if (!empty($ord['raw_payload'])) {
         $raw = is_array($ord['raw_payload']) ? $ord['raw_payload'] : (json_decode($ord['raw_payload'], true) ?: []);
-        if (!empty($raw['Payment'])) {
-            $p = $raw['Payment'];
-            $price = (float)($p['TotalAmount'] ?? 0);
-            if ($price <= 0) $price = (float)($p['SubTotal'] ?? 0);
-            if ($price <= 0) $price = (float)($p['OriginalTotalProductPrice'] ?? 0);
-        }
-        if ($price <= 0 && !empty($raw['Details'])) {
-            $sum = 0;
-            foreach ($raw['Details'] as $it) {
-                $qty = (int)($it['Qty'] ?? $it['quantity'] ?? 1);
-                $p = (float)($it['SalePrice'] ?? $it['OriginalPrice'] ?? 0);
-                $sum += ($p * $qty);
-            }
-            if ($sum > 0) $price = $sum;
+        if (isset($raw['Payment']['TotalAmount'])) {
+            return (float)$raw['Payment']['TotalAmount'];
         }
     }
 
-    return $price;
+    if (isset($ord['package_price']) && $ord['package_price'] !== null && $ord['package_price'] !== '') {
+        return (float)$ord['package_price'];
+    }
+
+    return 0.0;
 }
 
 /**
@@ -117,10 +97,8 @@ function syncSingleOrderFromPicklistFindOrder($pdo, $keyword) {
     $shipFee = (float)($fp['ShippingFee'] ?? 0);
     $serviceFee = (float)($fp['ServiceFee'] ?? 0);
     $subtotal = (float)($fp['SubTotal'] ?? ($origProdPrice - $sellerDisc));
+    // Sesuai instruksi: gunakan persis field Total dari tab Pembayaran OCS
     $totalAmount = (float)($fp['TotalAmount'] ?? 0);
-    if ($totalAmount <= 0) {
-        $totalAmount = $subtotal > 0 ? ($subtotal + $shipFee + $serviceFee) : $origProdPrice;
-    }
 
     $parsedItems = [];
     $itemNames = [];
@@ -381,11 +359,8 @@ function enrichOrdersFromOcs($pdo, array $orderIds) {
             ];
         }
 
+        // Sesuai instruksi: gunakan persis field Total dari tab Pembayaran OCS
         $calcPrice = $totalAmount;
-        if ($calcPrice <= 0) $calcPrice = $subtotal;
-        if ($calcPrice <= 0 && $itemSaleSum > 0) $calcPrice = $itemSaleSum;
-        if ($calcPrice <= 0 && $origTotalProduct > 0) $calcPrice = $origTotalProduct;
-        if ($calcPrice <= 0 && $itemOrigSum > 0) $calcPrice = $itemOrigSum;
 
         $trackingNum = trim($d['TrackingNumber'] ?? '');
         $skuJoined = !empty($skuList) ? implode(', ', array_unique($skuList)) : null;

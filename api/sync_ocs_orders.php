@@ -209,10 +209,8 @@ try {
         $shipFee = (float)($fp['ShippingFee'] ?? 0);
         $serviceFee = (float)($fp['ServiceFee'] ?? 0);
         $subtotal = (float)($fp['SubTotal'] ?? ($origProdPrice - $sellerDisc));
+        // Sesuai permintaan: gunakan persis field Total dari tab Pembayaran OCS (tidak dioverride dengan Total Harga Produk)
         $totalAmount = (float)($fp['TotalAmount'] ?? 0);
-        if ($totalAmount <= 0) {
-            $totalAmount = $subtotal > 0 ? ($subtotal + $shipFee + $serviceFee) : $origProdPrice;
-        }
 
         $parsedItems = [];
         $itemNames = [];
@@ -656,18 +654,7 @@ try {
                     ];
                 }
 
-                // Kalkulasi total harga akurat dengan fallback jika OCS mengirim 0
-                if ($totalAmount <= 0) {
-                    if ($subtotal > 0) {
-                        $totalAmount = $subtotal;
-                    } elseif ($itemSaleSum > 0) {
-                        $totalAmount = $itemSaleSum;
-                    } elseif ($origTotalProduct > 0) {
-                        $totalAmount = $origTotalProduct;
-                    } elseif ($itemOrigSum > 0) {
-                        $totalAmount = $itemOrigSum;
-                    }
-                }
+                // Sesuai permintaan: gunakan persis field Total dari tab Pembayaran OCS
 
                 $orderItemsJson = !empty($parsedItems) ? json_encode($parsedItems, JSON_UNESCAPED_UNICODE) : null;
                 $trackingNumber = trim($detailData['TrackingNumber'] ?? $ordHeader['TrackingNumber'] ?? '');

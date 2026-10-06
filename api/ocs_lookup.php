@@ -150,20 +150,13 @@ if ($query === '' || $action === 'list_claimable') {
                     $o = $ocsMap[$inv] ?? $ocsMap[$cleanInv] ?? null;
 
                     if ($o) {
-                        // Cari harga terbaik dari semua kolom harga OCS
-                        $bestPrice = 0;
-                        if ((float)($o['package_price'] ?? 0) > 0) {
-                            $bestPrice = (float)$o['package_price'];
-                        } elseif ((float)($o['total_amount'] ?? 0) > 0) {
+                        // Sesuai instruksi: gunakan persis field Total dari tab Pembayaran OCS
+                        if (isset($o['total_amount']) && $o['total_amount'] !== null && $o['total_amount'] !== '') {
                             $bestPrice = (float)$o['total_amount'];
-                        } elseif ((float)($o['subtotal'] ?? 0) > 0) {
-                            $bestPrice = (float)$o['subtotal'];
-                        } elseif ((float)($o['original_price'] ?? 0) > 0) {
-                            $bestPrice = (float)$o['original_price'];
-                        } elseif ((float)($o['nmv'] ?? 0) > 0) {
-                            $bestPrice = (float)$o['nmv'];
-                        } elseif ((float)($o['gmv'] ?? 0) > 0) {
-                            $bestPrice = (float)$o['gmv'];
+                        } elseif (isset($o['package_price']) && $o['package_price'] !== null && $o['package_price'] !== '') {
+                            $bestPrice = (float)$o['package_price'];
+                        } else {
+                            $bestPrice = 0;
                         }
 
                         // Jika masih 0, periksa dari rincian order_items_json
@@ -361,9 +354,12 @@ try {
 
         if ($cached) {
             $itemsDecoded = !empty($cached['order_items_json']) ? json_decode($cached['order_items_json'], true) : [];
-            $pkgPrice = (float)($cached['total_amount'] > 0 ? $cached['total_amount'] : ($cached['package_price'] > 0 ? $cached['package_price'] : ($cached['nmv'] > 0 ? $cached['nmv'] : $cached['gmv'])));
+            // Sesuai instruksi: gunakan persis field Total dari tab Pembayaran OCS
+            $pkgPrice = (isset($cached['total_amount']) && $cached['total_amount'] !== null && $cached['total_amount'] !== '')
+                ? (float)$cached['total_amount']
+                : (float)($cached['package_price'] ?? 0);
             $shippingFee = (float)($cached['shipping_fee'] ?? 0);
-            $totalClaim = $pkgPrice > 0 ? $pkgPrice : ((float)($cached['original_price'] ?? 0) + $shippingFee);
+            $totalClaim = $pkgPrice;
 
             $orderData = [
                 'Id'                     => $cached['order_id'],
@@ -484,10 +480,8 @@ try {
                         $shipFee = (float)($fp['ShippingFee'] ?? 0);
                         $serviceFee = (float)($fp['ServiceFee'] ?? 0);
                         $subtotal = (float)($fp['SubTotal'] ?? ($origProdPrice - $sellerDisc));
+                        // Sesuai instruksi: gunakan persis field Total dari tab Pembayaran OCS
                         $totalAmount = (float)($fp['TotalAmount'] ?? 0);
-                        if ($totalAmount <= 0) {
-                            $totalAmount = $subtotal > 0 ? ($subtotal + $shipFee + $serviceFee) : $origProdPrice;
-                        }
 
                         $parsedItems = [];
                         $itemNames = [];
@@ -790,10 +784,8 @@ try {
                             $shipFee = (float)($payment['ShippingFee'] ?? $origShipFee);
                             $serviceFee = (float)($payment['ServiceFee'] ?? 0);
                             $subtotal = (float)($payment['SubTotal'] ?? $netProdPrice);
+                            // Sesuai instruksi: gunakan persis field Total dari tab Pembayaran OCS
                             $totalAmount = (float)($payment['TotalAmount'] ?? 0);
-                            if ($totalAmount <= 0) {
-                                $totalAmount = $subtotal > 0 ? ($subtotal + $shippingFee + $serviceFee) : $origProdPrice;
-                            }
 
                             // Ekstraksi Rincian SKU Produk dari Details (Format Resmi OCS)
                             $rawDetails = $od['Details'] ?? $od['Items'] ?? [];
