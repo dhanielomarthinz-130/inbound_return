@@ -2021,6 +2021,53 @@ try {
             return canvas.toDataURL('image/jpeg', 0.70);
         }
 
+        // Kompres ulang DataURL (untuk foto draft lama beresolusi penuh) ke maks 1280px, kualitas 0.70
+        function compressDataUrl(dataUrl, maxW = 1280, maxH = 960, quality = 0.70) {
+            return new Promise((resolve) => {
+                // Foto kecil (< ~250KB) tidak perlu dikompres ulang
+                if (!dataUrl || dataUrl.length < 350000) { resolve(dataUrl); return; }
+                const img = new Image();
+                img.onload = () => {
+                    let w = img.naturalWidth, h = img.naturalHeight;
+                    const ratio = Math.min(1, maxW / w, maxH / h);
+                    w = Math.round(w * ratio); h = Math.round(h * ratio);
+                    const c = document.createElement('canvas');
+                    c.width = w; c.height = h;
+                    const cx = c.getContext('2d');
+                    cx.imageSmoothingQuality = 'high';
+                    cx.drawImage(img, 0, 0, w, h);
+                    resolve(c.toDataURL('image/jpeg', quality));
+                };
+                img.onerror = () => resolve(dataUrl);
+                img.src = dataUrl;
+            });
+        }
+
+        // Unggah 1 foto ke server, kembalikan path file (uploads/reception/...). Retry 1x jika gagal jaringan.
+        async function uploadReceptionPhoto(dataUrl, prefix) {
+            const compact = await compressDataUrl(dataUrl);
+            let lastErr = null;
+            for (let attempt = 1; attempt <= 2; attempt++) {
+                try {
+                    const res = await fetch('api/reception.php?action=upload_photo', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ photo: compact, prefix })
+                    });
+                    const txt = await res.text();
+                    let d = null;
+                    try { d = JSON.parse(txt); } catch (e) {
+                        throw new Error(res.status === 401 ? 'Sesi login habis, silakan login ulang di tab baru.' : `Respon server tidak valid (HTTP ${res.status}).`);
+                    }
+                    if (d && d.success && d.path) return d.path;
+                    throw new Error(d?.error || `Upload foto gagal (HTTP ${res.status}).`);
+                } catch (e) {
+                    lastErr = e;
+                }
+            }
+            throw new Error('Gagal mengunggah foto: ' + (lastErr ? lastErr.message : 'unknown'));
+        }
+
         // ==============================================================
         // DRAFT MANAGEMENT & LIST RENDERER
         // ==============================================================
@@ -2237,11 +2284,37 @@ try {
             }
 
             try {
+                // 1. Unggah foto satu per satu (kompres ulang foto draft lama yang masih resolusi penuh)
+                const setProgress = (txt) => {
+                    if (btnDesktop) btnDesktop.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${txt}`;
+                    if (btnMobile) btnMobile.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${txt}`;
+                };
+                const safeRcpt = String(currentReceiptId || 'RCV').replace(/[^a-zA-Z0-9_\-]/g, '_');
+
+                if (currentCourierPhoto && currentCourierPhoto.startsWith('data:image')) {
+                    setProgress('Mengunggah foto kurir...');
+                    currentCourierPhoto = await uploadReceptionPhoto(currentCourierPhoto, `courier_${safeRcpt}`);
+                    await saveDraftToStorage();
+                }
+
+                const totalPkg = draftPackages.length;
+                for (let i = 0; i < totalPkg; i++) {
+                    const p = draftPackages[i];
+                    if (p.photo && p.photo.startsWith('data:image')) {
+                        setProgress(`Mengunggah foto paket ${i + 1}/${totalPkg}...`);
+                        const safeB = String(p.barcode).replace(/[^a-zA-Z0-9_\-]/g, '_');
+                        p.photo = await uploadReceptionPhoto(p.photo, `pkg_${safeRcpt}_${safeB}`);
+                        await saveDraftToStorage();
+                    }
+                }
+                setProgress('Menyimpan data penerimaan...');
+
+                // 2. Submit final (hanya berisi path foto, ukuran sangat kecil)
                 const payload = {
                     receipt_number: currentReceiptId,
                     expedition: currentExpedition,
                     courier_name: currentCourierName,
-                    courier_photo: currentCourierPhoto, // Foto kurir
+                    courier_photo: currentCourierPhoto, // Path foto kurir
                     sack_number: currentSackNumber || 'Karung 1',
                     packages: draftPackages.map(p => ({
                         barcode: p.barcode,

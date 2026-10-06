@@ -400,6 +400,44 @@ if ($method === 'DELETE' || ($method === 'POST' && isset($_GET['action']) && $_G
 }
 
 // ==========================================
+// 2a. POST ?action=upload_photo : UNGGAH 1 FOTO (Dipakai sebelum submit final)
+//     Foto diunggah satu per satu agar request submit final kecil dan tidak
+//     pernah melebihi batas post_max_size server.
+// ==========================================
+if ($method === 'POST' && ($_GET['action'] ?? '') === 'upload_photo') {
+    $rawUp = file_get_contents('php://input');
+    $up = json_decode($rawUp, true);
+    if (!is_array($up)) {
+        $up = $_POST;
+    }
+    $photoData = $up['photo'] ?? '';
+    if (!is_string($photoData) || !preg_match('/^data:image\/(jpeg|jpg|png|webp);base64,/i', $photoData, $mType)) {
+        $len = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+        jsonResponse([
+            'error' => $len > 0 && empty($up)
+                ? 'Foto gagal diterima server (ukuran ' . round($len / 1048576, 2) . ' MB melebihi batas ' . ini_get('post_max_size') . ').'
+                : 'Data foto tidak valid.'
+        ], 400);
+    }
+    $decoded = base64_decode(substr($photoData, strpos($photoData, ',') + 1), true);
+    if ($decoded === false || strlen($decoded) < 10) {
+        jsonResponse(['error' => 'Data foto rusak / tidak dapat dibaca.'], 400);
+    }
+    $ext = strtolower($mType[1]) === 'jpeg' ? 'jpg' : strtolower($mType[1]);
+    $prefix = preg_replace('/[^a-zA-Z0-9_\-]/', '_', (string)($up['prefix'] ?? 'pkg'));
+    $prefix = substr($prefix ?: 'pkg', 0, 120);
+    $dir = __DIR__ . '/../uploads/reception';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0777, true);
+    }
+    $fname = $prefix . '_' . time() . '_' . mt_rand(1000, 9999) . '.' . $ext;
+    if (@file_put_contents($dir . '/' . $fname, $decoded) === false) {
+        jsonResponse(['error' => 'Gagal menulis file foto ke folder uploads/reception (cek izin folder).'], 500);
+    }
+    jsonResponse(['success' => true, 'path' => 'uploads/reception/' . $fname]);
+}
+
+// ==========================================
 // 2. POST: SIMPAN PENERIMAAN PAKET MULTIPLE
 // ==========================================
 if ($method === 'POST') {
@@ -409,10 +447,17 @@ if ($method === 'POST') {
         $input = $_POST;
     }
 
-    if ((empty($input) || !is_array($input)) && isset($_SERVER['CONTENT_LENGTH']) && (int)$_SERVER['CONTENT_LENGTH'] > 0) {
-        jsonResponse([
-            'error' => 'Ukuran data foto paket yang dikirim (' . round($_SERVER['CONTENT_LENGTH'] / (1024 * 1024), 2) . ' MB) melebihi batas upload server. Sistem telah mengaktifkan kompresi otomatis, silakan coba simpan kembali.'
-        ], 413);
+    // Body kosong: biasanya karena ukuran request melebihi post_max_size (PHP membuang seluruh body)
+    if (empty($input) || !is_array($input)) {
+        $len = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+        if ($len > 0 || strlen((string)$rawInput) === 0) {
+            jsonResponse([
+                'error' => 'Data penerimaan tidak sampai ke server'
+                    . ($len > 0 ? ' (ukuran ' . round($len / 1048576, 2) . ' MB, batas server ' . ini_get('post_max_size') . ')' : '')
+                    . '. Muat ulang halaman (draft tetap aman) lalu klik Simpan kembali.'
+            ], 413);
+        }
+        jsonResponse(['error' => 'Format data penerimaan tidak valid (JSON rusak).'], 400);
     }
 
     $expedition   = trim($input['expedition'] ?? '');
@@ -424,7 +469,7 @@ if ($method === 'POST') {
     $packages     = $input['packages'] ?? [];
 
     if (empty($expedition)) {
-        jsonResponse(['error' => 'Pilih Ekspedisi pengantar terlebih dahulu!'], 400);
+        jsonResponse(['error' => 'Ekspedisi pengantar tidak terbaca oleh server. Pilih ulang ekspedisi di Langkah 1 lalu simpan kembali.'], 400);
     }
 
     if (!is_array($packages) || count($packages) === 0) {
@@ -529,7 +574,8 @@ if ($method === 'POST') {
                     return 'uploads/reception/' . $pName;
                 }
             }
-        } elseif (is_string($pData) && !empty($pData)) {
+        } elseif (is_string($pData) && strpos($pData, 'uploads/reception/') === 0 && strpos($pData, '..') === false) {
+            // Foto sudah diunggah sebelumnya via action=upload_photo
             return $pData;
         }
         return null;
