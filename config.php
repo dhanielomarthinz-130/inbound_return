@@ -545,14 +545,27 @@ function requireLogin($allowedRoles = []) {
         }
     }
 
-    if (!empty($allowedRoles) && !in_array($user['role'], $allowedRoles)) {
-        $isApi = (strpos($_SERVER['REQUEST_URI'] ?? '', '/api/') !== false);
-        if ($isApi) {
-            jsonResponse(['error' => 'Akses ditolak: role Anda (' . $user['role'] . ') tidak memiliki izin.'], 403);
-        } else {
-            $redirect = ($user['role'] === 'operator') ? 'menu' : 'admin';
-            echo "<script>alert('Akses Ditolak: Halaman ini hanya untuk role " . implode('/', $allowedRoles) . "'); window.location.href = '{$redirect}';</script>";
-            exit;
+    $rawRole = strtolower(trim(str_replace([' ', '_', '-'], '', $user['role'] ?? '')));
+
+    // Superadmin selalu memiliki full access ke semua halaman dan API tanpa batas
+    if ($rawRole === 'superadmin') {
+        return $user;
+    }
+
+    if (!empty($allowedRoles)) {
+        $normalizedAllowed = array_map(function($r) {
+            return strtolower(trim(str_replace([' ', '_', '-'], '', $r)));
+        }, $allowedRoles);
+
+        if (!in_array($rawRole, $normalizedAllowed)) {
+            $isApi = (strpos($_SERVER['REQUEST_URI'] ?? '', '/api/') !== false);
+            if ($isApi) {
+                jsonResponse(['error' => 'Akses ditolak: role Anda (' . $user['role'] . ') tidak memiliki izin.'], 403);
+            } else {
+                $redirect = ($rawRole === 'operator') ? 'menu' : 'admin';
+                echo "<script>alert('Akses Ditolak: Halaman ini hanya untuk role " . implode('/', $allowedRoles) . "'); window.location.href = '{$redirect}';</script>";
+                exit;
+            }
         }
     }
     return $user;
@@ -560,8 +573,11 @@ function requireLogin($allowedRoles = []) {
 
 function checkMaintenanceMode($pdo, $user = null) {
     // Superadmin selalu bisa bypass maintenance mode
-    if ($user && $user['role'] === 'superadmin') {
-        return false;
+    if ($user) {
+        $roleClean = strtolower(trim(str_replace([' ', '_', '-'], '', $user['role'] ?? '')));
+        if ($roleClean === 'superadmin') {
+            return false;
+        }
     }
     try {
         $stmt = $pdo->prepare("SELECT key_value FROM system_settings WHERE key_name = 'maintenance_mode'");

@@ -13,8 +13,9 @@ if (!$currentUser) {
     jsonResponse(['error' => 'Unauthorized. Silakan login terlebih dahulu.'], 401);
 }
 
-// Hanya Admin dan Superadmin yang dapat mengelola Role
-if (!in_array($currentUser['role'] ?? '', ['superadmin', 'admin'], true)) {
+// Hanya Superadmin dan Admin yang dapat mengelola Role
+$userRoleClean = strtolower(trim(str_replace([' ', '_', '-'], '', $currentUser['role'] ?? '')));
+if (!in_array($userRoleClean, ['superadmin', 'admin'], true)) {
     jsonResponse(['error' => 'Akses ditolak: Hanya Admin/Superadmin yang berhak mengelola Role.'], 403);
 }
 

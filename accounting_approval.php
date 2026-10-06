@@ -1,9 +1,8 @@
 <?php
 /**
  * accounting_approval.php
- * Portal Khusus Web Approval Klaim Ekspedisi J&T untuk Tim Accounting & Management.
- * Dapat diakses online di InfinityFree (https://returninboundieg.great-site.net/accounting_approval)
- * maupun di PC Localhost.
+ * Portal Approval Klaim Ekspedisi J&T untuk Tim Accounting & Management.
+ * Terintegrasi ke Admin Dashboard Tab Approval Klaim J&T agar tampil bersama Sidebar.
  */
 require_once __DIR__ . '/config.php';
 
@@ -13,14 +12,9 @@ if (!$user) {
     exit;
 }
 
-// Hanya Accounting, Management, Superadmin, dan Admin yang dapat mengakses
-$allowedRoles = ['accounting', 'management', 'superadmin', 'admin'];
-if (!in_array($user['role'] ?? '', $allowedRoles, true)) {
-    echo "<script>alert('Akses Ditolak: Halaman ini khusus untuk tim Accounting & Management.'); window.location.href = 'menu';</script>";
-    exit;
-}
-
-ensureClaimStatusColumn($pdo);
+// Redirect otomatis ke dashboard admin tab approval-jnt agar selalu tampil bersama sidebar
+header('Location: admin?tab=approval-jnt');
+exit;
 ?>
 <!DOCTYPE html>
 <html lang="id">

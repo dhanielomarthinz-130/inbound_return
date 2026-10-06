@@ -13,11 +13,12 @@ if (!$currentUser) {
     jsonResponse(['error' => 'Unauthorized. Silakan login terlebih dahulu.'], 401);
 }
 
-// Hak akses: Hanya Management, Accounting, dan Superadmin
-$allowedRoles = ['superadmin', 'management', 'accounting'];
-if (!in_array($currentUser['role'] ?? '', $allowedRoles, true)) {
+// Hak akses: Superadmin (Akses Penuh), Admin, Management, dan Accounting
+$userRoleClean = strtolower(trim(str_replace([' ', '_', '-'], '', $currentUser['role'] ?? '')));
+$allowedRoles = ['superadmin', 'admin', 'management', 'accounting'];
+if (!in_array($userRoleClean, $allowedRoles, true)) {
     jsonResponse([
-        'error' => 'Akses ditolak: Menu Pengaturan Bank hanya dapat diakses oleh Management dan Accounting.'
+        'error' => 'Akses ditolak: Menu Pengaturan Bank hanya dapat diakses oleh Superadmin, Admin, Management, dan Accounting.'
     ], 403);
 }
 

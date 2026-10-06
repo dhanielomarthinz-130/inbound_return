@@ -43,6 +43,9 @@ const TAB_SLUG_MAP = {
     'expeditions': 'master-ekspedisi',
     'conditions': 'master-kondisi',
     'users': 'kelola-pengguna',
+    'roles': 'kelola-role',
+    'bank-settings': 'pengaturan-bank',
+    'approval-jnt': 'approval-jnt',
     'maintenance': 'pemeliharaan'
 };
 
@@ -64,6 +67,12 @@ const SLUG_TAB_MAP = {
     'conditions': 'conditions',
     'kelola-pengguna': 'users',
     'users': 'users',
+    'kelola-role': 'roles',
+    'roles': 'roles',
+    'pengaturan-bank': 'bank-settings',
+    'bank-settings': 'bank-settings',
+    'approval-jnt': 'approval-jnt',
+    'approval_jnt': 'approval-jnt',
     'pemeliharaan': 'maintenance',
     'maintenance': 'maintenance'
 };
@@ -268,6 +277,7 @@ window.switchTab = function (tabName, updateUrl = true) {
         else if (tabName === 'users') titleEl.innerText = 'Kelola Akun Pengguna';
         else if (tabName === 'roles') titleEl.innerText = 'Kelola Role & Hak Akses Pengguna';
         else if (tabName === 'bank-settings') titleEl.innerText = 'Pengaturan Rekening Bank Perusahaan';
+        else if (tabName === 'approval-jnt') titleEl.innerText = 'Approval Klaim J&T (Accounting & Management)';
         else if (tabName === 'maintenance') titleEl.innerText = 'Pemeliharaan Sistem & Database';
     }
 
@@ -291,6 +301,7 @@ window.switchTab = function (tabName, updateUrl = true) {
     if (tabName === 'users') loadUsers();
     if (tabName === 'roles') loadRoles();
     if (tabName === 'bank-settings') loadStandaloneBankSettings();
+    if (tabName === 'approval-jnt') loadJntClaimsData();
     if (tabName === 'maintenance') loadMaintenanceStatus();
 
     // Sinkronisasikan URL browser
@@ -2993,8 +3004,8 @@ window.cleanTestTransactions = async function () {
 // -------------------------------------------------------------
 function initFromUrlParams() {
     const params = new URLSearchParams(window.location.search);
-    const pageParam = params.get('page') || 'dashboard';
-    const targetTab = SLUG_TAB_MAP[pageParam] || 'dashboard';
+    const pageParam = params.get('page') || params.get('tab') || 'dashboard';
+    const targetTab = SLUG_TAB_MAP[pageParam] || pageParam || 'dashboard';
     const dateParam = params.get('date') || '';
     const searchParam = params.get('search') || '';
     const shopParam = params.get('shop') || '';
@@ -6883,6 +6894,370 @@ function escapeHtml(str) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
 }
+
+// =============================================================
+// APPROVAL KLAIM J&T (ACCOUNTING & MANAGEMENT)
+// =============================================================
+let allJntClaims = [];
+let currentJntStatusFilter = 'ALL';
+let currentJntSearchQuery = '';
+let selectedJntInvoices = new Set();
+let targetSingleJntInvoice = null;
+
+async function loadJntClaimsData() {
+    const tbody = document.getElementById('jntClaimsTableBody');
+    if (tbody) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="py-12 text-center text-slate-400">
+                    <i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-rose-500"></i>
+                    <div>Memuat data klaim J&amp;T...</div>
+                </td>
+            </tr>
+        `;
+    }
+
+    try {
+        const res = await fetch(`api/sync_claim_approval.php?action=list_for_accounting&status=${encodeURIComponent(currentJntStatusFilter)}&search=${encodeURIComponent(currentJntSearchQuery)}`);
+        const json = await res.json();
+
+        if (!json.success) {
+            throw new Error(json.error || 'Gagal memuat data');
+        }
+
+        allJntClaims = json.items || [];
+        const stats = json.stats || {};
+
+        // Update Stats
+        const statTotalAll = document.getElementById('jntStatTotalAll');
+        const statPending = document.getElementById('jntStatPending');
+        const statApproved = document.getElementById('jntStatApproved');
+        const tabCountPending = document.getElementById('jntTabCountPending');
+        const tabCountApproved = document.getElementById('jntTabCountApproved');
+        const statApprovedAmount = document.getElementById('jntStatApprovedAmount');
+
+        if (statTotalAll) statTotalAll.innerText = stats.total_all || 0;
+        if (statPending) statPending.innerText = stats.total_pending || 0;
+        if (statApproved) statApproved.innerText = stats.total_approved || 0;
+        if (tabCountPending) tabCountPending.innerText = stats.total_pending || 0;
+        if (tabCountApproved) tabCountApproved.innerText = stats.total_approved || 0;
+
+        const approvedAmt = parseFloat(stats.sum_approved_amount || 0);
+        if (statApprovedAmount) statApprovedAmount.innerText = 'Rp ' + approvedAmt.toLocaleString('id-ID');
+
+        renderJntClaimsTable();
+    } catch (err) {
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="py-8 text-center text-rose-500 font-semibold">
+                        <i class="fa-solid fa-triangle-exclamation text-xl mb-1 block"></i>
+                        ${escapeHtml(err.message)}
+                    </td>
+                </tr>
+            `;
+        }
+    }
+}
+
+function renderJntClaimsTable() {
+    const tbody = document.getElementById('jntClaimsTableBody');
+    const totalText = document.getElementById('jntTableTotalText');
+    if (totalText) totalText.innerText = `Total: ${allJntClaims.length} klaim`;
+    if (!tbody) return;
+
+    if (allJntClaims.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="py-12 text-center text-slate-400">
+                    <i class="fa-solid fa-folder-open text-3xl mb-2 text-slate-300"></i>
+                    <div>Tidak ada data pengajuan klaim J&amp;T dengan filter ini.</div>
+                </td>
+            </tr>
+        `;
+        updateJntSelectionState();
+        return;
+    }
+
+    let html = '';
+    allJntClaims.forEach(item => {
+        const inv = item.invoice_number;
+        const isChecked = selectedJntInvoices.has(inv);
+        const isPending = (item.status === 'PENDING');
+        const isApproved = (item.status === 'APPROVED');
+        const isRejected = (item.status === 'REJECTED');
+
+        // Badge Status
+        let badgeHtml = '';
+        if (isApproved) {
+            badgeHtml = `
+                <div class="inline-flex flex-col items-center">
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200">
+                        <i class="fa-solid fa-check mr-0.5"></i> APPROVED
+                    </span>
+                    <span class="text-[9px] text-slate-400 font-mono mt-0.5 truncate max-w-[120px]" title="${escapeHtml(item.esign_token || '')}">
+                        ${escapeHtml(item.approved_by || 'Accounting')}
+                    </span>
+                </div>
+            `;
+        } else if (isRejected) {
+            badgeHtml = `
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-700 border border-rose-200">
+                    <i class="fa-solid fa-xmark mr-0.5"></i> REJECTED
+                </span>
+            `;
+        } else {
+            badgeHtml = `
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-700 border border-amber-200 animate-pulse">
+                    <i class="fa-solid fa-clock mr-0.5"></i> MENUNGGU
+                </span>
+            `;
+        }
+
+        // Nilai Klaim
+        const amt = parseFloat(item.total_claim_amount || 0);
+        const amtFormatted = item.total_claim_amount_fmt || ('Rp ' + amt.toLocaleString('id-ID'));
+
+        // Action buttons
+        let actionHtml = '';
+        if (isPending) {
+            actionHtml = `
+                <div class="flex items-center justify-center space-x-1.5">
+                    <button onclick="approveSingleJnt('${escapeHtml(inv)}', ${amt})" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition shadow-xs cursor-pointer" title="Setujui Klaim">
+                        <i class="fa-solid fa-check"></i> Approve
+                    </button>
+                    <button onclick="rejectSingleJnt('${escapeHtml(inv)}')" class="p-1 text-slate-400 hover:text-rose-600 rounded transition cursor-pointer" title="Tolak Klaim">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            `;
+        } else {
+            actionHtml = `
+                <span class="text-[10px] text-slate-400 font-semibold italic">Selesai</span>
+            `;
+        }
+
+        html += `
+            <tr class="hover:bg-slate-50/80 transition ${isChecked ? 'bg-rose-50/40' : ''}">
+                <td class="py-3 px-3.5 text-center">
+                    <input type="checkbox" value="${escapeHtml(inv)}" ${isChecked ? 'checked' : ''} onchange="toggleSelectRowJnt('${escapeHtml(inv)}', this.checked)" class="jnt-row-checkbox w-4 h-4 rounded text-rose-600 focus:ring-rose-500 cursor-pointer">
+                </td>
+                <td class="py-3 px-3.5">
+                    <div class="font-bold text-slate-900 font-mono text-xs">${escapeHtml(inv)}</div>
+                    <div class="text-[10px] text-slate-400 flex items-center space-x-1 mt-0.5">
+                        <span class="px-1.5 py-0.2 bg-rose-50 text-rose-700 rounded font-bold">${escapeHtml(item.expedition || 'J&T')}</span>
+                        ${item.order_id && item.order_id !== inv ? `<span>Order: ${escapeHtml(item.order_id)}</span>` : ''}
+                    </div>
+                </td>
+                <td class="py-3 px-3.5 whitespace-nowrap">
+                    <div class="font-semibold text-slate-800 text-[11px]">${item.unboxing_date ? escapeHtml(item.unboxing_date.substring(0, 16)) : '-'}</div>
+                    <div class="text-[10px] text-slate-400">Petugas: ${escapeHtml(item.operator_name || '-')}</div>
+                </td>
+                <td class="py-3 px-3.5">
+                    <div class="font-medium text-slate-800 text-[11px] line-clamp-1" title="${escapeHtml(item.items_summary || '')}">${escapeHtml(item.items_summary || '-')}</div>
+                    <div class="text-[10px] text-amber-700 italic mt-0.5">${escapeHtml(item.damaged_reason || 'Kondisi rusak unboxing')}</div>
+                </td>
+                <td class="py-3 px-3.5 text-right whitespace-nowrap">
+                    <div class="font-bold text-slate-900 text-xs font-mono">${escapeHtml(amtFormatted)}</div>
+                    <div class="text-[9px] text-slate-400">Tarikan OCS</div>
+                </td>
+                <td class="py-3 px-3.5 text-center whitespace-nowrap">
+                    ${badgeHtml}
+                </td>
+                <td class="py-3 px-3.5 text-center whitespace-nowrap">
+                    ${actionHtml}
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+    updateJntSelectionState();
+}
+
+function setFilterJntStatus(st) {
+    currentJntStatusFilter = st;
+    document.querySelectorAll('.jnt-status-tab-btn').forEach(btn => {
+        btn.className = "jnt-status-tab-btn px-3 py-1.5 rounded-xl text-xs font-bold transition text-slate-600 hover:bg-slate-100 cursor-pointer";
+    });
+    const activeBtn = document.getElementById(`jntTabFilter${st}`);
+    if (activeBtn) {
+        activeBtn.className = "jnt-status-tab-btn px-3 py-1.5 rounded-xl text-xs font-bold transition bg-slate-900 text-white cursor-pointer";
+    }
+    loadJntClaimsData();
+}
+
+let jntSearchDebounce = null;
+function handleJntSearch(val) {
+    clearTimeout(jntSearchDebounce);
+    jntSearchDebounce = setTimeout(() => {
+        currentJntSearchQuery = (val || '').trim();
+        loadJntClaimsData();
+    }, 300);
+}
+
+function toggleSelectAllJnt(cb) {
+    if (cb.checked) {
+        allJntClaims.forEach(it => selectedJntInvoices.add(it.invoice_number));
+    } else {
+        selectedJntInvoices.clear();
+    }
+    renderJntClaimsTable();
+}
+
+function toggleSelectRowJnt(inv, isChecked) {
+    if (isChecked) {
+        selectedJntInvoices.add(inv);
+    } else {
+        selectedJntInvoices.delete(inv);
+    }
+    updateJntSelectionState();
+}
+
+function updateJntSelectionState() {
+    const count = selectedJntInvoices.size;
+    const txt = document.getElementById('jntSelectedCountText');
+    const btn = document.getElementById('btnJntBulkApprove');
+    if (txt) txt.innerText = `${count} baris dipilih`;
+    if (btn) btn.disabled = (count === 0);
+
+    const checkAll = document.getElementById('jntCheckAll');
+    if (checkAll && allJntClaims.length > 0) {
+        checkAll.checked = (selectedJntInvoices.size === allJntClaims.length);
+    }
+}
+
+function approveSingleJnt(inv, amount) {
+    targetSingleJntInvoice = inv;
+    const modalTitle = document.getElementById('modalJntApprovalTitle');
+    const claimCount = document.getElementById('modalJntClaimCount');
+    const claimAmount = document.getElementById('modalJntClaimAmount');
+    const modal = document.getElementById('modalApprovalJnt');
+
+    if (modalTitle) modalTitle.innerText = 'Setujui Klaim J&T Resi: ' + inv;
+    if (claimCount) claimCount.innerText = '1 Paket';
+    if (claimAmount) claimAmount.innerText = 'Rp ' + (amount || 0).toLocaleString('id-ID');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function openBulkApproveJntModal() {
+    if (selectedJntInvoices.size === 0) return;
+    targetSingleJntInvoice = null;
+
+    let totalAmt = 0;
+    allJntClaims.forEach(c => {
+        if (selectedJntInvoices.has(c.invoice_number)) {
+            totalAmt += parseFloat(c.total_claim_amount || 0);
+        }
+    });
+
+    const modalTitle = document.getElementById('modalJntApprovalTitle');
+    const claimCount = document.getElementById('modalJntClaimCount');
+    const claimAmount = document.getElementById('modalJntClaimAmount');
+    const modal = document.getElementById('modalApprovalJnt');
+
+    if (modalTitle) modalTitle.innerText = `Setujui ${selectedJntInvoices.size} Klaim J&T Terpilih`;
+    if (claimCount) claimCount.innerText = `${selectedJntInvoices.size} Paket`;
+    if (claimAmount) claimAmount.innerText = 'Rp ' + totalAmt.toLocaleString('id-ID');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeJntApprovalModal() {
+    const modal = document.getElementById('modalApprovalJnt');
+    if (modal) modal.classList.add('hidden');
+    targetSingleJntInvoice = null;
+}
+
+async function submitJntApproval(decision) {
+    const approverInput = document.getElementById('inputJntApproverName');
+    const notesInput = document.getElementById('inputJntApprovalNotes');
+    const approver = approverInput ? approverInput.value.trim() : '';
+    const notes = notesInput ? notesInput.value.trim() : '';
+
+    if (!approver) {
+        showToast('warning', 'Nama Petugas Accounting wajib diisi!', 'Data Kurang');
+        return;
+    }
+
+    const invoices = targetSingleJntInvoice ? [targetSingleJntInvoice] : Array.from(selectedJntInvoices);
+    if (invoices.length === 0) {
+        showToast('warning', 'Tidak ada paket yang dipilih!', 'Peringatan');
+        return;
+    }
+
+    const btn = document.getElementById('btnSubmitJntApproval');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Memproses e-Sign...`;
+    }
+
+    try {
+        const res = await fetch('api/sync_claim_approval.php?action=approve_reject', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                invoices: invoices,
+                decision: decision,
+                approved_by: approver,
+                notes: notes
+            })
+        });
+
+        const json = await res.json();
+        if (!json.success) {
+            throw new Error(json.error || 'Gagal memproses approval');
+        }
+
+        showToast('success', json.message || 'Klaim J&T berhasil disetujui (Approved) & e-Sign diterbitkan!', 'Approval Sukses');
+        closeJntApprovalModal();
+        selectedJntInvoices.clear();
+        loadJntClaimsData();
+    } catch (err) {
+        showToast('error', err.message, 'Gagal');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fa-solid fa-check-double"></i> <span>Setujui &amp; Terbitkan e-Sign</span>`;
+        }
+    }
+}
+
+async function rejectSingleJnt(inv) {
+    const reason = prompt(`Masukkan alasan penolakan klaim resi ${inv}:`);
+    if (reason === null) return;
+
+    try {
+        const res = await fetch('api/sync_claim_approval.php?action=approve_reject', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                invoices: [inv],
+                decision: 'REJECT',
+                notes: reason || 'Ditolak oleh Accounting'
+            })
+        });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.error || 'Gagal menolak klaim');
+
+        showToast('info', `Klaim resi ${inv} ditolak.`, 'Ditolak');
+        loadJntClaimsData();
+    } catch (err) {
+        showToast('error', err.message, 'Gagal');
+    }
+}
+
+window.loadJntClaimsData = loadJntClaimsData;
+window.renderJntClaimsTable = renderJntClaimsTable;
+window.setFilterJntStatus = setFilterJntStatus;
+window.handleJntSearch = handleJntSearch;
+window.toggleSelectAllJnt = toggleSelectAllJnt;
+window.toggleSelectRowJnt = toggleSelectRowJnt;
+window.updateJntSelectionState = updateJntSelectionState;
+window.approveSingleJnt = approveSingleJnt;
+window.openBulkApproveJntModal = openBulkApproveJntModal;
+window.closeJntApprovalModal = closeJntApprovalModal;
+window.submitJntApproval = submitJntApproval;
+window.rejectSingleJnt = rejectSingleJnt;
 
 
 

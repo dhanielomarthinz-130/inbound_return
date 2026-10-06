@@ -168,9 +168,10 @@ if ($action === 'list_for_accounting') {
 // -------------------------------------------------------------
 if ($action === 'approve_reject') {
     $user = getSessionUser();
-    // Memeriksa izin: Accounting, Management, atau Superadmin
-    if (!$user || !in_array($user['role'] ?? '', ['accounting', 'management', 'superadmin', 'admin'])) {
-        jsonResponse(['error' => 'Akses ditolak: Hanya Accounting atau Management yang berhak memberikan approval.'], 403);
+    // Memeriksa izin: Accounting, Management, Admin, atau Superadmin (dengan toleransi spasi)
+    $roleClean = strtolower(trim(str_replace([' ', '_', '-'], '', $user['role'] ?? '')));
+    if (!$user || !in_array($roleClean, ['accounting', 'management', 'superadmin', 'admin'], true)) {
+        jsonResponse(['error' => 'Akses ditolak: Hanya Accounting, Management, atau Superadmin yang berhak memberikan approval.'], 403);
     }
 
     $rawInput = file_get_contents('php://input');

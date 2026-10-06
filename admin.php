@@ -2,7 +2,13 @@
 require_once __DIR__ . '/config.php';
 $currentUser = getSessionUser();
 $user = requireLogin(['admin', 'superadmin', 'management', 'accounting']);
-$isSuperAdmin = ($user['role'] === 'superadmin');
+
+// Normalisasi role pengguna agar toleran variasi string ('super admin', 'superadmin') dan superadmin mendapat FULL ACCESS
+$rawRole = strtolower(trim(str_replace([' ', '_', '-'], '', $user['role'] ?? '')));
+$isSuperAdmin = ($rawRole === 'superadmin');
+$isAdmin = ($rawRole === 'admin' || $isSuperAdmin);
+$isManagement = ($rawRole === 'management' || $isSuperAdmin);
+$isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -289,17 +295,24 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 <span>Kelola Pengguna</span>
             </button>
 
-            <?php if (in_array($user['role'], ['superadmin', 'admin'])): ?>
+            <?php if ($isSuperAdmin || $isAdmin): ?>
             <button onclick="switchTab('roles')" id="nav-roles" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-user-shield w-5 text-center text-purple-600"></i>
                 <span>Kelola Role</span>
             </button>
             <?php endif; ?>
 
-            <?php if (in_array($user['role'], ['superadmin', 'management', 'accounting'])): ?>
+            <?php if ($isSuperAdmin || $isAdmin || $isManagement || $isAccounting): ?>
             <button onclick="switchTab('bank-settings')" id="nav-bank-settings" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-building-columns w-5 text-center text-emerald-600"></i>
                 <span>Pengaturan Bank</span>
+            </button>
+            <?php endif; ?>
+
+            <?php if ($isSuperAdmin || $isAdmin || $isManagement || $isAccounting): ?>
+            <button onclick="switchTab('approval-jnt')" id="nav-approval-jnt" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
+                <i class="fa-solid fa-stamp w-5 text-center text-rose-600"></i>
+                <span>Approval Klaim J&amp;T</span>
             </button>
             <?php endif; ?>
 
@@ -311,13 +324,6 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
             <?php endif; ?>
 
             <div class="pt-4 px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Akses Langsung</div>
-
-            <?php if (in_array($user['role'], ['accounting', 'management', 'superadmin', 'admin'])): ?>
-            <a href="accounting_approval" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-rose-700 hover:text-rose-800 hover:bg-rose-100/70 border border-rose-300/80 bg-rose-50/60 transition mb-1">
-                <i class="fa-solid fa-stamp w-5 text-center text-rose-600"></i>
-                <span>Approval Klaim J&amp;T</span>
-            </a>
-            <?php endif; ?>
 
             <a href="scanner" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100/70 border border-emerald-300/80 bg-emerald-50/60 transition">
                 <i class="fa-solid fa-barcode w-5 text-center text-emerald-600"></i>
@@ -1517,8 +1523,8 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                 </div>
             <?php endif; ?>
 
-            <!-- TAB: PENGATURAN BANK (KHUSUS MANAGEMENT & ACCOUNTING) -->
-            <?php if (in_array($user['role'], ['superadmin', 'management', 'accounting'])): ?>
+            <!-- TAB: PENGATURAN BANK (KHUSUS MANAGEMENT & ACCOUNTING & SUPERADMIN) -->
+            <?php if ($isSuperAdmin || $isAdmin || $isManagement || $isAccounting): ?>
             <div id="tab-bank-settings" class="tab-content hidden space-y-5">
                 <div class="bg-white rounded-2xl shadow-xs border border-slate-200 p-6 space-y-6">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
@@ -1588,7 +1594,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
             <?php endif; ?>
 
             <!-- TAB: KELOLA ROLE (ADD, EDIT, DELETE ROLE) -->
-            <?php if (in_array($user['role'], ['superadmin', 'admin'])): ?>
+            <?php if ($isSuperAdmin || $isAdmin): ?>
             <div id="tab-roles" class="tab-content hidden space-y-5">
                 <div class="bg-white rounded-2xl shadow-xs border border-slate-200 p-6 space-y-5">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
@@ -1630,6 +1636,139 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <!-- TAB: APPROVAL KLAIM J&T (KHUSUS MANAGEMENT & ACCOUNTING & SUPERADMIN) -->
+            <?php if ($isSuperAdmin || $isAdmin || $isManagement || $isAccounting): ?>
+            <div id="tab-approval-jnt" class="tab-content hidden space-y-6">
+                <!-- Header Banner -->
+                <div class="bg-white rounded-2xl shadow-xs border border-slate-200 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div class="flex items-center space-x-3.5">
+                        <div class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl shrink-0 border border-rose-200">
+                            <i class="fa-solid fa-stamp"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <h3 class="font-bold text-base text-slate-800">Approval Klaim Ekspedisi J&amp;T</h3>
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-700 border border-rose-200 uppercase tracking-wider">Khusus J&amp;T</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-0.5">
+                                Verifikasi berkas tagihan invoice klaim retur rusak J&amp;T resmi oleh Accounting &amp; Management dengan e-Sign digital.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="loadJntClaimsData()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition border border-slate-200 flex items-center gap-1.5 cursor-pointer" title="Muat Ulang Data">
+                            <i class="fa-solid fa-arrows-rotate"></i>
+                            <span>Segarkan</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Top KPI Metrics -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center space-x-3.5">
+                        <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl shrink-0">
+                            <i class="fa-solid fa-file-invoice"></i>
+                        </div>
+                        <div>
+                            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Klaim J&amp;T</div>
+                            <div class="text-xl sm:text-2xl font-black text-slate-900" id="jntStatTotalAll">0</div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl border border-amber-200 bg-amber-50/20 shadow-xs flex items-center space-x-3.5">
+                        <div class="w-12 h-12 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-xl shrink-0">
+                            <i class="fa-solid fa-clock"></i>
+                        </div>
+                        <div>
+                            <div class="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Menunggu Approval</div>
+                            <div class="text-xl sm:text-2xl font-black text-amber-700" id="jntStatPending">0</div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl border border-emerald-200 bg-emerald-50/20 shadow-xs flex items-center space-x-3.5">
+                        <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl shrink-0">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </div>
+                        <div>
+                            <div class="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Disetujui (Approved)</div>
+                            <div class="text-xl sm:text-2xl font-black text-emerald-700" id="jntStatApproved">0</div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl border border-blue-200 bg-blue-50/20 shadow-xs flex items-center space-x-3.5">
+                        <div class="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-xl shrink-0">
+                            <i class="fa-solid fa-coins"></i>
+                        </div>
+                        <div class="truncate">
+                            <div class="text-[11px] font-bold text-blue-700 uppercase tracking-wider">Total Nilai Disetujui</div>
+                            <div class="text-lg sm:text-xl font-black text-blue-800 truncate" id="jntStatApprovedAmount">Rp 0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter & Action Toolbar -->
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div class="flex items-center space-x-1.5 overflow-x-auto pb-1 md:pb-0">
+                        <button onclick="setFilterJntStatus('ALL')" id="jntTabFilterALL" class="jnt-status-tab-btn px-3 py-1.5 rounded-xl text-xs font-bold transition bg-slate-900 text-white cursor-pointer">
+                            Semua
+                        </button>
+                        <button onclick="setFilterJntStatus('PENDING')" id="jntTabFilterPENDING" class="jnt-status-tab-btn px-3 py-1.5 rounded-xl text-xs font-bold transition text-slate-600 hover:bg-slate-100 cursor-pointer">
+                            Menunggu Approval (<span id="jntTabCountPending">0</span>)
+                        </button>
+                        <button onclick="setFilterJntStatus('APPROVED')" id="jntTabFilterAPPROVED" class="jnt-status-tab-btn px-3 py-1.5 rounded-xl text-xs font-bold transition text-slate-600 hover:bg-slate-100 cursor-pointer">
+                            Disetujui (<span id="jntTabCountApproved">0</span>)
+                        </button>
+                        <button onclick="setFilterJntStatus('REJECTED')" id="jntTabFilterREJECTED" class="jnt-status-tab-btn px-3 py-1.5 rounded-xl text-xs font-bold transition text-slate-600 hover:bg-slate-100 cursor-pointer">
+                            Ditolak
+                        </button>
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                        <div class="relative flex-1 md:w-64">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                            <input type="text" id="jntSearchInput" placeholder="Cari Resi, Order, Produk..." oninput="handleJntSearch(this.value)" class="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-rose-500">
+                        </div>
+
+                        <button onclick="openBulkApproveJntModal()" id="btnJntBulkApprove" class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition disabled:opacity-50 disabled:pointer-events-none cursor-pointer" disabled>
+                            <i class="fa-solid fa-stamp"></i>
+                            <span>Setujui Terpilih</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Claims Table Card -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-700">
+                            <thead class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                <tr>
+                                    <th class="py-3 px-3.5 text-center w-10">
+                                        <input type="checkbox" id="jntCheckAll" onchange="toggleSelectAllJnt(this)" class="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 cursor-pointer">
+                                    </th>
+                                    <th class="py-3 px-3.5">No. Resi J&amp;T / Order ID</th>
+                                    <th class="py-3 px-3.5">Tgl Unboxing / Petugas</th>
+                                    <th class="py-3 px-3.5">Rincian Barang Rusak &amp; Alasan</th>
+                                    <th class="py-3 px-3.5 text-right">Nilai Tagihan (OCS)</th>
+                                    <th class="py-3 px-3.5 text-center">Status Approval</th>
+                                    <th class="py-3 px-3.5 text-center w-28">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="jntClaimsTableBody" class="divide-y divide-slate-100">
+                                <tr>
+                                    <td colspan="7" class="py-12 text-center text-slate-400">
+                                        <i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-rose-500"></i>
+                                        <div>Memuat data klaim J&amp;T...</div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="p-3.5 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                        <div id="jntSelectedCountText">0 baris dipilih</div>
+                        <div id="jntTableTotalText">Total: 0 klaim</div>
                     </div>
                 </div>
             </div>
@@ -3128,6 +3267,77 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
             <div class="space-y-1">
                 <h4 class="font-bold text-base text-slate-800" id="globalLoadingTitle">Memuat Data...</h4>
                 <p class="text-xs text-slate-500 leading-relaxed" id="globalLoadingDesc">Mohon tunggu sebentar, sistem sedang memproses data.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL APPROVAL / DIGITAL E-SIGN KLAIM J&T -->
+    <div id="modalApprovalJnt" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5 animate-scaleIn">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-stamp"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-base" id="modalJntApprovalTitle">Persetujuan Klaim (e-Sign)</h3>
+                        <p class="text-xs text-slate-400">Verifikasi Resmi Divisi Accounting</p>
+                    </div>
+                </div>
+                <button onclick="closeJntApprovalModal()" class="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4 text-xs">
+                <!-- Info Summary -->
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+                    <div class="flex justify-between text-slate-600">
+                        <span>Jumlah Paket yang Dipilih:</span>
+                        <b class="text-slate-900 font-mono" id="modalJntClaimCount">0 Paket</b>
+                    </div>
+                    <div class="flex justify-between text-slate-600">
+                        <span>Total Nilai Tagihan:</span>
+                        <b class="text-emerald-700 font-bold" id="modalJntClaimAmount">Rp 0</b>
+                    </div>
+                </div>
+
+                <!-- Input Nama Petugas Approver -->
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Nama Petugas Accounting (Approver) <span class="text-rose-500">*</span></label>
+                    <input type="text" id="inputJntApproverName" value="<?= htmlspecialchars($user['name'] ?: $user['username']) ?>" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-medium focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500">
+                </div>
+
+                <!-- Digital e-Signature Stamp Badge Preview -->
+                <div class="border border-dashed border-emerald-300 bg-emerald-50/40 p-3.5 rounded-2xl text-center space-y-1.5">
+                    <div class="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-emerald-600 text-white font-black text-[10px] tracking-wider uppercase">
+                        <i class="fa-solid fa-certificate"></i>
+                        <span>Digital Verified e-Sign</span>
+                    </div>
+                    <div class="text-[11px] font-bold text-slate-800">
+                        Dokumen Tagihan Invoice akan otomatis dibubuhi Cap &amp; Tanda Tangan Digital Resmi
+                    </div>
+                    <div class="text-[10px] text-slate-500 font-mono" id="previewJntEsignCode">
+                        Token: ESIGN-JNT-<?= date('Ymd') ?>-AUTO
+                    </div>
+                </div>
+
+                <!-- Catatan Verifikasi -->
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Catatan Verifikasi Accounting (Opsional)</label>
+                    <textarea id="inputJntApprovalNotes" rows="2" placeholder="Contoh: Telah diverifikasi fisik barang rusak dan sesuai dengan data OCS..." class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"></textarea>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center justify-end space-x-2 pt-2">
+                <button type="button" onclick="closeJntApprovalModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer">
+                    Batal
+                </button>
+                <button type="button" onclick="submitJntApproval('APPROVE')" id="btnSubmitJntApproval" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/30 transition flex items-center space-x-1.5 cursor-pointer">
+                    <i class="fa-solid fa-check-double"></i>
+                    <span>Setujui &amp; Terbitkan e-Sign</span>
+                </button>
             </div>
         </div>
     </div>
