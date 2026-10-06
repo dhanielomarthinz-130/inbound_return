@@ -2,7 +2,7 @@
 require_once __DIR__ . '/config.php';
 $currentUser = getSessionUser();
 checkMaintenanceMode($pdo, $currentUser);
-$user = requireLogin(['operator', 'admin', 'superadmin']);
+$user = requireLogin(['operator', 'admin', 'superadmin', 'management', 'accounting']);
 
 // Ambil daftar master ekspedisi aktif
 try {
@@ -1905,22 +1905,35 @@ try {
 
         function generateWatermarkedPhoto(sourceEl, mode, barcode = null) {
             const canvas = document.createElement('canvas');
-            let w, h;
+            let origW, origH;
 
             if (sourceEl instanceof HTMLVideoElement) {
-                w = sourceEl.videoWidth || 1280;
-                h = sourceEl.videoHeight || 720;
+                origW = sourceEl.videoWidth || 1280;
+                origH = sourceEl.videoHeight || 720;
             } else if (sourceEl instanceof HTMLImageElement) {
-                w = sourceEl.naturalWidth || sourceEl.width || 1280;
-                h = sourceEl.naturalHeight || sourceEl.height || 720;
+                origW = sourceEl.naturalWidth || sourceEl.width || 1280;
+                origH = sourceEl.naturalHeight || sourceEl.height || 720;
             } else {
-                w = 1280;
-                h = 720;
+                origW = 1280;
+                origH = 720;
+            }
+
+            // Skala proporsional agar memori browser & payload transmisi ringan (Maksimal 1280x960)
+            const MAX_WIDTH = 1280;
+            const MAX_HEIGHT = 960;
+            let w = origW;
+            let h = origH;
+            if (w > MAX_WIDTH || h > MAX_HEIGHT) {
+                const ratio = Math.min(MAX_WIDTH / w, MAX_HEIGHT / h);
+                w = Math.round(w * ratio);
+                h = Math.round(h * ratio);
             }
 
             canvas.width = w;
             canvas.height = h;
             const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
 
             // Render gambar dasar
             ctx.drawImage(sourceEl, 0, 0, w, h);
@@ -2005,7 +2018,7 @@ try {
             }
 
             ctx.textAlign = 'left';
-            return canvas.toDataURL('image/jpeg', 0.88);
+            return canvas.toDataURL('image/jpeg', 0.70);
         }
 
         // ==============================================================
@@ -2242,7 +2255,23 @@ try {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                const data = await res.json();
+
+                let data = null;
+                const responseText = await res.text();
+                try {
+                    data = JSON.parse(responseText);
+                } catch (eParse) {
+                    console.error('Non-JSON response from api/reception.php:', responseText);
+                    if (res.status === 413) {
+                        throw new Error('Ukuran total foto paket melebihi batas upload server (Error 413). Coba bagi paket ke beberapa karung.');
+                    } else if (res.status === 401) {
+                        throw new Error('Sesi login telah habis. Buka tab baru untuk login kembali agar draft di halaman ini tidak hilang.');
+                    } else if (res.status === 500) {
+                        throw new Error('Server mengalami kendala internal database (500). Detail: ' + (responseText.substring(0, 150) || 'Database MySQL offline'));
+                    } else {
+                        throw new Error(`Server merespon dengan status ${res.status}: ` + responseText.substring(0, 150));
+                    }
+                }
 
                 if (data && data.success) {
                     showStatusMsg(`✅ <b>Sukses Tersimpan!</b> Penerimaan <b>${data.total_packages} paket</b> (${escapeHtml(data.expedition)}) berhasil disimpan ke sistem! [Ref: ${escapeHtml(data.receipt_number)}]`, 'success');
@@ -2255,11 +2284,11 @@ try {
                     resetReceptionForm();
                     loadHistoryData();
                 } else {
-                    alert('Gagal menyimpan: ' + (data.error || 'Terjadi kesalahan sistem'));
+                    alert('Gagal menyimpan: ' + (data?.error || 'Terjadi kesalahan sistem saat menyimpan data penerimaan.'));
                 }
             } catch (err) {
                 console.error('Error submitCompleteReception:', err);
-                alert('Terjadi kesalahan saat memproses data: ' + err.message);
+                alert('Terjadi kesalahan saat memproses data:\n\n' + err.message);
             } finally {
                 isSubmittingReception = false;
                 if (btnDesktop) {

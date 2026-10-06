@@ -67,6 +67,7 @@ try {
     $pdo->exec("SET time_zone = '+07:00'");
     try {
         $pdo->exec("SET SESSION SQL_BIG_SELECTS=1");
+        $pdo->exec("SET SESSION max_allowed_packet = 67108864");
     } catch (Exception $e) {}
 
     // 2. Fungsi Skema & Migrasi (Hanya berjalan sekali saat pertama install atau saat api/migrate.php dipanggil)

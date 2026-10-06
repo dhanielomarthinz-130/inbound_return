@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../config.php';
-$user = requireLogin(['operator', 'admin', 'superadmin']);
+$user = requireLogin(['operator', 'admin', 'superadmin', 'management', 'accounting']);
 session_write_close();
 
 header('Content-Type: application/json; charset=utf-8');
@@ -403,9 +403,16 @@ if ($method === 'DELETE' || ($method === 'POST' && isset($_GET['action']) && $_G
 // 2. POST: SIMPAN PENERIMAAN PAKET MULTIPLE
 // ==========================================
 if ($method === 'POST') {
-    $input = json_decode(file_get_contents('php://input'), true);
+    $rawInput = file_get_contents('php://input');
+    $input = json_decode($rawInput, true);
     if (!is_array($input)) {
         $input = $_POST;
+    }
+
+    if ((empty($input) || !is_array($input)) && isset($_SERVER['CONTENT_LENGTH']) && (int)$_SERVER['CONTENT_LENGTH'] > 0) {
+        jsonResponse([
+            'error' => 'Ukuran data foto paket yang dikirim (' . round($_SERVER['CONTENT_LENGTH'] / (1024 * 1024), 2) . ' MB) melebihi batas upload server. Sistem telah mengaktifkan kompresi otomatis, silakan coba simpan kembali.'
+        ], 413);
     }
 
     $expedition   = trim($input['expedition'] ?? '');
@@ -622,21 +629,42 @@ if ($method === 'POST') {
     } catch (Exception $eCols2) {}
 
     // Anti Double-Submission & Idempotensi Penerimaan:
-    // 1. Cek apakah receipt_number yang sama persis sudah pernah tersimpan (misal double-click submit)
+    // 1. Cek apakah receipt_number yang sama persis sudah pernah tersimpan
     try {
         $chkRcpt = $pdo->prepare("SELECT id, receipt_number, expedition, total_packages, created_at FROM expedition_receptions WHERE receipt_number = ? LIMIT 1");
         $chkRcpt->execute([$receiptNo]);
         $existingRcpt = $chkRcpt->fetch(PDO::FETCH_ASSOC);
         if ($existingRcpt) {
-            jsonResponse([
-                'success'        => true,
-                'message'        => 'Penerimaan ini sudah tersimpan di database.',
-                'id'             => $existingRcpt['id'],
-                'receipt_number' => $existingRcpt['receipt_number'],
-                'expedition'     => $existingRcpt['expedition'],
-                'total_packages' => (int)$existingRcpt['total_packages'],
-                'already_exists' => true
-            ]);
+            $existingCreatedAt = strtotime($existingRcpt['created_at'] ?? '');
+            $isVeryRecent = ($existingCreatedAt && (time() - $existingCreatedAt) < 15);
+            // Jika ini double-click cepat (kurang dari 15 detik yang lalu) dengan jumlah paket yang sama, return sukses idempotent
+            if ($isVeryRecent && (int)$existingRcpt['total_packages'] === count($cleanPackages)) {
+                jsonResponse([
+                    'success'        => true,
+                    'message'        => 'Penerimaan ini sudah tersimpan di database.',
+                    'id'             => $existingRcpt['id'],
+                    'receipt_number' => $existingRcpt['receipt_number'],
+                    'expedition'     => $existingRcpt['expedition'],
+                    'total_packages' => (int)$existingRcpt['total_packages'],
+                    'already_exists' => true
+                ]);
+            } else {
+                // Receipt number bentrok dengan data penerimaan lama (misal draft browser lama tersimpan),
+                // generate receipt number baru otomatis agar paket saat ini tersimpan sempurna
+                $todayPrefix = 'RCV-' . date('Ymd') . '-';
+                $stmtMaxSeq = $pdo->prepare("SELECT receipt_number FROM expedition_receptions WHERE receipt_number LIKE ? ORDER BY id DESC LIMIT 1");
+                $stmtMaxSeq->execute([$todayPrefix . '%']);
+                $maxRow = $stmtMaxSeq->fetch();
+                $genSeq = 1;
+                if ($maxRow && !empty($maxRow['receipt_number'])) {
+                    $parts = explode('-', $maxRow['receipt_number']);
+                    $numPart = end($parts);
+                    if (is_numeric($numPart)) {
+                        $genSeq = intval($numPart) + 1;
+                    }
+                }
+                $receiptNo = $todayPrefix . str_pad($genSeq, 4, '0', STR_PAD_LEFT);
+            }
         }
     } catch (Exception $eRcpt) {}
 
