@@ -12,6 +12,16 @@ try {
     if (function_exists('ensureDatabaseSchema')) {
         ensureDatabaseSchema($pdo);
     }
+
+    // Periksa dan perbaiki izin folder uploads
+    $baseUploadDir = __DIR__ . '/../uploads';
+    if (!is_dir($baseUploadDir)) @mkdir($baseUploadDir, 0777, true);
+    @chmod($baseUploadDir, 0777);
+    foreach (['reception', 'photos', 'videos', 'cache', 'logs'] as $sDir) {
+        $tDir = $baseUploadDir . '/' . $sDir;
+        if (!is_dir($tDir)) @mkdir($tDir, 0777, true);
+        @chmod($tDir, 0777);
+    }
     $tables = [];
     $stmt = $pdo->query("SHOW TABLES");
     while ($row = $stmt->fetch(PDO::FETCH_NUM)) {

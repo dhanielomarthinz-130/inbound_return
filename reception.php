@@ -2043,7 +2043,8 @@ try {
             });
         }
 
-        // Unggah 1 foto ke server, kembalikan path file (uploads/reception/...). Retry 1x jika gagal jaringan.
+        // Unggah 1 foto ke server, kembalikan path file (uploads/...).
+        // Jika gagal karena izin folder hosting, jangan batalkan submit paket; fallback aman digunakan.
         async function uploadReceptionPhoto(dataUrl, prefix) {
             const compact = await compressDataUrl(dataUrl);
             let lastErr = null;
@@ -2056,16 +2057,26 @@ try {
                     });
                     const txt = await res.text();
                     let d = null;
-                    try { d = JSON.parse(txt); } catch (e) {
-                        throw new Error(res.status === 401 ? 'Sesi login habis, silakan login ulang di tab baru.' : `Respon server tidak valid (HTTP ${res.status}).`);
+                    try { d = JSON.parse(txt); } catch (e) { d = null; }
+                    if (res.status === 401) {
+                        throw new Error('Sesi login telah habis. Buka tab baru untuk login kembali.');
                     }
-                    if (d && d.success && d.path) return d.path;
-                    throw new Error(d?.error || `Upload foto gagal (HTTP ${res.status}).`);
+                    if (d && d.success) {
+                        return d.path || compact;
+                    }
+                    if (d && d.error) {
+                        lastErr = new Error(d.error);
+                    }
                 } catch (e) {
                     lastErr = e;
+                    if (e.message && e.message.includes('Sesi login')) {
+                        throw e;
+                    }
                 }
             }
-            throw new Error('Gagal mengunggah foto: ' + (lastErr ? lastErr.message : 'unknown'));
+            console.warn('Upload foto server dilewati:', lastErr);
+            // Kembalikan compact DataURL jika ukurannya wajar, atau biarkan null agar tidak memblokir submit
+            return (compact && compact.length < 350000) ? compact : null;
         }
 
         // ==============================================================

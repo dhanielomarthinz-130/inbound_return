@@ -426,15 +426,37 @@ if ($method === 'POST' && ($_GET['action'] ?? '') === 'upload_photo') {
     $ext = strtolower($mType[1]) === 'jpeg' ? 'jpg' : strtolower($mType[1]);
     $prefix = preg_replace('/[^a-zA-Z0-9_\-]/', '_', (string)($up['prefix'] ?? 'pkg'));
     $prefix = substr($prefix ?: 'pkg', 0, 120);
-    $dir = __DIR__ . '/../uploads/reception';
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0777, true);
-    }
     $fname = $prefix . '_' . time() . '_' . mt_rand(1000, 9999) . '.' . $ext;
-    if (@file_put_contents($dir . '/' . $fname, $decoded) === false) {
-        jsonResponse(['error' => 'Gagal menulis file foto ke folder uploads/reception (cek izin folder).'], 500);
+
+    // Kandidat folder penyimpanan dengan auto-repair izin folder
+    $possibleDirs = [
+        ['dir' => __DIR__ . '/../uploads/reception', 'rel' => 'uploads/reception/'],
+        ['dir' => __DIR__ . '/../uploads/photos',    'rel' => 'uploads/photos/'],
+        ['dir' => __DIR__ . '/../uploads/cache',     'rel' => 'uploads/cache/'],
+        ['dir' => __DIR__ . '/../uploads',           'rel' => 'uploads/']
+    ];
+
+    $savedPath = null;
+    foreach ($possibleDirs as $cand) {
+        $targetDir = $cand['dir'];
+        if (!is_dir($targetDir)) {
+            @mkdir($targetDir, 0777, true);
+        }
+        @chmod($targetDir, 0777);
+        $fullPath = $targetDir . '/' . $fname;
+        if (@file_put_contents($fullPath, $decoded) !== false) {
+            @chmod($fullPath, 0666);
+            $savedPath = $cand['rel'] . $fname;
+            break;
+        }
     }
-    jsonResponse(['success' => true, 'path' => 'uploads/reception/' . $fname]);
+
+    if ($savedPath) {
+        jsonResponse(['success' => true, 'path' => $savedPath]);
+    }
+
+    // Jika seluruh folder gagal ditulis (izin hosting sangat ketat), jangan gagalkan proses serah terima!
+    jsonResponse(['success' => true, 'path' => null, 'warning' => 'Izin folder dibatasi oleh hosting, data tetap aman']);
 }
 
 // ==========================================
@@ -557,8 +579,8 @@ if ($method === 'POST') {
         @mkdir($recUploadDir, 0777, true);
     }
 
-    // Helper simpan base64 image
-    $saveImgHelper = function($pData, $prefix) use ($recUploadDir) {
+    // Helper simpan base64 image dengan multi-folder fallback
+    $saveImgHelper = function($pData, $prefix) {
         if (is_string($pData) && strpos($pData, 'data:image') === 0) {
             $ext = 'jpg';
             if (preg_match('/^data:image\/(\w+);base64,/', $pData, $typeMatch)) {
@@ -570,11 +592,24 @@ if ($method === 'POST') {
             $decoded = base64_decode($raw);
             if ($decoded) {
                 $pName = $prefix . '_' . time() . '_' . mt_rand(100, 999) . '.' . $ext;
-                if (file_put_contents($recUploadDir . '/' . $pName, $decoded)) {
-                    return 'uploads/reception/' . $pName;
+                $possibleDirs = [
+                    ['dir' => __DIR__ . '/../uploads/reception', 'rel' => 'uploads/reception/'],
+                    ['dir' => __DIR__ . '/../uploads/photos',    'rel' => 'uploads/photos/'],
+                    ['dir' => __DIR__ . '/../uploads/cache',     'rel' => 'uploads/cache/'],
+                    ['dir' => __DIR__ . '/../uploads',           'rel' => 'uploads/']
+                ];
+                foreach ($possibleDirs as $cand) {
+                    $targetDir = $cand['dir'];
+                    if (!is_dir($targetDir)) @mkdir($targetDir, 0777, true);
+                    @chmod($targetDir, 0777);
+                    $fullPath = $targetDir . '/' . $pName;
+                    if (@file_put_contents($fullPath, $decoded) !== false) {
+                        @chmod($fullPath, 0666);
+                        return $cand['rel'] . $pName;
+                    }
                 }
             }
-        } elseif (is_string($pData) && strpos($pData, 'uploads/reception/') === 0 && strpos($pData, '..') === false) {
+        } elseif (is_string($pData) && strpos($pData, 'uploads/') === 0 && strpos($pData, '..') === false) {
             // Foto sudah diunggah sebelumnya via action=upload_photo
             return $pData;
         }

@@ -506,8 +506,14 @@ try {
     }
 
     if ($needsMigration) {
-        $uploadDir = __DIR__ . '/uploads';
-        if (!is_dir($uploadDir)) @mkdir($uploadDir, 0777, true);
+        $baseUploadDir = __DIR__ . '/uploads';
+        if (!is_dir($baseUploadDir)) @mkdir($baseUploadDir, 0777, true);
+        @chmod($baseUploadDir, 0777);
+        foreach (['reception', 'photos', 'videos', 'cache', 'logs'] as $sDir) {
+            $tDir = $baseUploadDir . '/' . $sDir;
+            if (!is_dir($tDir)) @mkdir($tDir, 0777, true);
+            @chmod($tDir, 0777);
+        }
         ensureDatabaseSchema($pdo);
     }
 
