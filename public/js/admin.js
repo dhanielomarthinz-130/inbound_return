@@ -6000,21 +6000,24 @@ window.toggleSyncDateInput = function () {
 
     const customContainer = document.getElementById('syncCustomDateContainer');
     const picklistContainer = document.getElementById('syncPicklistContainer');
+    const resyncTotalsContainer = document.getElementById('syncResyncTotalsContainer');
     const labelYesterday = document.getElementById('labelSyncYesterday');
     const labelToday = document.getElementById('labelSyncToday');
     const labelMonth = document.getElementById('labelSyncMonth');
     const labelCustom = document.getElementById('labelSyncCustom');
     const labelPicklist = document.getElementById('labelSyncPicklist');
+    const labelResyncTotals = document.getElementById('labelSyncResyncTotals');
 
-    [labelYesterday, labelToday, labelMonth, labelCustom, labelPicklist].forEach(l => {
+    [labelYesterday, labelToday, labelMonth, labelCustom, labelPicklist, labelResyncTotals].forEach(l => {
         if (l) {
-            l.classList.remove('border-indigo-600', 'bg-indigo-50/50', 'border-blue-600', 'bg-blue-50/50');
+            l.classList.remove('border-indigo-600', 'bg-indigo-50/50', 'border-blue-600', 'bg-blue-50/50', 'border-emerald-600', 'bg-emerald-50/50');
             l.classList.add('border-slate-200', 'bg-white');
         }
     });
 
     if (customContainer) customContainer.classList.add('hidden');
     if (picklistContainer) picklistContainer.classList.add('hidden');
+    if (resyncTotalsContainer) resyncTotalsContainer.classList.add('hidden');
 
     if (selected === 'yesterday' && labelYesterday) {
         labelYesterday.classList.add('border-indigo-600', 'bg-indigo-50/50');
@@ -6037,6 +6040,10 @@ window.toggleSyncDateInput = function () {
             const inp = document.getElementById('syncPicklistKeywordInput');
             if (inp) inp.focus();
         }
+    } else if (selected === 'resync_totals' && labelResyncTotals) {
+        labelResyncTotals.classList.add('border-emerald-600', 'bg-emerald-50/50');
+        labelResyncTotals.classList.remove('border-slate-200', 'bg-white');
+        if (resyncTotalsContainer) resyncTotalsContainer.classList.remove('hidden');
     }
 };
 
@@ -6149,6 +6156,11 @@ window.executeOcsOrderSync = async function () {
                 end: endDate
             });
         }
+    } else if (selected === 'resync_totals') {
+        chunks.push({
+            url: `api/sync_ocs_orders.php?action=resync_all_payment_totals`,
+            label: 'Sync Ulang Seluruh Biaya Paket (Baris Total OCS)'
+        });
     } else {
         // Kemarin / Hari ini (1 hari = 1 request cepat)
         chunks.push({
@@ -6246,7 +6258,9 @@ window.executeOcsOrderSync = async function () {
             progressBadge.innerText = 'SELESAI';
         }
         if (progressDetail) {
-            if (isSinglePicklist && lastResult) {
+            if (selected === 'resync_totals' && lastResult) {
+                progressDetail.innerHTML = `Selesai memindai <b>${(lastResult.total_scanned || 0).toLocaleString('id-ID')}</b> data order.<br>Sebanyak <b>${(lastResult.total_updated || 0).toLocaleString('id-ID')}</b> biaya paket & nilai klaim berhasil diperbarui persis sesuai baris <b>Total</b> Tab Pembayaran OCS!`;
+            } else if (isSinglePicklist && lastResult) {
                 progressDetail.innerHTML = `Order <b>${lastResult.order_id}</b> (Resi: <b>${lastResult.tracking_number || '-'}</b>) dari <b>${lastResult.shop_name || '-'}</b> (${lastResult.platform || '-'}) berhasil disinkronisasi lengkap dengan ${lastResult.skus_count || 1} SKU!`;
             } else {
                 const labelSummary = selected === 'month' ? '1 Bulan Terakhir (30 Hari)' : (selected === 'yesterday' ? 'Kemarin' : (selected === 'today' ? 'Hari Ini' : 'Rentang Tanggal'));
@@ -6254,7 +6268,11 @@ window.executeOcsOrderSync = async function () {
             }
         }
 
-        showToast('success', `Berhasil menyinkronkan total ${accumulatedOrders.toLocaleString('id-ID')} orders dari OCS!`, 'Sinkronisasi Selesai');
+        if (selected === 'resync_totals') {
+            showToast('success', `Berhasil sync ulang! ${(lastResult?.total_updated || 0).toLocaleString('id-ID')} order diperbarui persis sesuai baris Total OCS.`, 'Sync Ulang Berhasil');
+        } else {
+            showToast('success', `Berhasil menyinkronkan total ${accumulatedOrders.toLocaleString('id-ID')} orders dari OCS!`, 'Sinkronisasi Selesai');
+        }
 
         // Refresh data setelah sync sukses
         if (typeof loadClaimCandidates === 'function') loadClaimCandidates(true);

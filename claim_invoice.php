@@ -189,16 +189,13 @@ if (!empty($invoiceList)) {
                 $expeditionNames[] = $exp;
             }
 
-            // Tentukan harga paket
+            // Tentukan harga paket: strictly dari total_amount atau package_price (baris Total di tab Pembayaran OCS)
+            // BUKAN original_price (Total Harga Produk)
             $price = 0;
             if ($ocs) {
                 $candidates = [
-                    $ocs['package_price'] ?? 0,
                     $ocs['total_amount'] ?? 0,
-                    $ocs['subtotal'] ?? 0,
-                    $ocs['original_price'] ?? 0,
-                    $ocs['nmv'] ?? 0,
-                    $ocs['gmv'] ?? 0
+                    $ocs['package_price'] ?? 0
                 ];
                 foreach ($candidates as $cand) {
                     $cNum = (float)$cand;

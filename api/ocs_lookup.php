@@ -150,24 +150,29 @@ if ($query === '' || $action === 'list_claimable') {
                     $o = $ocsMap[$inv] ?? $ocsMap[$cleanInv] ?? null;
 
                     if ($o) {
-                        // Sesuai instruksi: gunakan persis field Total dari tab Pembayaran OCS
-                        if (isset($o['total_amount']) && $o['total_amount'] !== null && $o['total_amount'] !== '') {
-                            $bestPrice = (float)$o['total_amount'];
-                        } elseif (isset($o['package_price']) && $o['package_price'] !== null && $o['package_price'] !== '') {
-                            $bestPrice = (float)$o['package_price'];
-                        } else {
-                            $bestPrice = 0;
+                        // Prioritas: ambil persis baris Total dari tab Pembayaran OCS (BUKAN Total Harga Produk / OriginalTotalProductPrice)
+                        $bestPrice = 0.0;
+                        if (!empty($o['raw_payload'])) {
+                            $rawPay = is_array($o['raw_payload']) ? $o['raw_payload'] : json_decode($o['raw_payload'], true);
+                            $pay = $rawPay['Payment'] ?? $rawPay['data']['Payment'] ?? $rawPay['Data']['Payment'] ?? null;
+                            if (is_array($pay)) {
+                                if (isset($pay['Total']) && $pay['Total'] !== null && $pay['Total'] !== '') {
+                                    $bestPrice = (float)$pay['Total'];
+                                } elseif (isset($pay['TotalAmount']) && $pay['TotalAmount'] !== null && $pay['TotalAmount'] !== '') {
+                                    $bestPrice = (float)$pay['TotalAmount'];
+                                } elseif (isset($pay['total']) && $pay['total'] !== null && $pay['total'] !== '') {
+                                    $bestPrice = (float)$pay['total'];
+                                } elseif (isset($pay['total_amount']) && $pay['total_amount'] !== null && $pay['total_amount'] !== '') {
+                                    $bestPrice = (float)$pay['total_amount'];
+                                }
+                            }
                         }
 
-                        // Jika masih 0, periksa dari rincian order_items_json
-                        if ($bestPrice <= 0 && !empty($o['order_items_json'])) {
-                            $itemsDec = json_decode($o['order_items_json'], true);
-                            if (is_array($itemsDec)) {
-                                foreach ($itemsDec as $it) {
-                                    $itPrice = (float)($it['PackagePrice'] ?? $it['package_price'] ?? $it['Price'] ?? $it['price'] ?? $it['OriginalPrice'] ?? 0);
-                                    $itQty   = (int)($it['Quantity'] ?? $it['total_qty'] ?? $it['qty'] ?? 1);
-                                    $bestPrice += ($itPrice * max(1, $itQty));
-                                }
+                        if ($bestPrice <= 0) {
+                            if (isset($o['total_amount']) && $o['total_amount'] !== null && $o['total_amount'] !== '') {
+                                $bestPrice = (float)$o['total_amount'];
+                            } elseif (isset($o['package_price']) && $o['package_price'] !== null && $o['package_price'] !== '') {
+                                $bestPrice = (float)$o['package_price'];
                             }
                         }
 
@@ -205,10 +210,9 @@ if ($query === '' || $action === 'list_claimable') {
                             SELECT seller_sku, 
                                    MAX(CASE WHEN package_price > 0 THEN package_price / GREATEST(total_qty, 1) 
                                             WHEN total_amount > 0 THEN total_amount / GREATEST(total_qty, 1) 
-                                            WHEN original_price > 0 THEN original_price / GREATEST(total_qty, 1) 
                                             ELSE 0 END) as unit_price
                             FROM ocs_orders 
-                            WHERE seller_sku IN ($inSkuHolders) AND (package_price > 0 OR total_amount > 0 OR original_price > 0)
+                            WHERE seller_sku IN ($inSkuHolders) AND (package_price > 0 OR total_amount > 0)
                             GROUP BY seller_sku
                         ");
                         $stmtSkuPrice->execute($skuKeys);
@@ -354,10 +358,28 @@ try {
 
         if ($cached) {
             $itemsDecoded = !empty($cached['order_items_json']) ? json_decode($cached['order_items_json'], true) : [];
-            // Sesuai instruksi: gunakan persis field Total dari tab Pembayaran OCS
-            $pkgPrice = (isset($cached['total_amount']) && $cached['total_amount'] !== null && $cached['total_amount'] !== '')
-                ? (float)$cached['total_amount']
-                : (float)($cached['package_price'] ?? 0);
+            // Sesuai instruksi: ambil persis baris Total dari tab Pembayaran OCS (BUKAN Total Harga Produk)
+            $pkgPrice = 0.0;
+            if (!empty($cached['raw_payload'])) {
+                $rawP = is_array($cached['raw_payload']) ? $cached['raw_payload'] : json_decode($cached['raw_payload'], true);
+                $py = $rawP['Payment'] ?? $rawP['data']['Payment'] ?? $rawP['Data']['Payment'] ?? null;
+                if (is_array($py)) {
+                    if (isset($py['Total']) && $py['Total'] !== null && $py['Total'] !== '') {
+                        $pkgPrice = (float)$py['Total'];
+                    } elseif (isset($py['TotalAmount']) && $py['TotalAmount'] !== null && $py['TotalAmount'] !== '') {
+                        $pkgPrice = (float)$py['TotalAmount'];
+                    } elseif (isset($py['total']) && $py['total'] !== null && $py['total'] !== '') {
+                        $pkgPrice = (float)$py['total'];
+                    } elseif (isset($py['total_amount']) && $py['total_amount'] !== null && $py['total_amount'] !== '') {
+                        $pkgPrice = (float)$py['total_amount'];
+                    }
+                }
+            }
+            if ($pkgPrice <= 0) {
+                $pkgPrice = (isset($cached['total_amount']) && $cached['total_amount'] !== null && $cached['total_amount'] !== '')
+                    ? (float)$cached['total_amount']
+                    : (float)($cached['package_price'] ?? 0);
+            }
             $shippingFee = (float)($cached['shipping_fee'] ?? 0);
             $totalClaim = $pkgPrice;
 
@@ -395,6 +417,7 @@ try {
                     'ShippingFee'               => $shippingFee,
                     'ServiceFee'                => (float)$cached['service_fee'],
                     'SubTotal'                  => (float)$cached['subtotal'],
+                    'Total'                     => $totalClaim,
                     'TotalAmount'               => $totalClaim
                 ],
                 'CreatedAt'              => $cached['order_created_at'],
@@ -480,8 +503,17 @@ try {
                         $shipFee = (float)($fp['ShippingFee'] ?? 0);
                         $serviceFee = (float)($fp['ServiceFee'] ?? 0);
                         $subtotal = (float)($fp['SubTotal'] ?? ($origProdPrice - $sellerDisc));
-                        // Sesuai instruksi: gunakan persis field Total dari tab Pembayaran OCS
-                        $totalAmount = (float)($fp['TotalAmount'] ?? 0);
+                        // Sesuai instruksi: gunakan persis field Total dari tab Pembayaran OCS (BUKAN Total Harga Produk / OriginalTotalProductPrice)
+                        $totalAmount = 0.0;
+                        if (isset($fp['Total']) && $fp['Total'] !== null && $fp['Total'] !== '') {
+                            $totalAmount = (float)$fp['Total'];
+                        } elseif (isset($fp['TotalAmount']) && $fp['TotalAmount'] !== null && $fp['TotalAmount'] !== '') {
+                            $totalAmount = (float)$fp['TotalAmount'];
+                        } elseif (isset($fp['total']) && $fp['total'] !== null && $fp['total'] !== '') {
+                            $totalAmount = (float)$fp['total'];
+                        } elseif (isset($fp['total_amount']) && $fp['total_amount'] !== null && $fp['total_amount'] !== '') {
+                            $totalAmount = (float)$fp['total_amount'];
+                        }
 
                         $parsedItems = [];
                         $itemNames = [];
@@ -784,8 +816,17 @@ try {
                             $shipFee = (float)($payment['ShippingFee'] ?? $origShipFee);
                             $serviceFee = (float)($payment['ServiceFee'] ?? 0);
                             $subtotal = (float)($payment['SubTotal'] ?? $netProdPrice);
-                            // Sesuai instruksi: gunakan persis field Total dari tab Pembayaran OCS
-                            $totalAmount = (float)($payment['TotalAmount'] ?? 0);
+                            // Sesuai instruksi: gunakan persis field Total dari tab Pembayaran OCS (BUKAN Total Harga Produk / OriginalTotalProductPrice)
+                            $totalAmount = 0.0;
+                            if (isset($payment['Total']) && $payment['Total'] !== null && $payment['Total'] !== '') {
+                                $totalAmount = (float)$payment['Total'];
+                            } elseif (isset($payment['TotalAmount']) && $payment['TotalAmount'] !== null && $payment['TotalAmount'] !== '') {
+                                $totalAmount = (float)$payment['TotalAmount'];
+                            } elseif (isset($payment['total']) && $payment['total'] !== null && $payment['total'] !== '') {
+                                $totalAmount = (float)$payment['total'];
+                            } elseif (isset($payment['total_amount']) && $payment['total_amount'] !== null && $payment['total_amount'] !== '') {
+                                $totalAmount = (float)$payment['total_amount'];
+                            }
 
                             // Ekstraksi Rincian SKU Produk dari Details (Format Resmi OCS)
                             $rawDetails = $od['Details'] ?? $od['Items'] ?? [];

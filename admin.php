@@ -2853,7 +2853,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
             <div class="space-y-4">
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-2">Pilih Metode & Periode Sinkronisasi:</label>
-                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                         <label class="cursor-pointer border-2 border-indigo-600 bg-indigo-50/50 rounded-2xl p-2.5 flex flex-col justify-between transition hover:border-indigo-600" id="labelSyncYesterday">
                             <div class="flex items-center justify-between mb-1">
                                 <span class="text-xs font-black text-indigo-900">Kemarin</span>
@@ -2888,7 +2888,7 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                             <span class="text-[10px] text-slate-500 leading-tight">Pilih Tanggal</span>
                         </label>
 
-                        <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-2xl p-2.5 flex flex-col justify-between transition hover:border-slate-300 col-span-2 sm:col-span-1" id="labelSyncPicklist">
+                        <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-2xl p-2.5 flex flex-col justify-between transition hover:border-slate-300" id="labelSyncPicklist">
                             <div class="flex items-center justify-between mb-1">
                                 <span class="text-xs font-bold text-slate-800 flex items-center gap-1">
                                     <i class="fa-solid fa-barcode text-blue-500"></i> Resi / ID
@@ -2896,6 +2896,16 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                                 <input type="radio" name="syncPeriodType" value="picklist" onchange="toggleSyncDateInput()" class="text-indigo-600 focus:ring-indigo-500">
                             </div>
                             <span class="text-[10px] text-slate-500 leading-tight">FindOrder OCS</span>
+                        </label>
+
+                        <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-2xl p-2.5 flex flex-col justify-between transition hover:border-slate-300" id="labelSyncResyncTotals">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs font-bold text-slate-800 flex items-center gap-1">
+                                    <i class="fa-solid fa-arrows-rotate text-emerald-600"></i> Sync Total
+                                </span>
+                                <input type="radio" name="syncPeriodType" value="resync_totals" onchange="toggleSyncDateInput()" class="text-indigo-600 focus:ring-indigo-500">
+                            </div>
+                            <span class="text-[10px] text-emerald-600 font-bold leading-tight">Baris Total OCS</span>
                         </label>
                     </div>
                 </div>
@@ -2929,6 +2939,17 @@ $isSuperAdmin = ($user['role'] === 'superadmin');
                     </div>
                     <p class="text-[10px] text-blue-700 leading-tight">
                         Mengambil data langsung dari endpoint resmi <a href="https://ocs.iegsystem.id/picklist" target="_blank" class="underline font-bold">ocs.iegsystem.id/picklist</a> (Fitur Find Order). Mendukung pencarian instan: No. Resi, Order ID, atau Package ID.
+                    </p>
+                </div>
+
+                <!-- Info Sync Ulang Biaya Paket (Hidden by default) -->
+                <div id="syncResyncTotalsContainer" class="hidden space-y-2 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-3.5">
+                    <div class="flex items-center gap-2 text-emerald-900 font-bold text-xs">
+                        <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                        <span>Sync Ulang Biaya Paket & Nilai Klaim (Baris Total OCS)</span>
+                    </div>
+                    <p class="text-[11px] text-emerald-800 leading-relaxed">
+                        Sistem akan memindai seluruh data order di database lokal dan mengambil <strong>persis nilai dari baris &quot;Total&quot; pada Tab Pembayaran OCS</strong> (BUKAN Total Harga Produk). Ini memastikan seluruh nilai klaim dan biaya paket 100% akurat.
                     </p>
                 </div>
 

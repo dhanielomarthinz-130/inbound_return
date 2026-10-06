@@ -68,6 +68,7 @@ if ($isCli) {
     $params = array_merge($_GET, $_POST);
 }
 
+$actionParam    = trim($params['action'] ?? '');
 $keywordParam   = trim($params['keyword'] ?? $params['resi'] ?? $params['order_id'] ?? $params['q'] ?? '');
 $dateParam      = trim($params['date'] ?? 'yesterday');
 $startParam     = trim($params['start'] ?? $params['start_date'] ?? '');
@@ -81,6 +82,86 @@ if ($fetchDetailsParam === '0' || $fetchDetailsParam === 'false' || !empty($para
     $fetchDetails = true;
 }
 $detailsLimit = isset($params['details_limit']) ? (int)$params['details_limit'] : 250;
+
+// =============================================================
+// TINDAKAN KHUSUS: SYNC ULANG SELURUH BIAYA PAKET (BARIS TOTAL OCS)
+// Mengambil persis dari Tab Pembayaran baris Total di raw_payload OCS
+// BUKAN Total Harga Produk (OriginalTotalProductPrice), TAPI baris Total!
+// =============================================================
+if ($actionParam === 'resync_all_payment_totals' || $actionParam === 'resync_totals' || !empty($params['resync_totals'])) {
+    writeOcsSyncLog("=== MEMULAI SYNC ULANG BIAYA PAKET (BARIS TOTAL TAB PEMBAYARAN) ===");
+    if (empty($pdo)) {
+        echo json_encode(['success' => false, 'message' => 'Database tidak terhubung']);
+        exit;
+    }
+
+    try {
+        $stmtScan = $pdo->query("SELECT id, order_id, tracking_number, package_price, total_amount, original_price, raw_payload FROM ocs_orders WHERE raw_payload IS NOT NULL AND raw_payload != ''");
+        $allOrders = $stmtScan->fetchAll(PDO::FETCH_ASSOC);
+
+        $totalScanned = count($allOrders);
+        $totalUpdated = 0;
+
+        $stmtUpdate = $pdo->prepare("UPDATE ocs_orders SET package_price = :pkg_price, total_amount = :tot_amount WHERE id = :id");
+        $stmtUpdatePkg = $pdo->prepare("UPDATE incoming_packages SET package_price = :pkg_price WHERE tracking_number = :resi OR order_id = :ord_id");
+
+        foreach ($allOrders as $ord) {
+            $raw = json_decode($ord['raw_payload'], true);
+            if (!is_array($raw)) continue;
+
+            $pay = $raw['Payment'] ?? $raw['data']['Payment'] ?? $raw['Data']['Payment'] ?? null;
+            if (!is_array($pay)) continue;
+
+            // Prioritas: ambil persis baris Total (BUKAN Total Harga Produk / OriginalTotalProductPrice)
+            $exactTotal = null;
+            if (isset($pay['Total']) && $pay['Total'] !== null && $pay['Total'] !== '') {
+                $exactTotal = (float)$pay['Total'];
+            } elseif (isset($pay['TotalAmount']) && $pay['TotalAmount'] !== null && $pay['TotalAmount'] !== '') {
+                $exactTotal = (float)$pay['TotalAmount'];
+            } elseif (isset($pay['total']) && $pay['total'] !== null && $pay['total'] !== '') {
+                $exactTotal = (float)$pay['total'];
+            } elseif (isset($pay['total_amount']) && $pay['total_amount'] !== null && $pay['total_amount'] !== '') {
+                $exactTotal = (float)$pay['total_amount'];
+            }
+
+            if ($exactTotal !== null) {
+                $currPkg = (float)($ord['package_price'] ?? 0);
+                $currTot = (float)($ord['total_amount'] ?? 0);
+
+                if (abs($currPkg - $exactTotal) > 0.001 || abs($currTot - $exactTotal) > 0.001) {
+                    $stmtUpdate->execute([
+                        ':pkg_price'   => $exactTotal,
+                        ':tot_amount'  => $exactTotal,
+                        ':id'          => $ord['id']
+                    ]);
+                    $totalUpdated++;
+
+                    // Sync juga ke incoming_packages jika ada yang cocok
+                    try {
+                        $stmtUpdatePkg->execute([
+                            ':pkg_price' => $exactTotal,
+                            ':resi'      => $ord['tracking_number'] ?: '-',
+                            ':ord_id'    => $ord['order_id'] ?: '-'
+                        ]);
+                    } catch (Exception $ePkg) {}
+                }
+            }
+        }
+
+        writeOcsSyncLog("Sync Ulang Biaya Paket Selesai: {$totalUpdated} dari {$totalScanned} order berhasil diperbarui persis sesuai baris Total OCS.");
+        echo json_encode([
+            'success'       => true,
+            'message'       => "Berhasil sync ulang biaya paket! {$totalUpdated} dari {$totalScanned} order diperbarui persis dari baris 'Total' tab Pembayaran OCS.",
+            'total_scanned' => $totalScanned,
+            'total_updated' => $totalUpdated
+        ]);
+        exit;
+    } catch (Exception $eResync) {
+        writeOcsSyncLog("Gagal sync ulang biaya paket: " . $eResync->getMessage());
+        echo json_encode(['success' => false, 'message' => 'Gagal sync ulang: ' . $eResync->getMessage()]);
+        exit;
+    }
+}
 
 date_default_timezone_set('Asia/Jakarta');
 
@@ -209,8 +290,17 @@ try {
         $shipFee = (float)($fp['ShippingFee'] ?? 0);
         $serviceFee = (float)($fp['ServiceFee'] ?? 0);
         $subtotal = (float)($fp['SubTotal'] ?? ($origProdPrice - $sellerDisc));
-        // Sesuai permintaan: gunakan persis field Total dari tab Pembayaran OCS (tidak dioverride dengan Total Harga Produk)
-        $totalAmount = (float)($fp['TotalAmount'] ?? 0);
+        // Sesuai permintaan: gunakan persis baris Total dari tab Pembayaran OCS (BUKAN Total Harga Produk / OriginalTotalProductPrice)
+        $totalAmount = 0.0;
+        if (isset($fp['Total']) && $fp['Total'] !== null && $fp['Total'] !== '') {
+            $totalAmount = (float)$fp['Total'];
+        } elseif (isset($fp['TotalAmount']) && $fp['TotalAmount'] !== null && $fp['TotalAmount'] !== '') {
+            $totalAmount = (float)$fp['TotalAmount'];
+        } elseif (isset($fp['total']) && $fp['total'] !== null && $fp['total'] !== '') {
+            $totalAmount = (float)$fp['total'];
+        } elseif (isset($fp['total_amount']) && $fp['total_amount'] !== null && $fp['total_amount'] !== '') {
+            $totalAmount = (float)$fp['total_amount'];
+        }
 
         $parsedItems = [];
         $itemNames = [];
@@ -618,7 +708,17 @@ try {
                 $shippingFee      = (float)($payment['ShippingFee'] ?? $origShippingFee);
                 $serviceFee       = (float)($payment['ServiceFee'] ?? 0);
                 $subtotal         = (float)($payment['SubTotal'] ?? 0);
-                $totalAmount      = (float)($payment['TotalAmount'] ?? 0);
+                // Sesuai instruksi: ambil persis field Total dari tab Pembayaran OCS (BUKAN Total Harga Produk)
+                $totalAmount = 0.0;
+                if (isset($payment['Total']) && $payment['Total'] !== null && $payment['Total'] !== '') {
+                    $totalAmount = (float)$payment['Total'];
+                } elseif (isset($payment['TotalAmount']) && $payment['TotalAmount'] !== null && $payment['TotalAmount'] !== '') {
+                    $totalAmount = (float)$payment['TotalAmount'];
+                } elseif (isset($payment['total']) && $payment['total'] !== null && $payment['total'] !== '') {
+                    $totalAmount = (float)$payment['total'];
+                } elseif (isset($payment['total_amount']) && $payment['total_amount'] !== null && $payment['total_amount'] !== '') {
+                    $totalAmount = (float)$payment['total_amount'];
+                }
 
                 $customer = $detailData['Customer'] ?? [];
                 $custName    = trim($customer['Name'] ?? '');

@@ -19,17 +19,30 @@ $action = trim($_GET['action'] ?? $_POST['action'] ?? 'list');
  * Helper untuk menghitung total harga order dengan fallback bertingkat
  */
 function computeOrderPrice($ord) {
-    // Sesuai instruksi: gunakan persis field Total dari tab Pembayaran OCS
-    if (isset($ord['total_amount']) && $ord['total_amount'] !== null && $ord['total_amount'] !== '') {
-        return (float)$ord['total_amount'];
-    }
-
-    // Fallback dari raw_payload Payment.TotalAmount
+    // 1. Prioritas Utama: Tarik langsung baris 'Total' dari raw_payload Tab Pembayaran OCS
+    // BUKAN 'OriginalTotalProductPrice' (Total Harga Produk), tapi persis baris Total!
     if (!empty($ord['raw_payload'])) {
         $raw = is_array($ord['raw_payload']) ? $ord['raw_payload'] : (json_decode($ord['raw_payload'], true) ?: []);
-        if (isset($raw['Payment']['TotalAmount'])) {
-            return (float)$raw['Payment']['TotalAmount'];
+        $pay = $raw['Payment'] ?? $raw['data']['Payment'] ?? $raw['Data']['Payment'] ?? null;
+        if (is_array($pay)) {
+            if (isset($pay['Total']) && $pay['Total'] !== null && $pay['Total'] !== '') {
+                return (float)$pay['Total'];
+            }
+            if (isset($pay['TotalAmount']) && $pay['TotalAmount'] !== null && $pay['TotalAmount'] !== '') {
+                return (float)$pay['TotalAmount'];
+            }
+            if (isset($pay['total']) && $pay['total'] !== null && $pay['total'] !== '') {
+                return (float)$pay['total'];
+            }
+            if (isset($pay['total_amount']) && $pay['total_amount'] !== null && $pay['total_amount'] !== '') {
+                return (float)$pay['total_amount'];
+            }
         }
+    }
+
+    // 2. Jika tidak ada di raw_payload, gunakan kolom total_amount atau package_price
+    if (isset($ord['total_amount']) && $ord['total_amount'] !== null && $ord['total_amount'] !== '') {
+        return (float)$ord['total_amount'];
     }
 
     if (isset($ord['package_price']) && $ord['package_price'] !== null && $ord['package_price'] !== '') {
@@ -97,8 +110,17 @@ function syncSingleOrderFromPicklistFindOrder($pdo, $keyword) {
     $shipFee = (float)($fp['ShippingFee'] ?? 0);
     $serviceFee = (float)($fp['ServiceFee'] ?? 0);
     $subtotal = (float)($fp['SubTotal'] ?? ($origProdPrice - $sellerDisc));
-    // Sesuai instruksi: gunakan persis field Total dari tab Pembayaran OCS
-    $totalAmount = (float)($fp['TotalAmount'] ?? 0);
+    // Sesuai instruksi: gunakan persis baris Total dari tab Pembayaran OCS (BUKAN Total Harga Produk / OriginalTotalProductPrice)
+    $totalAmount = 0.0;
+    if (isset($fp['Total']) && $fp['Total'] !== null && $fp['Total'] !== '') {
+        $totalAmount = (float)$fp['Total'];
+    } elseif (isset($fp['TotalAmount']) && $fp['TotalAmount'] !== null && $fp['TotalAmount'] !== '') {
+        $totalAmount = (float)$fp['TotalAmount'];
+    } elseif (isset($fp['total']) && $fp['total'] !== null && $fp['total'] !== '') {
+        $totalAmount = (float)$fp['total'];
+    } elseif (isset($fp['total_amount']) && $fp['total_amount'] !== null && $fp['total_amount'] !== '') {
+        $totalAmount = (float)$fp['total_amount'];
+    }
 
     $parsedItems = [];
     $itemNames = [];
@@ -326,7 +348,17 @@ function enrichOrdersFromOcs($pdo, array $orderIds) {
         $shippingFee      = (float)($payment['ShippingFee'] ?? 0);
         $serviceFee       = (float)($payment['ServiceFee'] ?? 0);
         $subtotal         = (float)($payment['SubTotal'] ?? 0);
-        $totalAmount      = (float)($payment['TotalAmount'] ?? 0);
+        // Sesuai instruksi: gunakan persis baris Total dari tab Pembayaran OCS (BUKAN Total Harga Produk / OriginalTotalProductPrice)
+        $totalAmount = 0.0;
+        if (isset($payment['Total']) && $payment['Total'] !== null && $payment['Total'] !== '') {
+            $totalAmount = (float)$payment['Total'];
+        } elseif (isset($payment['TotalAmount']) && $payment['TotalAmount'] !== null && $payment['TotalAmount'] !== '') {
+            $totalAmount = (float)$payment['TotalAmount'];
+        } elseif (isset($payment['total']) && $payment['total'] !== null && $payment['total'] !== '') {
+            $totalAmount = (float)$payment['total'];
+        } elseif (isset($payment['total_amount']) && $payment['total_amount'] !== null && $payment['total_amount'] !== '') {
+            $totalAmount = (float)$payment['total_amount'];
+        }
 
         $customer = $d['Customer'] ?? [];
         $custName = trim($customer['Name'] ?? '');
