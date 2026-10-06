@@ -1,8 +1,13 @@
 <?php
 require_once __DIR__ . '/config.php';
+header("Cache-Control: no-cache, no-store, must-revalidate, max-age=0");
+header("Pragma: no-cache");
+header("Expires: 0");
+
 $currentUser = getSessionUser();
 checkMaintenanceMode($pdo, $currentUser);
 $user = requireLogin(['operator', 'admin', 'superadmin', 'management', 'accounting']);
+
 
 // Ambil daftar master ekspedisi aktif
 try {
@@ -18,6 +23,12 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Penerimaan Returan Ekspedisi - Inbound Station</title>
+    <?php
+    $appBaseDir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
+    $appBaseHref = ($appBaseDir === '' || $appBaseDir === '/') ? '/' : ($appBaseDir . '/');
+    ?>
+    <base href="<?= htmlspecialchars($appBaseHref) ?>">
+    <script>window.APP_BASE_URL = <?= json_encode($appBaseHref) ?>;</script>
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="assets/image/favicon.svg">
     <link rel="icon" type="image/png" href="assets/image/favicon.png">
@@ -1918,9 +1929,9 @@ try {
                 origH = 720;
             }
 
-            // Skala proporsional agar memori browser & payload transmisi ringan (Maksimal 1280x960)
-            const MAX_WIDTH = 1280;
-            const MAX_HEIGHT = 960;
+            // Skala proporsional agar memori browser & payload transmisi ringan (Maksimal 800x600, hemat kuota & anti-error 413)
+            const MAX_WIDTH = 800;
+            const MAX_HEIGHT = 600;
             let w = origW;
             let h = origH;
             if (w > MAX_WIDTH || h > MAX_HEIGHT) {
@@ -1933,13 +1944,13 @@ try {
             canvas.height = h;
             const ctx = canvas.getContext('2d');
             ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
+            ctx.imageSmoothingQuality = 'medium';
 
             // Render gambar dasar
             ctx.drawImage(sourceEl, 0, 0, w, h);
 
             // Banner Watermark Bawah (Gradient Slate Gelap Profesional)
-            const barHeight = Math.max(90, Math.round(h * 0.16));
+            const barHeight = Math.max(80, Math.round(h * 0.17));
             const grad = ctx.createLinearGradient(0, h - barHeight, 0, h);
             grad.addColorStop(0, 'rgba(15, 23, 42, 0.92)');
             grad.addColorStop(1, 'rgba(2, 6, 23, 0.98)');
@@ -1961,9 +1972,9 @@ try {
             const sack = currentSackNumber || 'Karung 1';
 
             // Font sizing
-            const titleSize = Math.max(14, Math.round(w * 0.018));
-            const bodySize  = Math.max(12, Math.round(w * 0.014));
-            const subSize   = Math.max(10, Math.round(w * 0.011));
+            const titleSize = Math.max(13, Math.round(w * 0.020));
+            const bodySize  = Math.max(11, Math.round(w * 0.015));
+            const subSize   = Math.max(9, Math.round(w * 0.012));
 
             ctx.textBaseline = 'top';
 
@@ -1972,69 +1983,71 @@ try {
                 ctx.textAlign = 'left';
                 ctx.fillStyle = '#818cf8';
                 ctx.font = `900 ${titleSize}px monospace, sans-serif`;
-                ctx.fillText('IEG • FOTO BUKTI KURIR PENGANTAR', 16, h - barHeight + 10);
+                ctx.fillText('IEG • FOTO BUKTI KURIR PENGANTAR', 14, h - barHeight + 8);
 
                 ctx.fillStyle = '#ffffff';
                 ctx.font = `bold ${bodySize}px monospace, sans-serif`;
-                ctx.fillText(`NAMA KURIR: ${courier}  |  EKSPEDISI: ${exp}`, 16, h - barHeight + 10 + titleSize + 5);
+                ctx.fillText(`NAMA KURIR: ${courier}  |  EKSPEDISI: ${exp}`, 14, h - barHeight + 8 + titleSize + 4);
 
                 ctx.fillStyle = '#94a3b8';
                 ctx.font = `normal ${subSize}px monospace, sans-serif`;
-                ctx.fillText(`NO. TERIMA: ${receiptNo}  |  OPERATOR: ${CURRENT_OPERATOR_NAME}`, 16, h - barHeight + 10 + titleSize + bodySize + 8);
+                ctx.fillText(`NO. TERIMA: ${receiptNo}  |  OPERATOR: ${CURRENT_OPERATOR_NAME}`, 14, h - barHeight + 8 + titleSize + bodySize + 6);
 
                 // SISI KANAN: Waktu & Badge
                 ctx.textAlign = 'right';
                 ctx.fillStyle = '#38bdf8';
                 ctx.font = `bold ${bodySize}px monospace, sans-serif`;
-                ctx.fillText(`${dateStr} ${timeStr}`, w - 16, h - barHeight + 10);
+                ctx.fillText(`${dateStr} ${timeStr}`, w - 14, h - barHeight + 8);
 
                 ctx.fillStyle = '#fbbf24';
                 ctx.font = `bold ${subSize}px monospace, sans-serif`;
-                ctx.fillText('👤 BUKTI FISIK SERAH TERIMA DRIVER', w - 16, h - barHeight + 12 + bodySize);
+                ctx.fillText('👤 BUKTI FISIK SERAH TERIMA DRIVER', w - 14, h - barHeight + 10 + bodySize);
             } else {
                 // SISI KIRI: Branding & Paket Resi
                 ctx.textAlign = 'left';
                 ctx.fillStyle = '#10b981';
                 ctx.font = `900 ${titleSize}px monospace, sans-serif`;
-                ctx.fillText('IEG • INBOUND RECEIVING', 16, h - barHeight + 10);
+                ctx.fillText('IEG • INBOUND RECEIVING', 14, h - barHeight + 8);
 
                 ctx.fillStyle = '#ffffff';
                 ctx.font = `bold ${bodySize}px monospace, sans-serif`;
-                ctx.fillText(`RESI: ${barcode || '-'}  |  KARUNG: ${sack}`, 16, h - barHeight + 10 + titleSize + 5);
+                ctx.fillText(`RESI: ${barcode || '-'}  |  KARUNG: ${sack}`, 14, h - barHeight + 8 + titleSize + 4);
 
                 ctx.fillStyle = '#94a3b8';
                 ctx.font = `normal ${subSize}px monospace, sans-serif`;
-                ctx.fillText(`EKSPEDISI: ${exp}  |  KURIR: ${courier}  |  OPERATOR: ${CURRENT_OPERATOR_NAME}`, 16, h - barHeight + 10 + titleSize + bodySize + 8);
+                ctx.fillText(`EKSPEDISI: ${exp}  |  KURIR: ${courier}  |  OPERATOR: ${CURRENT_OPERATOR_NAME}`, 14, h - barHeight + 8 + titleSize + bodySize + 6);
 
                 // SISI KANAN: Waktu & Status
                 ctx.textAlign = 'right';
                 ctx.fillStyle = '#38bdf8';
                 ctx.font = `bold ${bodySize}px monospace, sans-serif`;
-                ctx.fillText(`${dateStr} ${timeStr}`, w - 16, h - barHeight + 10);
+                ctx.fillText(`${dateStr} ${timeStr}`, w - 14, h - barHeight + 8);
 
                 ctx.fillStyle = '#fbbf24';
                 ctx.font = `bold ${subSize}px monospace, sans-serif`;
-                ctx.fillText('📸 BUKTI SERAH TERIMA FISIK PAKET', w - 16, h - barHeight + 12 + bodySize);
+                ctx.fillText('📸 BUKTI SERAH TERIMA FISIK PAKET', w - 14, h - barHeight + 10 + bodySize);
             }
 
             ctx.textAlign = 'left';
-            return canvas.toDataURL('image/jpeg', 0.70);
+            return canvas.toDataURL('image/jpeg', 0.58);
         }
 
-        // Kompres ulang DataURL (untuk foto draft lama beresolusi penuh) ke maks 1280px, kualitas 0.70
-        function compressDataUrl(dataUrl, maxW = 1280, maxH = 960, quality = 0.70) {
+        // Kompres DataURL ke ukuran sangat ringan (maks 800x600, kualitas 0.55 = ~20-25 KB per foto)
+        function compressDataUrl(dataUrl, maxW = 800, maxH = 600, quality = 0.55) {
             return new Promise((resolve) => {
-                // Foto kecil (< ~250KB) tidak perlu dikompres ulang
-                if (!dataUrl || dataUrl.length < 350000) { resolve(dataUrl); return; }
+                if (!dataUrl || typeof dataUrl !== 'string') { resolve(dataUrl); return; }
+                if (!dataUrl.startsWith('data:image')) { resolve(dataUrl); return; }
+                if (dataUrl.length < 55000) { resolve(dataUrl); return; }
                 const img = new Image();
                 img.onload = () => {
-                    let w = img.naturalWidth, h = img.naturalHeight;
+                    let w = img.naturalWidth || 800, h = img.naturalHeight || 600;
                     const ratio = Math.min(1, maxW / w, maxH / h);
-                    w = Math.round(w * ratio); h = Math.round(h * ratio);
+                    w = Math.max(320, Math.round(w * ratio));
+                    h = Math.max(240, Math.round(h * ratio));
                     const c = document.createElement('canvas');
                     c.width = w; c.height = h;
                     const cx = c.getContext('2d');
-                    cx.imageSmoothingQuality = 'high';
+                    cx.imageSmoothingQuality = 'medium';
                     cx.drawImage(img, 0, 0, w, h);
                     resolve(c.toDataURL('image/jpeg', quality));
                 };
@@ -2044,25 +2057,34 @@ try {
         }
 
         // Unggah 1 foto ke server, kembalikan path file (uploads/...).
-        // Jika gagal karena izin folder hosting, jangan batalkan submit paket; fallback aman digunakan.
         async function uploadReceptionPhoto(dataUrl, prefix) {
-            const compact = await compressDataUrl(dataUrl);
+            if (!dataUrl || typeof dataUrl !== 'string') return null;
+            if (!dataUrl.startsWith('data:image')) return dataUrl; // Sudah berupa path server
+
+            let compact = await compressDataUrl(dataUrl, 800, 600, 0.55);
             let lastErr = null;
-            for (let attempt = 1; attempt <= 2; attempt++) {
+            for (let attempt = 1; attempt <= 3; attempt++) {
                 try {
+                    if (attempt > 1) {
+                        compact = await compressDataUrl(compact, 640, 480, 0.45);
+                    }
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 12000);
                     const res = await fetch('api/reception.php?action=upload_photo', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ photo: compact, prefix })
+                        body: JSON.stringify({ photo: compact, prefix }),
+                        signal: controller.signal
                     });
+                    clearTimeout(timeoutId);
                     const txt = await res.text();
                     let d = null;
                     try { d = JSON.parse(txt); } catch (e) { d = null; }
                     if (res.status === 401) {
                         throw new Error('Sesi login telah habis. Buka tab baru untuk login kembali.');
                     }
-                    if (d && d.success) {
-                        return d.path || compact;
+                    if (d && d.success && d.path) {
+                        return d.path;
                     }
                     if (d && d.error) {
                         lastErr = new Error(d.error);
@@ -2075,8 +2097,8 @@ try {
                 }
             }
             console.warn('Upload foto server dilewati:', lastErr);
-            // Kembalikan compact DataURL jika ukurannya wajar, atau biarkan null agar tidak memblokir submit
-            return (compact && compact.length < 350000) ? compact : null;
+            const thumb = await compressDataUrl(compact, 480, 360, 0.40);
+            return (thumb && thumb.length < 35000) ? thumb : null;
         }
 
         // ==============================================================
@@ -2295,70 +2317,134 @@ try {
             }
 
             try {
-                // 1. Unggah foto satu per satu (kompres ulang foto draft lama yang masih resolusi penuh)
                 const setProgress = (txt) => {
                     if (btnDesktop) btnDesktop.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${txt}`;
                     if (btnMobile) btnMobile.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${txt}`;
                 };
                 const safeRcpt = String(currentReceiptId || 'RCV').replace(/[^a-zA-Z0-9_\-]/g, '_');
 
+                // 1. Unggah foto kurir jika masih berupa dataUrl
                 if (currentCourierPhoto && currentCourierPhoto.startsWith('data:image')) {
                     setProgress('Mengunggah foto kurir...');
                     currentCourierPhoto = await uploadReceptionPhoto(currentCourierPhoto, `courier_${safeRcpt}`);
                     await saveDraftToStorage();
                 }
 
-                const totalPkg = draftPackages.length;
-                for (let i = 0; i < totalPkg; i++) {
-                    const p = draftPackages[i];
-                    if (p.photo && p.photo.startsWith('data:image')) {
-                        setProgress(`Mengunggah foto paket ${i + 1}/${totalPkg}...`);
-                        const safeB = String(p.barcode).replace(/[^a-zA-Z0-9_\-]/g, '_');
-                        p.photo = await uploadReceptionPhoto(p.photo, `pkg_${safeRcpt}_${safeB}`);
-                        await saveDraftToStorage();
-                    }
-                }
-                setProgress('Menyimpan data penerimaan...');
+                // 2. Unggah foto paket dengan concurrent worker pool (3 koneksi simultan)
+                const itemsToUpload = draftPackages.filter(p => p.photo && p.photo.startsWith('data:image'));
+                const totalUploadCount = itemsToUpload.length;
+                let uploadedCount = 0;
 
-                // 2. Submit final (hanya berisi path foto, ukuran sangat kecil)
-                const payload = {
-                    receipt_number: currentReceiptId,
-                    expedition: currentExpedition,
-                    courier_name: currentCourierName,
-                    courier_photo: currentCourierPhoto, // Path foto kurir
-                    sack_number: currentSackNumber || 'Karung 1',
-                    packages: draftPackages.map(p => ({
-                        barcode: p.barcode,
-                        photo: p.photo,
-                        sack_number: p.sack_number || currentSackNumber || 'Karung 1'
-                    }))
-                };
-
-                const res = await fetch('api/reception.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                let data = null;
-                const responseText = await res.text();
-                try {
-                    data = JSON.parse(responseText);
-                } catch (eParse) {
-                    console.error('Non-JSON response from api/reception.php:', responseText);
-                    if (res.status === 413) {
-                        throw new Error('Ukuran total foto paket melebihi batas upload server (Error 413). Coba bagi paket ke beberapa karung.');
-                    } else if (res.status === 401) {
-                        throw new Error('Sesi login telah habis. Buka tab baru untuk login kembali agar draft di halaman ini tidak hilang.');
-                    } else if (res.status === 500) {
-                        throw new Error('Server mengalami kendala internal database (500). Detail: ' + (responseText.substring(0, 150) || 'Database MySQL offline'));
-                    } else {
-                        throw new Error(`Server merespon dengan status ${res.status}: ` + responseText.substring(0, 150));
-                    }
+                if (totalUploadCount > 0) {
+                    const CONCURRENCY = 3;
+                    const queue = [...itemsToUpload];
+                    const workers = Array(Math.min(CONCURRENCY, queue.length)).fill(0).map(async () => {
+                        while (queue.length > 0) {
+                            const p = queue.shift();
+                            if (!p) break;
+                            const safeB = String(p.barcode).replace(/[^a-zA-Z0-9_\-]/g, '_');
+                            p.photo = await uploadReceptionPhoto(p.photo, `pkg_${safeRcpt}_${safeB}`);
+                            uploadedCount++;
+                            setProgress(`Mengunggah foto (${uploadedCount}/${totalUploadCount})...`);
+                        }
+                    });
+                    await Promise.all(workers);
+                    await saveDraftToStorage();
                 }
 
-                if (data && data.success) {
-                    showStatusMsg(`✅ <b>Sukses Tersimpan!</b> Penerimaan <b>${data.total_packages} paket</b> (${escapeHtml(data.expedition)}) berhasil disimpan ke sistem! [Ref: ${escapeHtml(data.receipt_number)}]`, 'success');
+                // 3. Simpan data penerimaan ke database (menggunakan chunking jika paket > 20)
+                const CHUNK_SIZE = 25;
+                const totalPkgCount = draftPackages.length;
+                let lastResponseData = null;
+
+                if (totalPkgCount > CHUNK_SIZE) {
+                    for (let i = 0; i < totalPkgCount; i += CHUNK_SIZE) {
+                        const slice = draftPackages.slice(i, i + CHUNK_SIZE);
+                        const chunkIdx = Math.floor(i / CHUNK_SIZE);
+                        const endNum = Math.min(i + CHUNK_SIZE, totalPkgCount);
+                        setProgress(`Menyimpan paket ${i + 1}-${endNum} dari ${totalPkgCount}...`);
+
+                        const chunkPayload = {
+                            receipt_number: currentReceiptId,
+                            expedition: currentExpedition,
+                            courier_name: currentCourierName,
+                            courier_photo: currentCourierPhoto,
+                            sack_number: currentSackNumber || 'Karung 1',
+                            is_chunk: true,
+                            chunk_index: chunkIdx,
+                            total_packages: totalPkgCount,
+                            packages: slice.map(p => ({
+                                barcode: p.barcode,
+                                photo: p.photo,
+                                sack_number: p.sack_number || currentSackNumber || 'Karung 1'
+                            }))
+                        };
+
+                        const res = await fetch('api/reception.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(chunkPayload)
+                        });
+
+                        const responseText = await res.text();
+                        let chunkResult = null;
+                        try { 
+                            chunkResult = JSON.parse(responseText); 
+                        } catch(eParse) {
+                            if (res.status === 413) {
+                                throw new Error('Ukuran foto melebihi batas upload server (Error 413). Coba bagi paket ke beberapa karung.');
+                            } else if (res.status === 401) {
+                                throw new Error('Sesi login telah habis. Buka tab baru untuk login kembali.');
+                            }
+                            throw new Error(`Server error saat batch #${chunkIdx + 1} (${res.status}): ` + responseText.substring(0, 150));
+                        }
+
+                        if (!chunkResult || !chunkResult.success) {
+                            throw new Error(chunkResult?.error || `Gagal menyimpan batch #${chunkIdx + 1}`);
+                        }
+                        lastResponseData = chunkResult;
+                    }
+                } else {
+                    // Single request jika <= 25 paket
+                    setProgress('Menyimpan data penerimaan...');
+                    const payload = {
+                        receipt_number: currentReceiptId,
+                        expedition: currentExpedition,
+                        courier_name: currentCourierName,
+                        courier_photo: currentCourierPhoto,
+                        sack_number: currentSackNumber || 'Karung 1',
+                        packages: draftPackages.map(p => ({
+                            barcode: p.barcode,
+                            photo: p.photo,
+                            sack_number: p.sack_number || currentSackNumber || 'Karung 1'
+                        }))
+                    };
+
+                    const res = await fetch('api/reception.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const responseText = await res.text();
+                    try { 
+                        lastResponseData = JSON.parse(responseText); 
+                    } catch(eParse) {
+                        if (res.status === 413) {
+                            throw new Error('Ukuran total foto paket melebihi batas upload server (Error 413).');
+                        } else if (res.status === 401) {
+                            throw new Error('Sesi login telah habis. Buka tab baru untuk login kembali.');
+                        }
+                        throw new Error(`Server error (${res.status}): ` + responseText.substring(0, 150));
+                    }
+
+                    if (!lastResponseData || !lastResponseData.success) {
+                        throw new Error(lastResponseData?.error || 'Gagal menyimpan data penerimaan.');
+                    }
+                }
+
+                if (lastResponseData && lastResponseData.success) {
+                    showStatusMsg(`✅ <b>Sukses Tersimpan!</b> Penerimaan <b>${lastResponseData.total_packages || totalPkgCount} paket</b> (${escapeHtml(lastResponseData.expedition || currentExpedition)}) berhasil disimpan ke sistem! [Ref: ${escapeHtml(lastResponseData.receipt_number || currentReceiptId)}]`, 'success');
                     playBeep('success');
 
                     // Bersihkan draft tersimpan karena penerimaan sudah sukses masuk database
@@ -2368,7 +2454,7 @@ try {
                     resetReceptionForm();
                     loadHistoryData();
                 } else {
-                    alert('Gagal menyimpan: ' + (data?.error || 'Terjadi kesalahan sistem saat menyimpan data penerimaan.'));
+                    alert('Gagal menyimpan: ' + (lastResponseData?.error || 'Terjadi kesalahan sistem saat menyimpan data penerimaan.'));
                 }
             } catch (err) {
                 console.error('Error submitCompleteReception:', err);

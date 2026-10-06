@@ -35,7 +35,8 @@ try {
                 WHEN UPPER(COALESCE(i.type, i.condition, 'GOOD')) = 'GOOD' THEN 'GOOD'
                 ELSE 'RUSAK'
             END AS condition_type,
-            i.damage_reason
+            i.damage_reason,
+            i.photo_path AS item_photo
         FROM return_items i
         JOIN return_sessions s ON i.session_id = s.id
         LEFT JOIN master_products p ON i.barcode = p.barcode

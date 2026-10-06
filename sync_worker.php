@@ -112,12 +112,38 @@ function callInfinityFreeApi($url, $postPayload = null) {
     ];
 }
 
+function getSyncFtpConnection() {
+    static $ftpConn = null;
+    static $ftpTried = false;
+    if ($ftpConn !== null && @ftp_pasv($ftpConn, true)) {
+        return $ftpConn;
+    }
+    if ($ftpTried && $ftpConn === null) {
+        return false;
+    }
+    $ftpTried = true;
+    $host = defined('FTP_SYNC_HOST') ? FTP_SYNC_HOST : null;
+    $user = defined('FTP_SYNC_USER') ? FTP_SYNC_USER : null;
+    $pass = defined('FTP_SYNC_PASS') ? FTP_SYNC_PASS : null;
+    if (!$host || !$user || !$pass) return false;
+
+    $conn = @ftp_connect($host, 21, 15);
+    if ($conn && @ftp_login($conn, $user, $pass)) {
+        ftp_pasv($conn, true);
+        $ftpConn = $conn;
+        return $ftpConn;
+    }
+    return false;
+}
+
 /**
  * Helper Download File Media (Foto & Video) dari Cloud ke Localhost
+ * Prioritaskan FTP langsung agar tidak pernah terhalang proteksi anti-bot Cloud.
  */
 function downloadCloudFile($cloudUrl, $relPath) {
-    if (empty($relPath) || empty($cloudUrl)) return false;
-    $targetPath = __DIR__ . '/' . ltrim($relPath, '/');
+    if (empty($relPath)) return false;
+    $relPath = ltrim($relPath, '/');
+    $targetPath = __DIR__ . '/' . $relPath;
     $targetDir = dirname($targetPath);
     if (!is_dir($targetDir)) {
         @mkdir($targetDir, 0777, true);
@@ -127,11 +153,25 @@ function downloadCloudFile($cloudUrl, $relPath) {
         return true;
     }
 
-    $sourceUrl = rtrim($cloudUrl, '/') . '/' . ltrim($relPath, '/');
-    $res = callInfinityFreeApi($sourceUrl);
+    // 1. Prioritaskan FTP (Bypass semua limit anti-bot / cookie InfinityFree)
+    $ftpConn = getSyncFtpConnection();
+    if ($ftpConn) {
+        $remoteFtpBase = defined('FTP_SYNC_BASE') ? rtrim(FTP_SYNC_BASE, '/') : 'returninboundieg.great-site.net/htdocs';
+        $remoteFilePath = $remoteFtpBase . '/' . $relPath;
+        if (@ftp_get($ftpConn, $targetPath, $remoteFilePath, FTP_BINARY)) {
+            if (file_exists($targetPath) && filesize($targetPath) > 100) {
+                return true;
+            }
+        }
+    }
 
-    if ($res['code'] === 200 && !empty($res['body']) && strpos($res['body'], 'slowAES.decrypt') === false) {
-        return file_put_contents($targetPath, $res['body']) !== false;
+    // 2. Fallback via HTTP cURL API
+    if (!empty($cloudUrl)) {
+        $sourceUrl = rtrim($cloudUrl, '/') . '/' . $relPath;
+        $res = callInfinityFreeApi($sourceUrl);
+        if ($res['code'] === 200 && !empty($res['body']) && strpos($res['body'], 'slowAES.decrypt') === false) {
+            return file_put_contents($targetPath, $res['body']) !== false;
+        }
     }
     return false;
 }

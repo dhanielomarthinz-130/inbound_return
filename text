@@ -1,0 +1,9 @@
+1.Pisahin Pengaturan Bank
+2.Pengaturan Bank di akses Oleh Management dan Accounting.
+3.Buatkan menu Role untuk add, edit dan delete role
+4.approval Accounting (via web): Dari Local Host kirim Approval ke Infinity Free via syn
+    1.Dan Saat Approval kirim balik lagi ke Localhost untuk di print Tagihan( e-sign Digital)
+    2.Send Data Ke Accounting
+    3.Ambil total dari Find Orders di OCS (Menu Find Orders > Picklist)
+    Yang di klaim expedisi Oleh Accounting Hanya Expedisi JNT ( Kirim Ke Accounting via system infinity https://returninboundieg.great-site.net/ Untuk di Approval ) tanpa foto Hanya data table only
+    sisanya di Klaim Manual oleh Admin di klik menu Klaim

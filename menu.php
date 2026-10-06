@@ -37,6 +37,12 @@ $initials = strtoupper(substr($nameParts[0], 0, 1) . (isset($nameParts[1]) ? sub
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Inbound Hub • IEG</title>
+    <?php
+    $appBaseDir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
+    $appBaseHref = ($appBaseDir === '' || $appBaseDir === '/') ? '/' : ($appBaseDir . '/');
+    ?>
+    <base href="<?= htmlspecialchars($appBaseHref) ?>">
+    <script>window.APP_BASE_URL = <?= json_encode($appBaseHref) ?>;</script>
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="assets/image/favicon.svg">

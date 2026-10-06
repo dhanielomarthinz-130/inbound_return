@@ -16,6 +16,12 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Inbound Return</title>
+    <?php
+    $appBaseDir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
+    $appBaseHref = ($appBaseDir === '' || $appBaseDir === '/') ? '/' : ($appBaseDir . '/');
+    ?>
+    <base href="<?= htmlspecialchars($appBaseHref) ?>">
+    <script>window.APP_BASE_URL = <?= json_encode($appBaseHref) ?>;</script>
     <!-- Favicon Huruf D Warna Hijau -->
     <link rel="icon" type="image/svg+xml" href="assets/image/favicon.svg">
     <link rel="icon" type="image/png" href="assets/image/favicon.png">

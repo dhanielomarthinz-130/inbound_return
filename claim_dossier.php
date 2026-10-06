@@ -17,6 +17,12 @@ $query = trim($_GET['q'] ?? $_GET['query'] ?? $_GET['order_id'] ?? $_GET['tracki
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Berkas Klaim Ekspedisi - <?= htmlspecialchars($query ?: 'Pusat Klaim') ?> - IEG Inovasi Eka Gemilang</title>
+    <?php
+    $appBaseDir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
+    $appBaseHref = ($appBaseDir === '' || $appBaseDir === '/') ? '/' : ($appBaseDir . '/');
+    ?>
+    <base href="<?= htmlspecialchars($appBaseHref) ?>">
+    <script>window.APP_BASE_URL = <?= json_encode($appBaseHref) ?>;</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">

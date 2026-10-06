@@ -7,6 +7,12 @@ RewriteCond %{THE_REQUEST} ^[A-Z]{3,}\s+([^?\s]+)\.php(\?[^\s]*)?\s [NC]
 RewriteCond %{THE_REQUEST} !/api/ [NC]
 RewriteRule ^ %1%2 [R=301,L]
 
+# 1b. Normalisasi akses relatif ke folder uploads/ dan assets/ dari Clean URL (misal: /admin/uploads/... -> /uploads/...)
+RewriteRule ^(?:admin|menu|scanner|reception|penerimaan|dossier|claim_dossier|claim_invoice|claim-invoice)/uploads/(.+)$ uploads/$1 [L,NC]
+RewriteRule ^(?:admin|menu|scanner|reception|penerimaan|dossier|claim_dossier|claim_invoice|claim-invoice)/assets/(.+)$ assets/$1 [L,NC]
+RewriteRule ^.*/uploads/(.+)$ uploads/$1 [L,NC]
+RewriteRule ^.*/assets/(.+)$ assets/$1 [L,NC]
+
 # 2. Izinkan akses langsung ke file aset statis (CSS, JS, gambar, video, fonts) dan direktori
 RewriteCond %{REQUEST_FILENAME} -d [OR]
 RewriteCond %{REQUEST_URI} \.(css|js|png|jpg|jpeg|gif|svg|webp|ico|webm|mp4|woff|woff2|ttf|eot)$ [NC]

@@ -120,9 +120,18 @@ try {
                 }
             }
 
+            // Masukkan seluruh foto per paket individual agar ikut disinkronkan ke PC Localhost
+            $recPkgs = $packagesByRec[$rec['id']] ?? [];
+            foreach ($recPkgs as $rPkg) {
+                $pkgPhoto = trim($rPkg['photo_path'] ?? '');
+                if (!empty($pkgPhoto) && !in_array($pkgPhoto, $recPhotos)) {
+                    $recPhotos[] = $pkgPhoto;
+                }
+            }
+
             $receptionsData[] = [
                 'reception' => $rec,
-                'packages' => $packagesByRec[$rec['id']] ?? [],
+                'packages' => $recPkgs,
                 'photo_files' => $recPhotos
             ];
         }

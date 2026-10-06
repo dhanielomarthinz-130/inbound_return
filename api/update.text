@@ -1,0 +1,26 @@
+1. Klaim assign Ke Menu Accounting ( Expedisi JNT | JNE )
+    1. Saat Assign ke Menu Accounting Status akan Berubah Ke Waiting Klaim ( Via Local Host) Api update ke Localhost Statusnya
+    2. Saat di Klaim by Accounting Status Akan Berubah Ke Done Klaim ( Via System ) Api update ke Localhost Statusnya Ambil dari OCS / Manual
+2. Menu Role ( Add New Role )
+    1. Accounting ( Approve Klaim | Edit Klaim )
+    2. Operator Reporting ( Download | Share Report Productivity Dashboard)
+    3. Operator Menu Mobile (Reciving | Unboxing)
+    4. Custummer Service
+    5. Super Admin 
+    6. Admin
+    7. Management ( View Dashboard)
+3. Dashboard 
+    1.KPI Productivity
+        a.Trend penerimaan paket (Line Chart)
+        b.Trend Unboxing per hari (Bar Chart)
+    2. Total paket yang diterima
+    3. Total Paket Yang Missing ( Belum di Unboxing)
+    4. Total Paket Yang Received
+    5. Total Paket Yang Reject
+4. Data Table tampilkan Age Paket Avarage 14 Hari (Menu Klaim) 
+    1. Aging di Hitung dari tanggal Reciving sampai Tanggal Unboxing Jika Belum Unboxing Pakai Today
+    2. Paket Agging < 14 Hari ( Warna Hijau ) ( Klaim Or Belum Klaim)
+    3. Paket Agging > 14 Hari ( Warna Merah ) ( KLaim Or Belum Klaim)
+    4. Sort Data table By Date FiFo 
+5. Update Kualitas Video Unboxing
+6. Check Harga total yang di sync dari OCS jangan Per No resi Takut salah Ambil Harga

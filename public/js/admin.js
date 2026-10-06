@@ -10,6 +10,33 @@ function escapeHtml(str) {
 }
 window.escapeHtml = escapeHtml;
 
+// Helper Normalisasi URL Media (Foto & Video) agar selalu merujuk path root aplikasi
+window.normalizeMediaUrl = function(url) {
+    if (!url || typeof url !== 'string') return '';
+    url = url.trim();
+    if (url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('http://') || url.startsWith('https://')) {
+        return url;
+    }
+    // Hapus duplikasi prefix routing URL clean (admin/, dossier/, dll)
+    url = url.replace(/^(\/?(admin|dossier|claim_dossier|scanner|menu|reception|orders|claims|transactions)\/)+/i, '');
+    url = url.replace(/^(\.\.\/|\.\/|\/)+/, '');
+    
+    // Gunakan base href dokumen jika tersedia
+    const baseEl = document.querySelector('base');
+    if (baseEl && baseEl.href) {
+        try {
+            return new URL(url, baseEl.href).href;
+        } catch (e) {}
+    }
+    
+    if (window.APP_BASE_URL) {
+        const b = window.APP_BASE_URL.endsWith('/') ? window.APP_BASE_URL : (window.APP_BASE_URL + '/');
+        return b + url;
+    }
+    
+    return '/' + url;
+};
+
 // Helper Tanggal Sekarang (YYYY-MM-DD)
 function getTodayYMD() {
     const d = new Date();
@@ -926,7 +953,7 @@ function createTransactionRow(r, isPreview = false) {
                 <button type="button" onclick="playTransactionVideo(${r.session_id || r.id})" title="Putar Video Unboxing" class="bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition inline-flex items-center gap-1 shadow-sm shadow-indigo-600/30">
                     <i class="fa-solid fa-play text-[10px]"></i> Play
                 </button>
-                <a href="${r.video_path}" download="${r.invoice_number || 'inbound'}_unboxing.webm" title="Unduh File Video" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-1.5 rounded-xl font-bold text-[11px] transition inline-flex items-center gap-1 shadow-2xs">
+                <a href="${normalizeMediaUrl(r.video_path)}" download="${r.invoice_number || 'inbound'}_unboxing.webm" title="Unduh File Video" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-1.5 rounded-xl font-bold text-[11px] transition inline-flex items-center gap-1 shadow-2xs">
                     <i class="fa-solid fa-download text-[10px]"></i>
                 </a>
             </div>
@@ -1394,14 +1421,15 @@ window.viewDetails = async function (id, focusCondition) {
     const wmOverlay = document.getElementById('modalVideoWatermark');
 
     if (r.video_path && r.video_path.trim() !== '') {
-        videoPlayer.src = r.video_path;
+        const normVid = normalizeMediaUrl(r.video_path);
+        videoPlayer.src = normVid;
         videoPlayer.classList.remove('hidden');
         noVideoNotice.classList.add('hidden');
         if (wmOverlay) wmOverlay.classList.remove('hidden');
         videoBadge.className = "text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200";
         videoBadge.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-500"></i> Rekaman Tersedia`;
         videoFilename.innerText = r.video_path.split('/').pop();
-        downloadBtn.href = r.video_path;
+        downloadBtn.href = normVid;
         downloadBtn.download = `${r.invoice_number || 'inbound'}_unboxing.webm`;
         downloadBtn.classList.remove('hidden');
         videoPlayer.load();
@@ -1422,7 +1450,7 @@ window.viewDetails = async function (id, focusCondition) {
     const photosGrid = document.getElementById('modalPhotosGrid');
     const photoCount = document.getElementById('modalPhotoCount');
 
-    // Kumpulkan semua foto: photos (JSON array), package_photo, product_photo
+    // Kumpulkan semua foto: photos (JSON array), package_photo, product_photo, item_photo
     const allPhotos = [];
     const seenUrls = new Set();
     const isSessionDamaged = (parseInt(r.total_damaged, 10) > 0 || (condCode && condCode !== 'GOOD' && condCode !== 'BAGUS'));
@@ -1465,7 +1493,18 @@ window.viewDetails = async function (id, focusCondition) {
         }
     }
 
-    // 2. Fallback Foto Paket jika belum tercakup
+    // 2. Fallback Foto Item Spesifik jika ada
+    if (r.item_photo && r.item_photo.trim()) {
+        const isDmgItem = (condCode !== 'GOOD');
+        addPhotoUnique({
+            url: r.item_photo.trim(),
+            label: isDmgItem ? `⚠️ Foto Barang Rusak: ${r.product_name || r.barcode}` : `Foto Produk: ${r.product_name || r.barcode}`,
+            type: isDmgItem ? 'damaged' : 'product',
+            isDamaged: isDmgItem
+        });
+    }
+
+    // 3. Fallback Foto Paket jika belum tercakup
     if (r.package_photo && r.package_photo.trim()) {
         const hasPkg = allPhotos.some(p => p.type === 'PAKET');
         if (!hasPkg) {
@@ -1473,7 +1512,7 @@ window.viewDetails = async function (id, focusCondition) {
         }
     }
 
-    // 3. Fallback Foto Produk jika belum ada foto produk sama sekali
+    // 4. Fallback Foto Produk jika belum ada foto produk sama sekali
     if (r.product_photo && r.product_photo.trim()) {
         const hasProdOrDmg = allPhotos.some(p => p.type !== 'PAKET');
         if (!hasProdOrDmg) {
@@ -1509,6 +1548,7 @@ window.viewDetails = async function (id, focusCondition) {
             const isDamagedPhoto = photo.isDamaged || (photo.type || '').toLowerCase() === 'damaged' || ((photo.type || '').toUpperCase() === condCode && condCode !== 'GOOD');
             const imgWrap = document.createElement('div');
             imgWrap.className = `relative group cursor-pointer rounded-xl overflow-hidden border ${isDamagedPhoto ? 'border-rose-500 ring-2 ring-rose-400' : 'border-slate-200'} bg-slate-100 aspect-square shadow-xs hover:shadow-md transition`;
+            const normPhotoUrl = normalizeMediaUrl(photo.url);
             imgWrap.onclick = () => {
                 const lb = document.getElementById('modalPhotoLightbox');
                 const lbImg = document.getElementById('modalPhotoLightboxImg');
@@ -1516,9 +1556,9 @@ window.viewDetails = async function (id, focusCondition) {
                 const lbTag = document.getElementById('modalPhotoLightboxTag');
                 const lbDl = document.getElementById('modalPhotoLightboxDownload');
                 if (lb && lbImg) {
-                    lbImg.src = photo.url;
+                    lbImg.src = normPhotoUrl;
                     if (lbDl) {
-                        lbDl.href = photo.url;
+                        lbDl.href = normPhotoUrl;
                         lbDl.setAttribute('download', `unboxing_${r.invoice_number || 'photo'}_${photo.type || 'bukti'}.jpg`);
                     }
                     if (lbTitle) lbTitle.innerText = `${photo.label} • Invoice: ${r.invoice_number || '-'}`;
@@ -1533,9 +1573,9 @@ window.viewDetails = async function (id, focusCondition) {
                 }
             };
             imgWrap.innerHTML = `
-                <img src="${photo.url}" alt="${photo.label}" loading="lazy"
+                <img src="${normPhotoUrl}" alt="${photo.label}" loading="lazy"
                     class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                    onerror="this.parentElement.innerHTML='<div class=\\'flex flex-col items-center justify-center h-full text-slate-400 text-[10px] p-2 text-center\\'><i class=\\'fa-solid fa-image-slash text-2xl mb-1\\'></i>Foto tidak ditemukan</div>'">
+                    onerror="this.onerror=null; this.src='assets/image/no-photo.svg'; this.classList.add('p-3', 'opacity-60');">
                 <div class="absolute bottom-0 left-0 right-0 ${isDamagedPhoto ? 'bg-rose-950/80 text-rose-100' : 'bg-black/60 text-white'} text-[9px] font-semibold px-2 py-1 flex items-center justify-between transition truncate">
                     <span class="truncate">${photo.label}</span>
                     <span class="${isDamagedPhoto ? 'bg-rose-600' : 'bg-indigo-600/80'} px-1.5 py-0.5 rounded text-[8px] shrink-0 font-mono font-bold">${isDamagedPhoto ? 'RUSAK' : (photo.type || 'FOTO')}</span>
