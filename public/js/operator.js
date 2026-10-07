@@ -2845,6 +2845,7 @@ function generateWatermarkedPhoto({ badgeText, badgeColor = '#4f46e5', fields = 
         width = MAX_W;
     }
 
+    const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
