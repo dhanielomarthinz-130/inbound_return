@@ -32,6 +32,14 @@ function verifySyncSecretKey($secretKey) {
     }
 }
 
+// Auto-migration kolom video_path pada jnt_claim_approvals
+try {
+    $colCheck = $pdo->query("SHOW COLUMNS FROM jnt_claim_approvals LIKE 'video_path'")->fetch();
+    if (!$colCheck) {
+        $pdo->exec("ALTER TABLE jnt_claim_approvals ADD COLUMN video_path VARCHAR(255) NULL AFTER items_summary");
+    }
+} catch (Exception $eCol) {}
+
 // -------------------------------------------------------------
 // 1. RECEIVE_FROM_LOCAL: Terima data tabel klaim JNT dari Localhost
 // -------------------------------------------------------------
@@ -52,11 +60,11 @@ if ($action === 'receive_from_local') {
         $stmtUpsert = $pdo->prepare("
             INSERT INTO jnt_claim_approvals (
                 invoice_number, order_id, expedition, unboxing_date, operator_name,
-                customer_name, damaged_reason, items_summary, total_claim_amount,
+                customer_name, damaged_reason, items_summary, video_path, total_claim_amount,
                 total_claim_amount_fmt, status
             ) VALUES (
                 ?, ?, ?, ?, ?,
-                ?, ?, ?, ?,
+                ?, ?, ?, ?, ?,
                 ?, 'PENDING'
             ) ON DUPLICATE KEY UPDATE
                 order_id = VALUES(order_id),
@@ -66,6 +74,7 @@ if ($action === 'receive_from_local') {
                 customer_name = VALUES(customer_name),
                 damaged_reason = VALUES(damaged_reason),
                 items_summary = VALUES(items_summary),
+                video_path = COALESCE(VALUES(video_path), video_path),
                 total_claim_amount = VALUES(total_claim_amount),
                 total_claim_amount_fmt = VALUES(total_claim_amount_fmt),
                 updated_at = NOW()
@@ -87,6 +96,7 @@ if ($action === 'receive_from_local') {
                 $it['customer_name'] ?? 'Pelanggan Umum',
                 $it['damaged_reason'] ?? 'Rusak Unboxing',
                 $it['items_summary'] ?? '-',
+                !empty($it['video_path']) ? $it['video_path'] : null,
                 $totalAmt,
                 $totalFmt
             ]);
@@ -122,12 +132,12 @@ if ($action === 'list_for_accounting') {
         $params = [];
 
         if ($filterStatus !== 'ALL' && in_array($filterStatus, ['PENDING', 'APPROVED', 'REJECTED'])) {
-            $where[] = "status = ?";
+            $where[] = "j.status = ?";
             $params[] = $filterStatus;
         }
 
         if (!empty($search)) {
-            $where[] = "(invoice_number LIKE ? OR order_id LIKE ? OR items_summary LIKE ? OR operator_name LIKE ?)";
+            $where[] = "(j.invoice_number LIKE ? OR j.order_id LIKE ? OR j.items_summary LIKE ? OR j.operator_name LIKE ?)";
             $params[] = "%{$search}%";
             $params[] = "%{$search}%";
             $params[] = "%{$search}%";
@@ -149,7 +159,14 @@ if ($action === 'list_for_accounting') {
         ");
         $stats = $statStmt->fetch(PDO::FETCH_ASSOC);
 
-        $listStmt = $pdo->prepare("SELECT * FROM jnt_claim_approvals {$whereSql} ORDER BY id DESC LIMIT 500");
+        $listStmt = $pdo->prepare("
+            SELECT j.*, COALESCE(j.video_path, rs.video_path) AS video_path
+            FROM jnt_claim_approvals j
+            LEFT JOIN return_sessions rs ON rs.invoice_number = j.invoice_number
+            {$whereSql}
+            ORDER BY j.id DESC
+            LIMIT 500
+        ");
         $listStmt->execute($params);
         $rows = $listStmt->fetchAll(PDO::FETCH_ASSOC);
 

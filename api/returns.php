@@ -393,7 +393,7 @@ if (empty($productPhoto) && !empty($body['product_photo'])) {
 
 $photosJson = count($photosArr) > 0 ? json_encode($photosArr, JSON_UNESCAPED_SLASHES) : null;
 
-// 2. Cek apakah ada file video yang di-upload via $_FILES
+// 2. Cek apakah ada file video yang di-upload via $_FILES (WAJIB ADA)
 $videoPath = null;
 $videoStatus = 'no_video';
 if (isset($_FILES['video'])) {
@@ -414,11 +414,21 @@ if (isset($_FILES['video'])) {
         } else {
             $videoStatus = 'move_error';
             error_log("Failed to move uploaded video file to " . $targetFile);
+            jsonResponse(['error' => 'Gagal memindahkan file rekaman video unboxing ke folder server uploads/videos/.'], 500);
         }
     } else {
         $videoStatus = 'upload_err_' . $_FILES['video']['error'];
         error_log("Video upload failed with PHP error code: " . $_FILES['video']['error']);
+        jsonResponse(['error' => 'Gagal mengunggah file rekaman video unboxing (Kode Error PHP: ' . $_FILES['video']['error'] . '). Video unboxing WAJIB ada.'], 400);
     }
+}
+
+// VALIDASI WAJIB: Sesi Inbound Unboxing TIDAK BOLEH disimpan tanpa file video unboxing
+if (empty($videoPath) || !file_exists(__DIR__ . '/../' . $videoPath) || filesize(__DIR__ . '/../' . $videoPath) < 1000) {
+    jsonResponse([
+        'error' => 'Rekaman video unboxing WAJIB ada dan valid! Pastikan webcam/kamera menyala dan merekam proses unboxing sebelum menyelesaikan sesi.',
+        'video_status' => $videoStatus
+    ], 400);
 }
 
 if (empty($invoiceNumber) || empty($items) || !is_array($items)) {
@@ -539,8 +549,11 @@ try {
         $wrongBarcode = trim($item['wrong_barcode'] ?? '');
         $wrongProductName = trim($item['wrong_product_name'] ?? '');
 
-        if (!empty($wrongBarcode)) {
-            $wrongInfo = "[SALAH KIRIM] Fisik: " . ($wrongProductName ?: $wrongBarcode) . " (Barcode: {$wrongBarcode})";
+        if (!empty($wrongBarcode) || !empty($wrongProductName)) {
+            $hasRealWrongBcode = (!empty($wrongBarcode) && $wrongBarcode !== '-');
+            $wrongDesc = !empty($wrongProductName) ? $wrongProductName : ($hasRealWrongBcode ? $wrongBarcode : 'Barang Salah Kirim');
+            $bPart = $hasRealWrongBcode ? " (Barcode: {$wrongBarcode})" : "";
+            $wrongInfo = "[SALAH KIRIM] Fisik: {$wrongDesc}{$bPart}";
             if (empty($reason)) {
                 $reason = $wrongInfo;
             } elseif (strpos($reason, '[SALAH KIRIM]') === false) {

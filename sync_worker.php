@@ -184,6 +184,12 @@ function downloadCloudPhoto($cloudUrl, $relPath) {
  * Eksekutor 1 Putaran Sinkronisasi
  */
 function executeSyncRound($pdo) {
+    if (!$pdo) {
+        $errMsg = "Database MySQL Localhost tidak terhubung. Pastikan service MySQL/MariaDB di XAMPP atau Laragon sudah dijalankan.";
+        writeSyncLog("Error: $errMsg");
+        return ['success' => false, 'error' => $errMsg];
+    }
+
     $cloudUrl = defined('CLOUD_BASE_URL') ? rtrim(CLOUD_BASE_URL, '/') : 'http://localhost/retrun.inboud';
     $secretKey = defined('SYNC_SECRET_KEY') ? SYNC_SECRET_KEY : 'IEG_RETURN_SYNC_TOKEN_2026_X99A';
 
@@ -631,8 +637,11 @@ function executeSyncRound($pdo) {
 // EKSEKUSI
 // -------------------------------------------------------------
 if ($isDaemon) {
+    @set_time_limit(0);
+    @ini_set('max_execution_time', '0');
     writeSyncLog("Memulai IEG Auto-Sync Daemon di PC Localhost (Interval: 30 detik)... Tekan Ctrl+C untuk berhenti.");
     while (true) {
+        @set_time_limit(0);
         try {
             $result = executeSyncRound($pdo);
             if (!empty($result['synced_returns']) || !empty($result['synced_receptions'])) {

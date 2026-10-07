@@ -116,7 +116,7 @@ if ($action === 'send_to_cloud') {
         $stmtSessions = $pdo->prepare("
             SELECT rs.id, rs.invoice_number, rs.expedition, rs.operator_name, rs.customer_name,
                    rs.status, rs.claim_status, rs.accounting_status, rs.total_items, rs.total_damaged,
-                   rs.notes, rs.created_at
+                   rs.video_path, rs.notes, rs.created_at
             FROM return_sessions rs
             WHERE rs.invoice_number IN ($ph)
               AND (rs.expedition LIKE '%JNT%' OR rs.expedition LIKE '%J&T%')
@@ -215,7 +215,8 @@ if ($action === 'send_to_cloud') {
                 'damaged_reason'         => $dmgReasonText,
                 'items_summary'          => $itemsSummary,
                 'total_claim_amount'     => $totalClaimAmount,
-                'total_claim_amount_fmt' => 'Rp ' . number_format($totalClaimAmount, 0, ',', '.')
+                'total_claim_amount_fmt' => 'Rp ' . number_format($totalClaimAmount, 0, ',', '.'),
+                'video_path'             => $s['video_path'] ?? null
             ];
 
             $validInvoices[] = $inv;

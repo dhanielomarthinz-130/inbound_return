@@ -409,6 +409,7 @@ const inputType = document.getElementById('inputType');
 const inputWrongBarcode = document.getElementById('inputWrongBarcode');
 let currentWrongProduct = null;
 let wrongBarcodeDebounceTimer = null;
+let isManualWrongMode = false;
 
 // Helper deteksi kondisi Salah Kirim (SALAH_KIRIM, WRONG, dll)
 function isWrongItemCondition(val) {
@@ -417,28 +418,109 @@ function isWrongItemCondition(val) {
     return s === 'SALAH_KIRIM' || s === 'WRONG' || s.includes('SALAH') || s.includes('WRONG');
 }
 
-// Handler perubahan tipe kondisi untuk menampilkan input barcode salah kirim
+// Sinkronisasi tampilan antara Mode Scan Barcode vs Mode Input Keterangan Manual
+window.syncWrongProductInputMode = function() {
+    const barcodeVal = inputBarcode ? inputBarcode.value.trim() : '';
+    const isMainBarcodeDash = (barcodeVal === '-' || (currentDetectedProduct && currentDetectedProduct.barcode === '-'));
+    
+    // Jika barcode utama adalah '-', PAKSA mode manual Keterangan!
+    if (isMainBarcodeDash) {
+        isManualWrongMode = true;
+    }
+
+    const wrapperBarcode = document.getElementById('wrapperWrongBarcode');
+    const wrapperKeterangan = document.getElementById('wrapperWrongKeterangan');
+    const titleEl = document.getElementById('wrongSectionTitle');
+    const subtitleEl = document.getElementById('wrongSectionSubtitle');
+    const badgeEl = document.getElementById('wrongSectionBadge');
+    const iconEl = document.getElementById('wrongSectionIcon');
+    const btnToggle = document.getElementById('btnToggleWrongMode');
+    const labelToggle = document.getElementById('labelToggleWrongMode');
+    const detailBox = document.getElementById('detailProductSalahBox');
+
+    if (isManualWrongMode) {
+        // TAMPILKAN KOLOM KETERANGAN MANUAL, JANGAN TAMPILKAN KOLOM BARCODE!
+        if (wrapperBarcode) wrapperBarcode.classList.add('hidden');
+        if (wrapperKeterangan) wrapperKeterangan.classList.remove('hidden');
+        if (detailBox) detailBox.classList.add('hidden');
+
+        if (titleEl) titleEl.innerText = 'Keterangan / Input Barang Salah (Manual)';
+        if (subtitleEl) subtitleEl.innerText = 'Ketik manual nama barang yang salah atau keterangan alasan retur';
+        if (badgeEl) {
+            badgeEl.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs';
+            badgeEl.innerHTML = '<i class="fa-solid fa-pen-to-square text-amber-600"></i> Input Manual';
+        }
+        if (iconEl) iconEl.className = 'fa-solid fa-pen-to-square';
+        if (labelToggle) labelToggle.innerText = isMainBarcodeDash ? 'Mode Keterangan' : 'Scan Barcode';
+        if (btnToggle) {
+            btnToggle.style.display = isMainBarcodeDash ? 'none' : 'inline-flex';
+        }
+    } else {
+        // TAMPILKAN KOLOM SCAN BARCODE FISIK
+        if (wrapperBarcode) wrapperBarcode.classList.remove('hidden');
+        if (wrapperKeterangan) wrapperKeterangan.classList.add('hidden');
+
+        if (titleEl) titleEl.innerText = 'Scan Barcode Fisik Salah Kirim';
+        if (subtitleEl) subtitleEl.innerText = 'Scan barcode produk fisik yang salah dikirimkan (yang diterima)';
+        if (badgeEl) {
+            badgeEl.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-200/90 text-purple-900 border border-purple-300 flex items-center gap-1 shadow-2xs';
+            badgeEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-amber-600"></i> Fisik Salah';
+        }
+        if (iconEl) iconEl.className = 'fa-solid fa-arrows-split-up-and-left';
+        if (labelToggle) labelToggle.innerText = 'Input Manual';
+        if (btnToggle) btnToggle.style.display = 'inline-flex';
+    }
+};
+
+window.toggleWrongProductInputMode = function() {
+    isManualWrongMode = !isManualWrongMode;
+    syncWrongProductInputMode();
+    if (isManualWrongMode) {
+        const ketInp = document.getElementById('inputWrongKeterangan');
+        if (ketInp) {
+            ketInp.focus();
+            ketInp.select();
+        }
+    } else {
+        const bInp = document.getElementById('inputWrongBarcode');
+        if (bInp) {
+            bInp.focus();
+            bInp.select();
+        }
+    }
+};
+
+// Handler perubahan tipe kondisi untuk menampilkan input barcode atau keterangan salah kirim
 function handleConditionChange() {
     updateDamagedPhotoBanner();
     const typeVal = inputType ? inputType.value : '';
     const isWrong = isWrongItemCondition(typeVal);
+    const barcodeVal = inputBarcode ? inputBarcode.value.trim() : '';
+    const isMainBarcodeDash = (barcodeVal === '-' || (currentDetectedProduct && currentDetectedProduct.barcode === '-'));
     
     const container = document.getElementById('containerWrongProductSection');
     if (container) {
-        if (isWrong) {
+        if (isWrong || (isMainBarcodeDash && typeVal)) {
             container.classList.remove('hidden');
+            syncWrongProductInputMode();
             setTimeout(() => {
-                const wrongInp = document.getElementById('inputWrongBarcode');
-                if (wrongInp) {
-                    wrongInp.focus();
-                    if (wrongInp.value.trim() && !currentWrongProduct) {
-                        lookupWrongProduct(wrongInp.value.trim());
+                if (isManualWrongMode || isMainBarcodeDash) {
+                    const ketInp = document.getElementById('inputWrongKeterangan');
+                    if (ketInp) ketInp.focus();
+                } else {
+                    const wrongInp = document.getElementById('inputWrongBarcode');
+                    if (wrongInp) {
+                        wrongInp.focus();
+                        if (wrongInp.value.trim() && !currentWrongProduct) {
+                            lookupWrongProduct(wrongInp.value.trim());
+                        }
                     }
                 }
             }, 60);
         } else {
             container.classList.add('hidden');
             clearWrongProductInput(false);
+            clearWrongKeteranganInput(false);
         }
     }
 }
@@ -452,6 +534,14 @@ window.clearWrongProductInput = function(focus = true) {
         if (focus) inp.focus();
     }
     clearWrongProductDisplayOnly();
+};
+
+window.clearWrongKeteranganInput = function(focus = true) {
+    const ketInp = document.getElementById('inputWrongKeterangan');
+    if (ketInp) {
+        ketInp.value = '';
+        if (focus) ketInp.focus();
+    }
 };
 
 function clearWrongProductDisplayOnly() {
@@ -588,7 +678,7 @@ async function lookupWrongProduct(barcode) {
     }
 }
 
-// Inisialisasi event listener scan/input barcode salah kirim
+// Inisialisasi event listener scan/input barcode salah kirim & keterangan manual
 setTimeout(() => {
     const wrongInpEl = document.getElementById('inputWrongBarcode');
     if (wrongInpEl) {
@@ -622,6 +712,20 @@ setTimeout(() => {
                         lookupWrongProduct(code);
                     }
                 }, 350);
+            }
+        });
+    }
+
+    const wrongKetEl = document.getElementById('inputWrongKeterangan');
+    if (wrongKetEl) {
+        wrongKetEl.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const btnAdd = document.getElementById('btnSubmitItem');
+                if (btnAdd) {
+                    btnAdd.focus();
+                    btnAdd.click();
+                }
             }
         });
     }
@@ -660,12 +764,19 @@ inputBarcode.addEventListener('input', () => {
         const skuEl = document.getElementById('detectedProductSku');
         if (skuEl) skuEl.innerText = "";
         if (typeof updatePhotoButtonsState === 'function') updatePhotoButtonsState();
+        if (typeof syncWrongProductInputMode === 'function') syncWrongProductInputMode();
         return;
     }
     // Langsung deteksi tanda '-' tanpa harus tunggu Enter!
     if (code === '-') {
         lookupProduct(code);
+        if (typeof syncWrongProductInputMode === 'function') syncWrongProductInputMode();
         return;
+    }
+    // Jika berubah dari '-' ke kode barcode biasa
+    if (isManualWrongMode && code !== '-') {
+        isManualWrongMode = false;
+        if (typeof syncWrongProductInputMode === 'function') syncWrongProductInputMode();
     }
     if (code.length >= 6) {
         barcodeDebounceTimer = setTimeout(() => {
@@ -939,11 +1050,23 @@ inputQty.addEventListener('keypress', (e) => {
 inputType.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         e.preventDefault();
-        if (isWrongItemCondition(inputType.value)) {
-            const wrongInp = document.getElementById('inputWrongBarcode');
-            if (wrongInp && (!wrongInp.value.trim() || !currentWrongProduct)) {
-                wrongInp.focus();
-                return;
+        const barcodeVal = inputBarcode ? inputBarcode.value.trim() : '';
+        const isMainBarcodeDash = (barcodeVal === '-' || (currentDetectedProduct && currentDetectedProduct.barcode === '-'));
+        const isWrong = isWrongItemCondition(inputType.value);
+
+        if (isWrong || isMainBarcodeDash) {
+            if (isManualWrongMode || isMainBarcodeDash) {
+                const ketInp = document.getElementById('inputWrongKeterangan');
+                if (ketInp && !ketInp.value.trim()) {
+                    ketInp.focus();
+                    return;
+                }
+            } else {
+                const wrongInp = document.getElementById('inputWrongBarcode');
+                if (wrongInp && (!wrongInp.value.trim() || !currentWrongProduct)) {
+                    wrongInp.focus();
+                    return;
+                }
             }
         }
         const btnAdd = document.getElementById('btnSubmitItem');
@@ -1053,6 +1176,9 @@ function updateVirtualEnterBadge(fieldId) {
     currentActiveFieldId = fieldId;
     const labelEl = document.getElementById('virtualEnterTargetLabel');
     if (!labelEl) return;
+    const barcodeVal = inputBarcode ? inputBarcode.value.trim() : '';
+    const isMainBarcodeDash = (barcodeVal === '-' || (currentDetectedProduct && currentDetectedProduct.barcode === '-'));
+
     if (fieldId === 'inputBarcode') {
         labelEl.innerText = 'Lanjut ke No. Batch ➔';
     } else if (fieldId === 'inputBatch') {
@@ -1062,17 +1188,17 @@ function updateVirtualEnterBadge(fieldId) {
     } else if (fieldId === 'inputQty') {
         labelEl.innerText = 'Lanjut ke Type ➔';
     } else if (fieldId === 'inputType') {
-        if (isWrongItemCondition(inputType?.value)) {
-            labelEl.innerText = 'Lanjut ke Barcode Salah ➔';
+        if (isWrongItemCondition(inputType?.value) || isMainBarcodeDash) {
+            labelEl.innerText = (isManualWrongMode || isMainBarcodeDash) ? 'Lanjut ke Keterangan ➔' : 'Lanjut ke Barcode Salah ➔';
         } else {
             labelEl.innerText = 'Submit Tambah Item ✓';
         }
-    } else if (fieldId === 'inputWrongBarcode') {
+    } else if (fieldId === 'inputWrongBarcode' || fieldId === 'inputWrongKeterangan') {
         labelEl.innerText = 'Submit Tambah Item ✓';
     }
 }
 
-['inputBarcode', 'inputBatch', 'inputExpDate', 'inputQty', 'inputType', 'inputWrongBarcode'].forEach(id => {
+['inputBarcode', 'inputBatch', 'inputExpDate', 'inputQty', 'inputType', 'inputWrongBarcode', 'inputWrongKeterangan'].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
         el.addEventListener('focus', () => updateVirtualEnterBadge(id));
@@ -1677,15 +1803,23 @@ function commitAddItem() {
     let wrongProductNameVal = '';
     let wrongSkuVal = '';
 
-    if (isWrong) {
-        const wrongInput = document.getElementById('inputWrongBarcode');
-        const enteredWrongBarcode = wrongInput ? wrongInput.value.trim() : '';
-        const isCurrentUnknown = Boolean(currentDetectedProduct && (currentDetectedProduct.barcode === '-' || currentDetectedProduct.is_unknown));
+    const isCurrentUnknown = Boolean(currentDetectedProduct && (currentDetectedProduct.barcode === '-' || currentDetectedProduct.is_unknown));
+    const ketInput = document.getElementById('inputWrongKeterangan');
+    const enteredKeterangan = ketInput ? ketInput.value.trim() : '';
+    const wrongInput = document.getElementById('inputWrongBarcode');
+    const enteredWrongBarcode = wrongInput ? wrongInput.value.trim() : '';
 
-        if (!enteredWrongBarcode && (!currentWrongProduct || !currentWrongProduct.barcode)) {
-            if (!isCurrentUnknown) {
+    if (isWrong || isCurrentUnknown) {
+        if (isManualWrongMode || isCurrentUnknown || enteredKeterangan) {
+            // Mode Manual Keterangan (termasuk saat barcode utama adalah '-')
+            wrongBarcodeVal = '-';
+            wrongProductNameVal = enteredKeterangan || (isCurrentUnknown ? 'Produk Fisik Tanpa Barcode (Salah Return)' : 'Barang Salah Kirim');
+            wrongSkuVal = '-';
+        } else {
+            // Mode Scan Barcode Fisik
+            if (!enteredWrongBarcode && (!currentWrongProduct || !currentWrongProduct.barcode)) {
                 playBeep('error');
-                showToast('warning', "Untuk kondisi Salah Kirim, WAJIB scan barcode fisik produk yang salah!", "Barcode Salah Kirim Diperlukan");
+                showToast('warning', "Untuk kondisi Salah Kirim, silakan scan barcode atau ketik keterangan manual!", "Barcode / Keterangan Diperlukan");
                 const containerWrong = document.getElementById('containerWrongProductSection');
                 if (containerWrong) containerWrong.classList.remove('hidden');
                 if (wrongInput) {
@@ -1693,20 +1827,16 @@ function commitAddItem() {
                     wrongInput.select();
                 }
                 return;
+            } else if (enteredWrongBarcode && (!currentWrongProduct || currentWrongProduct.barcode !== enteredWrongBarcode)) {
+                lookupWrongProduct(enteredWrongBarcode).then(() => {
+                    commitAddItem();
+                });
+                return;
             } else {
-                wrongBarcodeVal = '-';
-                wrongProductNameVal = 'Produk Fisik Tanpa Barcode (Salah Return)';
-                wrongSkuVal = '-';
+                wrongBarcodeVal = currentWrongProduct ? currentWrongProduct.barcode : enteredWrongBarcode;
+                wrongProductNameVal = currentWrongProduct ? currentWrongProduct.name : '';
+                wrongSkuVal = currentWrongProduct ? (currentWrongProduct.seller_sku || currentWrongProduct.sku || '') : '';
             }
-        } else if (enteredWrongBarcode && (!currentWrongProduct || currentWrongProduct.barcode !== enteredWrongBarcode)) {
-            lookupWrongProduct(enteredWrongBarcode).then(() => {
-                commitAddItem();
-            });
-            return;
-        } else {
-            wrongBarcodeVal = currentWrongProduct ? currentWrongProduct.barcode : enteredWrongBarcode;
-            wrongProductNameVal = currentWrongProduct ? currentWrongProduct.name : '';
-            wrongSkuVal = currentWrongProduct ? (currentWrongProduct.seller_sku || currentWrongProduct.sku || '') : '';
         }
     }
 
@@ -1721,12 +1851,17 @@ function commitAddItem() {
 
     const itemPhoto = isItemDamaged ? currentActiveDamagedPhoto : null;
 
+    let finalProdName = currentDetectedProduct.name;
+    if (isCurrentUnknown && wrongProductNameVal && wrongProductNameVal !== 'Produk Fisik Tanpa Barcode (Salah Return)') {
+        finalProdName = `[Salah Return] ${wrongProductNameVal}`;
+    }
+
     scannedProductsList.push({
         barcode: currentDetectedProduct.barcode,
         wrong_barcode: wrongBarcodeVal,
         wrong_product_name: wrongProductNameVal,
         wrong_sku: wrongSkuVal,
-        product_name: currentDetectedProduct.name,
+        product_name: finalProdName,
         sku: currentDetectedProduct.sku,
         seller_sku: currentDetectedProduct.seller_sku || currentDetectedProduct.sku || '-',
         sap_code: currentDetectedProduct.sap_code || '-',
@@ -1737,6 +1872,8 @@ function commitAddItem() {
         qty: qty,
         type: type,
         condition: isItemDamaged ? 'RUSAK' : 'GOOD',
+        damage_reason: wrongProductNameVal || type,
+        notes: wrongProductNameVal,
         photo: itemPhoto,
         photo_path: itemPhoto
     });
@@ -1802,6 +1939,9 @@ function resetProductInputs() {
     updateDamagedPhotoBanner();
     currentDetectedProduct = null;
     clearWrongProductInput(false);
+    clearWrongKeteranganInput(false);
+    isManualWrongMode = false;
+    if (typeof syncWrongProductInputMode === 'function') syncWrongProductInputMode();
     const containerWrong = document.getElementById('containerWrongProductSection');
     if (containerWrong) containerWrong.classList.add('hidden');
     inputBarcode.value = '';
@@ -1900,14 +2040,15 @@ function renderItemsTable() {
         }
 
         let wrongInfoHtml = '';
-        if (item.wrong_barcode) {
+        if (item.wrong_product_name || (item.wrong_barcode && item.wrong_barcode !== '-')) {
+            const hasRealBarcode = Boolean(item.wrong_barcode && item.wrong_barcode !== '-');
             wrongInfoHtml = `
                 <div class="mt-1 px-2 py-1 bg-purple-50 border border-purple-200 rounded text-[10px] text-purple-900 leading-snug">
                     <div class="font-bold flex items-center gap-1 text-purple-800">
-                        <i class="fa-solid fa-arrows-split-up-and-left text-purple-600"></i> Fisik Salah Kirim:
+                        <i class="fa-solid ${hasRealBarcode ? 'fa-arrows-split-up-and-left' : 'fa-pen-to-square'} text-purple-600"></i> ${hasRealBarcode ? 'Fisik Salah Kirim:' : 'Keterangan Barang Salah:'}
                     </div>
                     <div class="font-semibold text-slate-800">${escapeHtml(item.wrong_product_name || 'Item Non-Master')}</div>
-                    <div class="font-mono text-[9px] text-purple-700">Barcode: <b class="text-purple-950 font-bold">${escapeHtml(item.wrong_barcode)}</b> ${item.wrong_sku ? '| SKU: ' + escapeHtml(item.wrong_sku) : ''}</div>
+                    ${hasRealBarcode ? `<div class="font-mono text-[9px] text-purple-700">Barcode: <b class="text-purple-950 font-bold">${escapeHtml(item.wrong_barcode)}</b> ${item.wrong_sku ? '| SKU: ' + escapeHtml(item.wrong_sku) : ''}</div>` : ''}
                 </div>
             `;
         }

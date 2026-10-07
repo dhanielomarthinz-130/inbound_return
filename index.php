@@ -634,25 +634,32 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                         </div>
                     </div>
 
-                    <!-- CONTAINER SCAN BARCODE PRODUK SALAH KIRIM (MUNCUL OTOMATIS SAAT TIPE = SALAH KIRIM / WRONG) -->
+                    <!-- CONTAINER SCAN BARCODE PRODUK SALAH KIRIM / INPUT KETERANGAN MANUAL -->
                     <div id="containerWrongProductSection" class="hidden mt-2 p-3 bg-gradient-to-r from-purple-50/95 via-fuchsia-50/70 to-purple-50/95 border-2 border-purple-400 rounded-2xl shadow-sm space-y-2.5 transition-all">
                         <div class="flex items-center justify-between border-b border-purple-200/80 pb-1.5">
                             <div class="flex items-center gap-2">
-                                <span class="w-6 h-6 rounded-lg bg-purple-600 text-white flex items-center justify-center text-xs shadow-xs">
-                                    <i class="fa-solid fa-arrows-split-up-and-left"></i>
+                                <span id="wrongSectionIconWrapper" class="w-6 h-6 rounded-lg bg-purple-600 text-white flex items-center justify-center text-xs shadow-xs">
+                                    <i id="wrongSectionIcon" class="fa-solid fa-arrows-split-up-and-left"></i>
                                 </span>
                                 <div>
-                                    <span class="text-xs font-black text-purple-900 tracking-wide uppercase">Scan Barcode Fisik Salah Kirim</span>
-                                    <p class="text-[10px] text-purple-700 font-medium">Scan barcode produk fisik yang salah dikirimkan (yang diterima)</p>
+                                    <span id="wrongSectionTitle" class="text-xs font-black text-purple-900 tracking-wide uppercase">Scan Barcode Fisik Salah Kirim</span>
+                                    <p id="wrongSectionSubtitle" class="text-[10px] text-purple-700 font-medium">Scan barcode produk fisik yang salah dikirimkan (yang diterima)</p>
                                 </div>
                             </div>
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-200/90 text-purple-900 border border-purple-300 flex items-center gap-1 shadow-2xs">
-                                <i class="fa-solid fa-triangle-exclamation text-amber-600"></i> Fisik Salah
-                            </span>
+                            <div class="flex items-center gap-1.5">
+                                <span id="wrongSectionBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-200/90 text-purple-900 border border-purple-300 flex items-center gap-1 shadow-2xs">
+                                    <i class="fa-solid fa-triangle-exclamation text-amber-600"></i> Fisik Salah
+                                </span>
+                                <button type="button" id="btnToggleWrongMode" onclick="toggleWrongProductInputMode()" 
+                                    class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-white text-purple-700 hover:bg-purple-100 border border-purple-300 flex items-center gap-1 shadow-2xs cursor-pointer transition"
+                                    title="Ganti mode scan barcode atau input keterangan manual">
+                                    <i class="fa-solid fa-keyboard text-purple-600"></i> <span id="labelToggleWrongMode">Input Manual</span>
+                                </button>
+                            </div>
                         </div>
 
-                        <!-- Input Barcode Fisik Salah Kirim -->
-                        <div class="relative">
+                        <!-- Mode 1: Input Barcode Fisik Salah Kirim (Saat Barcode Bukan '-') -->
+                        <div id="wrapperWrongBarcode" class="relative">
                             <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-purple-600">
                                 <i class="fa-solid fa-barcode text-sm"></i>
                             </span>
@@ -664,6 +671,21 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                                     <i class="fa-solid fa-circle-notch"></i>
                                 </div>
                                 <button type="button" id="btnClearWrongBarcode" onclick="clearWrongProductInput(true)" class="text-slate-400 hover:text-rose-500 text-xs px-2 py-1 rounded-lg bg-slate-100 hover:bg-rose-50 transition cursor-pointer font-bold" title="Reset barcode salah">
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Mode 2: Input Keterangan Manual Salah Barang (Aktif Otomatis Saat Barcode '-') -->
+                        <div id="wrapperWrongKeterangan" class="hidden relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-purple-600">
+                                <i class="fa-solid fa-pen-to-square text-sm"></i>
+                            </span>
+                            <input type="text" id="inputWrongKeterangan" autocomplete="off"
+                                placeholder="Ketik manual nama barang yang salah / keterangan di sini... (Enter)"
+                                class="w-full pl-9 pr-12 py-2 bg-white border-2 border-purple-300 focus:border-purple-600 rounded-xl text-xs sm:text-sm font-bold text-slate-900 placeholder:text-purple-400/80 focus:ring-2 focus:ring-purple-500/20 focus:outline-none transition shadow-inner">
+                            <div class="absolute inset-y-0 right-0 pr-2 flex items-center">
+                                <button type="button" onclick="clearWrongKeteranganInput(true)" class="text-slate-400 hover:text-rose-500 text-xs px-2 py-1 rounded-lg bg-slate-100 hover:bg-rose-50 transition cursor-pointer font-bold" title="Bersihkan keterangan">
                                     ✕
                                 </button>
                             </div>

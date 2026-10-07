@@ -518,10 +518,13 @@ try {
     }
 
 } catch (PDOException $e) {
-    if (php_sapi_name() !== 'cli' && basename($_SERVER['PHP_SELF']) !== 'config.php') {
+    $pdo = null;
+    if (php_sapi_name() === 'cli') {
+        fwrite(STDERR, "[DATABASE ERROR] Gagal koneksi ke database MySQL Localhost: " . $e->getMessage() . PHP_EOL);
+    } else if (basename($_SERVER['PHP_SELF']) !== 'config.php') {
         header('Content-Type: application/json; charset=utf-8', true, 500);
         echo json_encode([
-            'error' => 'Gagal koneksi ke database Laragon MySQL: ' . $e->getMessage()
+            'error' => 'Gagal koneksi ke database MySQL: ' . $e->getMessage()
         ]);
         exit;
     }
