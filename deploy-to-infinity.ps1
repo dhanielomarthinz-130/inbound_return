@@ -18,7 +18,12 @@ $remoteDirs = @(
     "assets/js",
     "public",
     "public/css",
-    "public/js"
+    "public/js",
+    "uploads",
+    "uploads/photos",
+    "uploads/videos",
+    "uploads/reception",
+    "uploads/cache"
 )
 
 foreach ($dir in $remoteDirs) {
@@ -26,12 +31,16 @@ foreach ($dir in $remoteDirs) {
     curl.exe -s -u "${ftpUser}:${ftpPass}" --ftp-create-dirs "ftp://${ftpHost}/${remoteBase}/${dir}/" | Out-Null
 }
 
-# 2. Daftar file yang akan diupload
+# 2. Daftar file yang akan diupload (hanya kode aplikasi, kecualikan folder uploads/scratch/tools)
 $files = Get-ChildItem -Recurse -File | Where-Object { 
     $_.FullName -notmatch '\\\.git' -and 
     $_.FullName -notmatch '\\\.github' -and
+    $_.FullName -notmatch '\\uploads\\' -and
+    $_.FullName -notmatch '\\scratch\\' -and
+    $_.FullName -notmatch '\\server-tools\\' -and
     $_.Name -ne 'deploy-to-infinity.ps1' -and
-    $_.Name -ne 'jalankan-server.bat'
+    $_.Name -ne 'jalankan-server.bat' -and
+    $_.Extension -ne '.log'
 }
 
 $total = $files.Count

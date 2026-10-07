@@ -2158,10 +2158,10 @@ function startVideoRecording() {
             }
         }
 
-        // Gunakan bitrate hemat 600 kbps agar file sangat ringan & super cepat diunggah
+        // Gunakan bitrate hemat 250 kbps (15-20 fps) agar video unboxing sangat ringan (<2MB) & upload super cepat ke hosting
         const options = {
             mimeType: mime || 'video/webm',
-            videoBitsPerSecond: 600000
+            videoBitsPerSecond: 250000
         };
 
         try {
@@ -2366,14 +2366,18 @@ window.submitFinalSession = async function() {
         items: optimizedItems
     };
 
-    showGlobalLoading(
-        'Menyimpan Transaksi...',
-        'Mempersiapkan data dan rekaman video...'
-    );
+    const payloadJson = JSON.stringify(payload);
+    const jsonSizeKb = Math.round(new Blob([payloadJson]).size / 1024);
+    const videoSizeMb = (videoBlob && videoBlob.size > 0) ? (videoBlob.size / (1024 * 1024)).toFixed(1) : null;
+    const initialDesc = videoSizeMb 
+        ? `Menyiapkan ${jsonSizeKb} KB data & ${videoSizeMb} MB video unboxing...`
+        : `Menyiapkan ${jsonSizeKb} KB data unboxing...`;
+
+    showGlobalLoading('Menyimpan Transaksi...', initialDesc);
 
     try {
         const formData = new FormData();
-        formData.append('data', JSON.stringify(payload));
+        formData.append('data', payloadJson);
         if (videoBlob && videoBlob.size > 0) {
             formData.append('video', videoBlob, `video_${savedInv}.webm`);
         }
@@ -2390,7 +2394,7 @@ window.submitFinalSession = async function() {
                     const loadedMb = (e.loaded / (1024 * 1024)).toFixed(1);
                     updateGlobalLoadingProgress(
                         `Mengunggah Video & Data (${percent}%)`,
-                        `Terkirim ${loadedMb} MB dari ${totalMb} MB...`,
+                        `Terkirim ${loadedMb} MB dari ${totalMb} MB... Mohon tunggu.`,
                         percent
                     );
                 }
@@ -2569,8 +2573,8 @@ async function startCamera(deviceId = null) {
         try {
             const constraints = {
                 video: deviceId 
-                    ? { deviceId: { exact: deviceId } } 
-                    : { facingMode: { ideal: "environment" }, width: { ideal: 1280 } },
+                    ? { deviceId: { exact: deviceId }, width: { ideal: 1280, max: 1280 }, height: { ideal: 720, max: 720 }, frameRate: { ideal: 20, max: 24 } } 
+                    : { facingMode: { ideal: "environment" }, width: { ideal: 1280, max: 1280 }, height: { ideal: 720, max: 720 }, frameRate: { ideal: 20, max: 24 } },
                 audio: false
             };
             stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -2578,7 +2582,7 @@ async function startCamera(deviceId = null) {
             console.warn("Gagal constraint spesifik, fallback ke video standar:", specErr);
             // Upaya 2: Fallback ke parameter paling dasar (cocok untuk semua jenis USB webcam)
             stream = await navigator.mediaDevices.getUserMedia({
-                video: deviceId ? { deviceId: deviceId } : true,
+                video: deviceId ? { deviceId: deviceId, frameRate: { ideal: 20, max: 24 } } : { frameRate: { ideal: 20, max: 24 } },
                 audio: false
             });
         }
