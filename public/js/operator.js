@@ -9,20 +9,43 @@ let capturedPackagePhoto = null;
 let capturedProductPhoto = null;
 let capturedPhotosList = [];
 
-// Global Loading Overlay Controls (Bola-bola Merah, Kuning, Hijau)
+// Global Loading Overlay Controls (Bola-bola Merah, Kuning, Hijau & Progress Bar)
 window.showGlobalLoading = function(title = 'Memproses...', desc = 'Mohon tunggu sebentar.') {
     const el = document.getElementById('globalLoadingOverlay');
     if (!el) return;
     const t = document.getElementById('globalLoadingTitle');
     const d = document.getElementById('globalLoadingDesc');
+    const pWrap = document.getElementById('globalLoadingProgressBarWrapper');
+    const pBar = document.getElementById('globalLoadingProgressBar');
     if (t) t.innerText = title;
     if (d) d.innerText = desc;
+    if (pWrap) pWrap.classList.add('hidden');
+    if (pBar) pBar.style.width = '0%';
     el.classList.remove('hidden');
+};
+
+window.updateGlobalLoadingProgress = function(title, desc, percent = null) {
+    const t = document.getElementById('globalLoadingTitle');
+    const d = document.getElementById('globalLoadingDesc');
+    const pWrap = document.getElementById('globalLoadingProgressBarWrapper');
+    const pBar = document.getElementById('globalLoadingProgressBar');
+    if (t && title) t.innerText = title;
+    if (d && desc) d.innerText = desc;
+    if (pWrap && pBar) {
+        if (percent !== null && percent >= 0) {
+            pWrap.classList.remove('hidden');
+            pBar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+        } else {
+            pWrap.classList.add('hidden');
+        }
+    }
 };
 
 window.hideGlobalLoading = function() {
     const el = document.getElementById('globalLoadingOverlay');
     if (el) el.classList.add('hidden');
+    const pWrap = document.getElementById('globalLoadingProgressBarWrapper');
+    if (pWrap) pWrap.classList.add('hidden');
 };
 
 // Audio Synthesizer Beep (Web Audio API)
@@ -2135,10 +2158,10 @@ function startVideoRecording() {
             }
         }
 
-        // Gunakan bitrate hemat 800 kbps agar file sangat ringan & cepat diunggah
+        // Gunakan bitrate hemat 600 kbps agar file sangat ringan & super cepat diunggah
         const options = {
             mimeType: mime || 'video/webm',
-            videoBitsPerSecond: 800000
+            videoBitsPerSecond: 600000
         };
 
         try {
@@ -2294,6 +2317,39 @@ window.submitFinalSession = async function() {
     const savedInv = activeInvoice;
     const totalItemsCount = scannedProductsList.length;
 
+    // OPTIMASI: Deduplikasi Base64 gambar agar JSON payload tidak bengkak puluhan MB
+    const optimizedItems = scannedProductsList.map((it) => {
+        let photoRef = null;
+        if (it.photo) {
+            const foundIdx = capturedPhotosList.findIndex(p => p.dataUrl === it.photo || p.data === it.photo);
+            if (foundIdx !== -1) {
+                photoRef = foundIdx;
+            }
+        }
+        return {
+            barcode: it.barcode,
+            wrong_barcode: it.wrong_barcode,
+            wrong_product_name: it.wrong_product_name,
+            wrong_sku: it.wrong_sku,
+            product_name: it.product_name,
+            sku: it.sku,
+            seller_sku: it.seller_sku,
+            sap_code: it.sap_code,
+            shop: it.shop,
+            bin_code: it.bin_code,
+            batch_no: it.batch_no,
+            exp_date: it.exp_date,
+            qty: it.qty,
+            type: it.type,
+            condition: it.condition,
+            damage_reason: it.damage_reason,
+            photo_ref: photoRef,
+            // Jika photoRef sudah menunjuk ke foto di array photos, kirim null agar JSON ringan & super cepat
+            photo: (photoRef !== null) ? null : it.photo,
+            photo_path: (photoRef !== null) ? null : it.photo_path
+        };
+    });
+
     const payload = {
         invoice_number: activeInvoice,
         expedition: activeExpedition || 'Lainnya',
@@ -2307,46 +2363,66 @@ window.submitFinalSession = async function() {
             data: p.dataUrl,
             title: p.title
         })),
-        items: scannedProductsList
+        items: optimizedItems
     };
 
     showGlobalLoading(
         'Menyimpan Transaksi...',
-        'Sedang mencatat data produk' + (videoBlob ? ' dan rekaman video unboxing' : '') + '...'
+        'Mempersiapkan data dan rekaman video...'
     );
 
     try {
-        let res;
+        const formData = new FormData();
+        formData.append('data', JSON.stringify(payload));
         if (videoBlob && videoBlob.size > 0) {
-            const formData = new FormData();
-            formData.append('data', JSON.stringify(payload));
             formData.append('video', videoBlob, `video_${savedInv}.webm`);
-            res = await fetch('api/returns.php', {
-                method: 'POST',
-                body: formData
-            });
-        } else {
-            res = await fetch('api/returns.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
         }
 
-        const rawText = await res.text();
-        let result;
-        try {
-            result = JSON.parse(rawText);
-        } catch (jsonErr) {
-            result = {
-                success: false,
-                error: `Respon server [HTTP ${res.status}]: ${rawText.replace(/<[^>]*>?/gm, '').trim().substring(0, 150)}`
+        // Gunakan XMLHttpRequest untuk memantau progress upload secara real-time
+        const result = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', 'api/returns.php', true);
+
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable && e.total > 0) {
+                    const percent = Math.min(99, Math.round((e.loaded / e.total) * 100));
+                    const totalMb = (e.total / (1024 * 1024)).toFixed(1);
+                    const loadedMb = (e.loaded / (1024 * 1024)).toFixed(1);
+                    updateGlobalLoadingProgress(
+                        `Mengunggah Video & Data (${percent}%)`,
+                        `Terkirim ${loadedMb} MB dari ${totalMb} MB...`,
+                        percent
+                    );
+                }
             };
-        }
+
+            xhr.onload = function() {
+                updateGlobalLoadingProgress(
+                    'Menyimpan Transaksi...',
+                    'Data & video terunggah! Memproses penyimpanan ke database...',
+                    100
+                );
+                try {
+                    const resJson = JSON.parse(xhr.responseText);
+                    resolve(resJson);
+                } catch (jsonErr) {
+                    resolve({
+                        success: false,
+                        error: `Respon server [HTTP ${xhr.status}]: ${xhr.responseText.replace(/<[^>]*>?/gm, '').trim().substring(0, 150)}`
+                    });
+                }
+            };
+
+            xhr.onerror = function() {
+                reject(new Error("Koneksi jaringan terputus saat mengunggah data ke server."));
+            };
+
+            xhr.send(formData);
+        });
 
         hideGlobalLoading();
 
-        if (result.success) {
+        if (result && result.success) {
             playBeep('success');
 
             // 1. Popup modal sukses dihilangkan sepenuhnya
@@ -2360,7 +2436,7 @@ window.submitFinalSession = async function() {
             const vidNote = (videoBlob && videoBlob.size > 0) ? ' & video rekaman' : '';
             showToast('success', `Invoice [${savedInv}]${vidNote} berhasil disimpan (${totalItemsCount} barang). Silakan scan invoice baru!`, "Inbound Selesai");
         } else {
-            showToast('error', result.error || 'Terjadi kesalahan saat menyimpan', "Gagal Menyimpan");
+            showToast('error', (result && result.error) || 'Terjadi kesalahan saat menyimpan transaksi', "Gagal Menyimpan");
         }
     } catch (err) {
         hideGlobalLoading();
@@ -2368,8 +2444,10 @@ window.submitFinalSession = async function() {
     } finally {
         isSubmittingFinalSession = false;
         hideGlobalLoading();
-        btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Submit`;
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Selesaikan Sesi Unboxing [F9]`;
+        }
     }
 };
 
@@ -2751,19 +2829,27 @@ function generateWatermarkedPhoto({ badgeText, badgeColor = '#4f46e5', fields = 
         source = videoElement;
     }
 
-    const canvas = document.createElement('canvas');
-    const width = source.videoWidth || source.naturalWidth || source.width || 1280;
-    const height = source.videoHeight || source.naturalHeight || source.height || 720;
+    const origW = source.videoWidth || source.naturalWidth || source.width || 1280;
+    const origH = source.videoHeight || source.naturalHeight || source.height || 720;
     
-    if (!width || !height || width === 0 || height === 0) {
+    if (!origW || !origH || origW === 0 || origH === 0) {
         throw new Error("Ukuran frame gambar kamera tidak valid.");
+    }
+
+    // Skala resolusi cerdas: batasi maksimal lebar 1280px agar foto ringan (<150KB) dan upload instan
+    const MAX_W = 1280;
+    let width = origW;
+    let height = origH;
+    if (width > MAX_W) {
+        height = Math.round((origH * MAX_W) / origW);
+        width = MAX_W;
     }
 
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
 
-    // 1. Gambar frame langsung dari webcam / gambar
+    // 1. Gambar frame langsung dari webcam / gambar (dengan scaling cerdas)
     ctx.drawImage(source, 0, 0, width, height);
 
     // 2. Bar Atas (Header Branding & Badge)
@@ -2838,7 +2924,7 @@ function generateWatermarkedPhoto({ badgeText, badgeColor = '#4f46e5', fields = 
         ctx.fillText(f.val || '-', x + lblW, y);
     });
 
-    return canvas.toDataURL('image/jpeg', 0.88);
+    return canvas.toDataURL('image/jpeg', 0.80);
 }
 
 window.renderPhotosGallery = function() {

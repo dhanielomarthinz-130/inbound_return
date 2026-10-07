@@ -982,7 +982,7 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
         </div>
     </div>
 
-    <!-- GLOBAL LOADING OVERLAY (BOLA-BOLA MERAH, KUNING, HIJAU) -->
+    <!-- GLOBAL LOADING OVERLAY (BOLA-BOLA MERAH, KUNING, HIJAU DENGAN PROGRESS BAR) -->
     <div id="globalLoadingOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4 transition-all">
         <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl flex flex-col items-center text-center space-y-4 border border-slate-100 animate-in fade-in zoom-in duration-200">
             <div class="traffic-loader traffic-loader-lg py-2">
@@ -990,9 +990,13 @@ $user = requireLogin(['operator', 'admin', 'superadmin']);
                 <div class="traffic-ball traffic-ball-yellow"></div>
                 <div class="traffic-ball traffic-ball-green"></div>
             </div>
-            <div class="space-y-1">
+            <div class="space-y-1 w-full">
                 <h4 class="font-bold text-base text-slate-800" id="globalLoadingTitle">Menyimpan Transaksi...</h4>
                 <p class="text-xs text-slate-500 leading-relaxed" id="globalLoadingDesc">Mohon tunggu, sedang memproses data retur ke server.</p>
+                <!-- Real-time Upload Progress Bar -->
+                <div id="globalLoadingProgressBarWrapper" class="hidden w-full bg-slate-100 rounded-full h-2 overflow-hidden mt-3 border border-slate-200">
+                    <div id="globalLoadingProgressBar" class="bg-gradient-to-r from-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-150" style="width: 0%"></div>
+                </div>
             </div>
         </div>
     </div>

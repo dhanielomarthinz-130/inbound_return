@@ -474,34 +474,11 @@ try {
     }
 } catch (Exception $eDup) {}
 
-// Self-healing: Pastikan kolom return_sessions & return_items lengkap sebelum transaksi
-try {
-    $rSessCols = $pdo->query("SHOW COLUMNS FROM return_sessions")->fetchAll(PDO::FETCH_COLUMN);
-    if (!in_array('expedition', $rSessCols)) $pdo->exec("ALTER TABLE return_sessions ADD COLUMN expedition VARCHAR(100) NULL AFTER customer_name");
-    if (!in_array('video_path', $rSessCols)) $pdo->exec("ALTER TABLE return_sessions ADD COLUMN video_path VARCHAR(255) NULL AFTER notes");
-    if (!in_array('package_photo', $rSessCols)) $pdo->exec("ALTER TABLE return_sessions ADD COLUMN package_photo VARCHAR(255) NULL AFTER video_path");
-    if (!in_array('product_photo', $rSessCols)) $pdo->exec("ALTER TABLE return_sessions ADD COLUMN product_photo VARCHAR(255) NULL AFTER package_photo");
-    if (!in_array('photos', $rSessCols)) $pdo->exec("ALTER TABLE return_sessions ADD COLUMN photos TEXT NULL AFTER product_photo");
-
-    $rItemCols = $pdo->query("SHOW COLUMNS FROM return_items")->fetchAll(PDO::FETCH_COLUMN);
-    if (!in_array('wrong_barcode', $rItemCols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN wrong_barcode VARCHAR(100) NULL AFTER barcode");
-    if (!in_array('wrong_product_name', $rItemCols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN wrong_product_name VARCHAR(255) NULL AFTER wrong_barcode");
-    if (!in_array('damage_reason', $rItemCols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN damage_reason VARCHAR(255) NULL AFTER `condition`");
-    if (!in_array('photo_path', $rItemCols)) $pdo->exec("ALTER TABLE return_items ADD COLUMN photo_path VARCHAR(255) NULL AFTER damage_reason");
-} catch (Exception $eSchemaFix) {
-    // Non-blocking schema auto-fix
-}
-
-// Cek ulang kolom yang aktif di return_items agar query INSERT tidak pernah crash
-$activeItemCols = [];
-try {
-    $activeItemCols = $pdo->query("SHOW COLUMNS FROM return_items")->fetchAll(PDO::FETCH_COLUMN);
-} catch (Exception $eColChk) {}
-
-$hasWrongBarcodeCol = in_array('wrong_barcode', $activeItemCols);
-$hasWrongProductCol = in_array('wrong_product_name', $activeItemCols);
-$hasPhotoPathCol    = in_array('photo_path', $activeItemCols);
-$hasDamageReasonCol = in_array('damage_reason', $activeItemCols);
+// Schema flags (kolom sudah dipastikan terstruktur di database)
+$hasWrongBarcodeCol = true;
+$hasWrongProductCol = true;
+$hasPhotoPathCol    = true;
+$hasDamageReasonCol = true;
 
 try {
     $pdo->beginTransaction();
@@ -567,6 +544,14 @@ try {
         }
 
         $itemPhoto = trim($item['photo_path'] ?? $item['photo'] ?? '');
+        // Prioritaskan photo_ref dari array photos yang sudah disimpan (Deduplikasi instan tanpa overhead)
+        if (isset($item['photo_ref']) && is_numeric($item['photo_ref'])) {
+            $pRefIdx = (int)$item['photo_ref'];
+            if (isset($photosArr[$pRefIdx]['path'])) {
+                $itemPhoto = $photosArr[$pRefIdx]['path'];
+            }
+        }
+
         if (!empty($itemPhoto) && strpos($itemPhoto, 'data:image') === 0) {
             $iHash = md5($itemPhoto);
             if (isset($savedBase64Map[$iHash])) {
