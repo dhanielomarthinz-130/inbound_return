@@ -17,6 +17,7 @@ $files = @(
     "api/expeditions.php",
     "assets/js/operator.js",
     "public/js/operator.js",
+    "index.php",
     "uploads/.htaccess"
 )
 
@@ -30,4 +31,6 @@ foreach ($rel in $files) {
 }
 if ($fail -eq 0) { Write-Host "SELESAI: semua file terunggah. Buka https://returninboundieg.great-site.net lalu tekan Ctrl+F5." -ForegroundColor Green }
 else { Write-Host "Ada $fail file gagal. Jalankan ulang script ini." -ForegroundColor Red }
-Read-Host "Tekan Enter untuk menutup"
+if ([Environment]::UserInteractive -and -not [Console]::IsInputRedirected) {
+    Read-Host "Tekan Enter untuk menutup"
+}
