@@ -815,34 +815,11 @@ function executeSyncRound(&$pdo) {
 }
 
 // -------------------------------------------------------------
-// EKSEKUSI
+// EKSEKUSI (SEKALI JALAN / ON-DEMAND - TANPA LOOP OTOMATIS)
 // -------------------------------------------------------------
-if ($isDaemon) {
-    @set_time_limit(0);
-    @ini_set('max_execution_time', '0');
-    writeSyncLog("Memulai IEG Auto-Sync Daemon di PC Localhost (Interval: 30 detik)... Tekan Ctrl+C untuk berhenti.");
-    while (true) {
-        @set_time_limit(0);
-        try {
-            $result = executeSyncRound($pdo);
-            if (!empty($result['rate_limited'])) {
-                writeSyncLog("Auto-Sync dijeda 3 menit untuk pendinginan rate-limit Cloud...");
-                sleep(180);
-                continue;
-            }
-            if (!empty($result['synced_returns']) || !empty($result['synced_receptions'])) {
-                writeSyncLog("Siklus selesai: {$result['synced_returns']} retur & {$result['synced_receptions']} receiving ditarik.");
-            }
-        } catch (Exception $e) {
-            writeSyncLog("Exception pada siklus sync: " . $e->getMessage());
-        }
-        sleep(30); // Jeda 30 detik tiap putaran
-    }
+$result = executeSyncRound($pdo);
+if ($isCli) {
+    echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;
 } else {
-    $result = executeSyncRound($pdo);
-    if ($isCli) {
-        echo json_encode($result, JSON_PRETTY_PRINT) . PHP_EOL;
-    } else {
-        echo json_encode($result);
-    }
+    echo json_encode($result);
 }

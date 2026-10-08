@@ -5961,21 +5961,42 @@ window.searchClaimDossier = function (e) {
 };
 
 // -------------------------------------------------------------
-// AUTO-SYNC CLOUD (INFINITYFREE -> LOCALHOST) BACKGROUND POLLER
+// SINKRONISASI CLOUD (INFINITYFREE -> LOCALHOST) - MANUAL ON-DEMAND
 // -------------------------------------------------------------
-let isSyncingBackground = false;
-async function triggerBackgroundCloudSync() {
-    if (window.SERVER_SYNC_ENABLED === false) return;
-    // Hanya jalankan jika diakses di PC Localhost / server lokal
-    const isLocalhost = (location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname.endsWith('.test') || location.hostname.startsWith('192.168.'));
-    if (!isLocalhost || isSyncingBackground) return;
+let isSyncingCloud = false;
+window.triggerCloudSyncNow = async function (isManual = true) {
+    if (window.SERVER_SYNC_ENABLED === false) {
+        if (isManual && typeof showToast === 'function') {
+            showToast('warning', 'Fitur Sync Cloud dinonaktifkan di perangkat ini. Hanya boleh di PC Server Kantor.', 'Sync Dinonaktifkan');
+        }
+        return;
+    }
+    if (isSyncingCloud) {
+        if (isManual && typeof showToast === 'function') {
+            showToast('info', 'Proses sinkronisasi sedang berjalan, mohon tunggu...', 'Sedang Sinkronisasi');
+        }
+        return;
+    }
 
-    isSyncingBackground = true;
+    isSyncingCloud = true;
+    if (isManual && typeof showToast === 'function') {
+        showToast('info', 'Menghubungi Cloud InfinityFree untuk menarik data transaksi baru...', 'Memulai Sync');
+    }
+
     try {
         const res = await fetch('sync_worker.php');
         const data = await res.json();
         if (data && data.blocked) {
             window.SERVER_SYNC_ENABLED = false;
+            if (isManual && typeof showToast === 'function') {
+                showToast('error', data.error || 'Sync diblokir di perangkat ini.', 'Gagal');
+            }
+            return;
+        }
+        if (data && data.rate_limited) {
+            if (isManual && typeof showToast === 'function') {
+                showToast('warning', 'Server InfinityFree sedang rate-limiting (HTTP 429). Mohon tunggu beberapa menit.', 'Rate Limited');
+            }
             return;
         }
         if (data && data.success) {
@@ -5983,7 +6004,7 @@ async function triggerBackgroundCloudSync() {
             const numRec = data.synced_receptions || 0;
             if (numRet > 0 || numRec > 0) {
                 if (typeof showToast === 'function') {
-                    showToast('info', `Tersinkron ${numRet} retur & ${numRec} receiving dari Cloud InfinityFree.`, 'Auto-Sync Berhasil');
+                    showToast('success', `Berhasil menarik ${numRet} retur & ${numRec} receiving dari Cloud InfinityFree!`, 'Sync Selesai');
                 }
                 // Refresh data dashboard / tabel aktif
                 if (typeof currentTab !== 'undefined') {
@@ -5991,21 +6012,24 @@ async function triggerBackgroundCloudSync() {
                     if (currentTab === 'transactions' && typeof loadTransactions === 'function') loadTransactions();
                     if (currentTab === 'receiving' && typeof loadReceivingData === 'function') loadReceivingData();
                 }
+            } else {
+                if (isManual && typeof showToast === 'function') {
+                    showToast('info', 'Tidak ada transaksi baru di Cloud InfinityFree (Semua data sudah up-to-date).', 'Data Up-to-Date');
+                }
+            }
+        } else if (data && data.error) {
+            if (isManual && typeof showToast === 'function') {
+                showToast('error', data.error, 'Gagal Sinkronisasi');
             }
         }
     } catch (e) {
-        // Silent error agar tidak mengganggu operasional jika cloud offline
-        console.debug('Background sync status:', e.message);
+        if (isManual && typeof showToast === 'function') {
+            showToast('error', 'Koneksi gagal: ' + e.message, 'Gagal');
+        }
     } finally {
-        isSyncingBackground = false;
+        isSyncingCloud = false;
     }
-}
-
-// Jalankan sync pertama 5 detik setelah admin terbuka, lalu ulang tiap 45 detik
-setTimeout(() => {
-    triggerBackgroundCloudSync();
-    setInterval(triggerBackgroundCloudSync, 45000);
-}, 5000);
+};
 
 // -------------------------------------------------------------
 // SINKRONISASI ORDERS OCS (RESI, INVOICE, SKU, BIAYA, KLAIM)

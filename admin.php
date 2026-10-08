@@ -404,6 +404,9 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
                         <button onclick="refreshDashboardMetrics()" title="Refresh data metrik dashboard dari backend" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 border border-slate-300 shadow-2xs shrink-0">
                             <i class="fa-solid fa-rotate text-indigo-600"></i> Refresh
                         </button>
+                        <button onclick="triggerCloudSyncNow(true)" title="Tarik data & foto transaksi terbaru dari InfinityFree secara manual (On-Demand)" class="bg-sky-600 hover:bg-sky-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-sm shadow-sky-600/30 shrink-0 cursor-pointer">
+                            <i class="fa-solid fa-cloud-arrow-down text-xs"></i> Tarik Data Cloud
+                        </button>
                         <button onclick="exportDashboardExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 shrink-0">
                             <i class="fa-solid fa-file-excel text-xs"></i> Export Excel
                         </button>

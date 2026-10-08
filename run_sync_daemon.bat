@@ -1,16 +1,20 @@
 @echo off
-title IEG Return - Auto Sync Worker Daemon (InfinityFree -> Localhost)
+title IEG Return - Sinkronisasi Manual On-Demand (InfinityFree -> Server)
 color 0a
 
 echo ===================================================================
-echo   IEG WAREHOUSE - AUTO SYNC WORKER DAEMON
-echo   Menyinkronkan data & foto dari InfinityFree ke Database Localhost
+echo   IEG WAREHOUSE - TARIK DATA CLOUD MANUAL (SEKALI JALAN)
+echo   Menyinkronkan data & foto transaksi dari InfinityFree ke Database
 echo ===================================================================
 echo.
-echo Daemon aktif... Mengecek data baru tiap 30 detik.
-echo Jangan tutup jendela ini agar sinkronisasi terus berjalan otomatis.
+echo Menghubungi Cloud InfinityFree...
 echo.
 
-"C:\xampp\php\php.exe" sync_worker.php --daemon
+"C:\xampp\php\php.exe" sync_worker.php
 
+echo.
+echo ===================================================================
+echo   Proses sinkronisasi selesai!
+echo ===================================================================
+echo.
 pause
