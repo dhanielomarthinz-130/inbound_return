@@ -424,7 +424,7 @@ if (isset($_FILES['video'])) {
 }
 
 // VALIDASI WAJIB: Sesi Inbound Unboxing TIDAK BOLEH disimpan tanpa file video unboxing
-if (empty($videoPath) || !file_exists(__DIR__ . '/../' . $videoPath) || filesize(__DIR__ . '/../' . $videoPath) < 1000) {
+if (empty($videoPath) || !file_exists(__DIR__ . '/../' . $videoPath) || filesize(__DIR__ . '/../' . $videoPath) < 100) {
     jsonResponse([
         'error' => 'Rekaman video unboxing WAJIB ada dan valid! Pastikan webcam/kamera menyala dan merekam proses unboxing sebelum menyelesaikan sesi.',
         'video_status' => $videoStatus

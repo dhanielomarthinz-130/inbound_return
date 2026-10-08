@@ -236,30 +236,69 @@ function executeSyncRound($pdo) {
         try {
             $pdo->beginTransaction();
 
-            $stmtInsSess = $pdo->prepare("
-                INSERT INTO return_sessions (
-                    invoice_number, customer_name, expedition, operator_name, status,
-                    total_items, total_good, total_damaged, notes, video_path,
-                    package_photo, product_photo, photos, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            $stmtInsSess->execute([
-                $sess['invoice_number'],
-                $sess['customer_name'] ?? 'Pelanggan Umum',
-                $sess['expedition'] ?? null,
-                $sess['operator_name'] ?? 'Gudang 01',
-                $sess['status'] ?? 'COMPLETED',
-                (int)($sess['total_items'] ?? count($items)),
-                (int)($sess['total_good'] ?? 0),
-                (int)($sess['total_damaged'] ?? 0),
-                $sess['notes'] ?? null,
-                $sess['video_path'] ?? null,
-                $sess['package_photo'] ?? null,
-                $sess['product_photo'] ?? null,
-                $sess['photos'] ?? null,
-                $sess['created_at'] ?? date('Y-m-d H:i:s')
-            ]);
-            $newSessionId = $pdo->lastInsertId();
+            // Cek apakah invoice_number sudah pernah ada di database Localhost
+            $stmtChkSess = $pdo->prepare("SELECT id FROM return_sessions WHERE invoice_number = ? ORDER BY id DESC LIMIT 1");
+            $stmtChkSess->execute([$sess['invoice_number']]);
+            $existingSessionId = $stmtChkSess->fetchColumn();
+
+            if ($existingSessionId) {
+                $newSessionId = (int)$existingSessionId;
+                $stmtUpdSess = $pdo->prepare("
+                    UPDATE return_sessions SET
+                        customer_name = ?, expedition = ?, operator_name = ?, status = ?,
+                        total_items = ?, total_good = ?, total_damaged = ?, notes = ?,
+                        video_path = COALESCE(?, video_path),
+                        package_photo = COALESCE(?, package_photo),
+                        product_photo = COALESCE(?, product_photo),
+                        photos = COALESCE(?, photos),
+                        created_at = ?
+                    WHERE id = ?
+                ");
+                $stmtUpdSess->execute([
+                    $sess['customer_name'] ?? 'Pelanggan Umum',
+                    $sess['expedition'] ?? null,
+                    $sess['operator_name'] ?? 'Gudang 01',
+                    $sess['status'] ?? 'COMPLETED',
+                    (int)($sess['total_items'] ?? count($items)),
+                    (int)($sess['total_good'] ?? 0),
+                    (int)($sess['total_damaged'] ?? 0),
+                    $sess['notes'] ?? null,
+                    $sess['video_path'] ?? null,
+                    $sess['package_photo'] ?? null,
+                    $sess['product_photo'] ?? null,
+                    $sess['photos'] ?? null,
+                    $sess['created_at'] ?? date('Y-m-d H:i:s'),
+                    $newSessionId
+                ]);
+
+                // Bersihkan items lama agar tidak duplikat
+                $pdo->prepare("DELETE FROM return_items WHERE session_id = ?")->execute([$newSessionId]);
+            } else {
+                $stmtInsSess = $pdo->prepare("
+                    INSERT INTO return_sessions (
+                        invoice_number, customer_name, expedition, operator_name, status,
+                        total_items, total_good, total_damaged, notes, video_path,
+                        package_photo, product_photo, photos, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmtInsSess->execute([
+                    $sess['invoice_number'],
+                    $sess['customer_name'] ?? 'Pelanggan Umum',
+                    $sess['expedition'] ?? null,
+                    $sess['operator_name'] ?? 'Gudang 01',
+                    $sess['status'] ?? 'COMPLETED',
+                    (int)($sess['total_items'] ?? count($items)),
+                    (int)($sess['total_good'] ?? 0),
+                    (int)($sess['total_damaged'] ?? 0),
+                    $sess['notes'] ?? null,
+                    $sess['video_path'] ?? null,
+                    $sess['package_photo'] ?? null,
+                    $sess['product_photo'] ?? null,
+                    $sess['photos'] ?? null,
+                    $sess['created_at'] ?? date('Y-m-d H:i:s')
+                ]);
+                $newSessionId = (int)$pdo->lastInsertId();
+            }
 
             // Insert Items
             $stmtInsItem = $pdo->prepare("
@@ -330,33 +369,59 @@ function executeSyncRound($pdo) {
         try {
             $pdo->beginTransaction();
 
-            $stmtInsRec = $pdo->prepare("
-                INSERT INTO expedition_receptions (
-                    receipt_number, expedition, courier_name, sack_number, vehicle_no, operator_name,
-                    total_packages, notes, photo_path, package_photos, status, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE 
-                    expedition = VALUES(expedition),
-                    sack_number = VALUES(sack_number),
-                    total_packages = VALUES(total_packages)
-            ");
-            $stmtInsRec->execute([
-                $rec['receipt_number'],
-                $rec['expedition'] ?? '',
-                $rec['courier_name'] ?? null,
-                $rec['sack_number'] ?? null,
-                $rec['vehicle_no'] ?? null,
-                $rec['operator_name'] ?? '',
-                (int)($rec['total_packages'] ?? count($packages)),
-                $rec['notes'] ?? null,
-                $rec['photo_path'] ?? null,
-                $rec['package_photos'] ?? null,
-                $rec['status'] ?? 'RECEIVED',
-                $rec['created_at'] ?? date('Y-m-d H:i:s')
-            ]);
-            $newRecId = $pdo->lastInsertId();
+            $stmtFindRec = $pdo->prepare("SELECT id FROM expedition_receptions WHERE receipt_number = ?");
+            $stmtFindRec->execute([$rec['receipt_number']]);
+            $existingRecId = $stmtFindRec->fetchColumn();
 
-            if (!empty($packages)) {
+            if ($existingRecId) {
+                $newRecId = (int)$existingRecId;
+                $stmtUpdRec = $pdo->prepare("
+                    UPDATE expedition_receptions SET
+                        expedition = ?, courier_name = ?, sack_number = ?, vehicle_no = ?,
+                        operator_name = ?, total_packages = ?, notes = ?, photo_path = ?,
+                        package_photos = ?, status = ?
+                    WHERE id = ?
+                ");
+                $stmtUpdRec->execute([
+                    $rec['expedition'] ?? '',
+                    $rec['courier_name'] ?? null,
+                    $rec['sack_number'] ?? null,
+                    $rec['vehicle_no'] ?? null,
+                    $rec['operator_name'] ?? '',
+                    (int)($rec['total_packages'] ?? count($packages)),
+                    $rec['notes'] ?? null,
+                    $rec['photo_path'] ?? null,
+                    $rec['package_photos'] ?? null,
+                    $rec['status'] ?? 'RECEIVED',
+                    $newRecId
+                ]);
+            } else {
+                $stmtInsRec = $pdo->prepare("
+                    INSERT INTO expedition_receptions (
+                        receipt_number, expedition, courier_name, sack_number, vehicle_no, operator_name,
+                        total_packages, notes, photo_path, package_photos, status, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmtInsRec->execute([
+                    $rec['receipt_number'],
+                    $rec['expedition'] ?? '',
+                    $rec['courier_name'] ?? null,
+                    $rec['sack_number'] ?? null,
+                    $rec['vehicle_no'] ?? null,
+                    $rec['operator_name'] ?? '',
+                    (int)($rec['total_packages'] ?? count($packages)),
+                    $rec['notes'] ?? null,
+                    $rec['photo_path'] ?? null,
+                    $rec['package_photos'] ?? null,
+                    $rec['status'] ?? 'RECEIVED',
+                    $rec['created_at'] ?? date('Y-m-d H:i:s')
+                ]);
+                $newRecId = (int)$pdo->lastInsertId();
+            }
+
+            if (!empty($packages) && $newRecId > 0) {
+                $pdo->prepare("DELETE FROM reception_packages WHERE reception_id = ?")->execute([$newRecId]);
+
                 $stmtInsPkg = $pdo->prepare("
                     INSERT INTO reception_packages (reception_id, package_barcode, sack_number, photo_path, scanned_at)
                     VALUES (?, ?, ?, ?, ?)

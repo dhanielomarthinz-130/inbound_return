@@ -2158,17 +2158,19 @@ function startVideoRecording() {
             }
         }
 
-        // Gunakan bitrate hemat 250 kbps (15-20 fps) agar video unboxing sangat ringan (<2MB) & upload super cepat ke hosting
-        const options = {
-            mimeType: mime || 'video/webm',
-            videoBitsPerSecond: 250000
-        };
-
+        // Gunakan bitrate hemat 300 kbps agar video unboxing sangat ringan (<2MB) & upload cepat
+        let options = {};
+        if (mime) options.mimeType = mime;
         try {
+            options.videoBitsPerSecond = 300000;
             mediaRecorder = new MediaRecorder(mediaStream, options);
         } catch (recErr) {
-            console.warn("MediaRecorder dengan options gagal, fallback:", recErr);
-            mediaRecorder = new MediaRecorder(mediaStream);
+            console.warn("MediaRecorder dengan options bitrate gagal, fallback:", recErr);
+            try {
+                mediaRecorder = mime ? new MediaRecorder(mediaStream, { mimeType: mime }) : new MediaRecorder(mediaStream);
+            } catch (e2) {
+                mediaRecorder = new MediaRecorder(mediaStream);
+            }
         }
 
         mediaRecorder.ondataavailable = (e) => {
@@ -2309,6 +2311,15 @@ window.submitFinalSession = async function() {
         videoBlob = await stopVideoRecording();
     } else if (recordedChunks.length > 0) {
         videoBlob = new Blob(recordedChunks, { type: 'video/webm' });
+    }
+
+    if (!videoBlob || videoBlob.size < 100) {
+        playBeep('error');
+        showToast('error', 'Rekaman video unboxing belum terdeteksi! Pastikan kamera menyala dan merekam proses unboxing sebelum menyelesaikan sesi.', 'Wajib Ada Video Unboxing');
+        isSubmittingFinalSession = false;
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Selesaikan Sesi Unboxing (F4)`;
+        return;
     }
 
     const displayOp = document.getElementById('displayOperator');
@@ -2569,20 +2580,20 @@ async function startCamera(deviceId = null) {
 
         let stream = null;
 
-        // Upaya 1: Coba dengan constraint spesifik / deviceId
+        // Upaya 1: Coba dengan constraint ideal / deviceId
         try {
             const constraints = {
                 video: deviceId 
-                    ? { deviceId: { exact: deviceId }, width: { ideal: 1280, max: 1280 }, height: { ideal: 720, max: 720 }, frameRate: { ideal: 20, max: 24 } } 
-                    : { facingMode: { ideal: "environment" }, width: { ideal: 1280, max: 1280 }, height: { ideal: 720, max: 720 }, frameRate: { ideal: 20, max: 24 } },
+                    ? { deviceId: { exact: deviceId } } 
+                    : { facingMode: { ideal: "environment" }, width: { ideal: 1280 } },
                 audio: false
             };
             stream = await navigator.mediaDevices.getUserMedia(constraints);
         } catch (specErr) {
             console.warn("Gagal constraint spesifik, fallback ke video standar:", specErr);
-            // Upaya 2: Fallback ke parameter paling dasar (cocok untuk semua jenis USB webcam)
+            // Upaya 2: Fallback ke parameter paling universal (didukung semua webcam USB)
             stream = await navigator.mediaDevices.getUserMedia({
-                video: deviceId ? { deviceId: deviceId, frameRate: { ideal: 20, max: 24 } } : { frameRate: { ideal: 20, max: 24 } },
+                video: deviceId ? { deviceId: deviceId } : true,
                 audio: false
             });
         }
