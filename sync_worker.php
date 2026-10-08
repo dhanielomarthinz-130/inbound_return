@@ -259,6 +259,12 @@ function executeSyncRound(&$pdo) {
     $exportUrl = $cloudUrl . '/api/sync_export.php?key=' . urlencode($secretKey);
     $apiRes = callInfinityFreeApi($exportUrl);
 
+    if ($apiRes['code'] === 429) {
+        $err = "Server InfinityFree membatasi frekuensi request (HTTP 429 Too Many Requests - Scanner activity detected). Menunggu jeda pendinginan agar IP tidak diblokir.";
+        writeSyncLog("[WARNING 429] " . $err);
+        return ['success' => false, 'rate_limited' => true, 'error' => $err];
+    }
+
     if ($apiRes['code'] !== 200 || empty($apiRes['body'])) {
         $err = "Koneksi ke Cloud gagal [HTTP {$apiRes['code']}]. " . ($apiRes['error'] ?: substr($apiRes['body'], 0, 150));
         return ['success' => false, 'error' => $err];
@@ -819,6 +825,11 @@ if ($isDaemon) {
         @set_time_limit(0);
         try {
             $result = executeSyncRound($pdo);
+            if (!empty($result['rate_limited'])) {
+                writeSyncLog("Auto-Sync dijeda 3 menit untuk pendinginan rate-limit Cloud...");
+                sleep(180);
+                continue;
+            }
             if (!empty($result['synced_returns']) || !empty($result['synced_receptions'])) {
                 writeSyncLog("Siklus selesai: {$result['synced_returns']} retur & {$result['synced_receptions']} receiving ditarik.");
             }
