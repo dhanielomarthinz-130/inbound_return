@@ -267,16 +267,22 @@ if (!empty($_POST['data'])) {
 } else {
     $rawInput = file_get_contents('php://input');
     if ($rawInput) {
+        $rawInput = preg_replace('/^[\xEF\xBB\xBF]+/', '', trim($rawInput));
         $body = json_decode($rawInput, true);
     }
 }
 
 if (!$body || !is_array($body)) {
-    if (empty($_POST) && empty($_FILES) && isset($_SERVER['CONTENT_LENGTH']) && (int)$_SERVER['CONTENT_LENGTH'] > 0) {
-        $maxSize = ini_get('post_max_size');
-        jsonResponse(['error' => "Ukuran file video melebihi batas upload server ($maxSize). Silakan rekam lebih singkat atau kurangi durasi."], 413);
+    $len = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+    $maxStr = ini_get('post_max_size') ?: '30M';
+    $unit = strtolower(substr($maxStr, -1));
+    $val = (int)$maxStr;
+    $maxBytes = $unit === 'g' ? $val * 1073741824 : ($unit === 'm' ? $val * 1048576 : ($unit === 'k' ? $val * 1024 : $val));
+
+    if ($len > 0 && $maxBytes > 0 && $len > $maxBytes) {
+        jsonResponse(['error' => "Ukuran file video & data melebihi batas upload server ($maxStr). Silakan rekam lebih singkat atau kurangi durasi."], 413);
     }
-    jsonResponse(['error' => 'Format input data tidak valid'], 400);
+    jsonResponse(['error' => 'Format input data transaksi unboxing tidak valid atau kosong'], 400);
 }
 
 $sessionUser   = getSessionUser();
@@ -322,34 +328,35 @@ try {
     }
 } catch (Exception $eDup) {}
 
-// Video unboxing WAJIB ada: cek status upload sebelum menulis foto
-if (!isset($_FILES['video'])) {
+// Video unboxing WAJIB ada: dukung $_FILES['video'] dan $_POST['video_base64']
+// (sangat penting untuk hosting seperti InfinityFree di mana upload_tmp_dir tidak tersedia / Error 6)
+$rawVideoBase64 = $_POST['video_base64'] ?? ($body['video_base64'] ?? '');
+$clientVideoExt = strtolower(trim($_POST['video_ext'] ?? ($body['video_ext'] ?? '')));
+
+$hasFilesVideo = isset($_FILES['video']) && $_FILES['video']['error'] === UPLOAD_ERR_OK && ((int)($_FILES['video']['size'] ?? 0) >= 100);
+$hasBase64Video = !empty($rawVideoBase64) && strlen($rawVideoBase64) >= 100;
+
+if (!$hasFilesVideo && !$hasBase64Video) {
+    if (isset($_FILES['video']) && $_FILES['video']['error'] !== UPLOAD_ERR_OK) {
+        $vErr = (int)$_FILES['video']['error'];
+        $vErrMap = [
+            UPLOAD_ERR_INI_SIZE   => 'Ukuran video melebihi batas upload_max_filesize server (' . ini_get('upload_max_filesize') . '). Silakan rekam lebih singkat',
+            UPLOAD_ERR_FORM_SIZE  => 'Ukuran video melebihi batas maksimum form upload',
+            UPLOAD_ERR_PARTIAL    => 'Upload video terputus di tengah jalan (partial). Silakan kirim ulang',
+            UPLOAD_ERR_NO_FILE    => 'File video tidak ikut terkirim',
+            UPLOAD_ERR_NO_TMP_DIR => 'Folder sementara (tmp) PHP di server tidak tersedia',
+            UPLOAD_ERR_CANT_WRITE => 'Server gagal menulis file video ke disk',
+            UPLOAD_ERR_EXTENSION  => 'Upload video dihentikan oleh ekstensi PHP',
+        ];
+        error_log("Video upload failed with PHP error code: " . $vErr);
+        jsonResponse([
+            'error' => ($vErrMap[$vErr] ?? ('Gagal mengunggah file rekaman video unboxing (Kode Error PHP: ' . $vErr . ')')) . '. Video unboxing WAJIB ada.',
+            'video_status' => 'upload_err_' . $vErr
+        ], in_array($vErr, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true) ? 413 : 400);
+    }
     jsonResponse([
         'error' => 'Rekaman video unboxing WAJIB ada dan valid! Pastikan webcam/kamera menyala dan merekam proses unboxing sebelum menyelesaikan sesi.',
         'video_status' => 'no_video'
-    ], 400);
-}
-if ($_FILES['video']['error'] !== UPLOAD_ERR_OK) {
-    $vErr = (int)$_FILES['video']['error'];
-    $vErrMap = [
-        UPLOAD_ERR_INI_SIZE   => 'Ukuran video melebihi batas upload_max_filesize server (' . ini_get('upload_max_filesize') . '). Silakan rekam lebih singkat',
-        UPLOAD_ERR_FORM_SIZE  => 'Ukuran video melebihi batas maksimum form upload',
-        UPLOAD_ERR_PARTIAL    => 'Upload video terputus di tengah jalan (partial). Silakan kirim ulang',
-        UPLOAD_ERR_NO_FILE    => 'File video tidak ikut terkirim',
-        UPLOAD_ERR_NO_TMP_DIR => 'Folder sementara (tmp) PHP di server tidak tersedia',
-        UPLOAD_ERR_CANT_WRITE => 'Server gagal menulis file video ke disk',
-        UPLOAD_ERR_EXTENSION  => 'Upload video dihentikan oleh ekstensi PHP',
-    ];
-    error_log("Video upload failed with PHP error code: " . $vErr);
-    jsonResponse([
-        'error' => ($vErrMap[$vErr] ?? ('Gagal mengunggah file rekaman video unboxing (Kode Error PHP: ' . $vErr . ')')) . '. Video unboxing WAJIB ada.',
-        'video_status' => 'upload_err_' . $vErr
-    ], in_array($vErr, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true) ? 413 : 400);
-}
-if ((int)($_FILES['video']['size'] ?? 0) < 100) {
-    jsonResponse([
-        'error' => 'Rekaman video unboxing WAJIB ada dan valid! Pastikan webcam/kamera menyala dan merekam proses unboxing sebelum menyelesaikan sesi.',
-        'video_status' => 'empty_video'
     ], 400);
 }
 
@@ -484,20 +491,53 @@ if (!is_dir($uploadDir)) {
     @mkdir($uploadDir, 0777, true);
 }
 
-// Hanya izinkan ekstensi video aman (nama file dari client tidak dipercaya)
-$ext = strtolower(pathinfo($_FILES['video']['name'] ?? '', PATHINFO_EXTENSION));
-if (!in_array($ext, ['webm', 'mp4'], true)) $ext = 'webm';
+// Tentukan ekstensi yang aman
+$ext = 'webm';
+if (!empty($clientVideoExt) && in_array($clientVideoExt, ['webm', 'mp4'], true)) {
+    $ext = $clientVideoExt;
+} elseif (isset($_FILES['video']['name'])) {
+    $fileExt = strtolower(pathinfo($_FILES['video']['name'], PATHINFO_EXTENSION));
+    if (in_array($fileExt, ['webm', 'mp4'], true)) {
+        $ext = $fileExt;
+    }
+}
+
 $fileName = 'video_' . $cleanInv . '_' . time() . '_' . substr(md5(uniqid((string)rand(), true)), 0, 6) . '.' . $ext;
 $targetFile = $uploadDir . $fileName;
 
-if (move_uploaded_file($_FILES['video']['tmp_name'], $targetFile)) {
-    $videoPath = 'uploads/videos/' . $fileName;
-    $videoStatus = 'uploaded';
-    $writtenFiles[] = $videoPath;
-} else {
-    error_log("Failed to move uploaded video file to " . $targetFile);
-    cleanupWrittenFiles();
-    jsonResponse(['error' => 'Gagal memindahkan file rekaman video unboxing ke folder server uploads/videos/.', 'video_status' => 'move_error'], 500);
+// Prioritas 1: Simpan dari $_FILES['video'] jika upload valid
+if ($hasFilesVideo) {
+    if (move_uploaded_file($_FILES['video']['tmp_name'], $targetFile)) {
+        $videoPath = 'uploads/videos/' . $fileName;
+        $videoStatus = 'uploaded';
+        $writtenFiles[] = $videoPath;
+    } else {
+        error_log("move_uploaded_file failed for " . $targetFile);
+    }
+}
+
+// Prioritas 2 / Fallback: Simpan dari Base64 jika belum tersimpan (kebal error upload_tmp_dir)
+if (empty($videoPath) && $hasBase64Video) {
+    $cleanB64 = $rawVideoBase64;
+    if (preg_match('/^data:video\/(\w+);base64,/', $cleanB64, $mType)) {
+        $cleanB64 = substr($cleanB64, strpos($cleanB64, ',') + 1);
+        $matchedExt = strtolower($mType[1]);
+        if (in_array($matchedExt, ['webm', 'mp4'], true)) {
+            $ext = $matchedExt;
+            $fileName = 'video_' . $cleanInv . '_' . time() . '_' . substr(md5(uniqid((string)rand(), true)), 0, 6) . '.' . $ext;
+            $targetFile = $uploadDir . $fileName;
+        }
+    }
+    $decodedVideo = base64_decode($cleanB64);
+    if ($decodedVideo && strlen($decodedVideo) >= 100) {
+        if (file_put_contents($targetFile, $decodedVideo)) {
+            $videoPath = 'uploads/videos/' . $fileName;
+            $videoStatus = 'uploaded_base64';
+            $writtenFiles[] = $videoPath;
+        } else {
+            error_log("file_put_contents failed for video to " . $targetFile);
+        }
+    }
 }
 
 // VALIDASI WAJIB: Sesi Inbound Unboxing TIDAK BOLEH disimpan tanpa file video unboxing

@@ -2469,7 +2469,28 @@ window.submitFinalSession = async function() {
         if (videoBlob && videoBlob.size > 0) {
             const vExt = /mp4/i.test(videoBlob.type || '') ? 'mp4' : 'webm';
             const safeInvName = String(savedInv || 'invoice').replace(/[^A-Za-z0-9_-]/g, '_');
-            formData.append('video', videoBlob, `video_${safeInvName}.${vExt}`);
+
+            // Konversi video blob ke Base64 agar kebal terhadap PHP Error 6 (UPLOAD_ERR_NO_TMP_DIR)
+            // yang terjadi di shared hosting seperti InfinityFree karena server tidak memiliki folder tmp PHP.
+            let videoBase64 = null;
+            try {
+                videoBase64 = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.onerror = () => resolve(null);
+                    reader.readAsDataURL(videoBlob);
+                });
+            } catch (convErr) {
+                console.warn('Konversi video unboxing ke Base64 gagal:', convErr);
+            }
+
+            if (videoBase64) {
+                formData.append('video_base64', videoBase64);
+                formData.append('video_ext', vExt);
+            } else {
+                // Fallback jika konversi reader gagal
+                formData.append('video', videoBlob, `video_${safeInvName}.${vExt}`);
+            }
         }
 
         // Gunakan XMLHttpRequest untuk memantau progress upload secara real-time
