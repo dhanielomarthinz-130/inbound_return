@@ -344,7 +344,7 @@ if (!$hasFilesVideo && !$hasBase64Video) {
             UPLOAD_ERR_FORM_SIZE  => 'Ukuran video melebihi batas maksimum form upload',
             UPLOAD_ERR_PARTIAL    => 'Upload video terputus di tengah jalan (partial). Silakan kirim ulang',
             UPLOAD_ERR_NO_FILE    => 'File video tidak ikut terkirim',
-            UPLOAD_ERR_NO_TMP_DIR => 'Folder sementara (tmp) PHP di server tidak tersedia',
+            UPLOAD_ERR_NO_TMP_DIR => 'Folder sementara (tmp) PHP di server tidak tersedia (muat ulang halaman browser dengan Ctrl+F5 lalu simpan kembali)',
             UPLOAD_ERR_CANT_WRITE => 'Server gagal menulis file video ke disk',
             UPLOAD_ERR_EXTENSION  => 'Upload video dihentikan oleh ekstensi PHP',
         ];

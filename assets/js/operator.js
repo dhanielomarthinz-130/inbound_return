@@ -2437,6 +2437,27 @@ window.submitFinalSession = async function() {
         };
     });
 
+    const videoSizeMb = (videoBlob && videoBlob.size > 0) ? (videoBlob.size / (1024 * 1024)).toFixed(1) : null;
+    showGlobalLoading('Menyimpan Transaksi...', videoSizeMb ? `Memproses data & video unboxing (${videoSizeMb} MB)...` : 'Memproses data unboxing...');
+
+    // Konversi video blob ke Base64 agar kebal terhadap PHP Error 6 (UPLOAD_ERR_NO_TMP_DIR)
+    // yang terjadi di shared hosting seperti InfinityFree karena server tidak memiliki folder tmp PHP.
+    let videoBase64 = null;
+    let vExt = 'webm';
+    if (videoBlob && videoBlob.size > 0) {
+        vExt = /mp4/i.test(videoBlob.type || '') ? 'mp4' : 'webm';
+        try {
+            videoBase64 = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = () => resolve(null);
+                reader.readAsDataURL(videoBlob);
+            });
+        } catch (convErr) {
+            console.warn('Konversi video unboxing ke Base64 gagal:', convErr);
+        }
+    }
+
     const payload = {
         invoice_number: activeInvoice,
         expedition: activeExpedition || 'Lainnya',
@@ -2451,46 +2472,20 @@ window.submitFinalSession = async function() {
             data: p.dataUrl,
             title: p.title
         })),
-        items: optimizedItems
+        items: optimizedItems,
+        video_base64: videoBase64,
+        video_ext: vExt
     };
 
     const payloadJson = JSON.stringify(payload);
     const jsonSizeKb = Math.round(new Blob([payloadJson]).size / 1024);
-    const videoSizeMb = (videoBlob && videoBlob.size > 0) ? (videoBlob.size / (1024 * 1024)).toFixed(1) : null;
-    const initialDesc = videoSizeMb 
-        ? `Menyiapkan ${jsonSizeKb} KB data & ${videoSizeMb} MB video unboxing...`
-        : `Menyiapkan ${jsonSizeKb} KB data unboxing...`;
-
-    showGlobalLoading('Menyimpan Transaksi...', initialDesc);
 
     try {
         const formData = new FormData();
         formData.append('data', payloadJson);
-        if (videoBlob && videoBlob.size > 0) {
-            const vExt = /mp4/i.test(videoBlob.type || '') ? 'mp4' : 'webm';
-            const safeInvName = String(savedInv || 'invoice').replace(/[^A-Za-z0-9_-]/g, '_');
-
-            // Konversi video blob ke Base64 agar kebal terhadap PHP Error 6 (UPLOAD_ERR_NO_TMP_DIR)
-            // yang terjadi di shared hosting seperti InfinityFree karena server tidak memiliki folder tmp PHP.
-            let videoBase64 = null;
-            try {
-                videoBase64 = await new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result);
-                    reader.onerror = () => resolve(null);
-                    reader.readAsDataURL(videoBlob);
-                });
-            } catch (convErr) {
-                console.warn('Konversi video unboxing ke Base64 gagal:', convErr);
-            }
-
-            if (videoBase64) {
-                formData.append('video_base64', videoBase64);
-                formData.append('video_ext', vExt);
-            } else {
-                // Fallback jika konversi reader gagal
-                formData.append('video', videoBlob, `video_${safeInvName}.${vExt}`);
-            }
+        if (videoBase64) {
+            formData.append('video_base64', videoBase64);
+            formData.append('video_ext', vExt);
         }
 
         // Gunakan XMLHttpRequest untuk memantau progress upload secara real-time

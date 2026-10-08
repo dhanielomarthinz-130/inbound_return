@@ -14,6 +14,13 @@ RewriteRule ^.*/uploads/(.+)$ uploads/$1 [L,NC]
 RewriteRule ^.*/assets/(.+)$ assets/$1 [L,NC]
 
 # 2. Izinkan akses langsung ke file aset statis (CSS, JS, gambar, video, fonts) dan direktori
+<IfModule mod_headers.c>
+    <FilesMatch "\.(js|css)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires 0
+    </FilesMatch>
+</IfModule>
 RewriteCond %{REQUEST_FILENAME} -d [OR]
 RewriteCond %{REQUEST_URI} \.(css|js|png|jpg|jpeg|gif|svg|webp|ico|webm|mp4|woff|woff2|ttf|eot)$ [NC]
 RewriteRule ^ - [L]
