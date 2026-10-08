@@ -1,0 +1,24 @@
+================================================================================
+          LINK RESMI & TETAP SISTEM INBOUND RETURN (NGROK STATIC DOMAIN)
+================================================================================
+
+Link Login Utama (Buka di browser Laptop / HP kantor / luar):
+https://music-saloon-viscosity.ngrok-free.dev/inbound_return/login
+
+Link Dashboard Admin:
+https://music-saloon-viscosity.ngrok-free.dev/inbound_return/admin
+
+Link Operator Unboxing:
+https://music-saloon-viscosity.ngrok-free.dev/inbound_return/operator
+
+Link Penerimaan Ekspedisi (Receiving):
+https://music-saloon-viscosity.ngrok-free.dev/inbound_return/reception
+
+--------------------------------------------------------------------------------
+PETUNJUK PENGGUNAAN:
+1. Link di atas PERMANEN & PATEN (TIDAK AKAN BERUBAH-UBAH).
+2. Kamera / Webcam 100% BISA DIAKSES (karena menggunakan HTTPS resmi SSL).
+3. Foto dan video unboxing langsung tersimpan ke harddisk server lokal PC ini.
+4. Jika PC Server baru dinyalakan kembali / restart, cukup klik 2x file:
+   JALANKAN_NGROK_PERMANEN.bat di folder inbound_return.
+================================================================================

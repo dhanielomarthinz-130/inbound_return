@@ -7,9 +7,9 @@ $currentUser = getSessionUser();
 // Jika sudah login, langsung redirect sesuai role
 if ($currentUser) {
     if ($currentUser['role'] === 'operator') {
-        header('Location: menu');
+        header('Location: ' . getAppBaseUrl() . 'menu');
     } else {
-        header('Location: admin');
+        header('Location: ' . getAppBaseUrl() . 'admin');
     }
     exit;
 }
@@ -73,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'role' => $user['role']
                         ];
                         
-                        header('Location: menu');
+                        header('Location: ' . getAppBaseUrl() . 'menu');
                         exit;
                     } else {
                         $error = 'PIN yang Anda masukkan salah!';
@@ -111,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'name' => $user['name'],
                             'role' => $user['role']
                         ];
-                        header('Location: admin');
+                        header('Location: ' . getAppBaseUrl() . 'admin');
                         exit;
                     }
                 } else {
@@ -130,6 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Masuk Sistem - Inbound Return IEG</title>
+    <base href="<?= htmlspecialchars(getAppBaseUrl()) ?>">
     <!-- Favicon Huruf D Warna Hijau -->
     <link rel="icon" type="image/svg+xml" href="assets/image/favicon.svg">
     <link rel="icon" type="image/png" href="assets/image/favicon.png">

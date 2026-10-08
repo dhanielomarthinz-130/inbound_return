@@ -58,7 +58,20 @@ function writeSyncLog($msg) {
  */
 function callInfinityFreeApi($url, $postPayload = null) {
     static $solvedCookie = null;
-    $cookieFile = __DIR__ . '/uploads/logs/infinity_cookie.txt';
+    $cookieDir = __DIR__ . '/uploads/logs';
+    if (!is_dir($cookieDir)) {
+        @mkdir($cookieDir, 0777, true);
+    }
+    $cookieFile = $cookieDir . '/infinity_cookie.txt';
+    $cookieTokenFile = $cookieDir . '/infinity_test_cookie.txt';
+
+    // Baca saved test cookie dari disk jika memory static belum ada
+    if ($solvedCookie === null && file_exists($cookieTokenFile)) {
+        $saved = trim(@file_get_contents($cookieTokenFile));
+        if (!empty($saved)) {
+            $solvedCookie = $saved;
+        }
+    }
 
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -93,12 +106,17 @@ function callInfinityFreeApi($url, $postPayload = null) {
             $decrypted = openssl_decrypt($ct, 'aes-128-cbc', $key, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING, $iv);
             $solvedCookie = bin2hex($decrypted);
 
-            // Simpan cookie ke jar
-            $domain = parse_url($url, PHP_URL_HOST);
-            @file_put_contents($cookieFile, "$domain\tTRUE\t/\tFALSE\t2147483647\t__test\t$solvedCookie\n");
+            // Simpan cookie ke file khusus agar tidak tertimpa cookie jar biasa
+            @file_put_contents($cookieTokenFile, $solvedCookie);
+
+            $retryUrl = $url;
+            if (preg_match('/location\.href="([^"]+)"/', $response, $locMatch)) {
+                $retryUrl = $locMatch[1];
+            }
+            @sleep(1);
 
             // Ulangi request langsung dengan cookie yang telah dipecahkan
-            $ch = curl_init($url);
+            $ch = curl_init($retryUrl);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 40);
@@ -788,16 +806,19 @@ function executeSyncRound(&$pdo) {
     // 6. Kirim Konfirmasi Cleanup / Sync Status ke InfinityFree jika ada transaksi yang berhasil disimpan
     $cleanupResult = null;
     if (!empty($syncedReturnIds) || !empty($syncedReceptionIds) || !empty($syncedOrderIds)) {
+        // Jeda 2 detik agar InfinityFree tidak membatasi burst request (429)
+        @sleep(2);
         $cleanupUrl = $cloudUrl . '/api/sync_cleanup.php?key=' . urlencode($secretKey);
-        $payload = json_encode([
+        $payload = [
             'synced_return_session_ids' => $syncedReturnIds,
             'synced_reception_ids'      => $syncedReceptionIds,
             'synced_ocs_order_ids'      => $syncedOrderIds
-        ]);
+        ];
 
         $cleanResp = callInfinityFreeApi($cleanupUrl, $payload);
         $cleanupResult = json_decode($cleanResp['body'] ?? '', true);
-        writeSyncLog("Sync Berhasil: " . count($syncedReturnIds) . " return unboxing, " . count($syncedReceptionIds) . " receiving, " . count($syncedOrderIds) . " OCS orders, $downloadedPhotosCount foto terunduh.");
+        $cleanStatus = !empty($cleanupResult['success']) ? " [Cloud Cleaned: OK]" : " [Cloud Cleanup: Pending/Cooldown]";
+        writeSyncLog("Sync Berhasil: " . count($syncedReturnIds) . " return unboxing, " . count($syncedReceptionIds) . " receiving, " . count($syncedOrderIds) . " OCS orders, $downloadedPhotosCount foto terunduh" . $cleanStatus . ".");
     }
 
     return [

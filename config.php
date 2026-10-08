@@ -550,6 +550,13 @@ function jsonResponse($data, $statusCode = 200) {
 }
 
 // Auth & Session Helpers
+function getAppBaseUrl() {
+    $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+    $dir = str_replace('\\', '/', dirname($scriptName));
+    $dir = rtrim($dir, '/');
+    return ($dir === '' || $dir === '/' || $dir === '.') ? '/' : ($dir . '/');
+}
+
 function getSessionUser() {
     return $_SESSION['user'] ?? null;
 }
@@ -561,7 +568,7 @@ function requireLogin($allowedRoles = []) {
         if ($isApi) {
             jsonResponse(['error' => 'Sesi berakhir atau belum login. Silakan login kembali.'], 401);
         } else {
-            header('Location: login');
+            header('Location: ' . getAppBaseUrl() . 'login');
             exit;
         }
     }

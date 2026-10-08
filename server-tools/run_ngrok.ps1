@@ -15,9 +15,11 @@ if (Test-Path "C:\xampp\htdocs" -and -not (Test-Path $xamppHtdocs)) {
     cmd /c "mklink /j $xamppHtdocs `"$projectDir`"" | Out-Null
 }
 
-# 2. Cek apakah ngrok.exe ada
 if (-not (Test-Path $ngrokExe)) {
-    Write-Host "[INFO] Sedang mendownload ngrok.exe portable..." -ForegroundColor Cyan
+    if (Test-Path "C:\laragon\bin\ngrok\ngrok.exe") {
+        $ngrokExe = "C:\laragon\bin\ngrok\ngrok.exe"
+    } else {
+        Write-Host "[INFO] Sedang mendownload ngrok.exe portable..." -ForegroundColor Cyan
     $zipPath = Join-Path $projectDir "ngrok.zip"
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12

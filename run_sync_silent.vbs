@@ -2,12 +2,20 @@
 Set fso = CreateObject("Scripting.FileSystemObject")
 currentDir = fso.GetParentFolderName(WScript.ScriptFullName)
 
-phpBin = "C:\xampp\php\php.exe"
-If Not fso.FileExists(phpBin) Then
-    If fso.FileExists("C:\laragon\bin\php\php-8.3.16-Win32-vs16-x64\php.exe") Then
-        phpBin = "C:\laragon\bin\php\php-8.3.16-Win32-vs16-x64\php.exe"
-    Else
-        phpBin = "php.exe"
+phpBin = "php.exe"
+If fso.FileExists("C:\xampp\php\php.exe") Then
+    phpBin = "C:\xampp\php\php.exe"
+Else
+    laragonPhpDir = "C:\laragon\bin\php"
+    If fso.FolderExists(laragonPhpDir) Then
+        Set parentFld = fso.GetFolder(laragonPhpDir)
+        For Each subFld in parentFld.SubFolders
+            candidate = subFld.Path & "\php.exe"
+            If fso.FileExists(candidate) Then
+                phpBin = candidate
+                Exit For
+            End If
+        Next
     End If
 End If
 

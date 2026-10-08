@@ -87,10 +87,18 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$zip = Join-Path $en
 echo.
 echo [*] Menyinkronkan database MySQL, tabel, dan user...
 set PHP_BIN=php
-if exist "C:\xampp\php\php.exe" set PHP_BIN=C:\xampp\php\php.exe
-if exist "C:\laragon\bin\php\php-8.3.16-Win32-vs16-x64\php.exe" set PHP_BIN=C:\laragon\bin\php\php-8.3.16-Win32-vs16-x64\php.exe
+where php >nul 2>nul
+if %errorlevel% neq 0 (
+    if exist "C:\xampp\php\php.exe" (
+        set PHP_BIN="C:\xampp\php\php.exe"
+    ) else (
+        for /d %%i in (C:\laragon\bin\php\php*) do (
+            if exist "%%i\php.exe" set PHP_BIN="%%i\php.exe"
+        )
+    )
+)
 
-"%PHP_BIN%" "api\migrate.php" >nul 2>nul
+%PHP_BIN% "api\migrate.php" >nul 2>nul
 if %errorlevel% equ 0 (
     echo [OK] Database dan struktur tabel berhasil disinkronkan!
 ) else (

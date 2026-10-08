@@ -11,5 +11,5 @@ if (ini_get("session.use_cookies")) {
 }
 session_destroy();
 
-header('Location: login?msg=logged_out');
+header('Location: ' . getAppBaseUrl() . 'login?msg=logged_out');
 exit;

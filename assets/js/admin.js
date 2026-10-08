@@ -3516,6 +3516,19 @@ function renderReceivingTable(data) {
     }
 
     let rowsHtml = '';
+    const isSuperAdmin = Boolean(
+        window.IS_SUPER_ADMIN === true ||
+        (typeof window.CURRENT_USER_ROLE === 'string' &&
+         ['superadmin', 'super_admin', 'super admin'].includes(window.CURRENT_USER_ROLE.toLowerCase().trim()))
+    );
+    const isAdmin = Boolean(
+        window.IS_ADMIN === true ||
+        isSuperAdmin ||
+        (typeof window.CURRENT_USER_ROLE === 'string' &&
+         ['admin'].includes(window.CURRENT_USER_ROLE.toLowerCase().trim()))
+    );
+    const canDelete = (typeof window.IS_ADMIN !== 'undefined' || typeof window.IS_SUPER_ADMIN !== 'undefined') ? isAdmin : true;
+
     data.forEach((item, idx) => {
         const timeStr = item.created_at || '-';
         rowsHtml += `
@@ -3532,9 +3545,11 @@ function renderReceivingTable(data) {
                         <span class="bg-emerald-50 text-emerald-700 font-bold px-2.5 py-1 rounded-lg border border-emerald-200 text-xs inline-block">
                             ${escapeHtml(item.expedition)}
                         </span>
+                        ${isSuperAdmin ? `
                         <button type="button" onclick="openEditReceivingModal(${item.id})" class="text-amber-600 hover:text-amber-800 hover:bg-amber-100/70 p-1 rounded-md transition cursor-pointer" title="Edit Ekspedisi">
                             <i class="fa-solid fa-pen-to-square text-xs"></i>
                         </button>
+                        ` : ''}
                     </div>
                 </td>
                 <td class="py-3 px-4 font-medium text-slate-700">
@@ -3552,21 +3567,17 @@ function renderReceivingTable(data) {
                 <td class="py-3 px-4 text-slate-500 font-mono text-[11px]">${timeStr}</td>
                 <td class="py-3 px-4 text-center">
                     <div class="flex items-center justify-center gap-1.5">
-                        <button type="button" onclick="openEditReceivingModal(${item.id})" class="bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold px-2.5 py-1.5 rounded-xl border border-amber-200 text-xs flex items-center gap-1.5 transition shadow-2xs cursor-pointer" title="Edit Ekspedisi">
-                            <i class="fa-solid fa-pen-to-square text-amber-600"></i>
-                            <span>Edit</span>
+                        <button type="button" onclick="viewReceivingReceipt(${item.id})" class="w-8 h-8 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center transition shadow-2xs hover:scale-105 cursor-pointer" title="Lihat & Cetak Bukti Serah Terima">
+                            <i class="fa-solid fa-file-invoice text-emerald-600 text-xs"></i>
                         </button>
-                        <button onclick="viewReceivingReceipt(${item.id})" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold px-2.5 py-1.5 rounded-xl border border-emerald-200 text-xs flex items-center gap-1.5 transition shadow-2xs" title="Lihat & Cetak Bukti Serah Terima">
-                            <i class="fa-solid fa-file-invoice text-emerald-600"></i>
-                            <span>Bukti Serah Terima</span>
+                        <button type="button" onclick="viewReceivingPackagesList(${item.id})" class="w-8 h-8 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center justify-center transition shadow-2xs hover:scale-105 cursor-pointer" title="Lihat Detail Paket & Foto">
+                            <i class="fa-solid fa-boxes-stacked text-indigo-600 text-xs"></i>
                         </button>
-                        <button onclick="viewReceivingPackagesList(${item.id})" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-2.5 py-1.5 rounded-xl border border-indigo-200 text-xs flex items-center gap-1.5 transition shadow-2xs" title="Lihat Detail Paket & Foto">
-                            <i class="fa-solid fa-boxes-stacked"></i>
-                            <span>Detail Paket</span>
+                        ${canDelete ? `
+                        <button type="button" onclick="deleteReceivingRecord(${item.id}, '${escapeHtml(item.receipt_number)}')" class="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 flex items-center justify-center transition shadow-2xs hover:scale-105 cursor-pointer" title="Hapus Data">
+                            <i class="fa-solid fa-trash-can text-rose-600 text-xs"></i>
                         </button>
-                        <button onclick="deleteReceivingRecord(${item.id}, '${escapeHtml(item.receipt_number)}')" class="bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold p-1.5 rounded-xl border border-rose-200 text-xs flex items-center transition" title="Hapus Data">
-                            <i class="fa-solid fa-trash-can"></i>
-                        </button>
+                        ` : ''}
                     </div>
                 </td>
             </tr>
@@ -3578,6 +3589,16 @@ function renderReceivingTable(data) {
 
 // Buka Modal Edit Ekspedisi Penerimaan
 window.openEditReceivingModal = async function (id) {
+    const isSuperAdmin = Boolean(
+        window.IS_SUPER_ADMIN === true ||
+        (typeof window.CURRENT_USER_ROLE === 'string' &&
+         ['superadmin', 'super_admin', 'super admin'].includes(window.CURRENT_USER_ROLE.toLowerCase().trim()))
+    );
+    if (!isSuperAdmin) {
+        showToast('warning', 'Fitur edit ekspedisi hanya dapat diakses oleh Super Admin.', 'Akses Terbatas');
+        return;
+    }
+
     const modal = document.getElementById('modalEditReceivingExpedition');
     if (!modal) return;
 

@@ -407,6 +407,11 @@ if ($method === 'DELETE' || ($method === 'POST' && isset($_GET['action']) && $_G
 // 1b. POST ?action=update_expedition : EDIT EKSPEDISI & DATA PENERIMAAN
 // ==========================================
 if ($method === 'POST' && (($_GET['action'] ?? '') === 'update_expedition' || ($_POST['action'] ?? '') === 'update_expedition')) {
+    $rawUserRole = strtolower(trim(str_replace([' ', '_', '-'], '', $user['role'] ?? '')));
+    if ($rawUserRole !== 'superadmin') {
+        jsonResponse(['error' => 'Akses ditolak. Fitur edit ekspedisi hanya diizinkan untuk Super Admin.'], 403);
+    }
+
     $input = [];
     if (!empty($_POST['expedition']) || !empty($_POST['id'])) {
         $input = $_POST;

@@ -8,12 +8,12 @@ require_once __DIR__ . '/config.php';
 
 $user = getSessionUser();
 if (!$user) {
-    header('Location: login');
+    header('Location: ' . getAppBaseUrl() . 'login');
     exit;
 }
 
 // Redirect otomatis ke dashboard admin tab approval-jnt agar selalu tampil bersama sidebar
-header('Location: admin?tab=approval-jnt');
+header('Location: ' . getAppBaseUrl() . 'admin?tab=approval-jnt');
 exit;
 ?>
 <!DOCTYPE html>

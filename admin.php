@@ -21,7 +21,12 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
     $appBaseHref = ($appBaseDir === '' || $appBaseDir === '/') ? '/' : ($appBaseDir . '/');
     ?>
     <base href="<?= htmlspecialchars($appBaseHref) ?>">
-    <script>window.APP_BASE_URL = <?= json_encode($appBaseHref) ?>;</script>
+    <script>
+        window.APP_BASE_URL = <?= json_encode($appBaseHref) ?>;
+        window.CURRENT_USER_ROLE = <?= json_encode($rawRole) ?>;
+        window.IS_SUPER_ADMIN = <?= $isSuperAdmin ? 'true' : 'false' ?>;
+        window.IS_ADMIN = <?= $isAdmin ? 'true' : 'false' ?>;
+    </script>
     <!-- Favicon Huruf D Warna Hijau -->
     <link rel="icon" type="image/svg+xml" href="assets/image/favicon.svg">
     <link rel="icon" type="image/png" href="assets/image/favicon.png">
