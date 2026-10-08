@@ -409,18 +409,28 @@ if ($method === 'DELETE' || ($method === 'POST' && isset($_GET['action']) && $_G
 //     pernah melebihi batas post_max_size server.
 // ==========================================
 if ($method === 'POST' && ($_GET['action'] ?? '') === 'upload_photo') {
-    $rawUp = file_get_contents('php://input');
-    $up = json_decode($rawUp, true);
-    if (!is_array($up)) {
+    $up = [];
+    if (!empty($_POST['photo'])) {
         $up = $_POST;
+    } elseif (!empty($_POST['data'])) {
+        $up = json_decode($_POST['data'], true) ?: [];
+    } else {
+        $rawUp = file_get_contents('php://input');
+        if ($rawUp) {
+            $rawUp = preg_replace('/^[\xEF\xBB\xBF]+/', '', trim($rawUp));
+            $up = json_decode($rawUp, true) ?: [];
+        }
     }
-    $photoData = $up['photo'] ?? '';
+    if (!is_array($up)) $up = [];
+
+    $photoData = $up['photo'] ?? ($_POST['photo'] ?? '');
     if (!is_string($photoData) || !preg_match('/^data:image\/(jpeg|jpg|png|webp);base64,/i', $photoData, $mType)) {
         $len = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+        $maxStr = ini_get('post_max_size') ?: '30M';
         jsonResponse([
-            'error' => $len > 0 && empty($up)
-                ? 'Foto gagal diterima server (ukuran ' . round($len / 1048576, 2) . ' MB melebihi batas ' . ini_get('post_max_size') . ').'
-                : 'Data foto tidak valid.'
+            'error' => ($len > 30 * 1048576)
+                ? 'Foto gagal diterima server (ukuran ' . round($len / 1048576, 2) . ' MB melebihi batas ' . $maxStr . ').'
+                : 'Data foto tidak valid atau tidak terbaca oleh server.'
         ], 400);
     }
     $decoded = base64_decode(substr($photoData, strpos($photoData, ',') + 1), true);
@@ -428,7 +438,7 @@ if ($method === 'POST' && ($_GET['action'] ?? '') === 'upload_photo') {
         jsonResponse(['error' => 'Data foto rusak / tidak dapat dibaca.'], 400);
     }
     $ext = strtolower($mType[1]) === 'jpeg' ? 'jpg' : strtolower($mType[1]);
-    $prefix = preg_replace('/[^a-zA-Z0-9_\-]/', '_', (string)($up['prefix'] ?? 'pkg'));
+    $prefix = preg_replace('/[^a-zA-Z0-9_\-]/', '_', (string)($up['prefix'] ?? ($_POST['prefix'] ?? 'pkg')));
     $prefix = substr($prefix ?: 'pkg', 0, 120);
     $fname = $prefix . '_' . time() . '_' . mt_rand(1000, 9999) . '.' . $ext;
 
@@ -467,23 +477,35 @@ if ($method === 'POST' && ($_GET['action'] ?? '') === 'upload_photo') {
 // 2. POST: SIMPAN PENERIMAAN PAKET MULTIPLE
 // ==========================================
 if ($method === 'POST') {
-    $rawInput = file_get_contents('php://input');
-    $input = json_decode($rawInput, true);
-    if (!is_array($input)) {
+    $input = [];
+    if (!empty($_POST['data'])) {
+        $input = json_decode($_POST['data'], true);
+    } elseif (!empty($_POST['payload'])) {
+        $input = json_decode($_POST['payload'], true);
+    } elseif (!empty($_POST['packages']) || !empty($_POST['expedition'])) {
         $input = $_POST;
+    } else {
+        $rawInput = file_get_contents('php://input');
+        if ($rawInput) {
+            $rawInput = preg_replace('/^[\xEF\xBB\xBF]+/', '', trim($rawInput));
+            $input = json_decode($rawInput, true);
+        }
     }
 
-    // Body kosong: biasanya karena ukuran request melebihi post_max_size (PHP membuang seluruh body)
-    if (empty($input) || !is_array($input)) {
+    // Validasi payload
+    if (!is_array($input) || empty($input)) {
         $len = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
-        if ($len > 0 || strlen((string)$rawInput) === 0) {
+        $maxStr = ini_get('post_max_size') ?: '30M';
+        $unit = strtolower(substr($maxStr, -1));
+        $val = (int)$maxStr;
+        $maxBytes = $unit === 'g' ? $val * 1073741824 : ($unit === 'm' ? $val * 1048576 : ($unit === 'k' ? $val * 1024 : $val));
+
+        if ($len > 0 && $maxBytes > 0 && $len > $maxBytes) {
             jsonResponse([
-                'error' => 'Data penerimaan tidak sampai ke server'
-                    . ($len > 0 ? ' (ukuran ' . round($len / 1048576, 2) . ' MB, batas server ' . ini_get('post_max_size') . ')' : '')
-                    . '. Muat ulang halaman (draft tetap aman) lalu klik Simpan kembali.'
+                'error' => 'Data penerimaan melebihi batas upload server (' . round($len / 1048576, 2) . ' MB, batas server ' . $maxStr . '). Coba bagi paket ke beberapa karung.'
             ], 413);
         }
-        jsonResponse(['error' => 'Format data penerimaan tidak valid (JSON rusak).'], 400);
+        jsonResponse(['error' => 'Data penerimaan kosong atau tidak terbaca oleh server. Silakan coba simpan kembali.'], 400);
     }
 
     $expedition   = trim($input['expedition'] ?? '');

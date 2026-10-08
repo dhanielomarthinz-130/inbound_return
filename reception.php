@@ -2143,10 +2143,12 @@ try {
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 12000);
                     const uploadEndpoint = (window.APP_BASE_URL || '').replace(/\/+$/, '') + '/api/reception.php?action=upload_photo';
+                    const fd = new FormData();
+                    fd.append('photo', compact);
+                    fd.append('prefix', prefix);
                     const res = await fetch(uploadEndpoint, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ photo: compact, prefix }),
+                        body: fd,
                         signal: controller.signal
                     });
                     clearTimeout(timeoutId);
@@ -2406,10 +2408,11 @@ try {
             // Kirim 1 request simpan & parse respons (aman dari respons HTML / error PHP)
             const postReception = async (payload, batchLabel) => {
                 const apiEndpoint = (window.APP_BASE_URL || '').replace(/\/+$/, '') + '/api/reception.php';
+                const fd = new FormData();
+                fd.append('data', JSON.stringify(payload));
                 const res = await fetch(apiEndpoint, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: fd
                 });
                 const responseText = await res.text();
                 let result = null;
