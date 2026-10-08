@@ -18,7 +18,7 @@ $files = @(
     "assets/js/operator.js",
     "public/js/operator.js",
     "index.php",
-    "uploads/.htaccess"
+    ".htaccess"
 )
 
 Write-Host "Mengunggah $($files.Count) file perbaikan ke $remoteBase ..." -ForegroundColor Cyan
