@@ -19,7 +19,7 @@ if (file_exists(__DIR__ . '/sync_config.php')) {
 }
 
 $isCli = (php_sapi_name() === 'cli');
-$isDaemon = $isCli && (isset($argv[1]) && $argv[1] === '--daemon');
+$isDaemon = $isCli && (in_array('--daemon', (array)($argv ?? []), true) || in_array('-d', (array)($argv ?? []), true));
 
 if (!$isCli) {
     header('Content-Type: application/json; charset=utf-8');
