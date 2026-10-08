@@ -183,9 +183,26 @@ function downloadCloudPhoto($cloudUrl, $relPath) {
 /**
  * Eksekutor 1 Putaran Sinkronisasi
  */
-function executeSyncRound($pdo) {
+function executeSyncRound(&$pdo) {
+    // 0. Pastikan koneksi MySQL Localhost tetap hidup (cegah error 2006 MySQL server has gone away)
+    try {
+        if ($pdo) {
+            $pdo->query("SELECT 1");
+        } else {
+            throw new Exception("PDO null");
+        }
+    } catch (Exception $ePdo) {
+        try {
+            require __DIR__ . '/config.php';
+        } catch (Exception $eRecon) {
+            $errMsg = "Database MySQL Localhost tidak terhubung: " . $eRecon->getMessage();
+            writeSyncLog("Error: $errMsg");
+            return ['success' => false, 'error' => $errMsg];
+        }
+    }
+
     if (!$pdo) {
-        $errMsg = "Database MySQL Localhost tidak terhubung. Pastikan service MySQL/MariaDB di XAMPP atau Laragon sudah dijalankan.";
+        $errMsg = "Database MySQL Localhost tidak terhubung. Pastikan service MySQL di XAMPP sudah dijalankan.";
         writeSyncLog("Error: $errMsg");
         return ['success' => false, 'error' => $errMsg];
     }
