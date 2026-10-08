@@ -519,24 +519,33 @@ if ($hasFilesVideo) {
 // Prioritas 2 / Fallback: Simpan dari Base64 jika belum tersimpan (kebal error upload_tmp_dir)
 if (empty($videoPath) && $hasBase64Video) {
     $cleanB64 = $rawVideoBase64;
-    if (preg_match('/^data:video\/(\w+);base64,/', $cleanB64, $mType)) {
+    // Potong header data:video/...;base64, jika ada koma (mendukung codecs webm, mp4, dsb.)
+    if (strpos($cleanB64, ',') !== false) {
+        $headerPart = substr($cleanB64, 0, strpos($cleanB64, ','));
         $cleanB64 = substr($cleanB64, strpos($cleanB64, ',') + 1);
-        $matchedExt = strtolower($mType[1]);
-        if (in_array($matchedExt, ['webm', 'mp4'], true)) {
-            $ext = $matchedExt;
-            $fileName = 'video_' . $cleanInv . '_' . time() . '_' . substr(md5(uniqid((string)rand(), true)), 0, 6) . '.' . $ext;
-            $targetFile = $uploadDir . $fileName;
+        if (preg_match('/video\/(mp4|webm)/i', $headerPart, $mExt)) {
+            $ext = strtolower($mExt[1]);
         }
     }
+    // Bersihkan spasi atau newline yang mungkin terbentuk saat transmisi HTTP
+    $cleanB64 = str_replace([' ', "\r", "\n", "\t"], ['+', '', '', ''], trim($cleanB64));
+    
     $decodedVideo = base64_decode($cleanB64);
     if ($decodedVideo && strlen($decodedVideo) >= 100) {
-        if (file_put_contents($targetFile, $decodedVideo)) {
+        $fileName = 'video_' . $cleanInv . '_' . time() . '_' . substr(md5(uniqid((string)rand(), true)), 0, 6) . '.' . $ext;
+        $targetFile = $uploadDir . $fileName;
+        
+        if (@file_put_contents($targetFile, $decodedVideo) !== false) {
             $videoPath = 'uploads/videos/' . $fileName;
             $videoStatus = 'uploaded_base64';
             $writtenFiles[] = $videoPath;
         } else {
             error_log("file_put_contents failed for video to " . $targetFile);
+            $videoStatus = 'write_failed';
         }
+    } else {
+        error_log("base64_decode failed or produced empty video bytes");
+        $videoStatus = 'decode_failed';
     }
 }
 
@@ -544,9 +553,9 @@ if (empty($videoPath) && $hasBase64Video) {
 if (empty($videoPath) || !file_exists(__DIR__ . '/../' . $videoPath) || filesize(__DIR__ . '/../' . $videoPath) < 100) {
     cleanupWrittenFiles();
     jsonResponse([
-        'error' => 'Rekaman video unboxing WAJIB ada dan valid! Pastikan webcam/kamera menyala dan merekam proses unboxing sebelum menyelesaikan sesi.',
+        'error' => 'Gagal menyimpan rekaman video unboxing di server (' . $videoStatus . '). Pastikan ruang hosting mencukupi dan coba simpan kembali.',
         'video_status' => $videoStatus
-    ], 400);
+    ], 500);
 }
 
 $totalGood = 0;

@@ -2449,13 +2449,30 @@ window.submitFinalSession = async function() {
         try {
             videoBase64 = await new Promise((resolve) => {
                 const reader = new FileReader();
-                reader.onload = (e) => resolve(e.target.result);
-                reader.onerror = () => resolve(null);
+                let done = false;
+                reader.onload = () => {
+                    if (!done) { done = true; resolve(reader.result || null); }
+                };
+                reader.onloadend = () => {
+                    if (!done) { done = true; resolve(reader.result || null); }
+                };
+                reader.onerror = () => {
+                    if (!done) { done = true; resolve(null); }
+                };
                 reader.readAsDataURL(videoBlob);
             });
         } catch (convErr) {
             console.warn('Konversi video unboxing ke Base64 gagal:', convErr);
         }
+    }
+
+    if (!videoBase64 || videoBase64.length < 100) {
+        hideGlobalLoading();
+        isSubmittingFinalSession = false;
+        btn.disabled = false;
+        btn.innerHTML = btnOrigHtml;
+        showToast('error', 'Gagal memproses file rekaman video unboxing di browser. Silakan klik Simpan kembali.', 'Gagal Proses Video');
+        return;
     }
 
     const payload = {
@@ -2473,7 +2490,6 @@ window.submitFinalSession = async function() {
             title: p.title
         })),
         items: optimizedItems,
-        video_base64: videoBase64,
         video_ext: vExt
     };
 
@@ -2483,10 +2499,8 @@ window.submitFinalSession = async function() {
     try {
         const formData = new FormData();
         formData.append('data', payloadJson);
-        if (videoBase64) {
-            formData.append('video_base64', videoBase64);
-            formData.append('video_ext', vExt);
-        }
+        formData.append('video_base64', videoBase64);
+        formData.append('video_ext', vExt);
 
         // Gunakan XMLHttpRequest untuk memantau progress upload secara real-time
         const result = await new Promise((resolve, reject) => {
