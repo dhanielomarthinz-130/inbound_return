@@ -28,3 +28,4 @@ cloudflared.exe
 ngrok.exe
 ngrok_domain.txt
 scratch/
+_backup_*/

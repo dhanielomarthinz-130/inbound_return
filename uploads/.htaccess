@@ -1,0 +1,38 @@
+# Keamanan folder uploads: file skrip TIDAK BOLEH dieksekusi / diakses.
+# Gambar & video (jpg, png, webp, webm, mp4, dll.) tetap dapat ditampilkan seperti biasa.
+
+
+# Matikan engine PHP di folder ini (bila PHP berjalan sebagai modul Apache)
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php5.c>
+    php_flag engine off
+</IfModule>
+<IfModule php_module>
+    php_flag engine off
+</IfModule>
+<IfModule php7_module>
+    php_flag engine off
+</IfModule>
+<IfModule php8_module>
+    php_flag engine off
+</IfModule>
+
+# Jangan jalankan skrip sebagai PHP/CGI walau ekstensinya cocok
+RemoveHandler .php .phtml .php3 .php4 .php5 .php7 .php8 .phps .phar .pl .py .cgi .sh
+RemoveType .php .phtml .php3 .php4 .php5 .php7 .php8 .phps .phar
+
+# Tolak akses langsung ke file skrip / sensitif (Apache 2.4 & 2.2)
+<FilesMatch "(?i)\.(php\d?|phtml|phps|phar|pl|py|cgi|sh|asp|aspx|jsp|htaccess|htpasswd|ini|log|json|txt)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>

@@ -7,6 +7,30 @@ header('Content-Type: application/json; charset=utf-8');
 
 $method = $_SERVER['REQUEST_METHOD'];
 
+// Nomor tanda terima berikutnya (RCV-YYYYMMDD-XXXX) berdasarkan urutan TERBESAR hari ini
+// (bukan baris terakhir), dipakai oleh generate_id, auto-generate, dan saat nomor bentrok.
+// $after: nomor yang barusan bentrok (opsional) -> hasil dijamin lebih besar dari nomor tsb,
+// sehingga retry di dalam transaksi (snapshot REPEATABLE READ) tetap maju.
+if (!function_exists('nextReceiptNumber')) {
+    function nextReceiptNumber(PDO $pdo, string $after = ''): string {
+        $prefix = 'RCV-' . date('Ymd') . '-';
+        $st = $pdo->prepare("
+            SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(receipt_number, '-', -1) AS UNSIGNED)), 0)
+            FROM expedition_receptions
+            WHERE receipt_number LIKE ?
+        ");
+        $st->execute([$prefix . '%']);
+        $seq = (int)$st->fetchColumn() + 1;
+        if ($after !== '' && strpos($after, $prefix) === 0) {
+            $afterSeq = (int)substr($after, strlen($prefix));
+            if ($seq <= $afterSeq) {
+                $seq = $afterSeq + 1;
+            }
+        }
+        return $prefix . str_pad((string)$seq, 4, '0', STR_PAD_LEFT);
+    }
+}
+
 // ==========================================
 // 1. GET: GENERATE ID, LIST, ATAU DETAIL
 // ==========================================
@@ -15,27 +39,7 @@ if ($method === 'GET') {
 
     // A. Generate Receipt Number unik (RCV-YYYYMMDD-XXXX)
     if ($action === 'generate_id') {
-        $todayPrefix = 'RCV-' . date('Ymd') . '-';
-        $stmt = $pdo->prepare("
-            SELECT receipt_number 
-            FROM expedition_receptions 
-            WHERE receipt_number LIKE ? 
-            ORDER BY id DESC 
-            LIMIT 1
-        ");
-        $stmt->execute([$todayPrefix . '%']);
-        $lastRow = $stmt->fetch();
-
-        $nextSeq = 1;
-        if ($lastRow && !empty($lastRow['receipt_number'])) {
-            $parts = explode('-', $lastRow['receipt_number']);
-            $numPart = end($parts);
-            if (is_numeric($numPart)) {
-                $nextSeq = intval($numPart) + 1;
-            }
-        }
-
-        $newId = $todayPrefix . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+        $newId = nextReceiptNumber($pdo);
         jsonResponse([
             'success' => true,
             'receipt_number' => $newId
@@ -492,6 +496,21 @@ if ($method === 'POST') {
     $isChunk      = !empty($input['is_chunk']);
     $chunkIndex   = (int)($input['chunk_index'] ?? 0);
     $totalExpected = (int)($input['total_packages'] ?? count((array)$packages));
+    // ID header dari batch sebelumnya (opsional) agar batch lanjutan / retry menempel ke header yang benar
+    $continueReceptionId = (int)($input['reception_id'] ?? 0);
+
+    // Potong teks agar tidak melebihi panjang kolom VARCHAR (strict mode -> error 1406 "Data too long")
+    $cutLen = function($str, $max) {
+        $str = (string)$str;
+        return function_exists('mb_substr') ? mb_substr($str, 0, $max, 'UTF-8') : substr($str, 0, $max);
+    };
+    $strLen = function($str) {
+        return function_exists('mb_strlen') ? mb_strlen((string)$str, 'UTF-8') : strlen((string)$str);
+    };
+    $courierName = $cutLen($courierName, 150);
+    $sackNumber  = $cutLen($sackNumber, 100);
+    $vehicleNo   = $cutLen($vehicleNo, 50);
+    $receiptNo   = $cutLen($receiptNo, 100);
 
     if (empty($expedition)) {
         jsonResponse(['error' => 'Ekspedisi pengantar tidak terbaca oleh server. Pilih ulang ekspedisi di Langkah 1 lalu simpan kembali.'], 400);
@@ -507,7 +526,7 @@ if ($method === 'POST') {
         if (is_array($pkg)) {
             $b = trim((string)($pkg['barcode'] ?? ''));
             $p = $pkg['photo'] ?? null;
-            $s = trim((string)($pkg['sack_number'] ?? '')) ?: $sackNumber;
+            $s = $cutLen(trim((string)($pkg['sack_number'] ?? '')), 100) ?: $sackNumber;
             if ($b !== '') {
                 $cleanPackages[] = [
                     'barcode'     => $b,
@@ -539,6 +558,15 @@ if ($method === 'POST') {
     }
     $cleanPackages = $uniquePackages;
 
+    // Barcode lebih dari 100 karakter tidak muat di kolom package_barcode (biasanya QR yang ter-scan, bukan resi)
+    foreach ($cleanPackages as $cp) {
+        if ($strLen($cp['barcode']) > 100) {
+            jsonResponse([
+                'error' => 'Barcode terlalu panjang (' . $strLen($cp['barcode']) . ' karakter): "' . $cutLen($cp['barcode'], 40) . '…". Kemungkinan QR yang ter-scan, bukan resi. Hapus paket tersebut dari draft lalu simpan kembali.'
+            ], 400);
+        }
+    }
+
     // Rangkum seluruh karung yang ada dalam penerimaan ini (bisa multiple karung per 1 ID)
     $distinctSacks = [];
     foreach ($cleanPackages as $cp) {
@@ -547,33 +575,34 @@ if ($method === 'POST') {
             $distinctSacks[] = $s;
         }
     }
-    $headerSackSummary = !empty($distinctSacks) ? implode(', ', $distinctSacks) : ($sackNumber ?: 'Karung 1');
+    $headerSackSummary = $cutLen(!empty($distinctSacks) ? implode(', ', $distinctSacks) : ($sackNumber ?: 'Karung 1'), 100);
 
     if (count($cleanPackages) === 0) {
         jsonResponse(['error' => 'Daftar barcode paket tidak boleh kosong!'], 400);
     }
 
+    // Batch lanjutan / retry: client mengirim reception_id dari respons batch sebelumnya.
+    // Validasi bahwa header tersebut ada dan nomor tanda terimanya cocok.
+    // Batch lanjutan / retry: client mengirim reception_id dari respons batch sebelumnya.
+    // Validasi bahwa header tersebut ada dan sinkronkan nomor tanda terimanya.
+    $continueHeader = null;
+    if ($continueReceptionId > 0) {
+        $stCont = $pdo->prepare("SELECT id, receipt_number FROM expedition_receptions WHERE id = ? LIMIT 1");
+        $stCont->execute([$continueReceptionId]);
+        $continueHeader = $stCont->fetch(PDO::FETCH_ASSOC) ?: null;
+        if ($continueHeader) {
+            // Gunakan nomor tanda terima resmi dari header yang sudah ada
+            $receiptNo = (string)$continueHeader['receipt_number'];
+        } else {
+            // Header tidak ditemukan di database (mis. draft lama atau sudah dibersihkan) -> buat header baru otomatis
+            $continueHeader = null;
+            $continueReceptionId = 0;
+        }
+    }
+
     // Jika nomor tanda terima belum diisi, generate otomatis
     if (empty($receiptNo)) {
-        $todayPrefix = 'RCV-' . date('Ymd') . '-';
-        $stmtSeq = $pdo->prepare("
-            SELECT receipt_number 
-            FROM expedition_receptions 
-            WHERE receipt_number LIKE ? 
-            ORDER BY id DESC 
-            LIMIT 1
-        ");
-        $stmtSeq->execute([$todayPrefix . '%']);
-        $lastRow = $stmtSeq->fetch();
-        $nextSeq = 1;
-        if ($lastRow && !empty($lastRow['receipt_number'])) {
-            $parts = explode('-', $lastRow['receipt_number']);
-            $numPart = end($parts);
-            if (is_numeric($numPart)) {
-                $nextSeq = intval($numPart) + 1;
-            }
-        }
-        $receiptNo = $todayPrefix . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+        $receiptNo = nextReceiptNumber($pdo);
     }
 
     $cleanRcpt = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $receiptNo);
@@ -712,71 +741,50 @@ if ($method === 'POST') {
         }
     } catch (Exception $eCols2) {}
 
-    // Anti Double-Submission & Idempotensi Penerimaan (Hanya dicek pada submit normal atau chunk #0)
-    if (!$isChunk || $chunkIndex === 0) {
+    // Anti Double-Submission & Idempotensi Penerimaan (submit normal atau chunk #0 tanpa reception_id).
+    // Dianggap "sudah tersimpan" HANYA jika nomor tanda terima sama DAN daftar barcode identik.
+    // Nomor sama dengan isi berbeda (2 operator dapat nomor yang sama) -> nomor baru, bukan dibuang.
+    if (!$continueHeader && (!$isChunk || $chunkIndex === 0)) {
         try {
             $chkRcpt = $pdo->prepare("SELECT id, receipt_number, expedition, total_packages, created_at FROM expedition_receptions WHERE receipt_number = ? LIMIT 1");
             $chkRcpt->execute([$receiptNo]);
             $existingRcpt = $chkRcpt->fetch(PDO::FETCH_ASSOC);
             if ($existingRcpt) {
-                $existingCreatedAt = strtotime($existingRcpt['created_at'] ?? '');
-                $isVeryRecent = ($existingCreatedAt && (time() - $existingCreatedAt) < 15);
-                // Jika ini double-click cepat (kurang dari 15 detik yang lalu) dengan jumlah paket yang sama, return sukses idempotent
-                if (!$isChunk && $isVeryRecent && (int)$existingRcpt['total_packages'] === count($cleanPackages)) {
+                $sameBatch = false;
+                $stB = $pdo->prepare("SELECT package_barcode FROM reception_packages WHERE reception_id = ?");
+                $stB->execute([$existingRcpt['id']]);
+                $oldCodes = array_values(array_unique(array_map(function($c) { return strtoupper(trim((string)$c)); }, $stB->fetchAll(PDO::FETCH_COLUMN))));
+                $newCodes = array_values(array_unique(array_map(function($c) { return strtoupper(trim((string)$c['barcode'])); }, $cleanPackages)));
+                sort($oldCodes);
+                sort($newCodes);
+                if (!$isChunk) {
+                    $sameBatch = (count($oldCodes) > 0 && $oldCodes === $newCodes);
+                } elseif (count($oldCodes) > 0
+                    && strcasecmp((string)$existingRcpt['expedition'], $expedition) === 0
+                    && count(array_diff($newCodes, $oldCodes)) === 0) {
+                    // Retry chunk #0 yang sebenarnya sudah tersimpan (respons hilang karena sinyal PDT):
+                    // lanjutkan ke header yang sama, jangan buat penerimaan baru yang setengah isi.
+                    $continueHeader = ['id' => (int)$existingRcpt['id'], 'receipt_number' => $existingRcpt['receipt_number']];
+                }
+                if ($continueHeader) {
+                    // lanjut ke header yang sudah ada (barcode yang sudah tersimpan akan dilewati)
+                } elseif ($sameBatch) {
                     jsonResponse([
                         'success'        => true,
                         'message'        => 'Penerimaan ini sudah tersimpan di database.',
                         'id'             => $existingRcpt['id'],
+                        'reception_id'   => $existingRcpt['id'],
                         'receipt_number' => $existingRcpt['receipt_number'],
                         'expedition'     => $existingRcpt['expedition'],
                         'total_packages' => (int)$existingRcpt['total_packages'],
                         'already_exists' => true
                     ]);
-                } elseif (!$isChunk) {
-                    // Generate receipt number baru otomatis agar tidak bentrok dengan data lama
-                    $todayPrefix = 'RCV-' . date('Ymd') . '-';
-                    $stmtMaxSeq = $pdo->prepare("SELECT receipt_number FROM expedition_receptions WHERE receipt_number LIKE ? ORDER BY id DESC LIMIT 1");
-                    $stmtMaxSeq->execute([$todayPrefix . '%']);
-                    $maxRow = $stmtMaxSeq->fetch();
-                    $genSeq = 1;
-                    if ($maxRow && !empty($maxRow['receipt_number'])) {
-                        $parts = explode('-', $maxRow['receipt_number']);
-                        $numPart = end($parts);
-                        if (is_numeric($numPart)) {
-                            $genSeq = intval($numPart) + 1;
-                        }
-                    }
-                    $receiptNo = $todayPrefix . str_pad($genSeq, 4, '0', STR_PAD_LEFT);
+                } else {
+                    // Generate receipt number baru otomatis agar tidak bentrok dengan data lama (juga untuk chunk #0)
+                    $receiptNo = nextReceiptNumber($pdo, $receiptNo);
                 }
             }
         } catch (Exception $eRcpt) {}
-
-        // Anti double-submit cepat operator
-        if (!$isChunk) {
-            try {
-                $opNameCheck = $user['name'] ?? $user['username'] ?? 'Operator';
-                $chkFastDup = $pdo->prepare("
-                    SELECT id, receipt_number, expedition, total_packages 
-                    FROM expedition_receptions 
-                    WHERE operator_name = ? AND expedition = ? AND total_packages = ? AND created_at >= (NOW() - INTERVAL 8 SECOND)
-                    ORDER BY id DESC 
-                    LIMIT 1
-                ");
-                $chkFastDup->execute([$opNameCheck, $expedition, count($cleanPackages)]);
-                $fastDup = $chkFastDup->fetch(PDO::FETCH_ASSOC);
-                if ($fastDup) {
-                    jsonResponse([
-                        'success'        => true,
-                        'message'        => 'Penerimaan telah berhasil dicatat sebelumnya.',
-                        'id'             => $fastDup['id'],
-                        'receipt_number' => $fastDup['receipt_number'],
-                        'expedition'     => $fastDup['expedition'],
-                        'total_packages' => (int)$fastDup['total_packages'],
-                        'already_exists' => true
-                    ]);
-                }
-            } catch (Exception $eDup) {}
-        }
     }
 
     $hasCourierNameCol   = in_array('courier_name', $recCols);
@@ -795,74 +803,100 @@ if ($method === 'POST') {
         $operatorName = $user['name'] ?? $user['username'] ?? 'Operator';
         $totalCount   = count($cleanPackages);
         $receptionId  = null;
+        $headerPreExisted = false;
 
-        // Jika mode chunk > 0, temukan header penerimaan yang telah dibuat di chunk #0
-        if ($isChunk && $chunkIndex > 0) {
+        if ($continueHeader) {
+            // Batch lanjutan / retry dengan reception_id yang sudah divalidasi
+            $receptionId = (int)$continueHeader['id'];
+        } elseif ($isChunk && $chunkIndex > 0) {
+            // Kompatibilitas client lama: chunk > 0 tanpa reception_id -> cari header berdasarkan nomor tanda terima
             $stmtFindRec = $pdo->prepare("SELECT id FROM expedition_receptions WHERE receipt_number = ? LIMIT 1");
             $stmtFindRec->execute([$receiptNo]);
             $receptionId = $stmtFindRec->fetchColumn();
         }
+        if ($receptionId) {
+            $headerPreExisted = true;
+        }
 
-        // Jika belum ada header (submit normal atau chunk #0), buatkan header baru
+        // Jika belum ada header (submit normal atau chunk #0), buatkan header baru.
+        // Nomor yang sudah dipakai header lain TIDAK lagi ditumpangi (lihat cek anti-bentrok di atas);
+        // jika bentrok terjadi bersamaan (error 1062), nomor baru dibuat lalu INSERT diulang.
         if (!$receptionId) {
-            // Cek apakah header dengan nomor tanda terima ini sudah ada
-            $stmtExHead = $pdo->prepare("SELECT id FROM expedition_receptions WHERE receipt_number = ? LIMIT 1");
-            $stmtExHead->execute([$receiptNo]);
-            $receptionId = $stmtExHead->fetchColumn();
+            $initTotal = $isChunk ? $totalExpected : $totalCount;
+            $fields = ['receipt_number', 'expedition', 'operator_name', 'total_packages', 'status', 'created_at'];
+            $placeholders = ['?', '?', '?', '?', "'RECEIVED'", 'NOW()'];
+            $values = [$receiptNo, $expedition, $operatorName, $initTotal];
 
-            if (!$receptionId) {
-                $initTotal = $isChunk ? $totalExpected : $totalCount;
-                $fields = ['receipt_number', 'expedition', 'operator_name', 'total_packages', 'status', 'created_at'];
-                $placeholders = ['?', '?', '?', '?', "'RECEIVED'", 'NOW()'];
-                $values = [$receiptNo, $expedition, $operatorName, $initTotal];
+            if ($hasCourierNameCol) {
+                $fields[] = 'courier_name';
+                $placeholders[] = '?';
+                $values[] = $courierName ?: null;
+            }
+            if ($hasSackNumberCol) {
+                $fields[] = 'sack_number';
+                $placeholders[] = '?';
+                $values[] = $headerSackSummary ?: ($sackNumber ?: null);
+            }
+            if ($hasCourierPhotoCol) {
+                $fields[] = 'courier_photo';
+                $placeholders[] = '?';
+                $values[] = $savedCourierPhoto ?: null;
+            }
+            if ($hasVehicleNoCol) {
+                $fields[] = 'vehicle_no';
+                $placeholders[] = '?';
+                $values[] = $vehicleNo ?: null;
+            }
+            if ($hasNotesCol) {
+                $fields[] = 'notes';
+                $placeholders[] = '?';
+                $values[] = $notes ?: null;
+            }
+            if ($hasPhotoPathCol) {
+                $fields[] = 'photo_path';
+                $placeholders[] = '?';
+                $values[] = $mainPhotoPath;
+            }
+            if ($hasPackagePhotosCol) {
+                $fields[] = 'package_photos';
+                $placeholders[] = '?';
+                $values[] = $allPhotosJson;
+            }
 
-                if ($hasCourierNameCol) {
-                    $fields[] = 'courier_name';
-                    $placeholders[] = '?';
-                    $values[] = $courierName ?: null;
-                }
-                if ($hasSackNumberCol) {
-                    $fields[] = 'sack_number';
-                    $placeholders[] = '?';
-                    $values[] = $headerSackSummary ?: ($sackNumber ?: null);
-                }
-                if ($hasCourierPhotoCol) {
-                    $fields[] = 'courier_photo';
-                    $placeholders[] = '?';
-                    $values[] = $savedCourierPhoto ?: null;
-                }
-                if ($hasVehicleNoCol) {
-                    $fields[] = 'vehicle_no';
-                    $placeholders[] = '?';
-                    $values[] = $vehicleNo ?: null;
-                }
-                if ($hasNotesCol) {
-                    $fields[] = 'notes';
-                    $placeholders[] = '?';
-                    $values[] = $notes ?: null;
-                }
-                if ($hasPhotoPathCol) {
-                    $fields[] = 'photo_path';
-                    $placeholders[] = '?';
-                    $values[] = $mainPhotoPath;
-                }
-                if ($hasPackagePhotosCol) {
-                    $fields[] = 'package_photos';
-                    $placeholders[] = '?';
-                    $values[] = $allPhotosJson;
-                }
-
-                $sqlHead = "INSERT INTO expedition_receptions (" . implode(', ', $fields) . ") VALUES (" . implode(', ', $placeholders) . ")";
-                $stmtHead = $pdo->prepare($sqlHead);
-                $stmtHead->execute($values);
-                $receptionId = $pdo->lastInsertId();
-            } else {
-                // Perbarui informasi header jika perlu
-                if (!empty($savedCourierPhoto) && $hasCourierPhotoCol) {
-                    $pdo->prepare("UPDATE expedition_receptions SET courier_photo = COALESCE(courier_photo, ?) WHERE id = ?")->execute([$savedCourierPhoto, $receptionId]);
+            $sqlHead = "INSERT INTO expedition_receptions (" . implode(', ', $fields) . ") VALUES (" . implode(', ', $placeholders) . ")";
+            $stmtHead = $pdo->prepare($sqlHead);
+            for ($tryHead = 0; ; $tryHead++) {
+                try {
+                    $values[0] = $receiptNo;
+                    $stmtHead->execute($values);
+                    $receptionId = $pdo->lastInsertId();
+                    break;
+                } catch (PDOException $eIns) {
+                    $isDupKey = ((int)($eIns->errorInfo[1] ?? 0) === 1062);
+                    if (!$isDupKey || $tryHead >= 4) {
+                        throw $eIns;
+                    }
+                    // Nomor tanda terima direbut operator lain di saat bersamaan -> ambil nomor berikutnya
+                    $receiptNo = nextReceiptNumber($pdo, $receiptNo);
                 }
             }
+        } else {
+            // Perbarui informasi header jika perlu
+            if (!empty($savedCourierPhoto) && $hasCourierPhotoCol) {
+                $pdo->prepare("UPDATE expedition_receptions SET courier_photo = COALESCE(courier_photo, ?) WHERE id = ?")->execute([$savedCourierPhoto, $receptionId]);
+            }
         }
+
+        // Barcode yang sudah tersimpan di header ini (retry batch) dilewati agar tidak tercatat ganda
+        $alreadyStored = [];
+        if ($headerPreExisted) {
+            $stAlready = $pdo->prepare("SELECT package_barcode FROM reception_packages WHERE reception_id = ?");
+            $stAlready->execute([$receptionId]);
+            foreach ($stAlready->fetchAll(PDO::FETCH_COLUMN) as $ac) {
+                $alreadyStored[strtoupper(trim((string)$ac))] = true;
+            }
+        }
+        $skippedExisting = 0;
 
         // 2. Simpan Detail Paket ke reception_packages
         if ($hasItemPhotoCol && $hasItemSackCol) {
@@ -888,6 +922,10 @@ if ($method === 'POST') {
         }
 
         foreach ($cleanPackages as $pkg) {
+            if (isset($alreadyStored[strtoupper(trim($pkg['barcode']))])) {
+                $skippedExisting++;
+                continue;
+            }
             if ($hasItemPhotoCol && $hasItemSackCol) {
                 $stmtItem->execute([$receptionId, $pkg['barcode'], $pkg['sack_number'], $pkg['saved_photo']]);
             } elseif ($hasItemPhotoCol) {
@@ -905,6 +943,22 @@ if ($method === 'POST') {
         $actualSavedCount = (int)$cntActual->fetchColumn();
         $pdo->prepare("UPDATE expedition_receptions SET total_packages = ? WHERE id = ?")->execute([$actualSavedCount, $receptionId]);
 
+        // Header dari batch sebelumnya: perbarui ringkasan karung dari SELURUH paket yang tersimpan
+        if ($headerPreExisted && $hasSackNumberCol && $hasItemSackCol) {
+            $stSacks = $pdo->prepare("SELECT sack_number FROM reception_packages WHERE reception_id = ? ORDER BY id ASC");
+            $stSacks->execute([$receptionId]);
+            $allSacks = [];
+            foreach ($stSacks->fetchAll(PDO::FETCH_COLUMN) as $sn) {
+                $sn = trim((string)$sn);
+                if ($sn !== '' && !in_array($sn, $allSacks)) {
+                    $allSacks[] = $sn;
+                }
+            }
+            if (!empty($allSacks)) {
+                $pdo->prepare("UPDATE expedition_receptions SET sack_number = ? WHERE id = ?")->execute([$cutLen(implode(', ', $allSacks), 100), $receptionId]);
+            }
+        }
+
         if ($pdo->inTransaction()) {
             $pdo->commit();
         }
@@ -916,8 +970,9 @@ if ($method === 'POST') {
             'message'        => $isChunk 
                 ? "Batch paket berhasil disimpan ({$actualSavedCount} / {$totalExpected} paket)." 
                 : "Penerimaan {$totalCount} paket ekspedisi {$expedition} berhasil disimpan!",
-            'reception_id'   => $receptionId,
+            'reception_id'   => (int)$receptionId,
             'receipt_number' => $receiptNo,
+            'skipped_existing' => $skippedExisting,
             'expedition'     => $expedition,
             'total_packages' => $actualSavedCount,
             'operator_name'  => $operatorName,

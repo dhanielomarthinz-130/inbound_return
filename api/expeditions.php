@@ -11,6 +11,11 @@ if (!$input) {
 
 $action = $_GET['action'] ?? $input['action'] ?? '';
 
+// Operasi tulis (tambah / ubah / hapus) wajib login; GET daftar tetap terbuka untuk halaman operator
+if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true) || in_array($action, ['delete', 'update', 'create'], true)) {
+    requireLogin(); // wajib login (role apa pun) — cegah perubahan master data tanpa sesi
+}
+
 // 1. DELETE EXPEDITION
 if ($method === 'DELETE' || $action === 'delete') {
     $id = (int)($_GET['id'] ?? $input['id'] ?? 0);

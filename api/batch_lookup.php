@@ -42,7 +42,7 @@ try {
     if ($row && !empty($row['exp_date'])) {
         $exp = trim($row['exp_date']);
         // Format ke YYYY-MM-DD agar pas dengan input HTML5 date
-        if (preg_match('/^(\d{2})[-/](\d{2})[-/](\d{4})$/', $exp, $m)) {
+        if (preg_match('#^(\d{2})[-/](\d{2})[-/](\d{4})$#', $exp, $m)) {
             $exp = "{$m[3]}-{$m[2]}-{$m[1]}";
         }
         jsonResponse([

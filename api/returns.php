@@ -257,6 +257,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonResponse(['error' => 'Metode tidak diizinkan'], 405);
 }
 
+// Simpan sesi unboxing WAJIB login (JSON 401/403 untuk request /api/)
+requireLogin(); // wajib login (role apa pun yang punya akses scanner)
+
 // 1. Terima payload (bisa via Multipart FormData atau Raw JSON)
 $body = [];
 if (!empty($_POST['data'])) {
@@ -285,6 +288,81 @@ $expedition    = trim($body['expedition'] ?? '');
 if (empty($expedition)) $expedition = 'Lainnya';
 $notes         = trim($body['notes'] ?? '');
 $items         = $body['items'] ?? [];
+
+// ---------------------------------------------------------------------------
+// VALIDASI DULU sebelum menulis file apa pun ke disk (cegah file yatim/orphan)
+// ---------------------------------------------------------------------------
+if (empty($invoiceNumber) || empty($items) || !is_array($items)) {
+    jsonResponse(['error' => 'Nomor Invoice dan minimal 1 produk wajib diisi'], 400);
+}
+
+// Kode kondisi yang dianggap BAIK (konsisten dengan operator.js & action=update)
+$goodConditionCodes = ['GOOD', 'BAGUS', 'LAYAK'];
+
+// Anti Double-Submit: Cek apakah invoice_number yang sama persis baru saja di-submit dalam 10 detik terakhir
+// (dicek sebelum menyimpan foto/video agar submit ganda tidak meninggalkan file yatim)
+try {
+    $chkRecent = $pdo->prepare("
+        SELECT id, invoice_number, created_at 
+        FROM return_sessions 
+        WHERE invoice_number = ? AND created_at >= (NOW() - INTERVAL 10 SECOND) 
+        ORDER BY id DESC 
+        LIMIT 1
+    ");
+    $chkRecent->execute([$invoiceNumber]);
+    $recentSession = $chkRecent->fetch(PDO::FETCH_ASSOC);
+    if ($recentSession) {
+        jsonResponse([
+            'success'        => true,
+            'message'        => 'Data transaksi telah berhasil dicatat sebelumnya.',
+            'session_id'     => $recentSession['id'],
+            'invoice_number' => $recentSession['invoice_number'],
+            'already_exists' => true
+        ]);
+    }
+} catch (Exception $eDup) {}
+
+// Video unboxing WAJIB ada: cek status upload sebelum menulis foto
+if (!isset($_FILES['video'])) {
+    jsonResponse([
+        'error' => 'Rekaman video unboxing WAJIB ada dan valid! Pastikan webcam/kamera menyala dan merekam proses unboxing sebelum menyelesaikan sesi.',
+        'video_status' => 'no_video'
+    ], 400);
+}
+if ($_FILES['video']['error'] !== UPLOAD_ERR_OK) {
+    $vErr = (int)$_FILES['video']['error'];
+    $vErrMap = [
+        UPLOAD_ERR_INI_SIZE   => 'Ukuran video melebihi batas upload_max_filesize server (' . ini_get('upload_max_filesize') . '). Silakan rekam lebih singkat',
+        UPLOAD_ERR_FORM_SIZE  => 'Ukuran video melebihi batas maksimum form upload',
+        UPLOAD_ERR_PARTIAL    => 'Upload video terputus di tengah jalan (partial). Silakan kirim ulang',
+        UPLOAD_ERR_NO_FILE    => 'File video tidak ikut terkirim',
+        UPLOAD_ERR_NO_TMP_DIR => 'Folder sementara (tmp) PHP di server tidak tersedia',
+        UPLOAD_ERR_CANT_WRITE => 'Server gagal menulis file video ke disk',
+        UPLOAD_ERR_EXTENSION  => 'Upload video dihentikan oleh ekstensi PHP',
+    ];
+    error_log("Video upload failed with PHP error code: " . $vErr);
+    jsonResponse([
+        'error' => ($vErrMap[$vErr] ?? ('Gagal mengunggah file rekaman video unboxing (Kode Error PHP: ' . $vErr . ')')) . '. Video unboxing WAJIB ada.',
+        'video_status' => 'upload_err_' . $vErr
+    ], in_array($vErr, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true) ? 413 : 400);
+}
+if ((int)($_FILES['video']['size'] ?? 0) < 100) {
+    jsonResponse([
+        'error' => 'Rekaman video unboxing WAJIB ada dan valid! Pastikan webcam/kamera menyala dan merekam proses unboxing sebelum menyelesaikan sesi.',
+        'video_status' => 'empty_video'
+    ], 400);
+}
+
+// Daftar file yang ditulis request ini -> dihapus lagi bila penyimpanan gagal
+$writtenFiles = [];
+function cleanupWrittenFiles() {
+    foreach (($GLOBALS['writtenFiles'] ?? []) as $relPath) {
+        $abs = __DIR__ . '/../' . ltrim($relPath, '/');
+        if (is_file($abs)) @unlink($abs);
+    }
+    $GLOBALS['writtenFiles'] = [];
+}
+
 // Helper simpan Base64 Image
 function saveBase64Image($base64Data, $dir, $prefix) {
     if (empty($base64Data) || !is_string($base64Data)) return '';
@@ -293,6 +371,8 @@ function saveBase64Image($base64Data, $dir, $prefix) {
         $data = substr($base64Data, strpos($base64Data, ',') + 1);
         $type = strtolower($type[1]);
         if ($type === 'jpeg') $type = 'jpg';
+        // Hanya izinkan ekstensi gambar aman (cegah upload .php dsb.)
+        if (!in_array($type, ['jpg', 'png', 'webp'], true)) return '';
         $ext = $type;
     } else {
         $data = $base64Data;
@@ -306,6 +386,7 @@ function saveBase64Image($base64Data, $dir, $prefix) {
     $fileName = $prefix . '_' . time() . '_' . substr(md5(uniqid(rand(), true)), 0, 6) . '.' . $ext;
     $filePath = rtrim($dir, '/') . '/' . $fileName;
     if (file_put_contents($filePath, $decoded)) {
+        $GLOBALS['writtenFiles'][] = 'uploads/photos/' . $fileName;
         return 'uploads/photos/' . $fileName;
     }
     return '';
@@ -319,6 +400,7 @@ $packagePhoto = '';
 $productPhoto = '';
 $damagedPhoto = '';
 $savedBase64Map = []; // hash => saved relative path
+$photoPathByClientIdx = []; // index array photos dari client => path tersimpan (untuk photo_ref item)
 
 if (!empty($body['photos']) && is_array($body['photos'])) {
     foreach ($body['photos'] as $idx => $itemP) {
@@ -343,6 +425,7 @@ if (!empty($body['photos']) && is_array($body['photos'])) {
         }
 
         if (!empty($savedPath)) {
+            $photoPathByClientIdx[$idx] = $savedPath;
             $isDmg = ($pType === 'damaged' || stripos($pTitle, 'rusak') !== false);
             $photosArr[] = [
                 'type' => $pType,
@@ -393,46 +476,37 @@ if (empty($productPhoto) && !empty($body['product_photo'])) {
 
 $photosJson = count($photosArr) > 0 ? json_encode($photosArr, JSON_UNESCAPED_SLASHES) : null;
 
-// 2. Cek apakah ada file video yang di-upload via $_FILES (WAJIB ADA)
+// 2. Simpan file video (status upload sudah divalidasi di atas)
 $videoPath = null;
 $videoStatus = 'no_video';
-if (isset($_FILES['video'])) {
-    if ($_FILES['video']['error'] === UPLOAD_ERR_OK) {
-        $uploadDir = __DIR__ . '/../uploads/videos/';
-        if (!is_dir($uploadDir)) {
-            @mkdir($uploadDir, 0777, true);
-        }
-        
-        $ext = pathinfo($_FILES['video']['name'], PATHINFO_EXTENSION);
-        if (empty($ext)) $ext = 'webm';
-        $fileName = 'video_' . $cleanInv . '_' . time() . '.' . $ext;
-        $targetFile = $uploadDir . $fileName;
+$uploadDir = __DIR__ . '/../uploads/videos/';
+if (!is_dir($uploadDir)) {
+    @mkdir($uploadDir, 0777, true);
+}
 
-        if (move_uploaded_file($_FILES['video']['tmp_name'], $targetFile)) {
-            $videoPath = 'uploads/videos/' . $fileName;
-            $videoStatus = 'uploaded';
-        } else {
-            $videoStatus = 'move_error';
-            error_log("Failed to move uploaded video file to " . $targetFile);
-            jsonResponse(['error' => 'Gagal memindahkan file rekaman video unboxing ke folder server uploads/videos/.'], 500);
-        }
-    } else {
-        $videoStatus = 'upload_err_' . $_FILES['video']['error'];
-        error_log("Video upload failed with PHP error code: " . $_FILES['video']['error']);
-        jsonResponse(['error' => 'Gagal mengunggah file rekaman video unboxing (Kode Error PHP: ' . $_FILES['video']['error'] . '). Video unboxing WAJIB ada.'], 400);
-    }
+// Hanya izinkan ekstensi video aman (nama file dari client tidak dipercaya)
+$ext = strtolower(pathinfo($_FILES['video']['name'] ?? '', PATHINFO_EXTENSION));
+if (!in_array($ext, ['webm', 'mp4'], true)) $ext = 'webm';
+$fileName = 'video_' . $cleanInv . '_' . time() . '_' . substr(md5(uniqid((string)rand(), true)), 0, 6) . '.' . $ext;
+$targetFile = $uploadDir . $fileName;
+
+if (move_uploaded_file($_FILES['video']['tmp_name'], $targetFile)) {
+    $videoPath = 'uploads/videos/' . $fileName;
+    $videoStatus = 'uploaded';
+    $writtenFiles[] = $videoPath;
+} else {
+    error_log("Failed to move uploaded video file to " . $targetFile);
+    cleanupWrittenFiles();
+    jsonResponse(['error' => 'Gagal memindahkan file rekaman video unboxing ke folder server uploads/videos/.', 'video_status' => 'move_error'], 500);
 }
 
 // VALIDASI WAJIB: Sesi Inbound Unboxing TIDAK BOLEH disimpan tanpa file video unboxing
 if (empty($videoPath) || !file_exists(__DIR__ . '/../' . $videoPath) || filesize(__DIR__ . '/../' . $videoPath) < 100) {
+    cleanupWrittenFiles();
     jsonResponse([
         'error' => 'Rekaman video unboxing WAJIB ada dan valid! Pastikan webcam/kamera menyala dan merekam proses unboxing sebelum menyelesaikan sesi.',
         'video_status' => $videoStatus
     ], 400);
-}
-
-if (empty($invoiceNumber) || empty($items) || !is_array($items)) {
-    jsonResponse(['error' => 'Nomor Invoice dan minimal 1 produk wajib diisi'], 400);
 }
 
 $totalGood = 0;
@@ -444,35 +518,14 @@ foreach ($items as $item) {
     if ($qty < 1) $qty = 1;
     $totalItems += $qty;
 
-    $condition = strtoupper(trim($item['condition'] ?? 'GOOD'));
-    if ($condition === 'GOOD') {
+    // Aturan sama persis dengan kolom `condition` yang disimpan per item di bawah
+    $typeT = strtoupper(trim($item['type'] ?? $item['condition'] ?? 'GOOD'));
+    if (in_array($typeT, $goodConditionCodes, true)) {
         $totalGood += $qty;
     } else {
         $totalDamaged += $qty;
     }
 }
-
-// Anti Double-Submit: Cek apakah invoice_number yang sama persis baru saja di-submit dalam 10 detik terakhir
-try {
-    $chkRecent = $pdo->prepare("
-        SELECT id, invoice_number, created_at 
-        FROM return_sessions 
-        WHERE invoice_number = ? AND created_at >= (NOW() - INTERVAL 10 SECOND) 
-        ORDER BY id DESC 
-        LIMIT 1
-    ");
-    $chkRecent->execute([$invoiceNumber]);
-    $recentSession = $chkRecent->fetch(PDO::FETCH_ASSOC);
-    if ($recentSession) {
-        jsonResponse([
-            'success'        => true,
-            'message'        => 'Data transaksi telah berhasil dicatat sebelumnya.',
-            'session_id'     => $recentSession['id'],
-            'invoice_number' => $recentSession['invoice_number'],
-            'already_exists' => true
-        ]);
-    }
-} catch (Exception $eDup) {}
 
 // Schema flags (kolom sudah dipastikan terstruktur di database)
 $hasWrongBarcodeCol = true;
@@ -520,7 +573,7 @@ try {
         $qty = isset($item['qty']) ? (int)$item['qty'] : 1;
         if ($qty < 1) $qty = 1;
         $type = strtoupper(trim($item['type'] ?? $item['condition'] ?? 'GOOD'));
-        $cond = ($type === 'GOOD') ? 'GOOD' : 'RUSAK';
+        $cond = in_array($type, $goodConditionCodes, true) ? 'GOOD' : 'RUSAK';
         $reason = ($cond === 'RUSAK') ? ($item['damage_reason'] ?? $type) : '';
 
         $wrongBarcode = trim($item['wrong_barcode'] ?? '');
@@ -547,8 +600,9 @@ try {
         // Prioritaskan photo_ref dari array photos yang sudah disimpan (Deduplikasi instan tanpa overhead)
         if (isset($item['photo_ref']) && is_numeric($item['photo_ref'])) {
             $pRefIdx = (int)$item['photo_ref'];
-            if (isset($photosArr[$pRefIdx]['path'])) {
-                $itemPhoto = $photosArr[$pRefIdx]['path'];
+            // photo_ref = index di array photos milik client (bukan index $photosArr yang bisa bergeser)
+            if (isset($photoPathByClientIdx[$pRefIdx])) {
+                $itemPhoto = $photoPathByClientIdx[$pRefIdx];
             }
         }
 
@@ -631,5 +685,7 @@ try {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
+    // Hapus foto/video yang sudah tertulis agar tidak menjadi file yatim
+    cleanupWrittenFiles();
     jsonResponse(['error' => 'Gagal menyimpan return: ' . $e->getMessage()], 500);
 }

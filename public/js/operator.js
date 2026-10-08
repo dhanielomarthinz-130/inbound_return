@@ -309,12 +309,26 @@ window.quickSelectInvoice = function(code) {
     }
 };
 
+let isProcessingInvoice = false;
 async function processInvoiceScan(invoiceNumber) {
+    invoiceNumber = String(invoiceNumber || '').trim();
+    // Guard: cegah proses ganda (Enter + klik Lanjut / scanner double Enter) & jangan restart rekaman sesi aktif
+    if (!invoiceNumber || isProcessingInvoice || activeInvoice) return;
+    isProcessingInvoice = true;
     try {
-        const res = await fetch(`api/invoice/${encodeURIComponent(invoiceNumber)}`);
-        const data = await res.json();
+        // Lookup invoice ke server bersifat opsional (non-blocking): gagal / non-JSON tidak menghentikan sesi
+        let data = {};
+        try {
+            const res = await fetch(`api/invoice.php?invoice_number=${encodeURIComponent(invoiceNumber)}`);
+            const ct = res.headers.get('content-type') || '';
+            if (res.ok && ct.includes('json')) {
+                data = await res.json();
+            }
+        } catch (lookupErr) {
+            console.warn('Lookup invoice gagal (diabaikan):', lookupErr);
+        }
 
-        activeInvoice = data.invoice_number || invoiceNumber;
+        activeInvoice = (data && data.invoice_number) || invoiceNumber;
         
         // Auto-detect ekspedisi dari invoice / resi
         const detected = detectExpeditionFromCode(invoiceNumber);
@@ -366,6 +380,8 @@ async function processInvoiceScan(invoiceNumber) {
     } catch (err) {
         playBeep('error');
         showToast('error', "Gagal memproses invoice: " + err.message, "Gagal Invoice");
+    } finally {
+        isProcessingInvoice = false;
     }
 }
 
@@ -375,6 +391,9 @@ window.resetInvoiceSession = function(force = false) {
     }
 
     stopVideoRecording();
+    // Lepas recorder & chunk sesi lama agar video invoice sebelumnya tidak ikut terkirim ke invoice berikutnya
+    mediaRecorder = null;
+    recordedChunks = [];
 
     activeInvoice = null;
     activeExpedition = null;
@@ -601,7 +620,8 @@ async function lookupWrongProduct(barcode) {
             sap_code: '-',
             shop: '-',
             bin_code: '',
-            is_master: false
+            is_master: false,
+            scanned: cleanBarcode
         };
 
         if (detailBox) detailBox.classList.remove('hidden');
@@ -626,7 +646,7 @@ async function lookupWrongProduct(barcode) {
     }
 
     try {
-        const res = await fetch(`api/product/${encodeURIComponent(cleanBarcode)}`);
+        const res = await fetch(`api/product.php?barcode=${encodeURIComponent(cleanBarcode)}`);
         if (!res.ok) {
             // Jika tidak ditemukan di master, tetap catat barcode fisiknya
             currentWrongProduct = {
@@ -637,7 +657,8 @@ async function lookupWrongProduct(barcode) {
                 sap_code: '-',
                 shop: '-',
                 bin_code: '',
-                is_master: false
+                is_master: false,
+                scanned: cleanBarcode
             };
 
             if (detailBox) detailBox.classList.remove('hidden');
@@ -669,7 +690,8 @@ async function lookupWrongProduct(barcode) {
             sap_code: product.sap_code || '-',
             shop: product.shop || '',
             bin_code: product.bin_code || '',
-            is_master: true
+            is_master: true,
+            scanned: cleanBarcode
         };
 
         if (detailBox) detailBox.classList.remove('hidden');
@@ -764,6 +786,12 @@ window.quickFillBarcode = function(barcode) {
     lookupProduct(barcode);
 };
 
+// Cek apakah produk terdeteksi saat ini berasal dari kode yang di-scan (barcode / BPOM / SKU / SAP)
+function isDetectedProductFor(code) {
+    if (!currentDetectedProduct || !code) return false;
+    return currentDetectedProduct._scanned === code || currentDetectedProduct.barcode === code;
+}
+
 // Deteksi Enter / Scan / Input pada Kolom Barcode
 let barcodeDebounceTimer = null;
 inputBarcode.addEventListener('keypress', (e) => {
@@ -803,7 +831,7 @@ inputBarcode.addEventListener('input', () => {
     }
     if (code.length >= 6) {
         barcodeDebounceTimer = setTimeout(() => {
-            if (code === inputBarcode.value.trim() && (!currentDetectedProduct || currentDetectedProduct.barcode !== code)) {
+            if (code === inputBarcode.value.trim() && !isDetectedProductFor(code)) {
                 lookupProduct(code);
             }
         }, 350);
@@ -812,7 +840,7 @@ inputBarcode.addEventListener('input', () => {
 
 inputBarcode.addEventListener('change', () => {
     const code = inputBarcode.value.trim();
-    if (code && (!currentDetectedProduct || currentDetectedProduct.barcode !== code)) {
+    if (code && !isDetectedProductFor(code)) {
         lookupProduct(code);
     }
 });
@@ -1107,7 +1135,7 @@ function updateDamagedPhotoBanner() {
     if (!banner) return;
 
     const typeVal = String(inputType?.value || '').toUpperCase().trim();
-    const isDamaged = (typeVal !== 'GOOD' && typeVal !== 'BAGUS' && typeVal !== '');
+    const isDamaged = (typeVal !== 'GOOD' && typeVal !== 'BAGUS' && typeVal !== 'LAYAK' && typeVal !== '');
 
     if (isDamaged) {
         banner.classList.remove('hidden');
@@ -1622,16 +1650,26 @@ window.triggerVirtualEnter = function() {
     } else if (currentActiveFieldId === 'inputType') {
         toggleVirtualKeyboard(false);
         toggleNumpadExpDate(false);
-        if (isWrongItemCondition(inputType ? inputType.value : '')) {
-            const wrongInp = document.getElementById('inputWrongBarcode');
-            if (wrongInp && (!wrongInp.value.trim() || !currentWrongProduct)) {
-                wrongInp.focus();
-                return;
+        const barcodeValT = inputBarcode ? inputBarcode.value.trim() : '';
+        const isMainBarcodeDashT = (barcodeValT === '-' || (currentDetectedProduct && currentDetectedProduct.barcode === '-'));
+        if (isWrongItemCondition(inputType ? inputType.value : '') || isMainBarcodeDashT) {
+            if (isManualWrongMode || isMainBarcodeDashT) {
+                const ketInp = document.getElementById('inputWrongKeterangan');
+                if (ketInp && !ketInp.value.trim()) {
+                    ketInp.focus();
+                    return;
+                }
+            } else {
+                const wrongInp = document.getElementById('inputWrongBarcode');
+                if (wrongInp && (!wrongInp.value.trim() || !currentWrongProduct)) {
+                    wrongInp.focus();
+                    return;
+                }
             }
         }
         const btnAdd = document.getElementById('btnSubmitItem');
         if (btnAdd) btnAdd.click();
-    } else if (currentActiveFieldId === 'inputWrongBarcode') {
+    } else if (currentActiveFieldId === 'inputWrongBarcode' || currentActiveFieldId === 'inputWrongKeterangan') {
         toggleVirtualKeyboard(false);
         toggleNumpadExpDate(false);
         const btnAdd = document.getElementById('btnSubmitItem');
@@ -1664,6 +1702,7 @@ async function lookupProduct(barcode) {
             category: 'Salah Return',
             is_unknown: true
         };
+        unknownProd._scanned = cleanBarcode;
         currentDetectedProduct = unknownProd;
         if (typeof updatePhotoButtonsState === 'function') updatePhotoButtonsState();
         playBeep('success');
@@ -1696,7 +1735,7 @@ async function lookupProduct(barcode) {
     }
 
     try {
-        const res = await fetch(`api/product/${encodeURIComponent(cleanBarcode)}`);
+        const res = await fetch(`api/product.php?barcode=${encodeURIComponent(cleanBarcode)}`);
         if (!res.ok) {
             playBeep('error');
             currentDetectedProduct = null;
@@ -1711,6 +1750,7 @@ async function lookupProduct(barcode) {
         }
 
         const product = await res.json();
+        if (product && typeof product === 'object') product._scanned = cleanBarcode;
         currentDetectedProduct = product;
         if (typeof updatePhotoButtonsState === 'function') updatePhotoButtonsState();
         playBeep('success');
@@ -1782,7 +1822,7 @@ window.handleAddItem = function(e) {
         return;
     }
 
-    if (!currentDetectedProduct || currentDetectedProduct.barcode !== barcode) {
+    if (!isDetectedProductFor(barcode)) {
         // Jika belum ter-lookup, lookup dulu
         lookupProduct(barcode).then(() => {
             if (currentDetectedProduct) commitAddItem();
@@ -1808,7 +1848,8 @@ function formatExpDate(val) {
     return clean;
 }
 
-function commitAddItem() {
+function commitAddItem(_afterWrongLookup = false) {
+    if (!currentDetectedProduct) return;
     const batchNo = inputBatch.value.trim();
     const expDate = inputExpDate.value.trim();
     const qty = parseInt(inputQty.value, 10) || 1;
@@ -1850,15 +1891,18 @@ function commitAddItem() {
                     wrongInput.select();
                 }
                 return;
-            } else if (enteredWrongBarcode && (!currentWrongProduct || currentWrongProduct.barcode !== enteredWrongBarcode)) {
+            } else if (!_afterWrongLookup && enteredWrongBarcode && (!currentWrongProduct || (currentWrongProduct.scanned || currentWrongProduct.barcode) !== enteredWrongBarcode)) {
+                // Lookup sekali saja lalu commit (cegah loop tanpa akhir bila kode = SKU/BPOM atau jaringan error)
                 lookupWrongProduct(enteredWrongBarcode).then(() => {
-                    commitAddItem();
+                    commitAddItem(true);
                 });
                 return;
             } else {
-                wrongBarcodeVal = currentWrongProduct ? currentWrongProduct.barcode : enteredWrongBarcode;
-                wrongProductNameVal = currentWrongProduct ? currentWrongProduct.name : '';
-                wrongSkuVal = currentWrongProduct ? (currentWrongProduct.seller_sku || currentWrongProduct.sku || '') : '';
+                // Abaikan data produk salah kirim yang basi (dari kode lain) bila lookup terakhir gagal
+                const wp = (currentWrongProduct && (!enteredWrongBarcode || (currentWrongProduct.scanned || currentWrongProduct.barcode) === enteredWrongBarcode)) ? currentWrongProduct : null;
+                wrongBarcodeVal = wp ? wp.barcode : enteredWrongBarcode;
+                wrongProductNameVal = wp ? wp.name : '';
+                wrongSkuVal = wp ? (wp.seller_sku || wp.sku || '') : '';
             }
         }
     }
@@ -1901,45 +1945,52 @@ function commitAddItem() {
         photo_path: itemPhoto
     });
 
-    // Otomatis perbarui foto produk yang diambil sebelum scan barcode / jika kondisi rusak
+    // Perbarui watermark HANYA untuk foto yang terikat ke item ini (jangan timpa foto rusak item sebelumnya)
+    const newItem = scannedProductsList[scannedProductsList.length - 1];
     let hasUpdatedPhotos = false;
-    if (Array.isArray(capturedPhotosList)) {
-        capturedPhotosList.forEach(photo => {
-            if (photo.type === 'product' || photo.type === 'damaged') {
-                const isThisItemPhoto = (photo.dataUrl === itemPhoto || (isItemDamaged && photo.type === 'damaged') || photo.isInitialBeforeScan);
-                if (isThisItemPhoto) {
-                    photo.isDamaged = isItemDamaged;
-                    photo.type = isItemDamaged ? 'damaged' : 'product';
-                    photo.badge = isItemDamaged ? 'Barang Rusak' : 'Produk Retur';
-                    photo.title = isItemDamaged 
-                        ? `Foto Bukti Barang Rusak (${currentDetectedProduct.name} - ${type} x${qty})` 
-                        : `Foto Produk (${currentDetectedProduct.name})`;
-                    photo.isInitialBeforeScan = false;
+    const boundPhoto = (itemPhoto && Array.isArray(capturedPhotosList))
+        ? capturedPhotosList.find(p => p.dataUrl === itemPhoto)
+        : null;
+    if (boundPhoto) {
+        boundPhoto.isDamaged = isItemDamaged;
+        boundPhoto.type = isItemDamaged ? 'damaged' : 'product';
+        boundPhoto.badge = isItemDamaged ? 'Barang Rusak' : 'Produk Retur';
+        boundPhoto.title = isItemDamaged 
+            ? `Foto Bukti Barang Rusak (${currentDetectedProduct.name} - ${type} x${qty})` 
+            : `Foto Produk (${currentDetectedProduct.name})`;
+        boundPhoto.isInitialBeforeScan = false;
 
-                    if (photo.rawCanvas) {
-                        const condLabel = isItemDamaged ? `⚠️ ${type} (RUSAK)` : (type || 'GOOD');
-                        const bText = isItemDamaged ? `⚠️ FOTO BUKTI BARANG RUSAK (${type})` : '🏷️ FOTO PRODUK UNBOXING';
-                        const bColor = isItemDamaged ? '#dc2626' : '#059669';
-                        const fields = [
-                            { label: 'NO. INVOICE', val: activeInvoice || 'INVOICE', highlight: true },
-                            { label: 'KONDISI / TIPE', val: condLabel, highlight: isItemDamaged },
-                            { label: 'NAMA PRODUK', val: currentDetectedProduct.name.length > 28 ? currentDetectedProduct.name.substring(0, 28) + '...' : currentDetectedProduct.name },
-                            { label: 'SKU / SAP', val: `${currentDetectedProduct.seller_sku || currentDetectedProduct.sku || '-'} | ${currentDetectedProduct.sap_code || '-'}` },
-                            { label: 'QTY PRODUK', val: `${qty} Unit`, highlight: isItemDamaged },
-                            { label: 'BATCH & EXP', val: `B:${batchNo || '-'} | Exp:${expDate || '-'}` },
-                            { label: 'WAKTU & OPERATOR', val: `${getNowFormattedWIB()} (${(document.getElementById('displayOperator')?.innerText || 'Gudang 01').trim()})` }
-                        ];
-                        photo.dataUrl = generateWatermarkedPhoto({
-                            badgeText: bText,
-                            badgeColor: bColor,
-                            fields: fields,
-                            sourceImage: photo.rawCanvas
-                        });
-                        hasUpdatedPhotos = true;
-                    }
-                }
+        if (boundPhoto.rawCanvas) {
+            const condLabel = isItemDamaged ? `⚠️ ${type} (RUSAK)` : (type || 'GOOD');
+            const bText = isItemDamaged ? `⚠️ FOTO BUKTI BARANG RUSAK (${type})` : '🏷️ FOTO PRODUK UNBOXING';
+            const bColor = isItemDamaged ? '#dc2626' : '#059669';
+            const fields = [
+                { label: 'NO. INVOICE', val: activeInvoice || 'INVOICE', highlight: true },
+                { label: 'KONDISI / TIPE', val: condLabel, highlight: isItemDamaged },
+                { label: 'NAMA PRODUK', val: currentDetectedProduct.name.length > 28 ? currentDetectedProduct.name.substring(0, 28) + '...' : currentDetectedProduct.name },
+                { label: 'SKU / SAP', val: `${currentDetectedProduct.seller_sku || currentDetectedProduct.sku || '-'} | ${currentDetectedProduct.sap_code || '-'}` },
+                { label: 'QTY PRODUK', val: `${qty} Unit`, highlight: isItemDamaged },
+                { label: 'BATCH & EXP', val: `B:${batchNo || '-'} | Exp:${expDate || '-'}` },
+                { label: 'WAKTU & OPERATOR', val: `${getNowFormattedWIB()} (${(document.getElementById('displayOperator')?.innerText || 'Gudang 01').trim()})` }
+            ];
+            try {
+                boundPhoto.dataUrl = generateWatermarkedPhoto({
+                    badgeText: bText,
+                    badgeColor: bColor,
+                    fields: fields,
+                    sourceImage: boundPhoto.rawCanvas
+                });
+            } catch (wmErr) {
+                console.warn('Re-watermark foto gagal, pakai foto asli:', wmErr);
             }
-        });
+        }
+        // Sinkronkan item dengan foto terbaru agar photo_ref tetap cocok saat submit
+        if (newItem) {
+            newItem.photo = boundPhoto.dataUrl;
+            newItem.photo_path = boundPhoto.dataUrl;
+            newItem.photo_id = boundPhoto.id;
+        }
+        hasUpdatedPhotos = true;
     }
     if (hasUpdatedPhotos) {
         renderPhotosGallery();
@@ -1972,7 +2023,6 @@ function resetProductInputs() {
     inputExpDate.value = '';
     inputQty.value = 1;
     inputType.value = '';
-    npDateDigits = '';
     clearAutoExpIndicator();
     if (typeof updateNumpadDisplay === 'function') updateNumpadDisplay();
     if (typeof toggleVirtualKeyboard === 'function') toggleVirtualKeyboard(false);
@@ -2022,6 +2072,7 @@ function renderItemsTable() {
             const colorClassMap = {
                 emerald: 'bg-emerald-100 text-emerald-800 border-emerald-200',
                 rose:    'bg-rose-100 text-rose-800 border-rose-200',
+                red:     'bg-rose-100 text-rose-800 border-rose-200',
                 amber:   'bg-amber-100 text-amber-800 border-amber-200',
                 orange:  'bg-orange-100 text-orange-800 border-orange-200',
                 purple:  'bg-purple-100 text-purple-800 border-purple-200',
@@ -2040,13 +2091,13 @@ function renderItemsTable() {
             badge = `<span class="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold text-[10px]">${escapeHtml(item.type || 'GOOD')}</span>`;
         }
 
-        const isDmgItem = (itemType !== 'GOOD' && itemType !== 'BAGUS');
+        const isDmgItem = (itemType !== 'GOOD' && itemType !== 'BAGUS' && itemType !== 'LAYAK');
         const itemPhotoSrc = item.photo || item.photo_path;
         let photoBtn = '';
         if (itemPhotoSrc) {
             photoBtn = `
                 <div class="mt-1">
-                    <button type="button" onclick="previewImageDirect('${itemPhotoSrc}', 'Foto Bukti: ${escapeHtml(item.product_name)} (${escapeHtml(item.type)}') " 
+                    <button type="button" onclick="previewItemPhoto(${index})" 
                         class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[9px] border border-rose-200 transition shadow-2xs cursor-pointer" title="Lihat Foto Bukti">
                         <i class="fa-solid fa-camera"></i> Foto Siap
                     </button>
@@ -2080,17 +2131,17 @@ function renderItemsTable() {
         tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
         tr.innerHTML = `
             <td class="py-1.5 px-2 text-center text-slate-400 font-mono text-[11px]">${index + 1}</td>
-            <td class="py-1.5 px-2 font-mono font-bold text-indigo-700 text-xs">${item.barcode}</td>
+            <td class="py-1.5 px-2 font-mono font-bold text-indigo-700 text-xs">${escapeHtml(item.barcode)}</td>
             <td class="py-1.5 px-2">
-                <div class="font-bold text-slate-800 text-xs">${item.product_name}</div>
+                <div class="font-bold text-slate-800 text-xs">${escapeHtml(item.product_name)}</div>
                 <div class="text-[9px] text-slate-500 flex flex-wrap gap-1 mt-0.5">
-                    <span class="bg-indigo-50 text-indigo-700 px-1.5 py-0.2 rounded font-mono font-bold border border-indigo-200">SKU: ${item.seller_sku || item.sku}</span>
-                    <span class="bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded font-mono font-bold border border-emerald-200">SAP: ${item.sap_code || '-'}</span>
-                    ${item.bin_code ? `<span class="bg-amber-50 text-amber-700 px-1.5 py-0.2 rounded font-mono text-[9px] border border-amber-200">Rak: ${item.bin_code}</span>` : ''}
+                    <span class="bg-indigo-50 text-indigo-700 px-1.5 py-0.2 rounded font-mono font-bold border border-indigo-200">SKU: ${escapeHtml(item.seller_sku || item.sku)}</span>
+                    <span class="bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded font-mono font-bold border border-emerald-200">SAP: ${escapeHtml(item.sap_code || '-')}</span>
+                    ${item.bin_code ? `<span class="bg-amber-50 text-amber-700 px-1.5 py-0.2 rounded font-mono text-[9px] border border-amber-200">Rak: ${escapeHtml(item.bin_code)}</span>` : ''}
                 </div>
                 ${wrongInfoHtml}
             </td>
-            <td class="py-1.5 px-2 font-mono text-slate-600 whitespace-nowrap text-xs">${item.batch_no || '-'}</td>
+            <td class="py-1.5 px-2 font-mono text-slate-600 whitespace-nowrap text-xs">${escapeHtml(item.batch_no || '-')}</td>
             <td class="py-1.5 px-2 font-mono text-slate-600 whitespace-nowrap text-xs font-medium">${formatExpDate(item.exp_date)}</td>
             <td class="py-1.5 px-2 text-center font-bold text-slate-900 text-xs font-mono">${item.qty}</td>
             <td class="py-1.5 px-2 text-center">${badge}${photoBtn}</td>
@@ -2109,8 +2160,26 @@ function renderItemsTable() {
 }
 
 window.removeItem = function(index) {
-    scannedProductsList.splice(index, 1);
+    const removed = scannedProductsList.splice(index, 1)[0];
+    // Hapus juga foto bukti rusak yang terikat KHUSUS ke item ini (jika tidak dipakai item lain)
+    if (removed && removed.photo_id) {
+        const stillUsed = scannedProductsList.some(it => it.photo_id === removed.photo_id);
+        if (!stillUsed) {
+            const before = capturedPhotosList.length;
+            capturedPhotosList = capturedPhotosList.filter(p => p.id !== removed.photo_id);
+            if (capturedPhotosList.length !== before) {
+                renderPhotosGallery();
+                showToast('info', 'Foto bukti milik item yang dihapus juga dihapus dari antrean unboxing.', 'Foto Dihapus');
+            }
+        }
+    }
     renderItemsTable();
+};
+
+window.previewItemPhoto = function(index) {
+    const it = scannedProductsList[index];
+    if (!it) return;
+    previewImageDirect(it.photo || it.photo_path, `Foto Bukti: ${it.product_name || it.barcode || '-'} (${it.type || '-'})`);
 };
 
 // -------------------------------------------------------------
@@ -2128,9 +2197,20 @@ let isVideoRecordingActive = false;
 let pendingVideoRecord = false;
 
 function startVideoRecording() {
-    if (!mediaStream) {
+    if (!window.MediaRecorder) {
+        console.warn("MediaRecorder tidak didukung browser ini.");
+        showToast('error', 'Browser ini tidak mendukung perekaman video unboxing (MediaRecorder). Gunakan Chrome / Edge terbaru.', 'Rekam Video Gagal');
+        return;
+    }
+    const hasLiveTrack = Boolean(mediaStream && mediaStream.getVideoTracks().some(t => t.readyState === 'live'));
+    if (!hasLiveTrack) {
         console.warn("mediaStream belum aktif, perekaman video ditunda hingga kamera siap.");
         pendingVideoRecord = true;
+        return;
+    }
+    // Sudah merekam untuk invoice yang sama -> jangan reset rekaman (cegah double start)
+    if (mediaRecorder && mediaRecorder.state !== 'inactive' && mediaRecorder._invoice === activeInvoice) {
+        pendingVideoRecord = false;
         return;
     }
     pendingVideoRecord = false;
@@ -2139,17 +2219,16 @@ function startVideoRecording() {
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
             try { mediaRecorder.stop(); } catch(e){}
         }
-        recordedChunks = [];
 
         let mime = '';
         const candidateTypes = [
-            'video/webm;codecs=vp8,opus',
             'video/webm;codecs=vp8',
+            'video/webm;codecs=vp8,opus',
             'video/webm',
             'video/mp4;codecs=avc1',
             'video/mp4'
         ];
-        if (window.MediaRecorder) {
+        if (typeof MediaRecorder.isTypeSupported === 'function') {
             for (const t of candidateTypes) {
                 if (MediaRecorder.isTypeSupported(t)) {
                     mime = t;
@@ -2159,31 +2238,43 @@ function startVideoRecording() {
         }
 
         // Gunakan bitrate hemat 300 kbps agar video unboxing sangat ringan (<2MB) & upload cepat
+        let rec = null;
         let options = {};
         if (mime) options.mimeType = mime;
         try {
             options.videoBitsPerSecond = 300000;
-            mediaRecorder = new MediaRecorder(mediaStream, options);
+            rec = new MediaRecorder(mediaStream, options);
         } catch (recErr) {
             console.warn("MediaRecorder dengan options bitrate gagal, fallback:", recErr);
             try {
-                mediaRecorder = mime ? new MediaRecorder(mediaStream, { mimeType: mime }) : new MediaRecorder(mediaStream);
+                rec = mime ? new MediaRecorder(mediaStream, { mimeType: mime }) : new MediaRecorder(mediaStream);
             } catch (e2) {
-                mediaRecorder = new MediaRecorder(mediaStream);
+                rec = new MediaRecorder(mediaStream);
             }
         }
 
-        mediaRecorder.ondataavailable = (e) => {
+        // Chunk disimpan per-recorder agar event 'dataavailable' terlambat dari recorder lama
+        // tidak tercampur ke rekaman baru (video korup / video invoice lain)
+        const chunks = [];
+        rec._chunks = chunks;
+        rec._invoice = activeInvoice;
+
+        rec.ondataavailable = (e) => {
             if (e.data && e.data.size > 0) {
-                recordedChunks.push(e.data);
+                chunks.push(e.data);
             }
         };
 
-        mediaRecorder.onerror = (err) => {
-            console.error("MediaRecorder runtime error:", err);
+        rec.onerror = (ev) => {
+            console.error("MediaRecorder runtime error:", ev);
+            const msg = (ev && ev.error && ev.error.message) ? ev.error.message : 'kesalahan tidak diketahui';
+            showToast('error', 'Rekaman video unboxing terhenti: ' + msg, 'Rekam Video');
         };
 
-        mediaRecorder.start(1000); // kumpulkan chunk tiap 1 detik
+        rec.start(1000); // kumpulkan chunk tiap 1 detik
+
+        mediaRecorder = rec;
+        recordedChunks = chunks;
 
         isVideoRecordingActive = true;
         recordingSeconds = 0;
@@ -2202,7 +2293,16 @@ function startVideoRecording() {
         console.log("Perekaman video unboxing aktif dimulai untuk invoice:", activeInvoice);
     } catch (e) {
         console.warn("Gagal start recording video:", e);
+        showToast('error', 'Gagal memulai rekaman video unboxing: ' + (e && e.message ? e.message : e) + '. Coba hubungkan ulang kamera.', 'Rekam Video Gagal');
     }
+}
+
+// Bangun Blob video dari chunk milik recorder tertentu dengan MIME asli (webm / mp4)
+function buildRecordingBlob(rec) {
+    const chunks = (rec && rec._chunks) ? rec._chunks : [];
+    if (chunks.length === 0) return null;
+    const rawType = (rec && rec.mimeType) || (chunks[0] && chunks[0].type) || 'video/webm';
+    return new Blob(chunks, { type: String(rawType).split(';')[0] || 'video/webm' });
 }
 
 function stopVideoRecording() {
@@ -2217,55 +2317,29 @@ function stopVideoRecording() {
         const recBadge = document.getElementById('cameraRecBadge');
         if (recBadge) recBadge.classList.add('hidden');
 
-        if (!mediaRecorder || mediaRecorder.state === 'inactive') {
-            if (recordedChunks.length > 0) {
-                resolve(new Blob(recordedChunks, { type: 'video/webm' }));
-            } else {
-                resolve(null);
-            }
+        const rec = mediaRecorder;
+        if (!rec || rec.state === 'inactive') {
+            resolve(buildRecordingBlob(rec));
             return;
         }
 
         let resolved = false;
-        const safetyTimeout = setTimeout(() => {
-            if (!resolved) {
-                resolved = true;
-                if (recordedChunks.length > 0) {
-                    resolve(new Blob(recordedChunks, { type: 'video/webm' }));
-                } else {
-                    resolve(null);
-                }
-            }
-        }, 1200);
-
-        mediaRecorder.onstop = () => {
-            if (!resolved) {
-                resolved = true;
-                clearTimeout(safetyTimeout);
-                if (recordedChunks.length > 0) {
-                    resolve(new Blob(recordedChunks, { type: 'video/webm' }));
-                } else {
-                    resolve(null);
-                }
-            }
+        let safetyTimeout = null;
+        const finish = () => {
+            if (resolved) return;
+            resolved = true;
+            if (safetyTimeout) clearTimeout(safetyTimeout);
+            resolve(buildRecordingBlob(rec));
         };
+        // Batas aman lebih longgar untuk perangkat lambat (PDT) agar chunk terakhir tidak hilang
+        safetyTimeout = setTimeout(finish, 5000);
+        rec.addEventListener('stop', finish, { once: true });
 
         try {
-            if (mediaRecorder.state === 'recording' && typeof mediaRecorder.requestData === 'function') {
-                mediaRecorder.requestData();
-            }
-            mediaRecorder.stop();
+            rec.stop(); // 'dataavailable' terakhir selalu terpicu sebelum event 'stop'
         } catch (e) {
             console.warn("mediaRecorder.stop error:", e);
-            if (!resolved) {
-                resolved = true;
-                clearTimeout(safetyTimeout);
-                if (recordedChunks.length > 0) {
-                    resolve(new Blob(recordedChunks, { type: 'video/webm' }));
-                } else {
-                    resolve(null);
-                }
-            }
+            finish();
         }
     });
 }
@@ -2302,23 +2376,25 @@ window.submitFinalSession = async function() {
     isSubmittingFinalSession = true;
     const notes = document.getElementById('sessionNotesInput').value.trim();
     const btn = document.getElementById('btnFinalizeSession');
+    if (!btn.dataset.origHtml) btn.dataset.origHtml = btn.innerHTML;
+    const btnOrigHtml = btn.dataset.origHtml;
     btn.disabled = true;
     btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...`;
 
-    // Ambil rekaman video unboxing dari sesi ini
+    // Ambil rekaman video unboxing HANYA dari recorder milik invoice aktif ini
     let videoBlob = null;
-    if (mediaRecorder && (mediaRecorder.state === 'recording' || mediaRecorder.state === 'paused')) {
+    if (mediaRecorder && mediaRecorder._invoice === activeInvoice) {
         videoBlob = await stopVideoRecording();
-    } else if (recordedChunks.length > 0) {
-        videoBlob = new Blob(recordedChunks, { type: 'video/webm' });
     }
 
     if (!videoBlob || videoBlob.size < 100) {
         playBeep('error');
         showToast('error', 'Rekaman video unboxing belum terdeteksi! Pastikan kamera menyala dan merekam proses unboxing sebelum menyelesaikan sesi.', 'Wajib Ada Video Unboxing');
         isSubmittingFinalSession = false;
-        btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Selesaikan Sesi Unboxing (F4)`;
+        btn.disabled = scannedProductsList.length === 0;
+        btn.innerHTML = btnOrigHtml;
+        // Mulai ulang perekaman agar sesi ini tetap bisa diselesaikan dengan video
+        startVideoRecording();
         return;
     }
 
@@ -2332,7 +2408,7 @@ window.submitFinalSession = async function() {
     const optimizedItems = scannedProductsList.map((it) => {
         let photoRef = null;
         if (it.photo) {
-            const foundIdx = capturedPhotosList.findIndex(p => p.dataUrl === it.photo || p.data === it.photo);
+            const foundIdx = capturedPhotosList.findIndex(p => (it.photo_id && p.id === it.photo_id) || p.dataUrl === it.photo || p.data === it.photo);
             if (foundIdx !== -1) {
                 photoRef = foundIdx;
             }
@@ -2367,8 +2443,9 @@ window.submitFinalSession = async function() {
         operator_name: operatorName,
         customer_name: 'Pelanggan Return',
         notes: notes,
-        package_photo: capturedPackagePhoto,
-        product_photo: capturedProductPhoto,
+        // Foto paket/produk sudah ada di array photos -> jangan kirim ulang (hemat payload)
+        package_photo: null,
+        product_photo: null,
         photos: capturedPhotosList.map(p => ({
             type: p.type,
             data: p.dataUrl,
@@ -2390,7 +2467,9 @@ window.submitFinalSession = async function() {
         const formData = new FormData();
         formData.append('data', payloadJson);
         if (videoBlob && videoBlob.size > 0) {
-            formData.append('video', videoBlob, `video_${savedInv}.webm`);
+            const vExt = /mp4/i.test(videoBlob.type || '') ? 'mp4' : 'webm';
+            const safeInvName = String(savedInv || 'invoice').replace(/[^A-Za-z0-9_-]/g, '_');
+            formData.append('video', videoBlob, `video_${safeInvName}.${vExt}`);
         }
 
         // Gunakan XMLHttpRequest untuk memantau progress upload secara real-time
@@ -2419,6 +2498,7 @@ window.submitFinalSession = async function() {
                 );
                 try {
                     const resJson = JSON.parse(xhr.responseText);
+                    if (resJson && typeof resJson === 'object') resJson._httpStatus = xhr.status;
                     resolve(resJson);
                 } catch (jsonErr) {
                     resolve({
@@ -2450,6 +2530,9 @@ window.submitFinalSession = async function() {
             // 3. Tampilkan toast notifikasi cepat dan elegan
             const vidNote = (videoBlob && videoBlob.size > 0) ? ' & video rekaman' : '';
             showToast('success', `Invoice [${savedInv}]${vidNote} berhasil disimpan (${totalItemsCount} barang). Silakan scan invoice baru!`, "Inbound Selesai");
+        } else if (result && result._httpStatus === 401) {
+            // Sesi login habis: JANGAN tinggalkan halaman ini (video & item masih tersimpan di memori)
+            showToast('error', 'Sesi login berakhir. Buka TAB BARU, login kembali, lalu kembali ke tab ini dan klik Submit lagi. Jangan muat ulang halaman ini agar video & data tidak hilang.', "Sesi Login Berakhir", 15000);
         } else {
             showToast('error', (result && result.error) || 'Terjadi kesalahan saat menyimpan transaksi', "Gagal Menyimpan");
         }
@@ -2460,8 +2543,8 @@ window.submitFinalSession = async function() {
         isSubmittingFinalSession = false;
         hideGlobalLoading();
         if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Selesaikan Sesi Unboxing [F9]`;
+            btn.disabled = scannedProductsList.length === 0;
+            btn.innerHTML = btnOrigHtml;
         }
     }
 };
@@ -2484,7 +2567,16 @@ async function getAvailableVideoDevices() {
     }
 }
 
+// Kamera sedang merekam sesi unboxing aktif -> jangan putus stream (rekaman sebelumnya bisa hilang)
+function isRecordingLiveSession() {
+    return Boolean(mediaRecorder && mediaRecorder.state === 'recording' && mediaStream && mediaStream.active);
+}
+
 window.switchCamera = async function() {
+    if (isRecordingLiveSession()) {
+        showToast('warning', 'Tidak bisa ganti kamera saat rekaman video unboxing berjalan. Selesaikan atau reset sesi invoice terlebih dahulu.', 'Rekaman Berjalan');
+        return;
+    }
     if (videoDevices.length <= 1) {
         await getAvailableVideoDevices();
     }
@@ -2503,6 +2595,10 @@ window.simulateScan = function(code) {
 };
 
 async function startCamera(deviceId = null) {
+    if (isRecordingLiveSession()) {
+        console.warn('startCamera diabaikan: kamera sedang merekam sesi unboxing aktif.');
+        return;
+    }
     const loading = document.getElementById('cameraLoading');
     const badge = document.getElementById('cameraStatusBadge');
     const videoElement = document.getElementById('liveVideoFeed');
@@ -2989,7 +3085,7 @@ window.renderPhotosGallery = function() {
         const badgeColor = isPkg ? 'bg-indigo-600' : (isDmg ? 'bg-rose-600' : 'bg-emerald-600');
         const badgeIcon = isPkg ? 'fa-box' : (isDmg ? 'fa-triangle-exclamation' : 'fa-tag');
         const badgeText = isPkg ? 'Paket' : (isDmg ? 'Rusak' : 'Produk');
-        const safeTitle = (item.title || (isPkg ? 'Foto Bukti Paket' : (isDmg ? 'Foto Barang Rusak' : 'Foto Bukti Produk'))).replace(/"/g, '&quot;');
+        const safeTitle = escapeHtml(item.title || (isPkg ? 'Foto Bukti Paket' : (isDmg ? 'Foto Barang Rusak' : 'Foto Bukti Produk')));
         const timeStr = item.createdAt ? (item.createdAt.split(' ')[1] || item.createdAt) : '';
 
         const row = document.createElement('div');
@@ -3003,7 +3099,7 @@ window.renderPhotosGallery = function() {
                 ${timeStr ? `<span class="text-[10px] text-slate-400 font-mono shrink-0 hidden sm:inline">${timeStr}</span>` : ''}
             </div>
             <div class="flex items-center gap-1 shrink-0 ml-1.5">
-                <button type="button" onclick="previewImageDirect('${item.dataUrl}', '${safeTitle}')" class="text-indigo-600 hover:text-indigo-800 bg-white hover:bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 shadow-2xs" title="Lihat Foto">
+                <button type="button" onclick="previewPhotoByIndex(${index})" class="text-indigo-600 hover:text-indigo-800 bg-white hover:bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 shadow-2xs" title="Lihat Foto">
                     <i class="fa-solid fa-eye text-[10px]"></i> <span>Lihat</span>
                 </button>
                 <button type="button" onclick="deletePhotoItem('${item.id}')" class="text-rose-600 hover:text-rose-800 bg-white hover:bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 shadow-2xs" title="Hapus Foto">
@@ -3013,6 +3109,12 @@ window.renderPhotosGallery = function() {
         `;
         listEl.appendChild(row);
     });
+};
+
+window.previewPhotoByIndex = function(index) {
+    const p = capturedPhotosList[index];
+    if (!p) return;
+    previewImageDirect(p.dataUrl, p.title || 'Preview Foto Watermark');
 };
 
 window.deletePhotoItem = function(id) {
@@ -3173,12 +3275,12 @@ window.captureProductPhoto = function(sourceImage = null, forcedCondition = null
         let pSap = currentDetectedProduct.sap_code || '-';
         let isDamaged = (forcedCondition === 'RUSAK');
 
-        if (isDamaged && (pType === 'GOOD' || pType === 'BAGUS' || !pType)) {
+        if (isDamaged && (pType === 'GOOD' || pType === 'BAGUS' || pType === 'LAYAK' || !pType)) {
             pType = 'RUSAK';
         }
 
         // PASTIKAN: Jika status isDamaged, label kondisi di watermark TIDAK BOLEH "GOOD"!
-        if (isDamaged && (String(pType).toUpperCase() === 'GOOD' || String(pType).toUpperCase() === 'BAGUS' || !pType)) {
+        if (isDamaged && (String(pType).toUpperCase() === 'GOOD' || String(pType).toUpperCase() === 'BAGUS' || String(pType).toUpperCase() === 'LAYAK' || !pType)) {
             pType = 'RUSAK';
         }
 
@@ -3274,8 +3376,9 @@ window.handlePhotosMultipleUpload = async function(inputElement) {
                     const img = new Image();
                     img.onload = function() {
                         // Tentukan otomatis apakah foto paket atau produk (default paket jika belum ada foto, atau produk jika sudah scan barcode)
-                        const hasProduct = Boolean(currentDetectedProduct || (scannedProductsList && scannedProductsList.length > 0));
-                        if (hasProduct && capturedPhotosList.filter(p => p.type === 'package').length > 0) {
+                        // Foto produk hanya bila detail produk + batch/exp sedang terisi; selain itu simpan sebagai foto paket (jangan dibuang)
+                        const canProductPhoto = Boolean(typeof window.isProductDetailAndBatchExpFilled === 'function' && window.isProductDetailAndBatchExpFilled());
+                        if (canProductPhoto && capturedPhotosList.filter(p => p.type === 'package').length > 0) {
                             captureProductPhoto(img);
                         } else {
                             capturePackagePhoto(img);
@@ -3357,6 +3460,17 @@ window.addEventListener('keydown', (e) => {
         // Cegah default browser reload jika sedang aktif di halaman
         e.preventDefault();
         captureProductPhoto(null, 'RUSAK');
+    }
+});
+
+// Peringatan sebelum meninggalkan halaman saat sesi unboxing berisi item / sedang merekam video
+window.addEventListener('beforeunload', (e) => {
+    const hasItems = Array.isArray(scannedProductsList) && scannedProductsList.length > 0;
+    const isRecording = Boolean(mediaRecorder && mediaRecorder.state === 'recording' && activeInvoice);
+    if (isSubmittingFinalSession || hasItems || isRecording) {
+        e.preventDefault();
+        e.returnValue = 'Sesi unboxing belum disimpan. Yakin ingin meninggalkan halaman?';
+        return e.returnValue;
     }
 });
 

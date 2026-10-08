@@ -181,29 +181,58 @@ function downloadCloudPhoto($cloudUrl, $relPath) {
 }
 
 /**
+ * Buat ulang koneksi PDO MySQL Localhost tanpa me-require ulang config.php
+ * (require ulang config.php memicu Fatal "Cannot redeclare function" & mematikan daemon).
+ */
+function reconnectLocalPdo() {
+    global $db_host, $db_user, $db_pass, $db_name;
+    $pdoNew = new PDO("mysql:host={$db_host};dbname={$db_name};charset=utf8mb4", $db_user, $db_pass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES => false
+    ]);
+    $pdoNew->exec("SET time_zone = '+07:00'");
+    try { $pdoNew->exec("SET SESSION SQL_BIG_SELECTS=1"); } catch (Exception $e) {}
+    $GLOBALS['pdo'] = $pdoNew;
+    return $pdoNew;
+}
+
+/**
+ * Pastikan koneksi masih hidup (cegah error 2006 "MySQL server has gone away"
+ * setelah proses unduh foto/video yang lama). Return false bila MySQL mati.
+ */
+function ensureLocalPdoAlive(&$pdo) {
+    try {
+        if ($pdo) { $pdo->query("SELECT 1"); return true; }
+    } catch (Exception $e) {}
+    try {
+        $pdo = reconnectLocalPdo();
+        writeSyncLog("Koneksi MySQL Localhost tersambung ulang.");
+        return true;
+    } catch (Exception $e) {
+        writeSyncLog("Error: Database MySQL Localhost tidak terhubung: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Daftar barcode paket (UPPER, terurut) milik 1 header penerimaan lokal.
+ */
+function getLocalReceptionBarcodes($pdo, $receptionId) {
+    $st = $pdo->prepare("SELECT UPPER(TRIM(package_barcode)) FROM reception_packages WHERE reception_id = ?");
+    $st->execute([(int)$receptionId]);
+    $codes = $st->fetchAll(PDO::FETCH_COLUMN);
+    sort($codes);
+    return $codes;
+}
+
+/**
  * Eksekutor 1 Putaran Sinkronisasi
  */
 function executeSyncRound(&$pdo) {
     // 0. Pastikan koneksi MySQL Localhost tetap hidup (cegah error 2006 MySQL server has gone away)
-    try {
-        if ($pdo) {
-            $pdo->query("SELECT 1");
-        } else {
-            throw new Exception("PDO null");
-        }
-    } catch (Exception $ePdo) {
-        try {
-            require __DIR__ . '/config.php';
-        } catch (Exception $eRecon) {
-            $errMsg = "Database MySQL Localhost tidak terhubung: " . $eRecon->getMessage();
-            writeSyncLog("Error: $errMsg");
-            return ['success' => false, 'error' => $errMsg];
-        }
-    }
-
-    if (!$pdo) {
+    if (!ensureLocalPdoAlive($pdo)) {
         $errMsg = "Database MySQL Localhost tidak terhubung. Pastikan service MySQL di XAMPP sudah dijalankan.";
-        writeSyncLog("Error: $errMsg");
         return ['success' => false, 'error' => $errMsg];
     }
 
@@ -250,6 +279,7 @@ function executeSyncRound(&$pdo) {
             downloadCloudFile($cloudUrl, $sess['video_path']);
         }
 
+        if (!ensureLocalPdoAlive($pdo)) break;
         try {
             $pdo->beginTransaction();
 
@@ -383,15 +413,52 @@ function executeSyncRound(&$pdo) {
             }
         }
 
+        if (!ensureLocalPdoAlive($pdo)) break;
+
+        // Barcode paket dari Cloud (untuk mengenali apakah header lokal = penerimaan yang sama)
+        $cloudCodes = [];
+        foreach ($packages as $pkg) {
+            $bc = strtoupper(trim((string)($pkg['package_barcode'] ?? '')));
+            if ($bc !== '') $cloudCodes[] = $bc;
+        }
+        sort($cloudCodes);
+        $cloudCreatedAt = (string)($rec['created_at'] ?? '');
+
         try {
             $pdo->beginTransaction();
 
-            $stmtFindRec = $pdo->prepare("SELECT id FROM expedition_receptions WHERE receipt_number = ?");
-            $stmtFindRec->execute([$rec['receipt_number']]);
-            $existingRecId = $stmtFindRec->fetchColumn();
+            // Nomor RCV dibuat terpisah di Cloud & Localhost, sehingga RCV-YYYYMMDD-0001 di Cloud bisa
+            // bentrok dengan penerimaan LAIN di Localhost. Jangan timpa data lokal: cari header yang
+            // memang penerimaan yang sama, atau pakai nomor alternatif (akhiran -C, -C2, ...).
+            $targetReceipt = $rec['receipt_number'];
+            $newRecId = 0;
+            $stmtFindRec = $pdo->prepare("SELECT id, created_at FROM expedition_receptions WHERE receipt_number = ? LIMIT 1");
+            for ($try = 0; $try < 6; $try++) {
+                $candidate = $try === 0 ? $rec['receipt_number'] : ($rec['receipt_number'] . '-C' . ($try > 1 ? $try : ''));
+                $stmtFindRec->execute([$candidate]);
+                $found = $stmtFindRec->fetch(PDO::FETCH_ASSOC);
+                $stmtFindRec->closeCursor();
+                if (!$found) { $targetReceipt = $candidate; $newRecId = 0; break; }
+                $localCodes = getLocalReceptionBarcodes($pdo, $found['id']);
+                $stExp = $pdo->prepare("SELECT expedition FROM expedition_receptions WHERE id = ?");
+                $stExp->execute([$found['id']]);
+                $sameExp = (strcasecmp((string)$stExp->fetchColumn(), (string)($rec['expedition'] ?? '')) === 0);
+                $sameCreated = ($sameExp && $cloudCreatedAt !== '' && substr((string)$found['created_at'], 0, 19) === substr($cloudCreatedAt, 0, 19));
+                $sameCodes = (!empty($cloudCodes) && $localCodes === $cloudCodes);
+                if ($sameCreated || $sameCodes) {
+                    // Header lokal ini adalah penerimaan yang sama (hasil sync sebelumnya / header kosong)
+                    $targetReceipt = $candidate; $newRecId = (int)$found['id']; break;
+                }
+                $targetReceipt = null; // bentrok dengan penerimaan lokal lain, coba nomor alternatif
+            }
+            if (!$targetReceipt) {
+                throw new Exception("Nomor tanda terima bentrok dengan data lokal dan semua nomor alternatif sudah terpakai.");
+            }
+            if ($targetReceipt !== $rec['receipt_number']) {
+                writeSyncLog("Info: No. terima Cloud [{$rec['receipt_number']}] bentrok dengan penerimaan lokal lain, disimpan sebagai [{$targetReceipt}].");
+            }
 
-            if ($existingRecId) {
-                $newRecId = (int)$existingRecId;
+            if ($newRecId > 0) {
                 $stmtUpdRec = $pdo->prepare("
                     UPDATE expedition_receptions SET
                         expedition = ?, courier_name = ?, sack_number = ?, vehicle_no = ?,
@@ -420,7 +487,7 @@ function executeSyncRound(&$pdo) {
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmtInsRec->execute([
-                    $rec['receipt_number'],
+                    $targetReceipt,
                     $rec['expedition'] ?? '',
                     $rec['courier_name'] ?? null,
                     $rec['sack_number'] ?? null,
@@ -436,7 +503,14 @@ function executeSyncRound(&$pdo) {
                 $newRecId = (int)$pdo->lastInsertId();
             }
 
-            if (!empty($packages) && $newRecId > 0) {
+            // Validasi header benar-benar ada sebelum menyimpan paket (hindari error FK yang membingungkan)
+            $chkParent = $pdo->prepare("SELECT COUNT(*) FROM expedition_receptions WHERE id = ?");
+            $chkParent->execute([$newRecId]);
+            if ($newRecId <= 0 || (int)$chkParent->fetchColumn() === 0) {
+                throw new Exception("Header penerimaan lokal gagal dibuat (id={$newRecId}).");
+            }
+
+            if (!empty($packages)) {
                 $pdo->prepare("DELETE FROM reception_packages WHERE reception_id = ?")->execute([$newRecId]);
 
                 $stmtInsPkg = $pdo->prepare("
@@ -459,7 +533,10 @@ function executeSyncRound(&$pdo) {
 
         } catch (Exception $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
-            writeSyncLog("Error insert reception [{$rec['receipt_number']}]: " . $e->getMessage());
+            $hint = (strpos($e->getMessage(), '1452') !== false)
+                ? ' | Petunjuk: constraint fk_reception_packages di database lokal rusak — jalankan perbaikan skema (scratch/fix_receiving_fk.php).'
+                : '';
+            writeSyncLog("Error insert reception [{$rec['receipt_number']}]: " . $e->getMessage() . $hint);
         }
     }
 

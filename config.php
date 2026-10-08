@@ -1,6 +1,17 @@
 <?php
 // config.php - Konfigurasi Database MySQL & Session
 if (session_status() === PHP_SESSION_NONE) {
+    // Sesi operator 12 jam (1 shift) agar simpan Receiving/Unboxing tidak gagal "Sesi berakhir"
+    // setelah PDT idle > 24 menit (default PHP).
+    @ini_set('session.gc_maxlifetime', '43200');
+    // Di PC lokal (XAMPP) folder sesi C:\xampp\tmp dipakai bersama aplikasi lain yang menghapus sesi
+    // setelah 24 menit. Pakai folder sesi khusus aplikasi ini (di luar htdocs) bila bisa ditulis.
+    $hostForSess = $_SERVER['HTTP_HOST'] ?? '';
+    if (php_sapi_name() !== 'cli' && !preg_match('/great-site\.net|infinityfree|rf\.gd|page\.gd|42web\.io|infy\.uk/i', $hostForSess) && getenv('APP_ENV') !== 'production') {
+        $iegSessDir = rtrim(sys_get_temp_dir(), '\\/') . DIRECTORY_SEPARATOR . 'ieg_return_inbound_sessions';
+        if (!is_dir($iegSessDir)) { @mkdir($iegSessDir, 0700, true); }
+        if (is_dir($iegSessDir) && is_writable($iegSessDir)) { session_save_path($iegSessDir); }
+    }
     session_start();
 }
 header('Access-Control-Allow-Origin: *');
@@ -534,7 +545,7 @@ try {
 function jsonResponse($data, $statusCode = 200) {
     header('Content-Type: application/json; charset=utf-8');
     http_response_code($statusCode);
-    echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_INVALID_UTF8_SUBSTITUTE);
     exit;
 }
 

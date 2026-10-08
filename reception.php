@@ -301,7 +301,7 @@ try {
             </button>
             <button id="tabBtnHistory" onclick="switchTab('history')" class="flex-1 py-1.5 sm:py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-900">
                 <i class="fa-solid fa-clock-rotate-left text-xs"></i>
-                <span>Riwayat (<span id="historyCountBadge">0</span>)</span>
+                <span>Riwayat (<span id="historyTabCountBadge">0</span>)</span>
             </button>
         </div>
 
@@ -321,7 +321,7 @@ try {
                         <span id="badgeReceiptDisplay" class="bg-slate-100 text-slate-600 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md border border-slate-200">
                             Memuat ID...
                         </span>
-                        <button onclick="resetReceptionForm()" type="button" class="text-[11px] text-amber-600 hover:text-amber-700 font-semibold flex items-center gap-1 ml-1" title="Reset Ulang Form">
+                        <button onclick="confirmResetReceptionForm()" type="button" class="text-[11px] text-amber-600 hover:text-amber-700 font-semibold flex items-center gap-1 ml-1" title="Reset Ulang Form">
                             <i class="fa-solid fa-rotate text-xs"></i> <span class="hidden sm:inline">Reset</span>
                         </button>
                     </div>
@@ -1070,6 +1070,7 @@ try {
 
         // State Penerimaan & Progressive Steps
         let currentReceiptId = '';
+        let currentReceptionDbId = null; // ID header di DB setelah batch pertama tersimpan (untuk batch lanjutan / retry)
         let currentExpedition = '';
         let currentCourierName = '';
         let currentCourierPhoto = null; // DataURL Foto Kurir
@@ -1129,6 +1130,7 @@ try {
             const draftPayload = {
                 key: 'active_session_draft',
                 receiptId: currentReceiptId,
+                receptionDbId: currentReceptionDbId,
                 expedition: currentExpedition,
                 courierName: currentCourierName,
                 courierPhoto: currentCourierPhoto,
@@ -1205,6 +1207,7 @@ try {
 
                 // Pulihkan data state
                 currentReceiptId = draft.receiptId || '';
+                currentReceptionDbId = draft.receptionDbId || null;
                 currentExpedition = draft.expedition || '';
                 currentCourierName = draft.courierName || '';
                 currentCourierPhoto = draft.courierPhoto || null;
@@ -1253,6 +1256,10 @@ try {
                     setText('txtCourierPhotoName', currentCourierName);
                     setText('txtCourierPhotoTime', 'Draft Tersimpan');
                     showElement('cardStep3');
+                    showElement('cardStep4');
+                    showElement('cardStep5');
+                } else if (draftPackages.length > 0) {
+                    // Draft berisi paket tapi foto kurir hilang: tetap tampilkan daftar paket (simpan akan meminta foto kurir)
                     showElement('cardStep4');
                     showElement('cardStep5');
                 }
@@ -1347,7 +1354,7 @@ try {
 
                 if (isActive) {
                     chipsHtml += `
-                        <button type="button" onclick="switchActiveSack('${escapeHtml(sackName)}')" 
+                        <button type="button" onclick="switchActiveSack(${jsArg(sackName)})"
                             class="px-3 py-1.5 bg-amber-500 text-white border-2 border-amber-600 rounded-xl text-xs font-black shrink-0 transition shadow-sm flex items-center gap-1 active:scale-95 cursor-pointer"
                             title="Sedang aktif: Paket selanjutnya masuk ke ${escapeHtml(sackName)}">
                             <i class="fa-solid fa-check text-[10px]"></i>
@@ -1357,7 +1364,7 @@ try {
                     `;
                 } else {
                     chipsHtml += `
-                        <button type="button" onclick="switchActiveSack('${escapeHtml(sackName)}')" 
+                        <button type="button" onclick="switchActiveSack(${jsArg(sackName)})"
                             class="px-3 py-1.5 bg-white hover:bg-amber-50/80 text-slate-700 hover:text-amber-900 border border-slate-200 hover:border-amber-300 rounded-xl text-xs font-bold shrink-0 transition shadow-2xs flex items-center gap-1 active:scale-95 cursor-pointer"
                             title="Klik untuk pindah scan ke ${escapeHtml(sackName)}">
                             <i class="fa-solid fa-box-archive text-[10px] text-slate-400"></i>
@@ -1549,6 +1556,10 @@ try {
         let isCheckingBarcode = false;
         async function submitPackageBarcode() {
             if (isCheckingBarcode) return;
+            if (isSubmittingReception) {
+                showStatusMsg('⏳ Penerimaan sedang disimpan. Tunggu sampai selesai sebelum scan resi berikutnya.', 'warning');
+                return;
+            }
 
             const input = document.getElementById('inputPackageBarcode');
             const rawCode = (input ? input.value : '').trim();
@@ -1559,6 +1570,16 @@ try {
             }
 
             const cleanCode = rawCode.trim();
+
+            // Barcode > 100 karakter tidak muat di database (biasanya QR yang ter-scan, bukan resi)
+            if (cleanCode.length > 100) {
+                playBeep('warning');
+                vibrateMobile([120, 60, 120]);
+                showStatusMsg(`⚠️ Barcode terlalu panjang (${cleanCode.length} karakter) — kemungkinan QR yang ter-scan, bukan resi. Scan ulang barcode resi.`, 'warning');
+                if (input) input.value = '';
+                input?.focus();
+                return;
+            }
 
             // 1. Cek duplikasi di sesi draft saat ini (Local Session Check)
             const isDuplicateLocal = draftPackages.some(item => item.barcode.toUpperCase() === cleanCode.toUpperCase());
@@ -1574,8 +1595,7 @@ try {
             // 2. Cek ke database apakah resi ini pernah diterima sebelumnya (Database Duplicate Check)
             isCheckingBarcode = true;
             try {
-                const checkRes = await fetch(`api/reception.php?action=check_barcode&barcode=${encodeURIComponent(cleanCode)}`);
-                const checkData = await checkRes.json();
+                const checkData = await fetchJson(`api/reception.php?action=check_barcode&barcode=${encodeURIComponent(cleanCode)}`);
                 if (checkData && checkData.exists) {
                     playBeep('warning');
                     vibrateMobile([150, 80, 150]);
@@ -1590,6 +1610,8 @@ try {
                 }
             } catch (errCheck) {
                 console.warn('Gagal cek duplikasi resi ke server:', errCheck);
+                playBeep('warning');
+                showStatusMsg(`⚠️ Cek duplikat resi ke server gagal: ${escapeHtml(errCheck.message || String(errCheck))}. Resi tetap diproses — pastikan resi belum pernah diterima.`, 'warning');
             } finally {
                 isCheckingBarcode = false;
             }
@@ -1605,10 +1627,12 @@ try {
         // MODAL KAMERA TERPADU ENGINE (FOTO KURIR & PAKET)
         // ==============================================================
 
-        async function openCameraModal(mode, barcode = null) {
+        async function openCameraModal(mode, barcode = null, retakeDraftId = null) {
+            if (isSubmittingReception) return;
             cameraModalMode = mode;
             pendingCapturedPhoto = null;
-            targetRetakeDraftId = (mode === 'package' && !barcode) ? targetRetakeDraftId : null;
+            // Foto ulang paket draft: ID paket dikirim eksplisit agar foto MENGGANTI paket tsb (bukan menambah paket baru)
+            targetRetakeDraftId = (mode === 'package') ? (retakeDraftId || null) : null;
 
             // Reset UI state modal
             showElement('modalControlsLive');
@@ -1643,15 +1667,32 @@ try {
             await startModalCameraStream();
         }
 
+        let cameraStreamToken = 0; // naik setiap stream dimulai/dihentikan -> stream yang telat datang setelah modal ditutup langsung dimatikan
+
+        function isCameraModalOpen() {
+            const modal = document.getElementById('modalCameraCapture');
+            return !!(modal && !modal.classList.contains('hidden'));
+        }
+
         async function startModalCameraStream() {
             const videoEl = document.getElementById('modalCameraVideo');
             const loadingEl = document.getElementById('modalCameraLoading');
             const switchBtn = document.getElementById('btnModalSwitchCam');
+            if (loadingEl) {
+                // Kembalikan tampilan "Menghubungkan kamera..." jika sebelumnya menampilkan pesan error
+                if (loadingEl.dataset.origHtml === undefined) loadingEl.dataset.origHtml = loadingEl.innerHTML;
+                else loadingEl.innerHTML = loadingEl.dataset.origHtml;
+            }
             showElement(loadingEl);
+            const myToken = ++cameraStreamToken;
 
             try {
                 if (cameraMediaStream) {
                     cameraMediaStream.getTracks().forEach(t => t.stop());
+                    cameraMediaStream = null;
+                }
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('Browser tidak mengizinkan akses kamera langsung (halaman harus dibuka via HTTPS / localhost).');
                 }
 
                 // Deteksi ketersediaan kamera
@@ -1674,23 +1715,40 @@ try {
                     audio: false
                 };
 
-                cameraMediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+                const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+                // Modal sudah ditutup / stream lain sudah dimulai selama menunggu izin kamera -> matikan stream ini
+                if (myToken !== cameraStreamToken || !isCameraModalOpen()) {
+                    newStream.getTracks().forEach(t => t.stop());
+                    return;
+                }
+                cameraMediaStream = newStream;
                 if (videoEl) {
                     videoEl.srcObject = cameraMediaStream;
                     videoEl.onloadedmetadata = () => {
-                        videoEl.play();
+                        const playPromise = videoEl.play();
+                        if (playPromise && playPromise.catch) playPromise.catch(() => {});
                         hideElement(loadingEl);
                     };
                 }
             } catch (err) {
                 console.warn('Gagal mengakses kamera langsung:', err);
-                hideElement(loadingEl);
-                // Jika kamera browser diblokir atau gagal, tawarkan kamera native HP
+                if (myToken !== cameraStreamToken) return;
+                // Tampilkan pesan error DI DALAM modal (status bar Langkah 4 tertutup modal)
+                if (loadingEl) {
+                    loadingEl.innerHTML = `
+                        <i class="fa-solid fa-video-slash text-2xl text-rose-400"></i>
+                        <span class="text-xs font-bold text-rose-300 text-center px-6">Kamera langsung tidak dapat dibuka</span>
+                        <span class="text-[11px] text-slate-400 text-center px-6">${escapeHtml(err && err.message ? err.message : String(err))}</span>
+                        <span class="text-[11px] text-slate-300 text-center px-6">Gunakan tombol <b>"Kamera HP"</b> di bawah untuk memotret.</span>
+                    `;
+                    showElement(loadingEl);
+                }
                 showStatusMsg('⚠️ Tidak dapat membuka stream kamera langsung. Anda dapat menggunakan tombol "Kamera HP".', 'warning');
             }
         }
 
         function stopModalCameraStream() {
+            cameraStreamToken++;
             if (cameraMediaStream) {
                 cameraMediaStream.getTracks().forEach(t => t.stop());
                 cameraMediaStream = null;
@@ -1720,14 +1778,21 @@ try {
 
             if (cameraMediaStream) {
                 cameraMediaStream.getTracks().forEach(t => t.stop());
+                cameraMediaStream = null;
             }
 
             const videoEl = document.getElementById('modalCameraVideo');
+            const myToken = ++cameraStreamToken;
             try {
-                cameraMediaStream = await navigator.mediaDevices.getUserMedia({
+                const newStream = await navigator.mediaDevices.getUserMedia({
                     video: { deviceId: { exact: targetDevice.deviceId } },
                     audio: false
                 });
+                if (myToken !== cameraStreamToken || !isCameraModalOpen()) {
+                    newStream.getTracks().forEach(t => t.stop());
+                    return;
+                }
+                cameraMediaStream = newStream;
                 if (videoEl) {
                     videoEl.srcObject = cameraMediaStream;
                     videoEl.play();
@@ -1792,6 +1857,7 @@ try {
             hideElement('modalCameraPreviewImg');
             showElement('modalCameraVideo');
             showElement('modalCameraReticle');
+            if (!cameraMediaStream) showElement('modalCameraLoading'); // tampilkan lagi status kamera (memuat / error)
             showElement('modalControlsLive');
             hideElement('modalControlsPreview');
         }
@@ -1803,6 +1869,8 @@ try {
             if (cameraModalMode === 'courier') {
                 // Simpan Foto Kurir
                 currentCourierPhoto = pendingCapturedPhoto;
+                pendingCapturedPhoto = null;
+                saveDraftToStorage(); // Foto kurir baru / foto ulang langsung masuk draft (aman jika halaman ter-refresh)
                 stopModalCameraStream();
                 hideElement('modalCameraCapture');
 
@@ -1830,15 +1898,17 @@ try {
 
             } else if (cameraModalMode === 'package') {
                 // Simpan Foto Paket
-                if (targetRetakeDraftId) {
+                // Foto ulang: paket target dari tombol "Foto Ulang", atau paket dengan barcode yang sama di draft (anti dobel)
+                const retakeItem = targetRetakeDraftId
+                    ? draftPackages.find(p => p.id === targetRetakeDraftId)
+                    : draftPackages.find(p => String(p.barcode).toUpperCase() === String(currentScanningBarcode).toUpperCase());
+                if (retakeItem) {
                     // Update paket tertentu
-                    const item = draftPackages.find(p => p.id === targetRetakeDraftId);
-                    if (item) {
-                        item.photo = pendingCapturedPhoto;
-                        showStatusMsg(`📸 Foto untuk resi <b>${escapeHtml(item.barcode)}</b> berhasil diperbarui!`, 'success');
-                    }
+                    retakeItem.photo = pendingCapturedPhoto;
+                    showStatusMsg(`📸 Foto untuk resi <b>${escapeHtml(retakeItem.barcode)}</b> berhasil diperbarui!`, 'success');
                     targetRetakeDraftId = null;
                 } else {
+                    targetRetakeDraftId = null;
                     // Tambah paket baru ke Draft
                     const now = new Date();
                     const newDraftItem = {
@@ -1853,6 +1923,7 @@ try {
                     draftPackages.unshift(newDraftItem);
                     showStatusMsg(`📦 Resi <b>${escapeHtml(currentScanningBarcode)}</b> [${escapeHtml(currentSackNumber)}] berhasil difoto & masuk ke <b>DRAFT</b>!`, 'success');
                 }
+                pendingCapturedPhoto = null;
 
                 saveDraftToStorage();
 
@@ -1902,6 +1973,7 @@ try {
                     }
                     hideElement('modalCameraVideo');
                     hideElement('modalCameraReticle');
+                    hideElement('modalCameraLoading'); // overlay loading/error tidak boleh menutupi preview
                     hideElement('modalControlsLive');
                     showElement('modalControlsPreview');
                 };
@@ -2070,7 +2142,8 @@ try {
                     }
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 12000);
-                    const res = await fetch('api/reception.php?action=upload_photo', {
+                    const uploadEndpoint = (window.APP_BASE_URL || '').replace(/\/+$/, '') + '/api/reception.php?action=upload_photo';
+                    const res = await fetch(uploadEndpoint, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ photo: compact, prefix }),
@@ -2096,9 +2169,11 @@ try {
                     }
                 }
             }
-            console.warn('Upload foto server dilewati:', lastErr);
+            console.warn('Upload foto server dilewati, foto dikirim langsung bersama data penerimaan:', lastErr);
+            // JANGAN pernah mengembalikan null (foto paket/kurir akan hilang diam-diam).
+            // Kirim versi kecil sebagai base64 -> server tetap menyimpannya saat submit data penerimaan.
             const thumb = await compressDataUrl(compact, 480, 360, 0.40);
-            return (thumb && thumb.length < 35000) ? thumb : null;
+            return thumb || compact || dataUrl;
         }
 
         // ==============================================================
@@ -2130,7 +2205,7 @@ try {
                 if (sackEntries.length > 0) {
                     showElement(summaryBar);
                     summaryChips.innerHTML = sackEntries.map(([sName, sQty]) => `
-                        <button type="button" onclick="switchActiveSack('${escapeHtml(sName)}')" 
+                        <button type="button" onclick="switchActiveSack(${jsArg(sName)})" 
                             class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white hover:bg-amber-100 border border-amber-300 text-amber-950 font-bold text-[11px] shadow-2xs font-mono transition cursor-pointer"
                             title="Klik untuk jadikan karung target scan">
                             <i class="fa-solid fa-box-archive text-amber-600 text-[10px]"></i>
@@ -2216,14 +2291,15 @@ try {
         }
 
         function retakeDraftPhoto(draftId) {
+            if (isSubmittingReception) return;
             const item = draftPackages.find(p => p.id === draftId);
             if (!item) return;
-            targetRetakeDraftId = draftId;
             currentScanningBarcode = item.barcode;
-            openCameraModal('package', item.barcode);
+            openCameraModal('package', item.barcode, draftId);
         }
 
         function removeDraftPackage(draftId) {
+            if (isSubmittingReception) return;
             const idx = draftPackages.findIndex(p => p.id === draftId);
             if (idx !== -1) {
                 const removed = draftPackages.splice(idx, 1);
@@ -2234,6 +2310,7 @@ try {
         }
 
         function clearAllDrafts() {
+            if (isSubmittingReception) return;
             if (draftPackages.length === 0) return;
             if (confirm(`Hapus semua ${draftPackages.length} paket dari draft sesi ini?`)) {
                 draftPackages = [];
@@ -2299,6 +2376,16 @@ try {
 
             // Lock agar tidak bisa dipencet 2x (Anti Double Submit)
             isSubmittingReception = true;
+            // Reset ID header penerimaan agar submit baru tidak menempel ke header basi
+            currentReceptionDbId = null;
+
+            // Snapshot paket yang dikirim: perubahan draft selama proses simpan tidak boleh hilang / terkirim ganda
+            const submitPackages = draftPackages.slice();
+            const submittedIds = new Set(submitPackages.map(p => p.id));
+
+            // Kunci input scan resi selama proses simpan berlangsung
+            const pkgInputLock = document.getElementById('inputPackageBarcode');
+            if (pkgInputLock) pkgInputLock.disabled = true;
 
             const btnDesktop = document.getElementById('btnSubmitReception');
             const origDesktopHtml = btnDesktop ? btnDesktop.innerHTML : '';
@@ -2316,6 +2403,48 @@ try {
                 btnMobile.classList.add('opacity-70', 'pointer-events-none');
             }
 
+            // Kirim 1 request simpan & parse respons (aman dari respons HTML / error PHP)
+            const postReception = async (payload, batchLabel) => {
+                const apiEndpoint = (window.APP_BASE_URL || '').replace(/\/+$/, '') + '/api/reception.php';
+                const res = await fetch(apiEndpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const responseText = await res.text();
+                let result = null;
+                try {
+                    result = JSON.parse(responseText);
+                } catch (eParse) {
+                    if (res.status === 413) {
+                        throw new Error('Ukuran foto melebihi batas upload server (Error 413). Coba bagi paket ke beberapa karung.');
+                    } else if (res.status === 401) {
+                        throw new Error('Sesi login telah habis. Buka tab baru untuk login kembali.');
+                    }
+                    throw new Error(`Server error${batchLabel} (${res.status}): ` + responseText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 150));
+                }
+                if (res.status === 409 && currentReceptionDbId) {
+                    // Header batch sebelumnya tidak ditemukan lagi (mis. dihapus admin) -> mulai header baru pada percobaan berikutnya
+                    currentReceptionDbId = null;
+                    await saveDraftToStorage();
+                }
+                if (!result || !result.success) {
+                    throw new Error((result && result.error) || `Gagal menyimpan data penerimaan${batchLabel}.`);
+                }
+                // Simpan ID header & nomor final dari server agar batch berikutnya / retry menempel ke header yang sama
+                if (result.reception_id) {
+                    currentReceptionDbId = result.reception_id;
+                    if (result.receipt_number) {
+                        currentReceiptId = result.receipt_number;
+                        const inputNo = document.getElementById('inputReceiptNo');
+                        if (inputNo) inputNo.value = currentReceiptId;
+                        setText('badgeReceiptDisplay', '#' + currentReceiptId);
+                    }
+                    await saveDraftToStorage();
+                }
+                return result;
+            };
+
             try {
                 const setProgress = (txt) => {
                     if (btnDesktop) btnDesktop.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${txt}`;
@@ -2326,12 +2455,12 @@ try {
                 // 1. Unggah foto kurir jika masih berupa dataUrl
                 if (currentCourierPhoto && currentCourierPhoto.startsWith('data:image')) {
                     setProgress('Mengunggah foto kurir...');
-                    currentCourierPhoto = await uploadReceptionPhoto(currentCourierPhoto, `courier_${safeRcpt}`);
+                    currentCourierPhoto = (await uploadReceptionPhoto(currentCourierPhoto, `courier_${safeRcpt}`)) || currentCourierPhoto;
                     await saveDraftToStorage();
                 }
 
                 // 2. Unggah foto paket dengan concurrent worker pool (3 koneksi simultan)
-                const itemsToUpload = draftPackages.filter(p => p.photo && p.photo.startsWith('data:image'));
+                const itemsToUpload = submitPackages.filter(p => p.photo && p.photo.startsWith('data:image'));
                 const totalUploadCount = itemsToUpload.length;
                 let uploadedCount = 0;
 
@@ -2343,7 +2472,7 @@ try {
                             const p = queue.shift();
                             if (!p) break;
                             const safeB = String(p.barcode).replace(/[^a-zA-Z0-9_\-]/g, '_');
-                            p.photo = await uploadReceptionPhoto(p.photo, `pkg_${safeRcpt}_${safeB}`);
+                            p.photo = (await uploadReceptionPhoto(p.photo, `pkg_${safeRcpt}_${safeB}`)) || p.photo;
                             uploadedCount++;
                             setProgress(`Mengunggah foto (${uploadedCount}/${totalUploadCount})...`);
                         }
@@ -2352,20 +2481,21 @@ try {
                     await saveDraftToStorage();
                 }
 
-                // 3. Simpan data penerimaan ke database (menggunakan chunking jika paket > 20)
+                // 3. Simpan data penerimaan ke database (menggunakan chunking jika paket > 25)
                 const CHUNK_SIZE = 25;
-                const totalPkgCount = draftPackages.length;
+                const totalPkgCount = submitPackages.length;
                 let lastResponseData = null;
 
                 if (totalPkgCount > CHUNK_SIZE) {
                     for (let i = 0; i < totalPkgCount; i += CHUNK_SIZE) {
-                        const slice = draftPackages.slice(i, i + CHUNK_SIZE);
+                        const slice = submitPackages.slice(i, i + CHUNK_SIZE);
                         const chunkIdx = Math.floor(i / CHUNK_SIZE);
                         const endNum = Math.min(i + CHUNK_SIZE, totalPkgCount);
                         setProgress(`Menyimpan paket ${i + 1}-${endNum} dari ${totalPkgCount}...`);
 
                         const chunkPayload = {
                             receipt_number: currentReceiptId,
+                            reception_id: currentReceptionDbId || undefined,
                             expedition: currentExpedition,
                             courier_name: currentCourierName,
                             courier_photo: currentCourierPhoto,
@@ -2380,87 +2510,58 @@ try {
                             }))
                         };
 
-                        const res = await fetch('api/reception.php', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(chunkPayload)
-                        });
-
-                        const responseText = await res.text();
-                        let chunkResult = null;
-                        try { 
-                            chunkResult = JSON.parse(responseText); 
-                        } catch(eParse) {
-                            if (res.status === 413) {
-                                throw new Error('Ukuran foto melebihi batas upload server (Error 413). Coba bagi paket ke beberapa karung.');
-                            } else if (res.status === 401) {
-                                throw new Error('Sesi login telah habis. Buka tab baru untuk login kembali.');
-                            }
-                            throw new Error(`Server error saat batch #${chunkIdx + 1} (${res.status}): ` + responseText.substring(0, 150));
-                        }
-
-                        if (!chunkResult || !chunkResult.success) {
-                            throw new Error(chunkResult?.error || `Gagal menyimpan batch #${chunkIdx + 1}`);
-                        }
-                        lastResponseData = chunkResult;
+                        lastResponseData = await postReception(chunkPayload, ` saat batch #${chunkIdx + 1}`);
                     }
                 } else {
                     // Single request jika <= 25 paket
                     setProgress('Menyimpan data penerimaan...');
                     const payload = {
                         receipt_number: currentReceiptId,
+                        reception_id: currentReceptionDbId || undefined,
                         expedition: currentExpedition,
                         courier_name: currentCourierName,
                         courier_photo: currentCourierPhoto,
                         sack_number: currentSackNumber || 'Karung 1',
-                        packages: draftPackages.map(p => ({
+                        packages: submitPackages.map(p => ({
                             barcode: p.barcode,
                             photo: p.photo,
                             sack_number: p.sack_number || currentSackNumber || 'Karung 1'
                         }))
                     };
 
-                    const res = await fetch('api/reception.php', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    const responseText = await res.text();
-                    try { 
-                        lastResponseData = JSON.parse(responseText); 
-                    } catch(eParse) {
-                        if (res.status === 413) {
-                            throw new Error('Ukuran total foto paket melebihi batas upload server (Error 413).');
-                        } else if (res.status === 401) {
-                            throw new Error('Sesi login telah habis. Buka tab baru untuk login kembali.');
-                        }
-                        throw new Error(`Server error (${res.status}): ` + responseText.substring(0, 150));
-                    }
-
-                    if (!lastResponseData || !lastResponseData.success) {
-                        throw new Error(lastResponseData?.error || 'Gagal menyimpan data penerimaan.');
-                    }
+                    lastResponseData = await postReception(payload, '');
                 }
 
                 if (lastResponseData && lastResponseData.success) {
                     showStatusMsg(`✅ <b>Sukses Tersimpan!</b> Penerimaan <b>${lastResponseData.total_packages || totalPkgCount} paket</b> (${escapeHtml(lastResponseData.expedition || currentExpedition)}) berhasil disimpan ke sistem! [Ref: ${escapeHtml(lastResponseData.receipt_number || currentReceiptId)}]`, 'success');
                     playBeep('success');
 
-                    // Bersihkan draft tersimpan karena penerimaan sudah sukses masuk database
-                    await clearDraftFromStorage();
+                    // Paket yang tidak ikut terkirim (seharusnya tidak ada karena input dikunci) tetap dipertahankan di draft
+                    const remainingPackages = draftPackages.filter(p => !submittedIds.has(p.id));
+                    if (remainingPackages.length === 0) {
+                        // Bersihkan draft tersimpan karena penerimaan sudah sukses masuk database
+                        await clearDraftFromStorage();
 
-                    // Reset form untuk penerimaan baru tanpa memunculkan modal bukti di layar
-                    resetReceptionForm();
+                        // Reset form untuk penerimaan baru tanpa memunculkan modal bukti di layar
+                        resetReceptionForm();
+                    } else {
+                        draftPackages = remainingPackages;
+                        currentReceptionDbId = null;
+                        await generateReceiptId();
+                        await saveDraftToStorage();
+                        renderDraftList();
+                        showStatusMsg(`✅ Penerimaan tersimpan. ⚠️ ${remainingPackages.length} paket yang di-scan saat proses simpan tetap di draft sebagai penerimaan baru — klik Simpan lagi.`, 'warning');
+                    }
                     loadHistoryData();
                 } else {
                     alert('Gagal menyimpan: ' + (lastResponseData?.error || 'Terjadi kesalahan sistem saat menyimpan data penerimaan.'));
                 }
             } catch (err) {
                 console.error('Error submitCompleteReception:', err);
-                alert('Terjadi kesalahan saat memproses data:\n\n' + err.message);
+                alert('Terjadi kesalahan saat memproses data:\n\n' + (err && err.message ? err.message : String(err)));
             } finally {
                 isSubmittingReception = false;
+                if (pkgInputLock) pkgInputLock.disabled = false;
                 if (btnDesktop) {
                     btnDesktop.disabled = false;
                     btnDesktop.innerHTML = origDesktopHtml;
@@ -2471,6 +2572,8 @@ try {
                     btnMobile.innerHTML = origMobileHtml;
                     btnMobile.classList.remove('opacity-70', 'pointer-events-none');
                 }
+                // innerHTML tombol baru dikembalikan -> perbarui ulang angka jumlah paket (#btnSubmitCount / #mobileBtnCount)
+                renderDraftList();
             }
         }
 
@@ -2543,7 +2646,7 @@ try {
                     const timeTag = scanTimeStr ? `<span class="text-[9px] text-slate-400 font-mono font-medium">${escapeHtml(scanTimeStr)}</span>` : '';
 
                     const photoThumb = pPath ? `
-                        <div class="relative group cursor-pointer shrink-0" onclick="previewImageDirect('${escapeHtml(pPath)}')">
+                        <div class="relative group cursor-pointer shrink-0" onclick="previewImageDirect(${jsArg(pPath)})">
                             <img src="${escapeHtml(pPath)}" class="w-11 h-11 rounded-lg object-cover border border-slate-300 shadow-2xs group-hover:scale-105 group-hover:border-emerald-500 transition" alt="Foto Paket">
                             <span class="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg transition text-white text-[10px]">
                                 <i class="fa-solid fa-magnifying-glass-plus"></i>
@@ -2599,7 +2702,7 @@ try {
                 let photoHtml = '';
                 photosToDisplay.forEach((pUrl, idx) => {
                     photoHtml += `
-                        <div class="relative group rounded-xl overflow-hidden border border-slate-200 aspect-video bg-black cursor-pointer shadow-xs hover:border-emerald-500 transition" onclick="previewImageDirect('${escapeHtml(pUrl)}')">
+                        <div class="relative group rounded-xl overflow-hidden border border-slate-200 aspect-video bg-black cursor-pointer shadow-xs hover:border-emerald-500 transition" onclick="previewImageDirect(${jsArg(pUrl)})">
                             <img src="${escapeHtml(pUrl)}" alt="Foto Paket ${idx + 1}" class="w-full h-full object-cover group-hover:scale-105 transition">
                             <div class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-white text-xs font-semibold gap-1">
                                 <i class="fa-solid fa-magnifying-glass-plus"></i>
@@ -2626,8 +2729,18 @@ try {
             resetReceptionForm();
         }
 
+        // Tombol "Reset" di Langkah 1: minta konfirmasi agar draft tidak terhapus karena salah sentuh
+        function confirmResetReceptionForm() {
+            if (isSubmittingReception) return;
+            if (draftPackages.length > 0 && !confirm(`Hapus draft ${draftPackages.length} paket beserta fotonya & mulai penerimaan baru?`)) {
+                return;
+            }
+            resetReceptionForm();
+        }
+
         function resetReceptionForm() {
             draftPackages = [];
+            currentReceptionDbId = null;
             currentExpedition = '';
             currentCourierName = '';
             currentCourierPhoto = null;
@@ -2669,19 +2782,16 @@ try {
         async function generateReceiptId() {
             let rId = '';
             try {
-                const res = await fetch('api/reception.php?action=generate_id');
-                const data = await res.json();
+                const data = await fetchJson('api/reception.php?action=generate_id');
                 if (data && data.success && data.receipt_number) {
                     rId = data.receipt_number;
                 }
             } catch (e) {
-                const now = new Date();
-                const dStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-                rId = `RCV-${dStr}-${Math.floor(1000 + Math.random() * 9000)}`;
+                console.warn('Gagal mengambil No. Tanda Terima dari server, memakai nomor sementara:', e);
             }
             if (!rId) {
-                const now = new Date();
-                const dStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+                // Nomor sementara (tanggal LOKAL WIB, bukan UTC); server akan memberi nomor baru jika bentrok
+                const dStr = localYmd().replace(/-/g, '');
                 rId = `RCV-${dStr}-${Math.floor(1000 + Math.random() * 9000)}`;
             }
             currentReceiptId = rId;
@@ -2790,7 +2900,7 @@ try {
             const expSelect = document.getElementById('historyExpeditionFilter');
             const searchInput = document.getElementById('historySearchInput');
 
-            const selectedDate = (dateInput && dateInput.value) ? dateInput.value : new Date().toISOString().slice(0, 10);
+            const selectedDate = (dateInput && dateInput.value) ? dateInput.value : localYmd(); // tanggal LOKAL (WIB), bukan UTC
             if (dateInput && !dateInput.value) dateInput.value = selectedDate;
 
             const selectedExp = (expSelect && expSelect.value) ? expSelect.value : '';
@@ -2805,8 +2915,7 @@ try {
                 if (selectedExp) url += `&expedition=${encodeURIComponent(selectedExp)}`;
                 if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
 
-                const res = await fetch(url);
-                const data = await res.json();
+                const data = await fetchJson(url);
 
                 if (data && data.success && Array.isArray(data.data)) {
                     const packages = data.data;
@@ -2814,6 +2923,7 @@ try {
                     const totalPhotos = data.total_photos || 0;
 
                     setText(badge, `${totalPkgs} Paket`);
+                    setText('historyTabCountBadge', totalPkgs);
                     setText(photoBadge, totalPhotos);
 
                     // Populate dropdown ekspedisi jika masih hanya 1 opsi
@@ -2853,7 +2963,7 @@ try {
                         let photoHtml = '';
                         if (item.package_photo) {
                             photoHtml = `
-                                <div class="relative group w-10 h-10 mx-auto cursor-pointer" onclick="previewImageDirect('${escapeHtml(item.package_photo)}')">
+                                <div class="relative group w-10 h-10 mx-auto cursor-pointer" onclick="previewImageDirect(${jsArg(item.package_photo)})">
                                     <img src="${escapeHtml(item.package_photo)}" alt="Foto Paket" class="w-10 h-10 rounded-lg object-cover border border-slate-200 shadow-2xs group-hover:scale-105 transition">
                                     <span class="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] transition">
                                         <i class="fa-solid fa-magnifying-glass"></i>
@@ -2873,7 +2983,7 @@ try {
                         if (item.courier_photo) {
                             courierHtml = `
                                 <div class="flex items-center gap-2">
-                                    <img src="${escapeHtml(item.courier_photo)}" onclick="previewImageDirect('${escapeHtml(item.courier_photo)}')" class="w-7 h-7 rounded-full object-cover border border-indigo-200 cursor-pointer shadow-2xs shrink-0 hover:scale-110 transition" title="Klik foto kurir">
+                                    <img src="${escapeHtml(item.courier_photo)}" onclick="previewImageDirect(${jsArg(item.courier_photo)})" class="w-7 h-7 rounded-full object-cover border border-indigo-200 cursor-pointer shadow-2xs shrink-0 hover:scale-110 transition" title="Klik foto kurir">
                                     <span class="text-slate-800 font-semibold truncate max-w-[120px]">${escapeHtml(item.courier_name || '-')}</span>
                                 </div>
                             `;
@@ -2885,7 +2995,7 @@ try {
                         let actionBtns = `
                             <div class="flex items-center justify-center gap-1.5">
                                 ${item.package_photo ? `
-                                <button onclick="previewImageDirect('${escapeHtml(item.package_photo)}')" class="w-7 h-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 flex items-center justify-center transition shadow-2xs" title="Lihat Foto Paket">
+                                <button onclick="previewImageDirect(${jsArg(item.package_photo)})" class="w-7 h-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 flex items-center justify-center transition shadow-2xs" title="Lihat Foto Paket">
                                     <i class="fa-solid fa-camera text-xs"></i>
                                 </button>` : ''}
                                 <button onclick="viewReceptionDetail(${item.reception_id})" class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 font-bold text-[11px] flex items-center gap-1 transition shadow-2xs" title="Buka Slip Serah Terima">
@@ -2902,7 +3012,7 @@ try {
                                 <td class="py-2.5 px-3">
                                     <div class="flex items-center gap-1.5 font-mono">
                                         <span class="font-black text-slate-900 text-xs tracking-wider">${escapeHtml(item.package_barcode)}</span>
-                                        <button onclick="navigator.clipboard.writeText('${escapeHtml(item.package_barcode)}'); playBeep('success');" class="text-slate-400 hover:text-slate-600 p-0.5" title="Salin Barcode">
+                                        <button onclick="copyTextSafe(${jsArg(item.package_barcode)})" class="text-slate-400 hover:text-slate-600 p-0.5" title="Salin Barcode">
                                             <i class="fa-regular fa-copy text-[11px]"></i>
                                         </button>
                                     </div>
@@ -2943,15 +3053,19 @@ try {
 
         async function viewReceptionDetail(id) {
             try {
-                const res = await fetch(`api/reception.php?action=detail&id=${id}`);
-                const data = await res.json();
+                const data = await fetchJson(`api/reception.php?action=detail&id=${encodeURIComponent(id)}`);
                 if (data && data.success && data.reception) {
                     const packagePhotos = (data.packages || []).map(p => p.photo_path).filter(Boolean);
                     if (data.reception.photo_path && !packagePhotos.includes(data.reception.photo_path)) {
                         packagePhotos.unshift(data.reception.photo_path);
                     }
-                    if (Array.isArray(data.reception.package_photos)) {
-                        data.reception.package_photos.forEach(ph => {
+                    // package_photos dari DB berupa string JSON -> parse dulu
+                    let recPkgPhotos = data.reception.package_photos;
+                    if (typeof recPkgPhotos === 'string' && recPkgPhotos.trim().startsWith('[')) {
+                        try { recPkgPhotos = JSON.parse(recPkgPhotos); } catch (e) { recPkgPhotos = null; }
+                    }
+                    if (Array.isArray(recPkgPhotos)) {
+                        recPkgPhotos.forEach(ph => {
                             if (ph && !packagePhotos.includes(ph)) packagePhotos.push(ph);
                         });
                     }
@@ -2998,10 +3112,60 @@ try {
         }
 
         function escapeHtml(text) {
-            if (!text) return '';
-            return text.replace(/[&<>"']/g, function(m) {
+            if (!text && text !== 0) return '';
+            return String(text).replace(/[&<>"']/g, function(m) {
                 return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
             });
+        }
+
+        // Argumen string aman untuk handler inline onclick="fn(...)": JSON.stringify lalu escape HTML.
+        // (escapeHtml saja tidak cukup: &#039; di-decode browser kembali menjadi ' sebelum JS dijalankan)
+        function jsArg(value) {
+            return escapeHtml(JSON.stringify(value === null || value === undefined ? '' : String(value)));
+        }
+
+        // fetch + parse JSON yang aman: respons HTML/warning PHP atau HTTP error menjadi pesan yang jelas
+        async function fetchJson(url, options) {
+            const res = await fetch(url, options);
+            const txt = await res.text();
+            let data;
+            try {
+                data = JSON.parse(txt);
+            } catch (e) {
+                if (res.status === 401) throw new Error('Sesi login telah habis. Buka tab baru untuk login kembali.');
+                throw new Error(`Server (${res.status}) tidak mengirim data JSON: ` + txt.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 150));
+            }
+            if (!res.ok && !(data && data.success)) {
+                throw new Error((data && data.error) || `HTTP ${res.status}`);
+            }
+            return data;
+        }
+
+        // Tanggal LOKAL perangkat (WIB) format YYYY-MM-DD (toISOString() memakai UTC -> mundur 1 hari pukul 00:00-06:59)
+        function localYmd(d = new Date()) {
+            const z = n => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
+        }
+
+        // Salin teks ke clipboard (navigator.clipboard tidak tersedia di http non-localhost)
+        function copyTextSafe(text) {
+            const done = () => playBeep('success');
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(done).catch(() => {});
+                    return;
+                }
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.setAttribute('readonly', '');
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                done();
+            } catch (e) {}
         }
 
         // Mencegah browser meng-autofill kredensial (admin.cs) ke input pencarian
