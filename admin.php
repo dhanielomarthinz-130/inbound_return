@@ -3355,6 +3355,9 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
     <script src="https://npmcdn.com/flatpickr/dist/l10n/id.js"></script>
     <!-- Toast Premium Notification -->
     <script src="assets/js/toast.js?v=<?= file_exists(__DIR__ . '/assets/js/toast.js') ? filemtime(__DIR__ . '/assets/js/toast.js') : time() ?>"></script>
+    <script>
+        window.SERVER_SYNC_ENABLED = <?= (defined('SYNC_ENABLED') && SYNC_ENABLED) ? 'true' : 'false' ?>;
+    </script>
     <script src="assets/js/admin.js?v=<?= file_exists(__DIR__ . '/assets/js/admin.js') ? filemtime(__DIR__ . '/assets/js/admin.js') : time() ?>"></script>
 </body>
 </html>

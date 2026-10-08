@@ -12,6 +12,20 @@ defined('SYNC_SECRET_KEY') or define('SYNC_SECRET_KEY', 'IEG_RETURN_SYNC_TOKEN_2
 // URL Web InfinityFree Anda
 defined('CLOUD_BASE_URL') or define('CLOUD_BASE_URL', 'https://returninboundieg.great-site.net');
 
+// Muat konfigurasi khusus mesin ini jika ada (misal di PC Server Kantor)
+if (file_exists(__DIR__ . '/sync_config.local.php')) {
+    require_once __DIR__ . '/sync_config.local.php';
+}
+
+/**
+ * PENGATURAN SYNC MULTI-PERANGKAT:
+ * Setel true HANYA di PC Server Kantor.
+ * Di laptop / PC dev / perangkat lain, setel false agar tidak menarik data dari Cloud (tidak salah jalur).
+ */
+$isLaptopDevice = (strpos(strtoupper(gethostname()), 'LAPTOP') !== false);
+$hasServerMarker = file_exists(__DIR__ . '/.is_pc_server');
+defined('SYNC_ENABLED') or define('SYNC_ENABLED', ($hasServerMarker && !$isLaptopDevice));
+
 // Batas jumlah transaksi yang ditarik per 1 kali putaran sync
 defined('SYNC_BATCH_LIMIT') or define('SYNC_BATCH_LIMIT', 30);
 

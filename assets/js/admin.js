@@ -5925,6 +5925,7 @@ window.searchClaimDossier = function (e) {
 // -------------------------------------------------------------
 let isSyncingBackground = false;
 async function triggerBackgroundCloudSync() {
+    if (window.SERVER_SYNC_ENABLED === false) return;
     // Hanya jalankan jika diakses di PC Localhost / server lokal
     const isLocalhost = (location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname.endsWith('.test') || location.hostname.startsWith('192.168.'));
     if (!isLocalhost || isSyncingBackground) return;
@@ -5933,6 +5934,10 @@ async function triggerBackgroundCloudSync() {
     try {
         const res = await fetch('sync_worker.php');
         const data = await res.json();
+        if (data && data.blocked) {
+            window.SERVER_SYNC_ENABLED = false;
+            return;
+        }
         if (data && data.success) {
             const numRet = data.synced_returns || 0;
             const numRec = data.synced_receptions || 0;

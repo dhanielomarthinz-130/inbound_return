@@ -5,4 +5,4 @@ echo Menghentikan proses IEG Auto-Sync Daemon...
 powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*sync_worker.php*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force; Write-Host ('Menghentikan PID: ' + $_.ProcessId) }"
 echo.
 echo IEG Auto-Sync Daemon telah dihentikan.
-timeout /t 3
+powershell -NoProfile -Command "Start-Sleep -Seconds 2" >nul 2>&1

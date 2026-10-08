@@ -25,6 +25,22 @@ if (!$isCli) {
     header('Content-Type: application/json; charset=utf-8');
 }
 
+// KEAMANAN & FILTER PERANGKAT: Cegah laptop / client salah jalur menarik data dari Cloud
+if (!defined('SYNC_ENABLED') || !SYNC_ENABLED) {
+    $blockedMsg = "Sinkronisasi Cloud InfinityFree dinonaktifkan di perangkat ini (" . gethostname() . "). Hanya boleh berjalan di PC Server Kantor!";
+    if ($isCli) {
+        echo "[SYNC BLOCKED] " . $blockedMsg . PHP_EOL;
+        exit(0);
+    } else {
+        echo json_encode([
+            'success' => false,
+            'blocked' => true,
+            'error'   => $blockedMsg
+        ]);
+        exit(0);
+    }
+}
+
 function writeSyncLog($msg) {
     $logDir = __DIR__ . '/uploads/logs';
     if (!is_dir($logDir)) {

@@ -29,3 +29,6 @@ ngrok.exe
 ngrok_domain.txt
 scratch/
 _backup_*/
+sync_config.local.php
+.is_pc_server
+TRANSFER_KE_SERVER_*/
