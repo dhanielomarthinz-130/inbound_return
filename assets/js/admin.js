@@ -3528,9 +3528,14 @@ function renderReceivingTable(data) {
                     </button>
                 </td>
                 <td class="py-3 px-4">
-                    <span class="bg-emerald-50 text-emerald-700 font-bold px-2.5 py-1 rounded-lg border border-emerald-200 text-xs inline-block">
-                        ${escapeHtml(item.expedition)}
-                    </span>
+                    <div class="flex items-center gap-1.5">
+                        <span class="bg-emerald-50 text-emerald-700 font-bold px-2.5 py-1 rounded-lg border border-emerald-200 text-xs inline-block">
+                            ${escapeHtml(item.expedition)}
+                        </span>
+                        <button type="button" onclick="openEditReceivingModal(${item.id})" class="text-amber-600 hover:text-amber-800 hover:bg-amber-100/70 p-1 rounded-md transition cursor-pointer" title="Edit Ekspedisi">
+                            <i class="fa-solid fa-pen-to-square text-xs"></i>
+                        </button>
+                    </div>
                 </td>
                 <td class="py-3 px-4 font-medium text-slate-700">
                     ${escapeHtml(item.courier_name || '-')}
@@ -3547,6 +3552,10 @@ function renderReceivingTable(data) {
                 <td class="py-3 px-4 text-slate-500 font-mono text-[11px]">${timeStr}</td>
                 <td class="py-3 px-4 text-center">
                     <div class="flex items-center justify-center gap-1.5">
+                        <button type="button" onclick="openEditReceivingModal(${item.id})" class="bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold px-2.5 py-1.5 rounded-xl border border-amber-200 text-xs flex items-center gap-1.5 transition shadow-2xs cursor-pointer" title="Edit Ekspedisi">
+                            <i class="fa-solid fa-pen-to-square text-amber-600"></i>
+                            <span>Edit</span>
+                        </button>
                         <button onclick="viewReceivingReceipt(${item.id})" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold px-2.5 py-1.5 rounded-xl border border-emerald-200 text-xs flex items-center gap-1.5 transition shadow-2xs" title="Lihat & Cetak Bukti Serah Terima">
                             <i class="fa-solid fa-file-invoice text-emerald-600"></i>
                             <span>Bukti Serah Terima</span>
@@ -3566,6 +3575,198 @@ function renderReceivingTable(data) {
 
     tbody.innerHTML = rowsHtml;
 }
+
+// Buka Modal Edit Ekspedisi Penerimaan
+window.openEditReceivingModal = async function (id) {
+    const modal = document.getElementById('modalEditReceivingExpedition');
+    if (!modal) return;
+
+    showGlobalLoading("Memuat Data...", "Mengambil data penerimaan ekspedisi...");
+    try {
+        let expeditionsList = [];
+        try {
+            const expRes = await fetch('api/expeditions.php');
+            expeditionsList = await expRes.json();
+        } catch (e) {
+            console.warn("Gagal load api/expeditions.php, pakai list default", e);
+        }
+
+        const res = await fetch(`api/reception.php?action=detail&id=${id}`);
+        const data = await res.json();
+        hideGlobalLoading();
+
+        if (!data || !data.success || !data.reception) {
+            showToast('error', data.error || 'Data penerimaan tidak ditemukan', 'Gagal');
+            return;
+        }
+
+        const r = data.reception;
+
+        // Set hidden ID dan ringkasan
+        document.getElementById('editReceivingId').value = r.id;
+        document.getElementById('editReceivingReceiptNo').innerText = r.receipt_number || '-';
+        const totalCount = (data.packages && data.packages.length > 0) ? data.packages.length : (r.total_packages || 0);
+        document.getElementById('editReceivingTotalPkgs').innerText = `${totalCount} Paket`;
+
+        // Field pendukung
+        document.getElementById('editReceivingCourierName').value = r.courier_name || '';
+        document.getElementById('editReceivingSackNumber').value = r.sack_number || '';
+        document.getElementById('editReceivingVehicleNo').value = r.vehicle_no || '';
+        document.getElementById('editReceivingNotes').value = r.notes || '';
+
+        // Populasi dropdown ekspedisi
+        const select = document.getElementById('editReceivingExpeditionSelect');
+        select.innerHTML = '';
+
+        const standardExpeditions = [
+            'Shopee Xpress (SPX)',
+            'GoTo Logistics (GTL)',
+            'J&T Express',
+            'SiCepat Ekspres',
+            'JNE Express',
+            'AnterAja',
+            'Ninja Xpress',
+            'ID Express',
+            'J&T Cargo',
+            'Wahana',
+            'Lion Parcel',
+            'Paxel'
+        ];
+
+        const setExp = new Set(standardExpeditions);
+        if (Array.isArray(expeditionsList)) {
+            expeditionsList.forEach(e => {
+                if (e.name) setExp.add(e.name.trim());
+            });
+        }
+        if (r.expedition) {
+            setExp.add(r.expedition.trim());
+        }
+
+        let isCurrentMatched = false;
+        setExp.forEach(expName => {
+            const opt = document.createElement('option');
+            opt.value = expName;
+            opt.textContent = expName;
+            if (r.expedition && expName.toLowerCase() === r.expedition.trim().toLowerCase()) {
+                opt.selected = true;
+                isCurrentMatched = true;
+            }
+            select.appendChild(opt);
+        });
+
+        // Opsi Lainnya / Custom
+        const otherOpt = document.createElement('option');
+        otherOpt.value = '__OTHER__';
+        otherOpt.textContent = '➕ Ekspedisi Lainnya (Ketik Manual)...';
+        select.appendChild(otherOpt);
+
+        const customContainer = document.getElementById('customExpeditionContainer');
+        const customInput = document.getElementById('editReceivingExpeditionCustom');
+        if (!isCurrentMatched && r.expedition) {
+            select.value = '__OTHER__';
+            customInput.value = r.expedition;
+            customContainer.classList.remove('hidden');
+        } else {
+            customInput.value = '';
+            customContainer.classList.add('hidden');
+        }
+
+        modal.classList.remove('hidden');
+    } catch (err) {
+        hideGlobalLoading();
+        console.error('Error openEditReceivingModal:', err);
+        showToast('error', err.message || 'Gagal memuat detail data', 'Error');
+    }
+};
+
+window.closeEditReceivingModal = function () {
+    const modal = document.getElementById('modalEditReceivingExpedition');
+    if (modal) modal.classList.add('hidden');
+};
+
+window.toggleCustomExpeditionInput = function () {
+    const select = document.getElementById('editReceivingExpeditionSelect');
+    const container = document.getElementById('customExpeditionContainer');
+    const customInput = document.getElementById('editReceivingExpeditionCustom');
+    if (select && select.value === '__OTHER__') {
+        container.classList.remove('hidden');
+        if (customInput) customInput.focus();
+    } else {
+        if (container) container.classList.add('hidden');
+    }
+};
+
+window.submitEditReceivingExpedition = async function (e) {
+    if (e && e.preventDefault) e.preventDefault();
+
+    const id = document.getElementById('editReceivingId').value;
+    const select = document.getElementById('editReceivingExpeditionSelect');
+    const customInput = document.getElementById('editReceivingExpeditionCustom');
+    let expedition = select ? select.value : '';
+
+    if (expedition === '__OTHER__') {
+        expedition = customInput ? customInput.value.trim() : '';
+    }
+
+    if (!expedition) {
+        showToast('warning', 'Nama ekspedisi wajib dipilih atau diisi.', 'Perhatian');
+        return;
+    }
+
+    const courierName = document.getElementById('editReceivingCourierName').value.trim();
+    const sackNumber = document.getElementById('editReceivingSackNumber').value.trim();
+    const vehicleNo = document.getElementById('editReceivingVehicleNo').value.trim();
+    const notes = document.getElementById('editReceivingNotes').value.trim();
+
+    const btn = document.getElementById('btnSaveEditReceiving');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i> Menyimpan...`;
+    }
+
+    try {
+        const payload = {
+            id: parseInt(id),
+            expedition: expedition,
+            courier_name: courierName,
+            sack_number: sackNumber,
+            vehicle_no: vehicleNo,
+            notes: notes
+        };
+
+        const res = await fetch('api/reception.php?action=update_expedition', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const json = await res.json();
+
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
+
+        if (json && json.success) {
+            showToast('success', json.message || 'Ekspedisi berhasil diperbarui!', 'Berhasil');
+            closeEditReceivingModal();
+            loadReceivingData();
+        } else {
+            showToast('error', json.error || 'Gagal memperbarui data ekspedisi', 'Gagal Simpan');
+        }
+    } catch (err) {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
+        console.error('Error submitEditReceivingExpedition:', err);
+        showToast('error', err.message || 'Terjadi kesalahan jaringan', 'Error');
+    }
+};
 
 // Buka Modal Bukti Serah Terima Resmi
 window.viewReceivingReceipt = async function (id) {

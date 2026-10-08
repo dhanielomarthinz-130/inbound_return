@@ -404,6 +404,79 @@ if ($method === 'DELETE' || ($method === 'POST' && isset($_GET['action']) && $_G
 }
 
 // ==========================================
+// 1b. POST ?action=update_expedition : EDIT EKSPEDISI & DATA PENERIMAAN
+// ==========================================
+if ($method === 'POST' && (($_GET['action'] ?? '') === 'update_expedition' || ($_POST['action'] ?? '') === 'update_expedition')) {
+    $input = [];
+    if (!empty($_POST['expedition']) || !empty($_POST['id'])) {
+        $input = $_POST;
+    } else {
+        $raw = file_get_contents('php://input');
+        if ($raw) {
+            $input = json_decode(preg_replace('/^[\xEF\xBB\xBF]+/', '', trim($raw)), true) ?: [];
+        }
+    }
+
+    $id = intval($_GET['id'] ?? ($input['id'] ?? 0));
+    $newExpedition = trim($input['expedition'] ?? '');
+    $courierName = isset($input['courier_name']) ? trim($input['courier_name']) : null;
+    $sackNumber = isset($input['sack_number']) ? trim($input['sack_number']) : null;
+    $vehicleNo = isset($input['vehicle_no']) ? trim($input['vehicle_no']) : null;
+    $notes = isset($input['notes']) ? trim($input['notes']) : null;
+
+    if ($id <= 0) {
+        jsonResponse(['error' => 'ID Penerimaan tidak valid.'], 400);
+    }
+    if (empty($newExpedition)) {
+        jsonResponse(['error' => 'Nama ekspedisi tidak boleh kosong.'], 400);
+    }
+
+    try {
+        $stmtChk = $pdo->prepare("SELECT id, receipt_number, expedition FROM expedition_receptions WHERE id = ?");
+        $stmtChk->execute([$id]);
+        $curr = $stmtChk->fetch(PDO::FETCH_ASSOC);
+        if (!$curr) {
+            jsonResponse(['error' => 'Data penerimaan tidak ditemukan.'], 404);
+        }
+
+        $fields = ["expedition = ?"];
+        $params = [$newExpedition];
+
+        if ($courierName !== null) {
+            $fields[] = "courier_name = ?";
+            $params[] = $courierName;
+        }
+        if ($sackNumber !== null) {
+            $fields[] = "sack_number = ?";
+            $params[] = $sackNumber;
+        }
+        if ($vehicleNo !== null) {
+            $fields[] = "vehicle_no = ?";
+            $params[] = $vehicleNo;
+        }
+        if ($notes !== null) {
+            $fields[] = "notes = ?";
+            $params[] = $notes;
+        }
+
+        $params[] = $id;
+        $sql = "UPDATE expedition_receptions SET " . implode(", ", $fields) . " WHERE id = ?";
+        $stmtUpd = $pdo->prepare($sql);
+        $stmtUpd->execute($params);
+
+        jsonResponse([
+            'success' => true,
+            'message' => "Ekspedisi tanda terima {$curr['receipt_number']} berhasil diperbarui menjadi '{$newExpedition}'.",
+            'id' => $id,
+            'old_expedition' => $curr['expedition'],
+            'new_expedition' => $newExpedition
+        ]);
+    } catch (Exception $e) {
+        jsonResponse(['error' => 'Gagal mengubah ekspedisi: ' . $e->getMessage()], 500);
+    }
+}
+
+// ==========================================
 // 2a. POST ?action=upload_photo : UNGGAH 1 FOTO (Dipakai sebelum submit final)
 //     Foto diunggah satu per satu agar request submit final kecil dan tidak
 //     pernah melebihi batas post_max_size server.

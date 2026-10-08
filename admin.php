@@ -3351,6 +3351,91 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
         </div>
     </div>
 
+    <!-- MODAL EDIT EKSPEDISI PENERIMAAN INBOUND -->
+    <div id="modalEditReceivingExpedition" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5 animate-scaleIn">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-base">Edit Ekspedisi Penerimaan</h3>
+                        <p class="text-xs text-slate-400">Perbarui data ekspedisi &amp; informasi serah terima</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeEditReceivingModal()" class="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="formEditReceivingExpedition" onsubmit="submitEditReceivingExpedition(event)" class="space-y-4 text-xs">
+                <input type="hidden" id="editReceivingId" value="">
+
+                <!-- Summary Info No Terima -->
+                <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">No. Tanda Terima</span>
+                        <b class="text-sm font-mono text-emerald-700" id="editReceivingReceiptNo">-</b>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Total Paket</span>
+                        <b class="text-xs font-mono text-indigo-700" id="editReceivingTotalPkgs">-</b>
+                    </div>
+                </div>
+
+                <!-- Pilihan Ekspedisi -->
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">
+                        Jasa Ekspedisi <span class="text-rose-500">*</span>
+                    </label>
+                    <select id="editReceivingExpeditionSelect" onchange="toggleCustomExpeditionInput()" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-800 text-xs focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500">
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+
+                <!-- Input Ekspedisi Kustom jika dipilih lainnya -->
+                <div id="customExpeditionContainer" class="hidden">
+                    <label class="block font-bold text-slate-700 mb-1">Ketik Nama Ekspedisi Kustom</label>
+                    <input type="text" id="editReceivingExpeditionCustom" placeholder="Contoh: J&amp;T Cargo, Paxel, dll." class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl font-medium text-xs focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Driver / Nama Kurir</label>
+                        <input type="text" id="editReceivingCourierName" placeholder="Nama Kurir" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Nomor Karung / Sack</label>
+                        <input type="text" id="editReceivingSackNumber" placeholder="Contoh: KR-01" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">No. Polisi Kendaraan</label>
+                        <input type="text" id="editReceivingVehicleNo" placeholder="Contoh: B 1234 XYZ" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Catatan Tambahan</label>
+                        <input type="text" id="editReceivingNotes" placeholder="Catatan jika ada" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500">
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+                    <button type="button" onclick="closeEditReceivingModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer">
+                        Batal
+                    </button>
+                    <button type="submit" id="btnSaveEditReceiving" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-amber-600/30 transition flex items-center space-x-1.5 cursor-pointer">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>Simpan Perubahan</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- SheetJS (Official Native XLSX Generator - 100% Bebas Corrupt) -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Flatpickr JS -->
