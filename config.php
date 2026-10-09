@@ -621,6 +621,216 @@ function checkMaintenanceMode($pdo, $user = null) {
 }
 
 /**
+ * Definisi Seluruh Menu Navigasi di Sistem
+ */
+function getSystemMenus() {
+    return [
+        'dashboard' => [
+            'key' => 'dashboard',
+            'name' => 'Dashboard Overview',
+            'icon' => 'fa-solid fa-gauge-high',
+            'category' => 'Utama & Analitik',
+            'description' => 'Monitoring analitik, trend volume penerimaan paket, dan KPI produktivitas'
+        ],
+        'receiving' => [
+            'key' => 'receiving',
+            'name' => 'Receiving Inbound',
+            'icon' => 'fa-solid fa-truck-ramp-box',
+            'category' => 'Operasional Gudang',
+            'description' => 'Pencatatan & pemindaian serah terima kurir ekspedisi di gudang'
+        ],
+        'transactions' => [
+            'key' => 'transactions',
+            'name' => 'Inbound Unboxing',
+            'icon' => 'fa-solid fa-box-open',
+            'category' => 'Operasional Gudang',
+            'description' => 'Riwayat hasil scan unboxing fisik paket, kondisi produk, dan rekaman video'
+        ],
+        'aging-return' => [
+            'key' => 'aging-return',
+            'name' => 'Aging Return',
+            'icon' => 'fa-solid fa-clock-rotate-left',
+            'category' => 'Operasional Gudang',
+            'description' => 'Pemantauan durasi waktu Receiving ke Unboxing & paket belum di-unboxing'
+        ],
+        'claims' => [
+            'key' => 'claims',
+            'name' => 'Pusat Klaim & Banding',
+            'icon' => 'fa-solid fa-shield-halved',
+            'category' => 'Klaim & Finansial',
+            'description' => 'Daftar berkas klaim paket rusak, pengajuan ekspedisi & assignment accounting'
+        ],
+        'orders' => [
+            'key' => 'orders',
+            'name' => 'Data Orders OCS',
+            'icon' => 'fa-solid fa-cart-flatbed',
+            'category' => 'Integrasi & Data',
+            'description' => 'Sinkronisasi data pesanan marketplace dari sistem OCS IEG'
+        ],
+        'products' => [
+            'key' => 'products',
+            'name' => 'Master Produk',
+            'icon' => 'fa-solid fa-tags',
+            'category' => 'Master Data',
+            'description' => 'Katalog produk, barcode SKU, dan sinkronisasi master data barang'
+        ],
+        'expeditions' => [
+            'key' => 'expeditions',
+            'name' => 'Master Ekspedisi',
+            'icon' => 'fa-solid fa-truck-fast',
+            'category' => 'Master Data',
+            'description' => 'Daftar ekspedisi logistik dan kurir rekanan gudang'
+        ],
+        'conditions' => [
+            'key' => 'conditions',
+            'name' => 'Master Kondisi',
+            'icon' => 'fa-solid fa-clipboard-check',
+            'category' => 'Master Data',
+            'description' => 'Klasifikasi kondisi barang retur (Bagus, Rusak, Cacat, dsb)'
+        ],
+        'users' => [
+            'key' => 'users',
+            'name' => 'Kelola Pengguna',
+            'icon' => 'fa-solid fa-users-gear',
+            'category' => 'Pengaturan & Akses',
+            'description' => 'Manajemen akun pengguna, reset password, dan penetapan role'
+        ],
+        'roles' => [
+            'key' => 'roles',
+            'name' => 'Kelola Role',
+            'icon' => 'fa-solid fa-user-shield',
+            'category' => 'Pengaturan & Akses',
+            'description' => 'Manajemen master role pengguna di sistem'
+        ],
+        'bank-settings' => [
+            'key' => 'bank-settings',
+            'name' => 'Pengaturan Bank',
+            'icon' => 'fa-solid fa-building-columns',
+            'category' => 'Klaim & Finansial',
+            'description' => 'Nomor rekening bank perusahaan untuk pencairan klaim ganti rugi'
+        ],
+        'approval-jnt' => [
+            'key' => 'approval-jnt',
+            'name' => 'Approval Klaim J&T',
+            'icon' => 'fa-solid fa-stamp',
+            'category' => 'Klaim & Finansial',
+            'description' => 'Approval klaim khusus ekspedisi J&T dengan e-Sign digital'
+        ],
+        'maintenance' => [
+            'key' => 'maintenance',
+            'name' => 'Pemeliharaan Sistem',
+            'icon' => 'fa-solid fa-screwdriver-wrench',
+            'category' => 'Pengaturan & Akses',
+            'description' => 'Mode pemeliharaan darurat dan optimasi database'
+        ],
+        'menu-permissions' => [
+            'key' => 'menu-permissions',
+            'name' => 'Control Panel Akses Menu',
+            'icon' => 'fa-solid fa-sliders',
+            'category' => 'Pengaturan & Akses',
+            'description' => 'Konfigurasi hak akses menu untuk masing-masing role (Khusus Super Admin)',
+            'superadmin_only' => true
+        ]
+    ];
+}
+
+/**
+ * Hak Akses Menu Bawaan (Default Fallback jika belum dikonfigurasi di DB)
+ */
+function getDefaultMenuPermissions() {
+    return [
+        'superadmin' => [
+            'dashboard', 'receiving', 'transactions', 'aging-return', 'claims', 'orders',
+            'products', 'expeditions', 'conditions', 'users', 'roles', 'bank-settings',
+            'approval-jnt', 'maintenance', 'menu-permissions'
+        ],
+        'admin' => [
+            'dashboard', 'receiving', 'transactions', 'aging-return', 'claims', 'orders',
+            'products', 'expeditions', 'conditions', 'users', 'roles', 'bank-settings', 'approval-jnt'
+        ],
+        'management' => [
+            'dashboard', 'aging-return', 'approval-jnt'
+        ],
+        'accounting' => [
+            'aging-return', 'claims', 'bank-settings', 'approval-jnt'
+        ],
+        'operator_reporting' => [
+            'dashboard', 'aging-return'
+        ],
+        'operator_mobile' => [
+            'receiving', 'transactions'
+        ],
+        'operator' => [
+            'receiving', 'transactions'
+        ],
+        'customer_service' => [
+            'transactions', 'aging-return', 'claims'
+        ]
+    ];
+}
+
+/**
+ * Ambil Pemetaan Hak Akses Menu untuk Seluruh Role dari Database
+ */
+function getRoleMenuPermissions($pdo = null) {
+    global $pdo;
+    static $cache = null;
+    if ($cache !== null) return $cache;
+
+    $defaults = getDefaultMenuPermissions();
+    $permissions = [];
+
+    if ($pdo) {
+        try {
+            $stmt = $pdo->query("SELECT role_key, permissions FROM roles");
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $rawKey = strtolower(trim($row['role_key']));
+                $stdKey = str_replace([' ', '-'], '_', $rawKey);
+                $perms = !empty($row['permissions']) ? json_decode($row['permissions'], true) : null;
+                if (is_array($perms)) {
+                    $permissions[$stdKey] = $perms;
+                    $permissions[$rawKey] = $perms;
+                }
+            }
+        } catch (Exception $e) {}
+    }
+
+    // Gabungkan dengan default jika belum diset di DB
+    foreach ($defaults as $rKey => $defList) {
+        if (!isset($permissions[$rKey])) {
+            $permissions[$rKey] = $defList;
+        }
+    }
+
+    // Super Admin selalu memiliki seluruh menu
+    $allMenuKeys = array_keys(getSystemMenus());
+    $permissions['superadmin'] = $allMenuKeys;
+
+    $cache = $permissions;
+    return $cache;
+}
+
+/**
+ * Cek Apakah Role Pengguna Berhak Mengakses Suatu Menu
+ */
+function userHasMenuAccess($menuKey, $userRole, $pdo = null) {
+    $roleClean = strtolower(trim(str_replace([' ', '-'], '_', $userRole ?? '')));
+    if ($roleClean === 'superadmin') {
+        return true;
+    }
+    // Control panel akses menu hanya boleh dibuka oleh superadmin
+    if ($menuKey === 'menu-permissions') {
+        return false;
+    }
+
+    global $pdo;
+    $perms = getRoleMenuPermissions($pdo);
+    $allowed = $perms[$roleClean] ?? ($perms[str_replace('_', '', $roleClean)] ?? []);
+
+    return in_array($menuKey, $allowed, true);
+}
+
+/**
  * Pastikan kolom status klaim & accounting approval serta tabel roles tersedia (self-healing schema).
  */
 function ensureClaimStatusColumn($pdo = null) {

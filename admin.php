@@ -11,6 +11,11 @@ $isManagement = ($rawRole === 'management' || $isSuperAdmin);
 $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
 $isReporting = ($rawRole === 'operatorreporting' || $rawRole === 'operator_reporting' || $isSuperAdmin || $isAdmin);
 $isCS = ($rawRole === 'customerservice' || $rawRole === 'customer_service' || $isSuperAdmin || $isAdmin);
+
+// Dapatkan izin akses menu aktual untuk role saat ini (Dikonfigurasi oleh Super Admin di Control Panel)
+$userRoleMenuPermissions = getRoleMenuPermissions($pdo);
+$roleKeyClean = str_replace([' ', '-'], '_', $rawRole);
+$currentUserAllowedMenus = $isSuperAdmin ? array_keys(getSystemMenus()) : ($userRoleMenuPermissions[$roleKeyClean] ?? ($userRoleMenuPermissions[$rawRole] ?? []));
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -32,6 +37,7 @@ $isCS = ($rawRole === 'customerservice' || $rawRole === 'customer_service' || $i
         window.IS_ACCOUNTING = <?= $isAccounting ? 'true' : 'false' ?>;
         window.IS_REPORTING = <?= $isReporting ? 'true' : 'false' ?>;
         window.IS_CS = <?= $isCS ? 'true' : 'false' ?>;
+        window.USER_ALLOWED_MENUS = <?= json_encode($currentUserAllowedMenus) ?>;
     </script>
     <!-- Favicon Huruf D Warna Hijau -->
     <link rel="icon" type="image/svg+xml" sizes="any" href="assets/image/favicon.svg?v=2">
@@ -265,7 +271,7 @@ $isCS = ($rawRole === 'customerservice' || $rawRole === 'customer_service' || $i
         <div class="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
             <div class="px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Menu Navigasi</div>
 
-            <?php if ($isAdmin || $isManagement || $isReporting): ?>
+            <?php if (userHasMenuAccess('dashboard', $rawRole, $pdo)): ?>
             <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition text-white bg-indigo-600 shadow-sm shadow-indigo-600/30">
                 <i class="fa-solid fa-gauge-high w-5 text-center text-indigo-100"></i>
                 <span>Dashboard Overview</span>
@@ -273,14 +279,14 @@ $isCS = ($rawRole === 'customerservice' || $rawRole === 'customer_service' || $i
             <?php endif; ?>
 
             <!-- MENU: RECEIVING INBOUND (PENERIMAAN EKSPEDISI) -->
-            <?php if ($isAdmin): ?>
+            <?php if (userHasMenuAccess('receiving', $rawRole, $pdo)): ?>
             <button onclick="switchTab('receiving')" id="nav-receiving" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-truck-ramp-box w-5 text-center text-emerald-600"></i>
                 <span>Receiving Inbound</span>
             </button>
             <?php endif; ?>
 
-            <?php if ($isAdmin || $isCS): ?>
+            <?php if (userHasMenuAccess('transactions', $rawRole, $pdo)): ?>
             <button onclick="switchTab('transactions')" id="nav-transactions" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-box-open w-5 text-center text-indigo-500"></i>
                 <span>Inbound Unboxing</span>
@@ -288,7 +294,7 @@ $isCS = ($rawRole === 'customerservice' || $rawRole === 'customer_service' || $i
             <?php endif; ?>
 
             <!-- MENU BARU: AGING RETURN (MONITORING DURASI RECEIVING KE UNBOXING) -->
-            <?php if ($isAdmin || $isManagement || $isReporting || $isAccounting || $isCS): ?>
+            <?php if (userHasMenuAccess('aging-return', $rawRole, $pdo)): ?>
             <button onclick="switchTab('aging-return')" id="nav-aging-return" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-clock-rotate-left w-5 text-center text-teal-600"></i>
                 <div class="flex items-center justify-between flex-1">
@@ -299,7 +305,7 @@ $isCS = ($rawRole === 'customerservice' || $rawRole === 'customer_service' || $i
             <?php endif; ?>
 
             <!-- MENU: PUSAT KLAIM & BANDING (CLAIM DOSSIER) -->
-            <?php if ($isAdmin || $isAccounting || $isCS): ?>
+            <?php if (userHasMenuAccess('claims', $rawRole, $pdo)): ?>
             <button onclick="switchTab('claims')" id="nav-claims" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-shield-halved w-5 text-center text-amber-500"></i>
                 <span>Pusat Klaim &amp; Banding</span>
@@ -307,55 +313,77 @@ $isCS = ($rawRole === 'customerservice' || $rawRole === 'customer_service' || $i
             <?php endif; ?>
 
             <!-- MENU BARU: DATA ORDERS OCS (SINKRONISASI PESANAN) -->
-            <?php if ($isAdmin): ?>
+            <?php if (userHasMenuAccess('orders', $rawRole, $pdo)): ?>
             <button onclick="switchTab('orders')" id="nav-orders" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-cart-flatbed w-5 text-center text-blue-600"></i>
                 <span>Data Orders OCS</span>
             </button>
+            <?php endif; ?>
 
+            <?php if (userHasMenuAccess('products', $rawRole, $pdo)): ?>
             <button onclick="switchTab('products')" id="nav-products" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-tags w-5 text-center text-blue-500"></i>
                 <span>Master Produk</span>
             </button>
+            <?php endif; ?>
 
+            <?php if (userHasMenuAccess('expeditions', $rawRole, $pdo)): ?>
             <button onclick="switchTab('expeditions')" id="nav-expeditions" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-truck-fast w-5 text-center text-teal-500"></i>
                 <span>Master Ekspedisi</span>
             </button>
+            <?php endif; ?>
 
+            <?php if (userHasMenuAccess('conditions', $rawRole, $pdo)): ?>
             <button onclick="switchTab('conditions')" id="nav-conditions" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-clipboard-check w-5 text-center text-purple-500"></i>
                 <span>Master Kondisi</span>
             </button>
+            <?php endif; ?>
 
+            <?php if (userHasMenuAccess('users', $rawRole, $pdo)): ?>
             <button onclick="switchTab('users')" id="nav-users" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-users-gear w-5 text-center text-slate-500"></i>
                 <span>Kelola Pengguna</span>
             </button>
             <?php endif; ?>
 
-            <?php if ($isSuperAdmin || $isAdmin): ?>
+            <?php if (userHasMenuAccess('roles', $rawRole, $pdo)): ?>
             <button onclick="switchTab('roles')" id="nav-roles" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-user-shield w-5 text-center text-purple-600"></i>
                 <span>Kelola Role</span>
             </button>
             <?php endif; ?>
 
-            <?php if ($isSuperAdmin || $isAdmin || $isAccounting): ?>
+            <?php if (userHasMenuAccess('bank-settings', $rawRole, $pdo)): ?>
             <button onclick="switchTab('bank-settings')" id="nav-bank-settings" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-building-columns w-5 text-center text-emerald-600"></i>
                 <span>Pengaturan Bank</span>
             </button>
+            <?php endif; ?>
+
+            <?php if (userHasMenuAccess('approval-jnt', $rawRole, $pdo)): ?>
             <button onclick="switchTab('approval-jnt')" id="nav-approval-jnt" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-stamp w-5 text-center text-rose-600"></i>
                 <span>Approval Klaim J&amp;T</span>
             </button>
             <?php endif; ?>
 
-            <?php if ($isSuperAdmin): ?>
+            <?php if (userHasMenuAccess('maintenance', $rawRole, $pdo)): ?>
             <button onclick="switchTab('maintenance')" id="nav-maintenance" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-amber-700 hover:text-amber-800 hover:bg-amber-100/70 border border-amber-300/80 bg-amber-50/60">
                 <i class="fa-solid fa-screwdriver-wrench w-5 text-center text-amber-600"></i>
                 <span>Pemeliharaan</span>
+            </button>
+            <?php endif; ?>
+
+            <!-- MENU BARU: CONTROL PANEL AKSES MENU & ROLE (KHUSUS SUPER ADMIN) -->
+            <?php if ($isSuperAdmin): ?>
+            <button onclick="switchTab('menu-permissions')" id="nav-menu-permissions" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-purple-700 hover:text-purple-900 hover:bg-purple-100/70 border border-purple-300/80 bg-purple-50/60" title="Kelola Hak Akses Menu untuk Setiap Role">
+                <i class="fa-solid fa-sliders w-5 text-center text-purple-600"></i>
+                <div class="flex items-center justify-between flex-1">
+                    <span>Control Panel Akses</span>
+                    <span class="px-1.5 py-0.5 text-[9px] font-black rounded-full bg-purple-200 text-purple-800 uppercase tracking-wider">Superadmin</span>
+                </div>
             </button>
             <?php endif; ?>
 
@@ -1900,6 +1928,111 @@ $isCS = ($rawRole === 'customerservice' || $rawRole === 'customer_service' || $i
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <!-- TAB: CONTROL PANEL AKSES MENU ROLE (KHUSUS SUPER ADMIN) -->
+            <?php if ($isSuperAdmin): ?>
+            <div id="tab-menu-permissions" class="tab-content hidden space-y-6">
+                <div class="bg-white rounded-2xl shadow-xs border border-slate-200 p-6 space-y-5">
+                    <!-- Header Card & Actions -->
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                        <div class="flex items-center space-x-3.5">
+                            <div class="w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center text-xl shrink-0 border border-purple-200 shadow-xs">
+                                <i class="fa-solid fa-sliders"></i>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="font-bold text-base text-slate-800">Control Panel Hak Akses Menu</h3>
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-800 border border-purple-200">
+                                        Super Admin Only
+                                    </span>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-0.5">
+                                    Atur menu apa saja yang dapat diakses oleh setiap role akun pengguna di sistem Inbound Return.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2.5">
+                            <button type="button" onclick="resetMenuPermissionsToDefaults()" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition border border-slate-200 flex items-center gap-1.5 cursor-pointer">
+                                <i class="fa-solid fa-rotate-left text-slate-500"></i>
+                                <span>Reset Default</span>
+                            </button>
+                            <button type="button" onclick="loadMenuPermissionsData(true)" class="px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs rounded-xl transition border border-indigo-200 flex items-center gap-1.5 cursor-pointer">
+                                <i class="fa-solid fa-arrows-rotate text-indigo-600"></i>
+                                <span>Muat Ulang</span>
+                            </button>
+                            <button type="button" id="btnSaveMenuPerms" onclick="saveMenuPermissions()" class="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:scale-95 text-white font-bold text-xs rounded-xl transition shadow-md shadow-purple-600/30 flex items-center gap-2 cursor-pointer">
+                                <i class="fa-solid fa-floppy-disk"></i>
+                                <span>Simpan Hak Akses</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Security Alert Banner -->
+                    <div class="p-4 rounded-xl bg-purple-50/80 border border-purple-200/80 flex items-start space-x-3 text-xs text-purple-900">
+                        <i class="fa-solid fa-shield-halved text-purple-600 mt-0.5 text-base shrink-0"></i>
+                        <div class="space-y-1">
+                            <span class="font-bold text-purple-900">Prinsip Keamanan Sistem:</span>
+                            <ul class="list-disc list-inside space-y-0.5 text-slate-600 text-[11px]">
+                                <li>Role <strong>Super Admin</strong> selalu memiliki akses penuh (unrestricted) ke seluruh menu dan tidak dapat dikunci.</li>
+                                <li>Menu <strong>Control Panel Akses</strong> diproteksi khusus dan hanya dapat dibuka oleh Super Admin.</li>
+                                <li>Pengguna role lain hanya akan melihat menu sidebar dan membuka halaman yang dicentang di bawah ini.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Search & Quick Filters -->
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-200">
+                        <div class="relative flex-1 max-w-sm">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                            <input type="text" id="filterMenuPermsInput" oninput="filterMenuPermissionsTable()" placeholder="Cari nama menu..." class="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-slate-800 placeholder-slate-400">
+                        </div>
+                        <div class="flex items-center gap-2 text-xs text-slate-500">
+                            <span id="menuPermsStatsBadge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200 font-medium text-slate-700">
+                                <i class="fa-solid fa-list-check text-purple-600"></i>
+                                <span id="menuCountLabel">0 Menu</span> &bull; <span id="roleCountLabel">0 Role</span>
+                            </span>
+                            <span id="menuPermsDirtyBadge" class="hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-100 text-amber-800 border border-amber-200 font-bold text-[11px] animate-pulse">
+                                <i class="fa-solid fa-circle-exclamation text-amber-600"></i>
+                                <span>Ada perubahan belum disimpan</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Matrix Table Container -->
+                    <div id="menuPermsTableWrapper" class="overflow-x-auto border border-slate-200 rounded-xl shadow-xs">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead id="menuPermsTableHead" class="bg-slate-100 text-slate-700 border-b border-slate-200 font-bold uppercase text-[10px] tracking-wider">
+                                <tr>
+                                    <th class="py-3 px-4 min-w-[240px]">Menu Sistem</th>
+                                    <!-- Dynamic Role Columns will be rendered here -->
+                                </tr>
+                            </thead>
+                            <tbody id="menuPermsTableBody" class="divide-y divide-slate-100 bg-white">
+                                <tr>
+                                    <td colspan="10" class="text-center py-12 text-slate-400">
+                                        <i class="fa-solid fa-spinner fa-spin mr-2 text-purple-600"></i> Memuat matriks hak akses...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Bottom Action Bar -->
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 text-xs text-slate-500">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                            <span>Centang kotak untuk memberikan hak akses menu ke role yang bersangkutan.</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="saveMenuPermissions()" class="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold rounded-xl transition shadow-md shadow-purple-600/30 flex items-center gap-2 cursor-pointer">
+                                <i class="fa-solid fa-check"></i>
+                                <span>Simpan Konfigurasi</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

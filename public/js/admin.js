@@ -49,7 +49,8 @@ const TAB_SLUG_MAP = {
     'roles': 'kelola-role',
     'bank-settings': 'pengaturan-bank',
     'approval-jnt': 'approval-jnt',
-    'maintenance': 'pemeliharaan'
+    'maintenance': 'pemeliharaan',
+    'menu-permissions': 'control-panel-akses'
 };
 
 const SLUG_TAB_MAP = {
@@ -78,7 +79,9 @@ const SLUG_TAB_MAP = {
     'approval-jnt': 'approval-jnt',
     'approval_jnt': 'approval-jnt',
     'pemeliharaan': 'maintenance',
-    'maintenance': 'maintenance'
+    'maintenance': 'maintenance',
+    'control-panel-akses': 'menu-permissions',
+    'menu-permissions': 'menu-permissions'
 };
 
 // Sinkronisasikan URL browser tanpa .php dengan page slug & filter parameter
@@ -284,6 +287,7 @@ window.switchTab = function (tabName, updateUrl = true) {
         else if (tabName === 'bank-settings') titleEl.innerText = 'Pengaturan Rekening Bank Perusahaan';
         else if (tabName === 'approval-jnt') titleEl.innerText = 'Approval Klaim J&T (Accounting & Management)';
         else if (tabName === 'maintenance') titleEl.innerText = 'Pemeliharaan Sistem & Database';
+        else if (tabName === 'menu-permissions') titleEl.innerText = 'Control Panel Hak Akses Menu & Role';
     }
 
     // Auto close sidebar on mobile after click
@@ -309,6 +313,14 @@ window.switchTab = function (tabName, updateUrl = true) {
     if (tabName === 'bank-settings') loadStandaloneBankSettings();
     if (tabName === 'approval-jnt') loadJntClaimsData();
     if (tabName === 'maintenance') loadMaintenanceStatus();
+    if (tabName === 'menu-permissions') {
+        if (!window.IS_SUPER_ADMIN) {
+            showToast('error', 'Akses Ditolak: Hanya Super Admin yang berhak mengakses Control Panel ini.', 'Akses Ditolak');
+            switchTab('dashboard');
+            return;
+        }
+        if (typeof loadMenuPermissionsData === 'function') loadMenuPermissionsData();
+    }
 
     // Sinkronisasikan URL browser
     if (updateUrl) {
@@ -2463,6 +2475,9 @@ window.refreshAllData = function () {
     if (document.getElementById('tab-maintenance') && currentTab === 'maintenance') {
         promises.push(loadMaintenanceStatus());
     }
+    if (document.getElementById('tab-menu-permissions') && currentTab === 'menu-permissions') {
+        promises.push(loadMenuPermissionsData(true));
+    }
 
     Promise.all(promises).then(() => {
         setTimeout(() => {
@@ -3119,6 +3134,314 @@ window.cleanTestTransactions = async function () {
     } catch (err) {
         hideGlobalLoading();
         showToast('error', 'Gagal koneksi ke server: ' + err.message, 'Koneksi Terputus');
+    }
+};
+
+// =============================================================
+// 7. CONTROL PANEL HAK AKSES MENU & ROLE (SUPERADMIN ONLY)
+// =============================================================
+let cachedMenuPermsData = null;
+let isMenuPermsDirty = false;
+
+window.loadMenuPermissionsData = async function (forceRefresh = false) {
+    const tbody = document.getElementById('menuPermsTableBody');
+    if (!tbody) return;
+
+    if (forceRefresh || !cachedMenuPermsData) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="12" class="text-center py-12 text-slate-400">
+                    <i class="fa-solid fa-spinner fa-spin mr-2 text-purple-600 text-lg"></i>
+                    <span class="text-xs font-semibold">Memuat matriks hak akses menu & role...</span>
+                </td>
+            </tr>
+        `;
+    }
+
+    try {
+        const res = await fetch('api/admin/menu_permissions.php');
+        if (res.status === 401) {
+            window.location.href = 'login';
+            return;
+        }
+        if (res.status === 403) {
+            showToast('error', 'Akses ditolak: Hanya Super Admin yang berhak mengakses menu ini.', 'Akses Ditolak');
+            return;
+        }
+
+        const data = await res.json();
+        if (data.success) {
+            cachedMenuPermsData = data;
+            renderMenuPermsMatrix(data);
+            setMenuPermsDirty(false);
+        } else {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="12" class="text-center py-8 text-rose-500 font-semibold text-xs">
+                        <i class="fa-solid fa-triangle-exclamation mr-1.5"></i> ${escapeHtml(data.error || 'Gagal memuat hak akses')}
+                    </td>
+                </tr>
+            `;
+        }
+    } catch (err) {
+        console.error("Gagal load menu permissions:", err);
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="12" class="text-center py-8 text-rose-500 font-semibold text-xs">
+                    <i class="fa-solid fa-triangle-exclamation mr-1.5"></i> Kesalahan koneksi: ${escapeHtml(err.message)}
+                </td>
+            </tr>
+        `;
+    }
+};
+
+function renderMenuPermsMatrix(data) {
+    const thead = document.getElementById('menuPermsTableHead');
+    const tbody = document.getElementById('menuPermsTableBody');
+    if (!thead || !tbody) return;
+
+    const menus = data.menus || [];
+    const roles = data.roles || [];
+
+    // Update stats label
+    const menuCountLabel = document.getElementById('menuCountLabel');
+    const roleCountLabel = document.getElementById('roleCountLabel');
+    if (menuCountLabel) menuCountLabel.innerText = `${menus.length} Menu`;
+    if (roleCountLabel) roleCountLabel.innerText = `${roles.length} Role`;
+
+    // 1. Build THEAD
+    let headerHtml = `
+        <tr>
+            <th class="py-3 px-4 min-w-[260px] bg-slate-100 text-slate-700 font-bold uppercase text-[10px] tracking-wider border-b border-r border-slate-200">
+                Menu Sistem &amp; Keterangan
+            </th>
+    `;
+
+    // Render Super Admin column first (Locked)
+    headerHtml += `
+        <th class="py-3 px-3 text-center min-w-[140px] bg-purple-50 text-purple-900 border-b border-r border-purple-200">
+            <div class="flex flex-col items-center gap-1">
+                <span class="font-bold text-xs">Super Admin</span>
+                <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-purple-200 text-purple-800">
+                    Akses Penuh
+                </span>
+            </div>
+        </th>
+    `;
+
+    // Render other roles columns
+    roles.forEach(role => {
+        const rKey = String(role.role_key || '').toLowerCase();
+        if (rKey === 'superadmin') return;
+
+        headerHtml += `
+            <th class="py-3 px-3 min-w-[150px] bg-slate-50 text-slate-700 border-b border-r border-slate-200">
+                <div class="flex flex-col items-center gap-1 text-center">
+                    <span class="font-bold text-xs text-slate-800">${escapeHtml(role.role_name || role.role_key)}</span>
+                    <span class="text-[10px] text-slate-400 font-mono">${escapeHtml(role.role_key)}</span>
+                    <div class="flex items-center gap-1 mt-1">
+                        <button type="button" onclick="toggleRoleAllMenus('${escapeHtml(role.role_key)}', true)" class="px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold text-[9px] transition cursor-pointer" title="Centang semua menu untuk role ini">
+                            Semua
+                        </button>
+                        <button type="button" onclick="toggleRoleAllMenus('${escapeHtml(role.role_key)}', false)" class="px-1.5 py-0.5 rounded bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold text-[9px] transition cursor-pointer" title="Batal centang semua untuk role ini">
+                            Kosong
+                        </button>
+                    </div>
+                </div>
+            </th>
+        `;
+    });
+
+    headerHtml += `</tr>`;
+    thead.innerHTML = headerHtml;
+
+    // 2. Build TBODY
+    let bodyHtml = '';
+    menus.forEach(menu => {
+        const mKey = menu.key;
+        const isPermControlMenu = (mKey === 'menu-permissions');
+
+        bodyHtml += `
+            <tr class="hover:bg-slate-50/70 transition border-b border-slate-100 menu-row" data-menu-search="${escapeHtml((menu.label + ' ' + (menu.description || '') + ' ' + menu.key).toLowerCase())}">
+                <!-- Menu Info Cell -->
+                <td class="py-3.5 px-4 border-r border-slate-100">
+                    <div class="flex items-start space-x-3">
+                        <div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center text-sm shrink-0 border border-slate-200 mt-0.5">
+                            <i class="${escapeHtml(menu.icon || 'fa-solid fa-circle')}"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-slate-800 text-xs">${escapeHtml(menu.label)}</span>
+                                ${isPermControlMenu ? '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-100 text-purple-700">Khusus Superadmin</span>' : ''}
+                            </div>
+                            <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">${escapeHtml(menu.description || '')}</p>
+                            <span class="inline-block mt-1 text-[9px] font-mono text-slate-400 bg-slate-100 px-1 rounded">${escapeHtml(menu.key)}</span>
+                        </div>
+                    </div>
+                </td>
+
+                <!-- Super Admin Cell (Always Full Access) -->
+                <td class="py-3.5 px-3 text-center border-r border-purple-100 bg-purple-50/30">
+                    <div class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-xs shadow-xs" title="Super Admin selalu memiliki hak akses penuh ke menu ini">
+                        <i class="fa-solid fa-check"></i>
+                    </div>
+                </td>
+        `;
+
+        // Other roles cells
+        roles.forEach(role => {
+            const rKey = String(role.role_key || '').toLowerCase();
+            if (rKey === 'superadmin') return;
+
+            const effectiveList = role.effective_permissions || [];
+            const isChecked = effectiveList.includes(mKey);
+
+            if (isPermControlMenu) {
+                // Control Panel menu is restricted strictly to Super Admin only
+                bodyHtml += `
+                    <td class="py-3.5 px-3 text-center border-r border-slate-100 bg-slate-50/50">
+                        <span class="inline-flex items-center justify-center text-slate-300 text-xs" title="Menu ini khusus Super Admin dan tidak dapat diberikan ke role lain">
+                            <i class="fa-solid fa-lock"></i>
+                        </span>
+                    </td>
+                `;
+            } else {
+                bodyHtml += `
+                    <td class="py-3.5 px-3 text-center border-r border-slate-100">
+                        <label class="inline-flex items-center justify-center cursor-pointer select-none">
+                            <input type="checkbox" 
+                                class="menu-perm-chk role-${escapeHtml(role.role_key)} w-4 h-4 text-purple-600 bg-slate-100 border-slate-300 rounded focus:ring-purple-500 focus:ring-2 cursor-pointer transition" 
+                                data-role="${escapeHtml(role.role_key)}" 
+                                data-menu="${escapeHtml(mKey)}"
+                                ${isChecked ? 'checked' : ''}
+                                onchange="setMenuPermsDirty(true)">
+                        </label>
+                    </td>
+                `;
+            }
+        });
+
+        bodyHtml += `</tr>`;
+    });
+
+    tbody.innerHTML = bodyHtml;
+}
+
+window.setMenuPermsDirty = function (dirty) {
+    isMenuPermsDirty = !!dirty;
+    const badge = document.getElementById('menuPermsDirtyBadge');
+    if (badge) {
+        if (isMenuPermsDirty) badge.classList.remove('hidden');
+        else badge.classList.add('hidden');
+    }
+};
+
+window.toggleRoleAllMenus = function (roleKey, checkAll) {
+    const checkboxes = document.querySelectorAll(`.menu-perm-chk.role-${CSS.escape ? CSS.escape(roleKey) : roleKey}`);
+    checkboxes.forEach(chk => {
+        if (!chk.disabled) {
+            chk.checked = !!checkAll;
+        }
+    });
+    setMenuPermsDirty(true);
+};
+
+window.filterMenuPermissionsTable = function () {
+    const input = document.getElementById('filterMenuPermsInput');
+    const filter = (input ? input.value : '').toLowerCase().trim();
+    const rows = document.querySelectorAll('#menuPermsTableBody tr.menu-row');
+    rows.forEach(row => {
+        const text = row.dataset.menuSearch || '';
+        if (!filter || text.includes(filter)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+};
+
+window.saveMenuPermissions = async function () {
+    if (!cachedMenuPermsData || !cachedMenuPermsData.roles) {
+        showToast('warning', 'Data role belum dimuat, silakan muat ulang halaman.', 'Perhatian');
+        return;
+    }
+
+    const btnSave = document.getElementById('btnSaveMenuPerms');
+    const origHtml = btnSave ? btnSave.innerHTML : '';
+    if (btnSave) {
+        btnSave.disabled = true;
+        btnSave.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Menyimpan...`;
+    }
+
+    try {
+        const permsPayload = {};
+        cachedMenuPermsData.roles.forEach(r => {
+            const rKey = String(r.role_key || '').toLowerCase();
+            if (rKey === 'superadmin') return;
+            permsPayload[r.role_key] = [];
+        });
+
+        document.querySelectorAll('.menu-perm-chk:checked').forEach(chk => {
+            const roleKey = chk.dataset.role;
+            const menuKey = chk.dataset.menu;
+            if (roleKey && menuKey && permsPayload[roleKey] !== undefined) {
+                permsPayload[roleKey].push(menuKey);
+            }
+        });
+
+        const res = await fetch('api/admin/menu_permissions.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'save',
+                permissions: permsPayload
+            })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            showToast('success', data.message || 'Hak akses menu berhasil disimpan!', 'Sukses Simpan');
+            setMenuPermsDirty(false);
+            await loadMenuPermissionsData(true);
+        } else {
+            showToast('error', data.error || 'Gagal menyimpan hak akses menu', 'Gagal Simpan');
+        }
+    } catch (err) {
+        console.error("Gagal save menu permissions:", err);
+        showToast('error', 'Koneksi ke server bermasalah: ' + err.message, 'Kesalahan');
+    } finally {
+        if (btnSave) {
+            btnSave.disabled = false;
+            btnSave.innerHTML = origHtml;
+        }
+    }
+};
+
+window.resetMenuPermissionsToDefaults = async function () {
+    if (!confirm("Kembalikan hak akses menu untuk SELURUH role ke rekomendasi default sistem?\n\nPerubahan ini akan langsung disimpan ke database.")) {
+        return;
+    }
+
+    showGlobalLoading("Mereset Hak Akses...", "Mengembalikan izin menu ke rekomendasi default sistem...");
+    try {
+        const res = await fetch('api/admin/menu_permissions.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'reset_defaults' })
+        });
+        const data = await res.json();
+        hideGlobalLoading();
+
+        if (data.success) {
+            showToast('success', data.message || 'Hak akses menu berhasil direset ke default!', 'Reset Berhasil');
+            setMenuPermsDirty(false);
+            await loadMenuPermissionsData(true);
+        } else {
+            showToast('error', data.error || 'Gagal mereset hak akses', 'Gagal Reset');
+        }
+    } catch (err) {
+        hideGlobalLoading();
+        showToast('error', 'Koneksi error: ' + err.message, 'Kesalahan');
     }
 };
 
