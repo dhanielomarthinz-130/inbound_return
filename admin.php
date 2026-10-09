@@ -28,9 +28,10 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
         window.IS_ADMIN = <?= $isAdmin ? 'true' : 'false' ?>;
     </script>
     <!-- Favicon Huruf D Warna Hijau -->
-    <link rel="icon" type="image/svg+xml" href="assets/image/favicon.svg">
-    <link rel="icon" type="image/png" href="assets/image/favicon.png">
-    <link rel="shortcut icon" href="favicon.ico">
+    <link rel="icon" type="image/svg+xml" sizes="any" href="assets/image/favicon.svg?v=2">
+    <link rel="icon" type="image/png" sizes="64x64" href="assets/image/favicon.png?v=2">
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico?v=2">
+    <link rel="apple-touch-icon" href="assets/image/favicon.png?v=2">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome 6 CDN -->

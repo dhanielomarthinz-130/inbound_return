@@ -22,9 +22,11 @@ exit;
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portal Approval Klaim J&amp;T - Accounting IEG</title>
-    <link rel="icon" type="image/svg+xml" href="assets/image/favicon.svg">
-    <link rel="icon" type="image/png" href="assets/image/favicon.png">
-    <link rel="shortcut icon" href="favicon.ico">
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" sizes="any" href="assets/image/favicon.svg?v=2">
+    <link rel="icon" type="image/png" sizes="64x64" href="assets/image/favicon.png?v=2">
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico?v=2">
+    <link rel="apple-touch-icon" href="assets/image/favicon.png?v=2">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="assets/css/custom.css?v=<?= file_exists(__DIR__ . '/assets/css/custom.css') ? filemtime(__DIR__ . '/assets/css/custom.css') : time() ?>">

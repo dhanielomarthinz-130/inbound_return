@@ -23,6 +23,11 @@ $query = trim($_GET['q'] ?? $_GET['query'] ?? $_GET['order_id'] ?? $_GET['tracki
     ?>
     <base href="<?= htmlspecialchars($appBaseHref) ?>">
     <script>window.APP_BASE_URL = <?= json_encode($appBaseHref) ?>;</script>
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" sizes="any" href="assets/image/favicon.svg?v=2">
+    <link rel="icon" type="image/png" sizes="64x64" href="assets/image/favicon.png?v=2">
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico?v=2">
+    <link rel="apple-touch-icon" href="assets/image/favicon.png?v=2">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
