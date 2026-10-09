@@ -1,8 +1,10 @@
-1. Klaim assign Ke Menu Accounting ( Expedisi JNT | JNE )
-    1. Saat Assign ke Menu Accounting Status akan Berubah Ke Waiting Klaim ( Via Local Host) Api update ke Localhost Statusnya
-    2. Saat di Klaim by Accounting Status Akan Berubah Ke Done Klaim ( Via System ) Api update ke Localhost Statusnya Ambil dari OCS / Manual
+1. Pusat Klaim assign Ke Menu Accounting ( Expedisi JNT | JNE)
+    1. Multiple Select Dan Akan Langsung email Ke Accounting.
+    2. Saat Sudah di email Maka Status Akan berubah menjadi Done Email.
+    3. Accounting Cuma Bisa Recive atau Edit Data.
+    4. dan Untuk Yang Bukan expedisi JNE dan JNT Juga Bisa Ganti Status Manual Ke Done Klaim Sesuai dengan Ekspedisi Masing-masing.
 2. Menu Role ( Add New Role )
-    1. Accounting ( Approve Klaim | Edit Klaim )
+    1. Accounting ( view data yang sudah di email paket nya | Done Klaim)
     2. Operator Reporting ( Download | Share Report Productivity Dashboard)
     3. Operator Menu Mobile (Reciving | Unboxing)
     4. Custummer Service
@@ -24,3 +26,7 @@
     4. Sort Data table By Date FiFo 
 5. Update Kualitas Video Unboxing
 6. Check Harga total yang di sync dari OCS jangan Per No resi Takut salah Ambil Harga
+7. Menu Baru: Aging Return
+    1. Menampilkan Aging Paket dari Receiving sampai Unboxing berapa hari (FIFO / LIFO / Kritis)
+    2. Jika belum di Unboxing: Status "Belum di Unboxing" dan aging dihitung dari tanggal receiving sampai hari ini (Today)
+    3. Bisa lihat detail saat klik nomor resi atau invoice (Modal komparasi Receiving, Unboxing Video/Foto, & Data OCS)

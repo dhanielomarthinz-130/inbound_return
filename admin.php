@@ -287,6 +287,17 @@ $isCS = ($rawRole === 'customerservice' || $rawRole === 'customer_service' || $i
             </button>
             <?php endif; ?>
 
+            <!-- MENU BARU: AGING RETURN (MONITORING DURASI RECEIVING KE UNBOXING) -->
+            <?php if ($isAdmin || $isManagement || $isReporting || $isAccounting || $isCS): ?>
+            <button onclick="switchTab('aging-return')" id="nav-aging-return" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
+                <i class="fa-solid fa-clock-rotate-left w-5 text-center text-teal-600"></i>
+                <div class="flex items-center justify-between flex-1">
+                    <span>Aging Return</span>
+                    <span id="navAgingCountBadge" class="hidden px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-teal-100 text-teal-700">0</span>
+                </div>
+            </button>
+            <?php endif; ?>
+
             <!-- MENU: PUSAT KLAIM & BANDING (CLAIM DOSSIER) -->
             <?php if ($isAdmin || $isAccounting || $isCS): ?>
             <button onclick="switchTab('claims')" id="nav-claims" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
@@ -895,6 +906,205 @@ $isCS = ($rawRole === 'customerservice' || $rawRole === 'customer_service' || $i
                                 <tr><td colspan="10" class="text-center py-8 text-slate-400">Memuat data transaksi unboxing...</td></tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB BARU: AGING RETURN (MONITORING DURASI RECEIVING KE UNBOXING) -->
+            <div id="tab-aging-return" class="tab-content hidden space-y-6">
+                <!-- Header Card & Actions -->
+                <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+                    <div class="p-4 sm:p-5 border-b border-slate-200 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div class="flex items-center gap-3">
+                            <span class="w-10 h-10 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold text-lg shadow-sm border border-teal-100 shrink-0">
+                                <i class="fa-solid fa-clock-rotate-left"></i>
+                            </span>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="font-bold text-base text-slate-800">Aging Return - Lead Time Inbound</h3>
+                                    <span class="bg-teal-50 text-teal-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-teal-200">Receiving ➔ Unboxing</span>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-0.5">Pantau durasi hari paket dari serah terima ekspedisi hingga unboxing & deteksi paket yang belum di-unboxing di gudang</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                            <button onclick="exportAgingReturnExcel()" title="Download Seluruh Data Aging Return ke Excel" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/20 cursor-pointer">
+                                <i class="fa-solid fa-file-excel text-xs"></i>
+                                <span>Export Excel</span>
+                            </button>
+                            <button onclick="loadAgingReturnData(true)" title="Muat ulang data terbaru" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-2 rounded-xl font-bold transition flex items-center justify-center gap-1.5 border border-slate-200 cursor-pointer">
+                                <i class="fa-solid fa-rotate text-xs" id="agingRefreshIcon"></i>
+                                <span>Refresh</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 5 KPI Summary Cards -->
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 p-4 sm:p-5 bg-slate-50/70 border-b border-slate-200">
+                        <!-- 1. Total Terpantau -->
+                        <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Paket</span>
+                                <span class="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs">
+                                    <i class="fa-solid fa-boxes-stacked"></i>
+                                </span>
+                            </div>
+                            <div class="text-xl sm:text-2xl font-black text-slate-800 mt-1" id="agingKpiTotal">0</div>
+                            <span class="text-[10px] text-slate-500 font-medium">Paket receiving inbound</span>
+                        </div>
+
+                        <!-- 2. Belum di Unboxing -->
+                        <div class="bg-white p-3.5 rounded-2xl border border-amber-200 shadow-2xs bg-gradient-to-br from-white to-amber-50/30">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-amber-700">Belum di Unboxing</span>
+                                <span class="w-6 h-6 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center text-xs">
+                                    <i class="fa-solid fa-hourglass-half"></i>
+                                </span>
+                            </div>
+                            <div class="text-xl sm:text-2xl font-black text-amber-600 mt-1" id="agingKpiBelum">0</div>
+                            <span class="text-[10px] text-amber-600 font-medium">Menunggu di gudang</span>
+                        </div>
+
+                        <!-- 3. Sudah di Unboxing -->
+                        <div class="bg-white p-3.5 rounded-2xl border border-emerald-200 shadow-2xs bg-gradient-to-br from-white to-emerald-50/30">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Sudah Unboxing</span>
+                                <span class="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs">
+                                    <i class="fa-solid fa-circle-check"></i>
+                                </span>
+                            </div>
+                            <div class="text-xl sm:text-2xl font-black text-emerald-600 mt-1" id="agingKpiSudah">0</div>
+                            <span class="text-[10px] text-emerald-600 font-medium">Selesai diperiksa</span>
+                        </div>
+
+                        <!-- 4. Rata-rata Aging -->
+                        <div class="bg-white p-3.5 rounded-2xl border border-teal-200 shadow-2xs bg-gradient-to-br from-white to-teal-50/30">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-teal-700">Rata-rata Aging</span>
+                                <span class="w-6 h-6 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center text-xs">
+                                    <i class="fa-solid fa-stopwatch"></i>
+                                </span>
+                            </div>
+                            <div class="text-xl sm:text-2xl font-black text-teal-600 mt-1"><span id="agingKpiAvg">0</span> <span class="text-xs font-normal text-slate-500">Hari</span></div>
+                            <span class="text-[10px] text-teal-600 font-medium">Lead time rata-rata</span>
+                        </div>
+
+                        <!-- 5. Kritis > 14 Hari -->
+                        <div class="col-span-2 sm:col-span-1 bg-white p-3.5 rounded-2xl border border-rose-200 shadow-2xs bg-gradient-to-br from-white to-rose-50/30">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-rose-700">Aging Kritis (&gt;14 Hari)</span>
+                                <span class="w-6 h-6 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center text-xs">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                </span>
+                            </div>
+                            <div class="text-xl sm:text-2xl font-black text-rose-600 mt-1" id="agingKpiCritical">0</div>
+                            <span class="text-[10px] text-rose-600 font-medium">Perlu tindakan segera</span>
+                        </div>
+                    </div>
+
+                    <!-- Toolbar Filter & Search -->
+                    <div class="p-3.5 sm:p-4 bg-slate-50 border-b border-slate-200">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5">
+                            <!-- 1. Search Box -->
+                            <div class="relative w-full">
+                                <span class="absolute left-3 top-2.5 text-slate-400 pointer-events-none text-xs">
+                                    <i class="fa-solid fa-magnifying-glass"></i>
+                                </span>
+                                <input type="text" id="agingSearchInput" placeholder="Cari Resi / Surat Jalan / Kurir..."
+                                    class="w-full bg-white hover:border-slate-400 focus:bg-white border border-slate-300 rounded-xl pl-8 pr-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500 transition shadow-2xs">
+                            </div>
+
+                            <!-- 2. Status Unboxing Filter -->
+                            <div class="relative w-full">
+                                <select id="agingStatusFilter" onchange="loadAgingReturnData()" class="w-full bg-white hover:border-slate-400 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500 transition shadow-2xs cursor-pointer">
+                                    <option value="ALL">Semua Status Paket</option>
+                                    <option value="BELUM_UNBOXING">⚠️ Belum di Unboxing</option>
+                                    <option value="SUDAH_UNBOXING">✓ Sudah di Unboxing</option>
+                                </select>
+                            </div>
+
+                            <!-- 3. Ekspedisi Filter -->
+                            <div class="relative w-full">
+                                <select id="agingExpeditionFilter" onchange="loadAgingReturnData()" class="w-full bg-white hover:border-slate-400 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500 transition shadow-2xs cursor-pointer">
+                                    <option value="">Semua Ekspedisi</option>
+                                </select>
+                            </div>
+
+                            <!-- 4. Aging Category Filter (<=14 vs >14) -->
+                            <div class="relative w-full">
+                                <select id="agingCategoryFilter" onchange="loadAgingReturnData()" class="w-full bg-white hover:border-slate-400 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500 transition shadow-2xs cursor-pointer">
+                                    <option value="ALL">Semua Rentang Aging</option>
+                                    <option value="LE14">Aman (≤ 14 Hari)</option>
+                                    <option value="GT14">⚠️ Kritis (&gt; 14 Hari)</option>
+                                </select>
+                            </div>
+
+                            <!-- 5. Datepicker Flatpickr -->
+                            <div class="relative flex items-center w-full">
+                                <span class="absolute left-3 text-teal-600 pointer-events-none text-xs z-10">
+                                    <i class="fa-regular fa-calendar-days"></i>
+                                </span>
+                                <input type="text" id="agingDateFilter" placeholder="Rentang Tanggal..." readonly
+                                    class="w-full bg-white hover:border-slate-400 focus:bg-white border border-slate-300 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-2xs transition cursor-pointer">
+                                <button type="button" id="btnClearAgingDate" onclick="clearAgingDateFilter()" title="Hapus filter tanggal" class="absolute right-2.5 text-slate-400 hover:text-rose-500 transition text-xs hidden z-10">
+                                    <i class="fa-solid fa-circle-xmark"></i>
+                                </button>
+                            </div>
+
+                            <!-- 6. Sort Order & Reset -->
+                            <div class="flex items-center gap-1.5 w-full">
+                                <select id="agingSortOrder" onchange="loadAgingReturnData()" class="w-full bg-white hover:border-slate-400 border border-slate-300 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500 transition shadow-2xs cursor-pointer">
+                                    <option value="fifo">FIFO (Masuk Dulu)</option>
+                                    <option value="lifo">LIFO (Baru Dulu)</option>
+                                    <option value="aging_desc">Aging Terlama</option>
+                                    <option value="aging_asc">Aging Tercepat</option>
+                                </select>
+                                <button type="button" onclick="resetAgingFilters()" title="Reset semua filter" class="p-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-300 text-slate-500 hover:text-slate-800 transition shrink-0 cursor-pointer">
+                                    <i class="fa-solid fa-arrow-rotate-left text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Data Table -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+                                    <th class="py-3 px-3.5 text-center w-12">No</th>
+                                    <th class="py-3 px-4">No. Resi / AWB</th>
+                                    <th class="py-3 px-4">Ekspedisi & Kurir</th>
+                                    <th class="py-3 px-4">Tgl Receiving</th>
+                                    <th class="py-3 px-4">Tgl Unboxing</th>
+                                    <th class="py-3 px-4 text-center">Status Paket</th>
+                                    <th class="py-3 px-4 text-center">Aging (Lead Time)</th>
+                                    <th class="py-3 px-4">Petugas</th>
+                                    <th class="py-3 px-4 text-center">Bukti / Media</th>
+                                    <th class="py-3 px-4 text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="agingReturnTableBody" class="divide-y divide-slate-100">
+                                <tr>
+                                    <td colspan="10" class="text-center py-12 text-slate-400">
+                                        <i class="fa-solid fa-spinner fa-spin text-2xl text-teal-600 block mb-2"></i>
+                                        <span>Memuat data Aging Return...</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Footer Table / Info -->
+                    <div class="p-3.5 sm:p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-2 text-xs text-slate-500">
+                        <div id="agingTableCountInfo">Menampilkan 0 data paket</div>
+                        <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Aman (≤ 14 Hari)
+                            </span>
+                            <span class="inline-flex items-center gap-1 text-[11px] text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Kritis (&gt; 14 Hari)
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -3535,6 +3745,166 @@ $isCS = ($rawRole === 'customerservice' || $rawRole === 'customer_service' || $i
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL DETAIL KHUSUS AGING RETURN (BISA LIHAT DETAIL SAAT KLIK RESI / INVOICE) -->
+    <div id="modalAgingDetail" class="hidden fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+        <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+            <!-- Header Modal -->
+            <div class="p-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
+                <div class="flex items-center gap-3">
+                    <span class="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center font-bold text-base border border-teal-500/30">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                    </span>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-black text-sm sm:text-base leading-tight" id="mAgingBarcodeTitle">Detail Paket Inbound</h3>
+                            <span id="mAgingStatusBadge" class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-500 text-slate-950">BELUM DI UNBOXING</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 font-mono" id="mAgingSubtitle">Pelacakan riwayat serah terima kurir dan status unboxing</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="closeAgingDetailModal()" class="text-slate-400 hover:text-white text-base p-1.5 rounded-lg hover:bg-slate-800 transition cursor-pointer">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scrollable Modal Content Body -->
+            <div class="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1 text-xs" id="mAgingModalBody">
+                <!-- Highlight Lead Time / Aging Journey Banner -->
+                <div id="mAgingJourneyBanner" class="p-4 rounded-2xl border transition">
+                    <!-- Dynamic Journey content injected via JS -->
+                </div>
+
+                <!-- 2 Kolom Komparasi: Receiving Gudang vs Unboxing Stasiun -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Kolom 1: Receiving Inbound (Penerimaan Fisik) -->
+                    <div class="p-4 bg-slate-50/80 rounded-2xl border border-slate-200 space-y-3">
+                        <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+                            <span class="font-bold text-slate-800 flex items-center gap-1.5">
+                                <i class="fa-solid fa-truck-ramp-box text-emerald-600"></i> Serah Terima Receiving
+                            </span>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                Fisik Diterima
+                            </span>
+                        </div>
+
+                        <div class="space-y-2">
+                            <div>
+                                <span class="text-[10px] uppercase font-bold text-slate-400 block">No. Resi / Paket</span>
+                                <div class="font-mono font-bold text-slate-800 text-sm flex items-center gap-2">
+                                    <span id="mAgingRecBarcode">-</span>
+                                    <button type="button" onclick="copyAgingBarcode()" class="text-slate-400 hover:text-slate-600 transition" title="Copy Resi">
+                                        <i class="fa-regular fa-copy text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <span class="text-[10px] uppercase font-bold text-slate-400 block">Ekspedisi</span>
+                                    <div class="font-semibold text-slate-800" id="mAgingRecExpedition">-</div>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] uppercase font-bold text-slate-400 block">Nama Kurir</span>
+                                    <div class="font-semibold text-slate-800" id="mAgingRecCourier">-</div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <span class="text-[10px] uppercase font-bold text-slate-400 block">No Surat Jalan / Karung</span>
+                                    <div class="font-mono text-slate-700" id="mAgingRecReceipt">-</div>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] uppercase font-bold text-slate-400 block">Petugas Receiving</span>
+                                    <div class="font-semibold text-slate-800" id="mAgingRecOperator">-</div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <span class="text-[10px] uppercase font-bold text-slate-400 block">Waktu Scan Masuk Gudang</span>
+                                <div class="font-semibold text-slate-800 flex items-center gap-1.5">
+                                    <i class="fa-regular fa-calendar-check text-emerald-600"></i>
+                                    <span id="mAgingRecTime">-</span>
+                                </div>
+                            </div>
+
+                            <!-- Foto Serah Terima Receiving -->
+                            <div id="mAgingRecPhotoContainer" class="pt-2 border-t border-slate-200">
+                                <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Foto Bukti Receiving</span>
+                                <div id="mAgingRecPhotoView" class="rounded-xl overflow-hidden border border-slate-200 min-h-[90px] max-h-48 bg-slate-900 flex items-center justify-center">
+                                    <span class="text-slate-400 text-xs">Tidak ada foto receiving</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Kolom 2: Status & Hasil Unboxing -->
+                    <div class="p-4 bg-slate-50/80 rounded-2xl border border-slate-200 space-y-3">
+                        <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+                            <span class="font-bold text-slate-800 flex items-center gap-1.5">
+                                <i class="fa-solid fa-box-open text-indigo-600"></i> Stasiun Unboxing
+                            </span>
+                            <span id="mAgingUnboxStatusBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
+                                Status
+                            </span>
+                        </div>
+
+                        <!-- Konten Dinamis: Jika Belum vs Jika Sudah Unboxing -->
+                        <div id="mAgingUnboxContent" class="space-y-3">
+                            <!-- Diisi via JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section Tambahan: Data Order OCS & Finansial (Jika ada) -->
+                <div id="mAgingOcsSection" class="p-4 bg-slate-50/60 rounded-2xl border border-slate-200 hidden">
+                    <div class="flex items-center justify-between border-b border-slate-200 pb-2 mb-3">
+                        <span class="font-bold text-slate-800 flex items-center gap-1.5">
+                            <i class="fa-solid fa-cart-flatbed text-blue-600"></i> Data Order Marketplace (OCS System)
+                        </span>
+                        <span class="text-[10px] text-slate-500 font-mono" id="mAgingOcsOrderId">-</span>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block">Toko</span>
+                            <div class="font-semibold text-slate-800" id="mAgingOcsShop">-</div>
+                        </div>
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block">Platform</span>
+                            <div class="font-semibold text-slate-800" id="mAgingOcsPlatform">-</div>
+                        </div>
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block">Total Pembayaran</span>
+                            <div class="font-bold text-emerald-600 font-mono text-sm" id="mAgingOcsPrice">Rp -</div>
+                        </div>
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block">Pelanggan</span>
+                            <div class="font-semibold text-slate-800 truncate" id="mAgingOcsCustomer">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Modal -->
+            <div class="p-3.5 sm:p-4 bg-slate-100 border-t border-slate-200 flex justify-between items-center shrink-0">
+                <div class="text-[11px] text-slate-500">
+                    Sistem Inbound Return IEG &bull; Terhubung Otomatis dengan Receiving & Unboxing
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" id="btnAgingOpenClaimDossier" onclick="openClaimDossierFromAging()" class="hidden px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs shadow-sm transition flex items-center gap-1.5 cursor-pointer">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <span>Buka Berkas Klaim</span>
+                    </button>
+                    <button type="button" onclick="closeAgingDetailModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-xs transition cursor-pointer">
+                        Tutup
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 

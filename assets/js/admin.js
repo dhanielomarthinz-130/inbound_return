@@ -39,6 +39,7 @@ const TAB_SLUG_MAP = {
     'dashboard': 'dashboard',
     'receiving': 'receiving-inbound',
     'transactions': 'inbound-unboxing',
+    'aging-return': 'aging-return',
     'claims': 'klaim',
     'orders': 'data-orders',
     'products': 'master-produk',
@@ -57,6 +58,7 @@ const SLUG_TAB_MAP = {
     'receiving': 'receiving',
     'inbound-unboxing': 'transactions',
     'transactions': 'transactions',
+    'aging-return': 'aging-return',
     'klaim': 'claims',
     'claims': 'claims',
     'data-orders': 'orders',
@@ -271,6 +273,7 @@ window.switchTab = function (tabName, updateUrl = true) {
         if (tabName === 'dashboard') titleEl.innerText = 'Dashboard Monitoring Retur';
         else if (tabName === 'receiving') titleEl.innerText = 'Receiving Inbound - Penerimaan Ekspedisi';
         else if (tabName === 'transactions') titleEl.innerText = 'Inbound Unboxing';
+        else if (tabName === 'aging-return') titleEl.innerText = 'Aging Return - Lead Time Inbound';
         else if (tabName === 'claims') titleEl.innerText = 'Pusat Klaim & Banding Ekspedisi';
         else if (tabName === 'orders') titleEl.innerText = 'Data Orders OCS (Sinkronisasi Pesanan)';
         else if (tabName === 'products') titleEl.innerText = 'Master Data Produk & Barcode';
@@ -293,6 +296,7 @@ window.switchTab = function (tabName, updateUrl = true) {
     if (tabName === 'receiving') loadReceivingData();
     if (tabName === 'products') loadProducts();
     if (tabName === 'transactions') loadTransactions();
+    if (tabName === 'aging-return') loadAgingReturnData();
     if (tabName === 'claims') loadClaimCandidates();
     if (tabName === 'orders') {
         if (typeof loadOrdersStats === 'function') loadOrdersStats();
@@ -7902,5 +7906,665 @@ window.closeJntApprovalModal = closeJntApprovalModal;
 window.submitJntApproval = submitJntApproval;
 window.rejectSingleJnt = rejectSingleJnt;
 
+// ==========================================
+// MODUL AGING RETURN (LEAD TIME RECEIVING -> UNBOXING)
+// ==========================================
+let currentAgingPackages = [];
+let currentAgingSummary = {};
+let flatpickrAgingInstance = null;
+let agingSearchTimer = null;
+let activeAgingBarcode = null;
 
+// Inisialisasi Datepicker Flatpickr untuk Aging Return
+function initAgingDatePicker() {
+    const el = document.getElementById('agingDateFilter');
+    if (!el || typeof flatpickr === 'undefined') return;
+    if (flatpickrAgingInstance) return;
 
+    flatpickrAgingInstance = flatpickr(el, {
+        mode: 'range',
+        dateFormat: 'Y-m-d',
+        altInput: true,
+        altFormat: 'j M Y',
+        altInputClass: 'w-full bg-white hover:border-slate-400 focus:bg-white border border-slate-300 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-2xs transition cursor-pointer',
+        locale: (flatpickr.l10ns && flatpickr.l10ns.id) ? flatpickr.l10ns.id : 'default',
+        allowInput: false,
+        onClose: function (selectedDates, dateStr, instance) {
+            const btnClear = document.getElementById('btnClearAgingDate');
+            if (dateStr) {
+                if (btnClear) btnClear.classList.remove('hidden');
+            } else {
+                if (btnClear) btnClear.classList.add('hidden');
+            }
+            loadAgingReturnData();
+        }
+    });
+}
+
+function clearAgingDateFilter() {
+    if (flatpickrAgingInstance) {
+        flatpickrAgingInstance.clear();
+    }
+    const btnClear = document.getElementById('btnClearAgingDate');
+    if (btnClear) btnClear.classList.add('hidden');
+    loadAgingReturnData();
+}
+
+function resetAgingFilters() {
+    const sInput = document.getElementById('agingSearchInput');
+    const stFlt = document.getElementById('agingStatusFilter');
+    const expFlt = document.getElementById('agingExpeditionFilter');
+    const agFlt = document.getElementById('agingCategoryFilter');
+    const sortEl = document.getElementById('agingSortOrder');
+    
+    if (sInput) sInput.value = '';
+    if (stFlt) stFlt.value = 'ALL';
+    if (expFlt) expFlt.value = '';
+    if (agFlt) agFlt.value = 'ALL';
+    if (sortEl) sortEl.value = 'fifo';
+    
+    if (flatpickrAgingInstance) flatpickrAgingInstance.clear();
+    const btnClear = document.getElementById('btnClearAgingDate');
+    if (btnClear) btnClear.classList.add('hidden');
+
+    loadAgingReturnData();
+}
+
+function debounceAgingSearch() {
+    if (agingSearchTimer) clearTimeout(agingSearchTimer);
+    agingSearchTimer = setTimeout(() => {
+        loadAgingReturnData();
+    }, 400);
+}
+
+// Event listener saat search input diketik
+document.addEventListener('DOMContentLoaded', () => {
+    const sInput = document.getElementById('agingSearchInput');
+    if (sInput) {
+        sInput.addEventListener('input', debounceAgingSearch);
+    }
+});
+
+// Load Data Aging Return dari backend
+async function loadAgingReturnData(forceRefresh = false) {
+    initAgingDatePicker();
+
+    const tbody = document.getElementById('agingReturnTableBody');
+    const refreshIcon = document.getElementById('agingRefreshIcon');
+    if (refreshIcon) refreshIcon.classList.add('fa-spin');
+
+    const search = (document.getElementById('agingSearchInput')?.value || '').trim();
+    const status = document.getElementById('agingStatusFilter')?.value || 'ALL';
+    const expedition = document.getElementById('agingExpeditionFilter')?.value || '';
+    const agingFilter = document.getElementById('agingCategoryFilter')?.value || 'ALL';
+    const sort = document.getElementById('agingSortOrder')?.value || 'fifo';
+    
+    let dateVal = '';
+    if (flatpickrAgingInstance && flatpickrAgingInstance.selectedDates && flatpickrAgingInstance.selectedDates.length > 0) {
+        if (flatpickrAgingInstance.selectedDates.length === 2) {
+            const d1 = flatpickr.formatDate(flatpickrAgingInstance.selectedDates[0], 'Y-m-d');
+            const d2 = flatpickr.formatDate(flatpickrAgingInstance.selectedDates[1], 'Y-m-d');
+            dateVal = `${d1} to ${d2}`;
+        } else {
+            dateVal = flatpickr.formatDate(flatpickrAgingInstance.selectedDates[0], 'Y-m-d');
+        }
+    }
+
+    if (tbody && tbody.children.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="10" class="text-center py-12 text-slate-400">
+                    <i class="fa-solid fa-spinner fa-spin text-2xl text-teal-600 block mb-2"></i>
+                    <span>Memuat data Aging Return...</span>
+                </td>
+            </tr>
+        `;
+    }
+
+    try {
+        const queryParams = new URLSearchParams({
+            search: search,
+            status: status,
+            expedition: expedition,
+            aging_filter: agingFilter,
+            date: dateVal,
+            sort: sort,
+            limit: '500'
+        });
+
+        const res = await fetch(`api/admin/aging_return.php?${queryParams.toString()}`);
+        const data = await res.json();
+
+        if (!data.success) {
+            throw new Error(data.error || 'Gagal memuat data');
+        }
+
+        currentAgingPackages = data.packages || [];
+        currentAgingSummary = data.summary || {};
+
+        // Update KPI Summary Cards
+        const elTotal = document.getElementById('agingKpiTotal');
+        const elBelum = document.getElementById('agingKpiBelum');
+        const elSudah = document.getElementById('agingKpiSudah');
+        const elAvg   = document.getElementById('agingKpiAvg');
+        const elCrit  = document.getElementById('agingKpiCritical');
+        const navBadge = document.getElementById('navAgingCountBadge');
+
+        if (elTotal) elTotal.innerText = Number(currentAgingSummary.total_packages || 0).toLocaleString('id-ID');
+        if (elBelum) elBelum.innerText = Number(currentAgingSummary.total_belum_unboxing || 0).toLocaleString('id-ID');
+        if (elSudah) elSudah.innerText = Number(currentAgingSummary.total_sudah_unboxing || 0).toLocaleString('id-ID');
+        if (elAvg) elAvg.innerText = currentAgingSummary.avg_aging_days ?? 0;
+        if (elCrit) elCrit.innerText = Number(currentAgingSummary.total_critical_aging || 0).toLocaleString('id-ID');
+
+        if (navBadge) {
+            const pendingCount = currentAgingSummary.total_belum_unboxing || 0;
+            if (pendingCount > 0) {
+                navBadge.innerText = pendingCount > 999 ? '999+' : pendingCount;
+                navBadge.classList.remove('hidden');
+            } else {
+                navBadge.classList.add('hidden');
+            }
+        }
+
+        // Populate Expedition Filter Dropdown jika belum ada
+        const expSelect = document.getElementById('agingExpeditionFilter');
+        if (expSelect && expSelect.options.length <= 1 && data.expeditions) {
+            data.expeditions.forEach(exp => {
+                if (!exp) return;
+                const opt = document.createElement('option');
+                opt.value = exp;
+                opt.textContent = exp;
+                expSelect.appendChild(opt);
+            });
+            if (expedition) expSelect.value = expedition;
+        }
+
+        renderAgingReturnTable(currentAgingPackages, currentAgingSummary);
+
+    } catch (err) {
+        console.error('Error loadAgingReturnData:', err);
+        showToast('error', err.message, 'Gagal');
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="10" class="text-center py-8 text-rose-500">
+                        <i class="fa-solid fa-triangle-exclamation text-2xl block mb-2"></i>
+                        <span>Gagal memuat data: ${escapeHtml(err.message)}</span>
+                    </td>
+                </tr>
+            `;
+        }
+    } finally {
+        if (refreshIcon) refreshIcon.classList.remove('fa-spin');
+    }
+}
+
+// Render data ke tabel Aging Return
+function renderAgingReturnTable(packages, summary) {
+    const tbody = document.getElementById('agingReturnTableBody');
+    const infoEl = document.getElementById('agingTableCountInfo');
+    if (!tbody) return;
+
+    if (!packages || packages.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="10" class="text-center py-12 text-slate-400">
+                    <i class="fa-solid fa-box-open text-3xl block mb-2 text-slate-300"></i>
+                    <p class="font-bold text-slate-600">Tidak ada paket yang sesuai dengan filter</p>
+                    <p class="text-xs text-slate-400 mt-1">Coba ubah kata kunci pencarian, rentang tanggal, atau filter status.</p>
+                </td>
+            </tr>
+        `;
+        if (infoEl) infoEl.innerText = `Menampilkan 0 dari 0 data paket`;
+        return;
+    }
+
+    if (infoEl) {
+        infoEl.innerText = `Menampilkan ${packages.length.toLocaleString('id-ID')} data paket (Total Terpantau: ${(summary.total_packages || packages.length).toLocaleString('id-ID')})`;
+    }
+
+    let html = '';
+    packages.forEach((pkg, index) => {
+        const isBelum = (pkg.status_paket === 'BELUM_UNBOXING');
+        const isCritical = (pkg.aging_days > 14);
+
+        // Status Badge
+        const statusBadge = isBelum
+            ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs">
+                 <i class="fa-solid fa-hourglass-half text-[10px]"></i> Belum di Unboxing
+               </span>`
+            : `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                 <i class="fa-solid fa-check text-[10px]"></i> Sudah di Unboxing
+               </span>`;
+
+        // Aging Badge
+        const agingBadge = isCritical
+            ? `<div class="inline-flex flex-col items-center">
+                 <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-rose-100 text-rose-700 border border-rose-300 shadow-2xs animate-pulse" title="Lead time kritis melebihi batas toleransi 14 hari!">
+                   <i class="fa-solid fa-triangle-exclamation text-[10px]"></i> ${pkg.aging_days} Hari
+                 </span>
+                 <span class="text-[9px] text-rose-600 font-semibold mt-0.5">${isBelum ? 'Receiving ➔ Hari Ini' : 'Receiving ➔ Unbox'}</span>
+               </div>`
+            : `<div class="inline-flex flex-col items-center">
+                 <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                   <i class="fa-regular fa-clock text-[10px]"></i> ${pkg.aging_days} Hari
+                 </span>
+                 <span class="text-[9px] text-slate-500 mt-0.5">${isBelum ? 'Receiving ➔ Hari Ini' : 'Receiving ➔ Unbox'}</span>
+               </div>`;
+
+        // Format dates
+        const recDateStr = pkg.receiving_at ? pkg.receiving_at.substring(0, 16) : '-';
+        const unboxDateStr = pkg.unboxing_at ? pkg.unboxing_at.substring(0, 16) : '<span class="text-amber-600 font-bold italic">- Menunggu -</span>';
+
+        // Petugas
+        const recOp = pkg.receiving_operator || '-';
+        const unboxOp = pkg.unboxing_operator || (isBelum ? '<span class="text-slate-400 italic">Belum ada</span>' : '-');
+
+        // Media badges
+        let mediaHtml = '<div class="flex items-center justify-center gap-1.5">';
+        if (pkg.has_video) {
+            mediaHtml += `<span class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs" title="Video Unboxing Tersedia"><i class="fa-solid fa-video"></i></span>`;
+        } else {
+            mediaHtml += `<span class="w-6 h-6 rounded-lg bg-slate-100 text-slate-300 flex items-center justify-center text-xs" title="Tidak ada video"><i class="fa-solid fa-video-slash"></i></span>`;
+        }
+        if (pkg.has_photo) {
+            mediaHtml += `<span class="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs" title="Foto Tersedia"><i class="fa-solid fa-image"></i></span>`;
+        } else {
+            mediaHtml += `<span class="w-6 h-6 rounded-lg bg-slate-100 text-slate-300 flex items-center justify-center text-xs" title="Tidak ada foto"><i class="fa-regular fa-image"></i></span>`;
+        }
+        mediaHtml += '</div>';
+
+        const safeBarcode = escapeHtml(pkg.barcode || '');
+
+        html += `
+            <tr class="hover:bg-teal-50/40 transition">
+                <td class="py-3 px-3.5 text-center text-slate-400 font-mono text-[11px]">${index + 1}</td>
+                <td class="py-3 px-4">
+                    <button type="button" onclick="openAgingDetail('${safeBarcode}')" class="font-mono font-bold text-teal-700 hover:text-teal-900 hover:underline text-left block text-xs cursor-pointer" title="Klik untuk melihat detail paket & riwayat lead time">
+                        ${safeBarcode}
+                    </button>
+                    ${pkg.invoice_number && pkg.invoice_number !== pkg.barcode ? `<span class="text-[10px] text-slate-400 font-mono block">Inv: ${escapeHtml(pkg.invoice_number)}</span>` : ''}
+                </td>
+                <td class="py-3 px-4">
+                    <span class="font-bold text-slate-800 block">${escapeHtml(pkg.expedition || 'Lainnya')}</span>
+                    <span class="text-[11px] text-slate-500 block">Kurir: ${escapeHtml(pkg.courier_name || '-')}</span>
+                    ${pkg.receipt_number ? `<span class="text-[10px] text-indigo-600 font-mono block">SJ: ${escapeHtml(pkg.receipt_number)}</span>` : ''}
+                </td>
+                <td class="py-3 px-4">
+                    <div class="font-semibold text-slate-800">${recDateStr}</div>
+                    <span class="text-[10px] text-slate-500 block">Oleh: ${escapeHtml(recOp)}</span>
+                </td>
+                <td class="py-3 px-4">
+                    <div class="font-semibold text-slate-800">${unboxDateStr}</div>
+                    <span class="text-[10px] text-slate-500 block">Oleh: ${unboxOp}</span>
+                </td>
+                <td class="py-3 px-4 text-center">
+                    ${statusBadge}
+                </td>
+                <td class="py-3 px-4 text-center">
+                    ${agingBadge}
+                </td>
+                <td class="py-3 px-4">
+                    <div class="text-[11px] text-slate-700">Rec: <span class="font-semibold">${escapeHtml(recOp)}</span></div>
+                    <div class="text-[11px] text-slate-700">Unbox: <span class="font-semibold">${unboxOp}</span></div>
+                </td>
+                <td class="py-3 px-4 text-center">
+                    ${mediaHtml}
+                </td>
+                <td class="py-3 px-4 text-center">
+                    <button type="button" onclick="openAgingDetail('${safeBarcode}')" class="px-2.5 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 hover:text-teal-900 font-bold text-xs transition border border-teal-200/80 shadow-2xs flex items-center justify-center gap-1 mx-auto cursor-pointer" title="Buka Detail Paket">
+                        <i class="fa-solid fa-eye text-xs"></i>
+                        <span>Detail</span>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+}
+
+// Buka Modal Detail Aging Return (Saat klik Resi / Invoice)
+async function openAgingDetail(barcode) {
+    if (!barcode) return;
+    activeAgingBarcode = barcode;
+
+    const modal = document.getElementById('modalAgingDetail');
+    if (!modal) return;
+
+    modal.classList.remove('hidden');
+
+    // Cari paket di currentAgingPackages
+    const pkg = currentAgingPackages.find(p => p.barcode === barcode || p.invoice_number === barcode) || {
+        barcode: barcode,
+        expedition: '-',
+        status_paket: 'BELUM_UNBOXING',
+        aging_days: 0,
+        receiving_at: null,
+        unboxing_at: null
+    };
+
+    const isBelum = (pkg.status_paket === 'BELUM_UNBOXING');
+    const isCritical = (pkg.aging_days > 14);
+
+    // Header modal
+    const titleEl = document.getElementById('mAgingBarcodeTitle');
+    const statusBadge = document.getElementById('mAgingStatusBadge');
+    const subtitleEl = document.getElementById('mAgingSubtitle');
+
+    if (titleEl) titleEl.innerText = `Paket Inbound #${barcode}`;
+    if (subtitleEl) subtitleEl.innerText = `Ekspedisi: ${pkg.expedition || '-'} • Kurir: ${pkg.courier_name || '-'}`;
+
+    if (statusBadge) {
+        if (isBelum) {
+            statusBadge.className = 'px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-500 text-slate-950 shadow-2xs';
+            statusBadge.innerText = 'BELUM DI UNBOXING (MENUNGGU)';
+        } else {
+            statusBadge.className = 'px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white shadow-2xs';
+            statusBadge.innerText = 'SUDAH DI UNBOXING (SELESAI)';
+        }
+    }
+
+    // Lead Time / Aging Journey Banner
+    const journeyEl = document.getElementById('mAgingJourneyBanner');
+    if (journeyEl) {
+        if (isBelum) {
+            journeyEl.className = isCritical
+                ? 'p-4 rounded-2xl border border-rose-300 bg-rose-50/80 text-rose-900 space-y-2'
+                : 'p-4 rounded-2xl border border-amber-300 bg-amber-50/80 text-amber-900 space-y-2';
+
+            journeyEl.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <span class="font-black text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-triangle-exclamation ${isCritical ? 'text-rose-600 animate-bounce' : 'text-amber-600'}"></i>
+                        <span>Status: BELUM DI UNBOXING DI GUDANG</span>
+                    </span>
+                    <span class="px-2.5 py-1 rounded-full text-xs font-black ${isCritical ? 'bg-rose-200 text-rose-800' : 'bg-amber-200 text-amber-800'}">
+                        Lead Time: ${pkg.aging_days} Hari
+                    </span>
+                </div>
+                <p class="text-xs ${isCritical ? 'text-rose-700 font-semibold' : 'text-amber-800'}">
+                    ${isCritical 
+                        ? '⚠️ PERINGATAN: Paket ini telah berada di gudang selama ' + pkg.aging_days + ' hari sejak serah terima receiving dan MELEBIHI batas 14 hari! Segera lakukan unboxing untuk mencegah hangus klaim.' 
+                        : 'Paket fisik telah diterima di area receiving gudang sejak ' + (pkg.receiving_at || 'tanggal scan') + ' dan saat ini sedang menunggu giliran proses unboxing.'}
+                </p>
+                <div class="flex items-center gap-2 pt-1 text-[11px] font-mono text-slate-600">
+                    <span class="bg-white/80 px-2 py-1 rounded border border-slate-200">1. Receiving (${pkg.receiving_at || '-'})</span>
+                    <i class="fa-solid fa-arrow-right text-slate-400"></i>
+                    <span class="bg-amber-100 px-2 py-1 rounded border border-amber-300 font-bold text-amber-800">2. Menunggu Unboxing (${pkg.aging_days} Hari)</span>
+                </div>
+            `;
+        } else {
+            journeyEl.className = 'p-4 rounded-2xl border border-emerald-300 bg-emerald-50/80 text-emerald-900 space-y-2';
+            journeyEl.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <span class="font-black text-sm flex items-center gap-2 text-emerald-800">
+                        <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                        <span>Status: PROSES UNBOXING SELESAI</span>
+                    </span>
+                    <span class="px-2.5 py-1 rounded-full text-xs font-black bg-emerald-200 text-emerald-800">
+                        Lead Time: ${pkg.aging_days} Hari (Selesai)
+                    </span>
+                </div>
+                <p class="text-xs text-emerald-700">
+                    Paket berhasil diselesaikan dari proses serah terima receiving sampai unboxing dalam waktu <strong>${pkg.aging_days} hari</strong>.
+                </p>
+                <div class="flex items-center gap-2 pt-1 text-[11px] font-mono text-slate-600">
+                    <span class="bg-white/80 px-2 py-1 rounded border border-slate-200">1. Receiving (${pkg.receiving_at || '-'})</span>
+                    <i class="fa-solid fa-arrow-right text-emerald-500"></i>
+                    <span class="bg-emerald-100 px-2 py-1 rounded border border-emerald-300 font-bold text-emerald-800">2. Unboxed (${pkg.unboxing_at || '-'})</span>
+                </div>
+            `;
+        }
+    }
+
+    // Kolom 1: Receiving Data
+    const elRecBarcode = document.getElementById('mAgingRecBarcode');
+    const elRecExp     = document.getElementById('mAgingRecExpedition');
+    const elRecCour    = document.getElementById('mAgingRecCourier');
+    const elRecRcpt    = document.getElementById('mAgingRecReceipt');
+    const elRecOp      = document.getElementById('mAgingRecOperator');
+    const elRecTime    = document.getElementById('mAgingRecTime');
+    const photoView    = document.getElementById('mAgingRecPhotoView');
+
+    if (elRecBarcode) elRecBarcode.innerText = pkg.barcode || '-';
+    if (elRecExp) elRecExp.innerText = pkg.expedition || '-';
+    if (elRecCour) elRecCour.innerText = pkg.courier_name || '-';
+    if (elRecRcpt) elRecRcpt.innerText = pkg.receipt_number ? `SJ #${pkg.receipt_number}${pkg.receiving_sack ? ' (Karung: ' + pkg.receiving_sack + ')' : ''}` : '-';
+    if (elRecOp) elRecOp.innerText = pkg.receiving_operator || '-';
+    if (elRecTime) elRecTime.innerText = pkg.receiving_at || '-';
+
+    if (photoView) {
+        if (pkg.receiving_photo) {
+            photoView.innerHTML = `
+                <a href="${escapeHtml(pkg.receiving_photo)}" target="_blank" title="Klik untuk perbesar foto serah terima" class="block w-full h-full">
+                    <img src="${escapeHtml(pkg.receiving_photo)}" alt="Foto Receiving" class="w-full h-44 object-cover hover:opacity-90 transition">
+                </a>
+            `;
+        } else {
+            photoView.innerHTML = `<span class="text-slate-400 text-xs py-6">Tidak ada foto serah terima receiving</span>`;
+        }
+    }
+
+    // Kolom 2: Unboxing Data
+    const unboxBadge = document.getElementById('mAgingUnboxStatusBadge');
+    const unboxContent = document.getElementById('mAgingUnboxContent');
+    const btnClaim = document.getElementById('btnAgingOpenClaimDossier');
+
+    if (unboxBadge) {
+        if (isBelum) {
+            unboxBadge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200';
+            unboxBadge.innerText = 'Menunggu Unboxing';
+        } else {
+            unboxBadge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200';
+            unboxBadge.innerText = 'Selesai Unboxing';
+        }
+    }
+
+    if (unboxContent) {
+        if (isBelum) {
+            unboxContent.innerHTML = `
+                <div class="p-6 text-center text-slate-500 bg-white rounded-xl border border-slate-200 space-y-3">
+                    <span class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center text-xl mx-auto">
+                        <i class="fa-solid fa-hourglass-half"></i>
+                    </span>
+                    <div>
+                        <h4 class="font-black text-slate-800 text-sm">Paket Belum di-Unboxing</h4>
+                        <p class="text-xs text-slate-500 mt-1">Paket fisik berada di antrean receiving inbound. Belum ada rekaman unboxing atau pemeriksaan fisik produk di meja kerja unboxing.</p>
+                    </div>
+                    <div class="pt-2">
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 text-xs font-bold border border-amber-200">
+                            <i class="fa-solid fa-bell"></i> Antrean Proses Gudang
+                        </span>
+                    </div>
+                </div>
+            `;
+            if (btnClaim) btnClaim.classList.add('hidden');
+        } else {
+            let videoHtml = '';
+            if (pkg.unboxing_video) {
+                videoHtml = `
+                    <div class="rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
+                        <video controls class="w-full max-h-56 bg-black" src="${escapeHtml(pkg.unboxing_video)}" preload="metadata">
+                            Browser Anda tidak mendukung tag video.
+                        </video>
+                    </div>
+                `;
+            } else {
+                videoHtml = `
+                    <div class="p-4 text-center text-slate-400 bg-slate-100 rounded-xl border border-slate-200 text-xs">
+                        <i class="fa-solid fa-video-slash text-xl block mb-1"></i> Tidak ada file video unboxing tersimpan
+                    </div>
+                `;
+            }
+
+            unboxContent.innerHTML = `
+                <div class="space-y-2">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block">Operator Unboxing</span>
+                            <div class="font-semibold text-slate-800">${escapeHtml(pkg.unboxing_operator || '-')}</div>
+                        </div>
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block">Waktu Selesai</span>
+                            <div class="font-semibold text-slate-800">${pkg.unboxing_at || '-'}</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200">
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block">Total Item Diperiksa</span>
+                            <div class="font-bold text-slate-800">${pkg.total_items || 0} Item</div>
+                        </div>
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block">Item Rusak / Cacat</span>
+                            <div class="font-bold ${pkg.total_damaged > 0 ? 'text-rose-600' : 'text-emerald-600'}">
+                                ${pkg.total_damaged || 0} Item ${pkg.total_damaged > 0 ? '⚠️' : '✓'}
+                            </div>
+                        </div>
+                    </div>
+
+                    ${pkg.unboxing_notes ? `
+                        <div class="p-2 bg-amber-50 rounded-lg border border-amber-200 text-[11px] text-amber-900">
+                            <strong>Catatan:</strong> ${escapeHtml(pkg.unboxing_notes)}
+                        </div>
+                    ` : ''}
+
+                    <div class="pt-2">
+                        <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Rekaman Video Unboxing</span>
+                        ${videoHtml}
+                    </div>
+                </div>
+            `;
+
+            if (btnClaim) {
+                if (pkg.total_damaged > 0) {
+                    btnClaim.classList.remove('hidden');
+                } else {
+                    btnClaim.classList.add('hidden');
+                }
+            }
+        }
+    }
+
+    // Async: Ambil data pelengkap OCS Marketplace jika tersedia
+    const ocsSec = document.getElementById('mAgingOcsSection');
+    try {
+        const ocsRes = await fetch(`api/ocs_lookup.php?q=${encodeURIComponent(barcode)}`);
+        const ocsData = await ocsRes.json();
+        if (ocsData && ocsData.success && ocsData.order) {
+            const ord = ocsData.order;
+            const elOcsId = document.getElementById('mAgingOcsOrderId');
+            const elOcsShop = document.getElementById('mAgingOcsShop');
+            const elOcsPlat = document.getElementById('mAgingOcsPlatform');
+            const elOcsPrice = document.getElementById('mAgingOcsPrice');
+            const elOcsCust = document.getElementById('mAgingOcsCustomer');
+
+            if (elOcsId) elOcsId.innerText = ord.Id || barcode;
+            if (elOcsShop) elOcsShop.innerText = ord.ShopName || '-';
+            if (elOcsPlat) elOcsPlat.innerText = ord.CommercePlatform || 'Marketplace';
+            if (elOcsPrice) elOcsPrice.innerText = ord.PackagePriceFormatted || (ord.PackagePrice > 0 ? 'Rp ' + Number(ord.PackagePrice).toLocaleString('id-ID') : 'Rp -');
+            if (elOcsCust) elOcsCust.innerText = (ord.Customer && ord.Customer.Name) ? ord.Customer.Name : '-';
+
+            if (ocsSec) ocsSec.classList.remove('hidden');
+
+            if (btnClaim && ocsData.is_claimable) {
+                btnClaim.classList.remove('hidden');
+            }
+        } else {
+            if (ocsSec) ocsSec.classList.add('hidden');
+        }
+    } catch (e) {
+        if (ocsSec) ocsSec.classList.add('hidden');
+    }
+}
+
+function closeAgingDetailModal() {
+    const modal = document.getElementById('modalAgingDetail');
+    if (modal) modal.classList.add('hidden');
+    // Pause video
+    const video = modal ? modal.querySelector('video') : null;
+    if (video) video.pause();
+}
+
+function copyAgingBarcode() {
+    if (!activeAgingBarcode) return;
+    navigator.clipboard.writeText(activeAgingBarcode).then(() => {
+        showToast('success', `No. Resi ${activeAgingBarcode} berhasil disalin ke clipboard!`, 'Tersalin');
+    }).catch(() => {
+        showToast('info', activeAgingBarcode, 'Nomor Resi');
+    });
+}
+
+function openClaimDossierFromAging() {
+    if (!activeAgingBarcode) return;
+    closeAgingDetailModal();
+    if (typeof openClaimDetailModal === 'function') {
+        openClaimDetailModal(activeAgingBarcode);
+    }
+}
+
+// Export Data Aging Return ke Excel (.xlsx) Native Bebas Corrupt
+function exportAgingReturnExcel() {
+    if (typeof XLSX === 'undefined') {
+        showToast('error', 'Pustaka Excel belum siap. Silakan muat ulang halaman.', 'Gagal');
+        return;
+    }
+
+    if (!currentAgingPackages || currentAgingPackages.length === 0) {
+        showToast('warning', 'Tidak ada data Aging Return yang dapat diekspor.', 'Data Kosong');
+        return;
+    }
+
+    const rows = currentAgingPackages.map((pkg, idx) => {
+        const isBelum = (pkg.status_paket === 'BELUM_UNBOXING');
+        const isCrit = (pkg.aging_days > 14);
+
+        return {
+            'No': idx + 1,
+            'No. Resi / AWB': pkg.barcode || '',
+            'No. Invoice': pkg.invoice_number || '',
+            'Ekspedisi': pkg.expedition || '',
+            'Nama Kurir': pkg.courier_name || '',
+            'No. Surat Jalan': pkg.receipt_number || '',
+            'No. Karung / Sack': pkg.receiving_sack || '',
+            'Waktu Receiving Inbound': pkg.receiving_at || '',
+            'Petugas Receiving': pkg.receiving_operator || '',
+            'Waktu Inbound Unboxing': pkg.unboxing_at || (isBelum ? 'BELUM UNBOXING' : ''),
+            'Operator Unboxing': pkg.unboxing_operator || '',
+            'Status Paket': isBelum ? 'Belum di Unboxing' : 'Sudah di Unboxing',
+            'Aging Lead Time (Hari)': pkg.aging_days,
+            'Kategori Aging': isCrit ? 'Kritis (> 14 Hari)' : 'Aman (≤ 14 Hari)',
+            'Status Kondisi': pkg.unboxing_status || '',
+            'Total Items': pkg.total_items || 0,
+            'Total Rusak': pkg.total_damaged || 0,
+            'Catatan Unboxing': pkg.unboxing_notes || '',
+            'Link Video Unboxing': pkg.unboxing_video ? window.location.origin + '/' + pkg.unboxing_video : ''
+        };
+    });
+
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const timeStr = now.toTimeString().slice(0, 5).replace(/:/g, '');
+    const fileName = `Aging_Return_Report_${dateStr}_${timeStr}.xlsx`;
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Aging_Return");
+    XLSX.writeFile(wb, fileName);
+
+    showToast('success', `Berhasil mengekspor ${rows.length} data Aging Return ke ${fileName}!`, 'Export Berhasil');
+}
+
+// Window global exports
+window.initAgingDatePicker = initAgingDatePicker;
+window.clearAgingDateFilter = clearAgingDateFilter;
+window.resetAgingFilters = resetAgingFilters;
+window.debounceAgingSearch = debounceAgingSearch;
+window.loadAgingReturnData = loadAgingReturnData;
+window.renderAgingReturnTable = renderAgingReturnTable;
+window.openAgingDetail = openAgingDetail;
+window.closeAgingDetailModal = closeAgingDetailModal;
+window.copyAgingBarcode = copyAgingBarcode;
+window.openClaimDossierFromAging = openClaimDossierFromAging;
+window.exportAgingReturnExcel = exportAgingReturnExcel;
