@@ -22,6 +22,8 @@ function getTodayYMD() {
 // State Management & Instances
 let ratioChartInstance = null;
 let trendChartInstance = null;
+let trendReceivingChartInstance = null;
+let trendUnboxingChartInstance = null;
 let expeditionChartInstance = null;
 let currentTab = 'dashboard';
 let cachedProducts = [];
@@ -313,6 +315,7 @@ window.switchTab = function (tabName, updateUrl = true) {
 // 1. Load Metrics KPI (Refresh di backend via cache atau query)
 async function loadMetrics(forceRefresh = false) {
     const elRecPkg = document.getElementById('kpiTotalReceivedPackages');
+    const elMissing = document.getElementById('kpiTotalMissingPackages');
     const elRecSess = document.getElementById('kpiTotalReceptions');
     const elInv = document.getElementById('kpiTotalInvoice');
     const elItems = document.getElementById('kpiTotalItems');
@@ -323,6 +326,7 @@ async function loadMetrics(forceRefresh = false) {
 
     // Tampilkan spinner loading pada KPI & tabel saat proses fetch
     if (elRecPkg) elRecPkg.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-base text-emerald-400"></i>';
+    if (elMissing) elMissing.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-base text-amber-400"></i>';
     if (elInv) elInv.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-base text-indigo-400"></i>';
     if (elItems) elItems.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-base text-blue-400"></i>';
     if (elGood) elGood.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-base text-emerald-400"></i>';
@@ -351,6 +355,7 @@ async function loadMetrics(forceRefresh = false) {
         const data = await res.json();
 
         if (elRecPkg) elRecPkg.innerText = (data.total_received_packages ?? 0).toLocaleString('id-ID');
+        if (elMissing) elMissing.innerText = (data.total_missing_packages ?? 0).toLocaleString('id-ID');
         if (elRecSess) elRecSess.innerText = (data.total_receptions ?? 0).toLocaleString('id-ID');
         if (elInv) elInv.innerText = (data.total_invoices ?? 0).toLocaleString('id-ID');
         if (elItems) elItems.innerText = (data.total_items ?? 0).toLocaleString('id-ID');
@@ -358,7 +363,8 @@ async function loadMetrics(forceRefresh = false) {
         if (elDamaged) elDamaged.innerText = (data.total_damaged ?? 0).toLocaleString('id-ID');
 
         renderRatioChart(data.total_good || 0, data.total_damaged || 0);
-        renderTrendChart(data.trend_7days || []);
+        renderReceivingTrendChart(data.trend_receiving || data.trend_7days || []);
+        renderUnboxingTrendChart(data.trend_unboxing || data.trend_7days || []);
         renderExpeditionChart(data.by_expedition || []);
         renderDashExpeditionTable(data.by_expedition || []);
         renderDashPicTable(data.pic_stats || []);
@@ -392,23 +398,136 @@ function renderRatioChart(good, damaged) {
     });
 }
 
-function renderTrendChart(trend) {
-    const canvas = document.getElementById('trendChart');
+// KPI Productivity 1: Trend Penerimaan Paket (Line Chart)
+function renderReceivingTrendChart(trend) {
+    const canvas = document.getElementById('trendReceivingChart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    if (trendChartInstance) trendChartInstance.destroy();
-    const labels = trend.map(t => { const d = new Date(t.tgl); return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }); });
-    const values = trend.map(t => parseInt(t.total_qty) || 0);
-    trendChartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: { labels, datasets: [{ label: 'Total Qty Retur', data: values, backgroundColor: 'rgba(99,102,241,0.15)', borderColor: '#6366f1', borderWidth: 2, borderRadius: 6 }] },
+    if (trendReceivingChartInstance) {
+        trendReceivingChartInstance.destroy();
+        trendReceivingChartInstance = null;
+    }
+    const labels = (trend || []).map(t => { 
+        const d = new Date(t.tgl); 
+        return isNaN(d.getTime()) ? t.tgl : d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }); 
+    });
+    const values = (trend || []).map(t => parseInt(t.total_packages ?? t.total_qty) || 0);
+
+    trendReceivingChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Paket Diterima (Receiving)',
+                data: values,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                borderWidth: 2.5,
+                pointBackgroundColor: '#059669',
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                fill: true,
+                tension: 0.35
+            }]
+        },
         options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ` ${ctx.raw.toLocaleString('id-ID')} pcs` } } },
-            scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } }, y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 }, precision: 0 }, beginAtZero: true } }
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: (ctx) => ` ${ctx.raw.toLocaleString('id-ID')} paket fisik masuk` } }
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 }, precision: 0 }, beginAtZero: true }
+            }
         }
     });
 }
+
+// KPI Productivity 2: Trend Unboxing per Hari (Bar Chart)
+function renderUnboxingTrendChart(trend) {
+    const canvas = document.getElementById('trendUnboxingChart') || document.getElementById('trendChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (trendUnboxingChartInstance) {
+        trendUnboxingChartInstance.destroy();
+        trendUnboxingChartInstance = null;
+    }
+    const labels = (trend || []).map(t => { 
+        const d = new Date(t.tgl); 
+        return isNaN(d.getTime()) ? t.tgl : d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }); 
+    });
+    const values = (trend || []).map(t => parseInt(t.total_packages ?? t.total_qty) || 0);
+
+    trendUnboxingChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Paket Selesai Unboxing',
+                data: values,
+                backgroundColor: 'rgba(99, 102, 241, 0.85)',
+                borderColor: '#6366f1',
+                borderWidth: 1,
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: (ctx) => ` ${ctx.raw.toLocaleString('id-ID')} paket selesai unboxing` } }
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 }, precision: 0 }, beginAtZero: true }
+            }
+        }
+    });
+}
+
+// Backward Compatibility Trend Chart
+function renderTrendChart(trend) {
+    renderUnboxingTrendChart(trend);
+}
+
+// Share Dashboard Productivity Report
+window.shareDashboardReport = function() {
+    const rec = document.getElementById('kpiTotalReceivedPackages')?.innerText || '0';
+    const miss = document.getElementById('kpiTotalMissingPackages')?.innerText || '0';
+    const unb = document.getElementById('kpiTotalInvoice')?.innerText || '0';
+    const dmg = document.getElementById('kpiTotalDamaged')?.innerText || '0';
+    const itm = document.getElementById('kpiTotalItems')?.innerText || '0';
+    const period = activeDashboardDateFilter || 'Hari Ini';
+
+    const text = `📊 *LAPORAN PRODUKTIVITAS INBOUND RETURN IEG*\n` +
+        `📅 Periode: ${period}\n\n` +
+        `📦 Total Paket Diterima: ${rec} paket\n` +
+        `⏳ Total Paket Missing (Belum Unbox): ${miss} paket\n` +
+        `✅ Total Paket Received (Selesai Unbox): ${unb} paket\n` +
+        `⚠️ Total Paket Reject (Cacat/Rusak): ${dmg} paket\n` +
+        `🏷️ Total Unit Fisik Produk: ${itm} unit\n\n` +
+        `Sistem Inbound Return IEG - ${new Date().toLocaleDateString('id-ID')}`;
+
+    if (navigator.share) {
+        navigator.share({
+            title: 'Laporan Produktivitas Inbound Return',
+            text: text
+        }).catch(() => {});
+    } else {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('success', 'Ringkasan laporan produktivitas berhasil disalin ke clipboard!', 'Laporan Disalin');
+            }).catch(() => {
+                prompt('Salin teks laporan berikut:', text);
+            });
+        } else {
+            prompt('Salin teks laporan berikut:', text);
+        }
+    }
+};
 
 // Visualisasi Chart per Ekspedisi Total Paket (Receiving Fisik vs Unboxing Terproses)
 function renderExpeditionChart(list) {
@@ -4995,15 +5114,21 @@ function populateClaimExpeditionFilter(candidates) {
     sel.innerHTML = optHtml;
 }
 
-// State Mode Ekspedisi Klaim: 'jnt' (Approval Accounting via Web) vs 'other' (Klaim Manual Admin)
-let claimExpeditionMode = 'jnt';
+// State Mode Ekspedisi Klaim: 'jnt_jne' (Assign Email ke Accounting) vs 'other' (Klaim Manual Ekspedisi)
+let claimExpeditionMode = 'jnt_jne';
+
+function isJntOrJneExpedition(expedition) {
+    const u = String(expedition || '').toUpperCase().trim();
+    return u.includes('JNT') || u.includes('J&T') || u.includes('JNE');
+}
 
 window.setClaimExpeditionMode = function (mode) {
+    if (mode === 'jnt') mode = 'jnt_jne';
     claimExpeditionMode = mode;
     const btnJnt = document.getElementById('btnClaimModeJnt');
     const btnOther = document.getElementById('btnClaimModeOther');
 
-    if (mode === 'jnt') {
+    if (mode === 'jnt_jne') {
         if (btnJnt) {
             btnJnt.className = 'px-4 py-2 rounded-t-xl font-bold text-xs transition border-t-2 border-rose-500 bg-white text-rose-700 shadow-2xs flex items-center gap-1.5 cursor-pointer';
         }
@@ -5035,14 +5160,27 @@ window.applyClaimCandidatesFilter = function () {
     const exp = expSelect ? expSelect.value.trim().toLowerCase() : '';
     const stFilter = statusSelect ? statusSelect.value.trim().toUpperCase() : '';
 
-    let filtered = cachedClaimCandidates.filter(c => {
-        // Filter Berdasarkan Mode Tab Ekspedisi (JNT Khusus Approval Accounting vs Ekspedisi Lain Klaim Manual)
-        const cExpUpper = String(c.expedition || '').toUpperCase();
-        const isJntExp = (cExpUpper.includes('JNT') || cExpUpper.includes('J&T'));
-        if (claimExpeditionMode === 'jnt' && !isJntExp) return false;
-        if (claimExpeditionMode === 'other' && isJntExp) return false;
+    const userRole = String(window.CURRENT_USER_ROLE || '').toLowerCase();
+    const isAccountingUser = (userRole === 'accounting' || (window.IS_ACCOUNTING && !window.IS_ADMIN));
 
-        // Filter Search (Invoice / Resi, Produk, SKU, Alasan Rusak, Operator)
+    let filtered = cachedClaimCandidates.filter(c => {
+        const cStatus = (c.claim_status || 'PENDING').toUpperCase();
+        const accStatus = (c.accounting_status || '').toUpperCase();
+
+        // 1. Jika User adalah Accounting: Hanya melihat paket yang sudah di-email ke Accounting (DONE_EMAIL, RECEIVED, DONE)
+        if (isAccountingUser) {
+            const isEmailedOrDone = (cStatus === 'DONE_EMAIL' || accStatus === 'DONE_EMAIL' || 
+                                     cStatus === 'RECEIVED' || accStatus === 'RECEIVED' || 
+                                     cStatus === 'DONE' || accStatus === 'DONE');
+            if (!isEmailedOrDone) return false;
+        }
+
+        // 2. Filter Berdasarkan Mode Tab Ekspedisi (JNT & JNE Assign Accounting vs Ekspedisi Lain Klaim Manual)
+        const isTargetExp = isJntOrJneExpedition(c.expedition);
+        if (claimExpeditionMode === 'jnt_jne' && !isTargetExp) return false;
+        if (claimExpeditionMode === 'other' && isTargetExp) return false;
+
+        // 3. Filter Search (Invoice / Resi, Produk, SKU, Alasan Rusak, Operator)
         if (q) {
             const inv = String(c.invoice_number || '').toLowerCase();
             const prod = String(c.product_names || '').toLowerCase();
@@ -5054,16 +5192,18 @@ window.applyClaimCandidatesFilter = function () {
             }
         }
 
-        // Filter Ekspedisi Spesifik Dropdown
+        // 4. Filter Ekspedisi Spesifik Dropdown
         if (exp) {
             const cExp = String(c.expedition || '').toLowerCase();
             if (cExp !== exp) return false;
         }
 
-        // Filter Status Klaim
-        if (stFilter && (c.claim_status || 'PENDING') !== stFilter) return false;
+        // 5. Filter Status Klaim
+        if (stFilter) {
+            if (cStatus !== stFilter && accStatus !== stFilter) return false;
+        }
 
-        // Filter Tanggal Rentang (Flatpickr)
+        // 6. Filter Tanggal Rentang (Flatpickr)
         if (activeClaimDateFilter) {
             const cDate = String(c.created_at || '').substring(0, 10);
             if (activeClaimDateFilter.includes(' to ')) {
@@ -5077,10 +5217,11 @@ window.applyClaimCandidatesFilter = function () {
         return true;
     });
 
-    // Hitung berapa klaim JNT yang perlu tindakan / pending approval
+    // Hitung berapa klaim JNT & JNE yang perlu tindakan / siap di-email
     const jntPendingCount = cachedClaimCandidates.filter(c => {
-        const expU = String(c.expedition || '').toUpperCase();
-        return (expU.includes('JNT') || expU.includes('J&T')) && (!c.accounting_status || c.accounting_status === 'PENDING' || c.accounting_status === 'PENDING_APPROVAL');
+        const isJntJne = isJntOrJneExpedition(c.expedition);
+        const st = (c.claim_status || 'PENDING').toUpperCase();
+        return isJntJne && (st === 'PENDING' || st === 'PROCESS');
     }).length;
     const badgeJnt = document.getElementById('badgeJntPendingApproval');
     if (badgeJnt) {
@@ -5088,28 +5229,38 @@ window.applyClaimCandidatesFilter = function () {
         badgeJnt.classList.toggle('hidden', jntPendingCount === 0);
     }
 
-    // Hitung akumulasi total real-time dari seluruh item yang lolos filter
+    // Hitung akumulasi total real-time & rata-rata aging dari seluruh item yang lolos filter
     let sumFilteredNominal = 0;
     let sumFilteredDamaged = 0;
+    let totalAging = 0;
+    let countWithAging = 0;
+
     filtered.forEach(c => {
         sumFilteredNominal += Number(c.package_price || 0);
         const dQty = Number(c.damaged_qty || (c.total_damaged > 0 ? c.total_damaged : (c.damaged_items_count || 1)));
         sumFilteredDamaged += dQty;
+        const aDays = Number(c.aging_days ?? 0);
+        totalAging += aDays;
+        countWithAging++;
     });
 
-    // Update Counter & Rekap Finansial Hasil Filter di Toolbar
+    const avgAging = countWithAging > 0 ? (totalAging / countWithAging).toFixed(1) : '0';
+
+    // Update Counter & Rekap Finansial & Average Aging di Toolbar
     const countEl = document.getElementById('countClaimFiltered');
     const totalEl = document.getElementById('countClaimTotal');
     const sumDmgEl = document.getElementById('sumClaimFilteredDamaged');
     const sumNomEl = document.getElementById('sumClaimFilteredNominal');
+    const avgAgingEl = document.getElementById('avgClaimAging');
 
     if (countEl) countEl.innerText = filtered.length;
     if (totalEl) totalEl.innerText = cachedClaimCandidates.length;
     if (sumDmgEl) sumDmgEl.innerText = `${sumFilteredDamaged} pcs`;
     if (sumNomEl) sumNomEl.innerText = 'Rp ' + sumFilteredNominal.toLocaleString('id-ID');
+    if (avgAgingEl) avgAgingEl.innerText = `${avgAging} Hari`;
 
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center py-10 text-slate-400">
+        tbody.innerHTML = `<tr><td colspan="11" class="text-center py-10 text-slate-400">
             <i class="fa-solid fa-filter-circle-xmark text-2xl text-slate-300 mb-2 block"></i>
             Tidak ada paket rusak yang sesuai dengan filter pencarian yang diterapkan.
         </td></tr>`;
@@ -5145,6 +5296,44 @@ window.applyClaimCandidatesFilter = function () {
             `;
         }
 
+        // Badge Aging Paket: < 14 Hari = Hijau, > 14 Hari = Merah
+        const aDays = Number(c.aging_days ?? 0);
+        let agingBadge = '';
+        if (aDays <= 14) {
+            agingBadge = `
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs" title="Aging: ${aDays} hari (<= 14 hari)">
+                    <i class="fa-solid fa-clock text-[10px] text-emerald-600"></i> ${aDays} Hari
+                </span>
+            `;
+        } else {
+            agingBadge = `
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs animate-pulse" title="Aging: ${aDays} hari (> 14 hari - Prioritas!)">
+                    <i class="fa-solid fa-triangle-exclamation text-[10px] text-rose-600"></i> ${aDays} Hari
+                </span>
+            `;
+        }
+
+        const recvDate = c.receiving_at ? String(c.receiving_at).substring(0, 10) : '';
+        const unboxDate = c.created_at ? String(c.created_at).substring(0, 10) : '';
+        const dateSubtext = recvDate ? `<span class="block text-[9px] text-slate-400 font-mono mt-0.5">Recv: ${recvDate}</span>` : `<span class="block text-[9px] text-slate-400 font-mono mt-0.5">Unbox: ${unboxDate}</span>`;
+
+        // Status Badge
+        const stMain = (c.claim_status || 'PENDING').toUpperCase();
+        const accMain = (c.accounting_status || '').toUpperCase();
+        let statusColBadge = '';
+
+        if (stMain === 'DONE_EMAIL' || accMain === 'DONE_EMAIL') {
+            statusColBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300 shadow-2xs"><i class="fa-solid fa-envelope-circle-check text-blue-600"></i> Done Email</span>`;
+        } else if (stMain === 'RECEIVED' || accMain === 'RECEIVED') {
+            statusColBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300 shadow-2xs"><i class="fa-solid fa-check-double text-indigo-600"></i> Received Acc</span>`;
+        } else if (stMain === 'DONE' || accMain === 'DONE') {
+            statusColBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs"><i class="fa-solid fa-circle-check text-emerald-600"></i> Done Klaim</span>`;
+        } else if (stMain === 'PROCESS') {
+            statusColBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300"><i class="fa-solid fa-hourglass-half text-amber-600"></i> Proses</span>`;
+        } else {
+            statusColBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">Belum Klaim</span>`;
+        }
+
         const isChecked = selectedClaimInvoices.has(c.invoice_number);
         html += `
             <tr class="hover:bg-rose-50/40 transition border-b border-slate-100 ${isChecked ? 'bg-amber-50/60' : ''}">
@@ -5168,8 +5357,12 @@ window.applyClaimCandidatesFilter = function () {
                         <span class="text-[10px] text-slate-400">(${escapeHtml(c.operator_name || 'Operator')})</span>
                     </div>
                 </td>
+                <td class="py-3 px-3 text-center whitespace-nowrap">
+                    ${agingBadge}
+                    ${dateSubtext}
+                </td>
                 <td class="py-3 px-3">
-                    <div class="font-bold text-slate-800 text-xs whitespace-normal break-words leading-snug min-w-[220px]">
+                    <div class="font-bold text-slate-800 text-xs whitespace-normal break-words leading-snug min-w-[200px]">
                         ${prodName}
                     </div>
                     ${c.sku ? `
@@ -5195,6 +5388,9 @@ window.applyClaimCandidatesFilter = function () {
                     ${priceHtml}
                 </td>
                 <td class="py-3 px-3 text-slate-500 text-[11px] whitespace-nowrap">${escapeHtml(c.created_at || '-')}</td>
+                <td class="py-3 px-3 text-center whitespace-nowrap">
+                    ${statusColBadge}
+                </td>
                 <td class="py-3 px-3 text-center">
                     ${hasVideo ?
                 `<span class="inline-flex items-center gap-1 text-[11px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
@@ -5205,7 +5401,7 @@ window.applyClaimCandidatesFilter = function () {
                          </span>`
             }
                 </td>
-                <td class="py-3 px-3 text-center">
+                <td class="py-3 px-3 text-center whitespace-nowrap">
                     ${renderClaimStatusAction(c)}
                 </td>
             </tr>
@@ -5233,73 +5429,139 @@ window.resetClaimCandidatesFilter = function () {
 };
 
 // -------------------------------------------------------------
-// STATUS KLAIM: PENDING (Belum Klaim) -> PROCESS (Proses Klaim) -> DONE (Done Claim)
+// STATUS KLAIM ACTION & PERMISSION HANDLING
 // -------------------------------------------------------------
 function renderClaimStatusAction(c) {
     const inv = escapeHtml(c.invoice_number);
-    const expUpper = String(c.expedition || '').toUpperCase();
-    const isJnt = (expUpper.includes('JNT') || expUpper.includes('J&T'));
+    const exp = escapeHtml(c.expedition || '');
+    const isJntOrJne = isJntOrJneExpedition(c.expedition);
+    const userRole = String(window.CURRENT_USER_ROLE || '').toLowerCase();
+    const isAccountingUser = (userRole === 'accounting' || (window.IS_ACCOUNTING && !window.IS_ADMIN));
+    const st = (c.claim_status || c.accounting_status || 'PENDING').toUpperCase();
 
-    // JIKA EKSPEDISI J&T: STATUS BERGANTUNG PADA APPROVAL ACCOUNTING VIA WEB
-    if (isJnt) {
-        const accSt = c.accounting_status || 'PENDING';
-        if (accSt === 'APPROVED') {
+    // 1. ROLE ACCOUNTING: HANYA BISA RECEIVE ATAU EDIT DATA / DONE KLAIM
+    if (isAccountingUser) {
+        if (st === 'DONE_EMAIL') {
             return `
-                <div class="inline-flex flex-col items-center gap-0.5">
-                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
-                        <i class="fa-solid fa-stamp text-emerald-600"></i> Approved Acc
+                <div class="flex items-center justify-center gap-1">
+                    <button type="button" onclick="accountingReceiveClaim('${inv}')" class="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold transition shadow-2xs flex items-center gap-1 cursor-pointer" title="Terima berkas paket dari Tim Inbound">
+                        <i class="fa-solid fa-inbox text-[9px]"></i> Receive
+                    </button>
+                    <button type="button" onclick="accountingEditClaimModal('${inv}')" class="px-1.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold transition border border-slate-300 cursor-pointer" title="Edit Data & Catatan">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </button>
+                </div>
+            `;
+        } else if (st === 'RECEIVED') {
+            return `
+                <div class="flex items-center justify-center gap-1">
+                    <button type="button" onclick="accountingEditClaimModal('${inv}')" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold transition shadow-2xs flex items-center gap-1 cursor-pointer" title="Selesaikan ke Done Klaim">
+                        <i class="fa-solid fa-circle-check text-[9px]"></i> Done Klaim
+                    </button>
+                    <button type="button" onclick="accountingEditClaimModal('${inv}')" class="px-1.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold transition border border-slate-300 cursor-pointer" title="Edit Data">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </button>
+                </div>
+            `;
+        } else if (st === 'DONE') {
+            return `
+                <div class="flex items-center justify-center gap-1">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <i class="fa-solid fa-check text-[9px]"></i> Selesai
                     </span>
-                    ${c.accounting_approved_by ? `<span class="text-[9px] text-slate-400 font-medium">by ${escapeHtml(c.accounting_approved_by)}</span>` : ''}
-                </div>`;
-        } else if (accSt === 'PENDING_APPROVAL') {
-            return `
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                    <i class="fa-solid fa-clock text-amber-600"></i> Menunggu Acc
-                </span>`;
-        } else if (accSt === 'REJECTED') {
-            return `
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
-                    <i class="fa-solid fa-xmark text-rose-600"></i> Ditolak Acc
-                </span>`;
-        } else {
-            return `
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-                    <i class="fa-solid fa-paper-plane text-slate-400"></i> Siap Kirim
-                </span>`;
+                    <button type="button" onclick="accountingEditClaimModal('${inv}')" class="p-1 text-slate-400 hover:text-slate-600 transition" title="Lihat / Edit Catatan">
+                        <i class="fa-solid fa-pen-to-square text-[10px]"></i>
+                    </button>
+                </div>
+            `;
         }
     }
 
-    // JIKA EKSPEDISI LAIN: KLAIM MANUAL OLEH ADMIN (PENDING -> PROCESS -> DONE)
-    const st = c.claim_status || 'PENDING';
-
-    if (st === 'PENDING') {
-        return `
-            <button onclick="openClaimDetailModal('${inv}')" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[11px] font-bold transition shadow-2xs flex items-center gap-1.5 mx-auto cursor-pointer" title="Belum diklaim - buka berkas detail klaim">
-                <i class="fa-solid fa-shield-halved"></i> Klaim
-            </button>`;
+    // 2. JIKA EKSPEDISI JNT ATAU JNE: ALUR EMAIL & ASSIGN KE ACCOUNTING
+    if (isJntOrJne) {
+        if (st === 'DONE_EMAIL') {
+            return `
+                <div class="inline-flex flex-col items-center gap-0.5">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300 shadow-2xs">
+                        <i class="fa-solid fa-envelope-circle-check text-blue-600"></i> Done Email
+                    </span>
+                    <button onclick="openClaimDetailModal('${inv}')" class="text-[9px] text-indigo-600 hover:underline">Detail Dossier</button>
+                </div>
+            `;
+        } else if (st === 'RECEIVED') {
+            return `
+                <div class="inline-flex flex-col items-center gap-0.5">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300 shadow-2xs">
+                        <i class="fa-solid fa-check-double text-indigo-600"></i> Received Acc
+                    </span>
+                    <button onclick="openClaimDetailModal('${inv}')" class="text-[9px] text-indigo-600 hover:underline">Detail Dossier</button>
+                </div>
+            `;
+        } else if (st === 'DONE') {
+            return `
+                <div class="inline-flex flex-col items-center gap-0.5">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                        <i class="fa-solid fa-circle-check text-emerald-600"></i> Done Klaim
+                    </span>
+                    <button onclick="openClaimDetailModal('${inv}')" class="text-[9px] text-emerald-700 hover:underline">Detail Dossier</button>
+                </div>
+            `;
+        } else {
+            return `
+                <div class="inline-flex flex-col items-center gap-0.5">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                        <i class="fa-solid fa-square-check text-slate-400"></i> Siap Email
+                    </span>
+                    <button onclick="openClaimDetailModal('${inv}')" class="text-[9px] text-indigo-600 hover:underline">Lihat Berkas</button>
+                </div>
+            `;
+        }
     }
 
-    const isDone = st === 'DONE';
-    const cls = isDone
-        ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-        : 'bg-blue-50 text-blue-700 border-blue-300';
-    return `
-        <div class="relative inline-flex items-center mx-auto" title="Ubah status klaim secara manual">
-            <i class="fa-solid ${isDone ? 'fa-circle-check' : 'fa-hourglass-half'} absolute left-2 text-[10px] pointer-events-none ${isDone ? 'text-emerald-600' : 'text-blue-600'}"></i>
-            <select onchange="changeSingleClaimStatus('${inv}', this)" class="appearance-none pl-6 pr-6 py-1 rounded-lg text-[11px] font-bold border cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500 ${cls}">
-                <option value="PROCESS" ${!isDone ? 'selected' : ''}>Proses Klaim</option>
-                <option value="DONE" ${isDone ? 'selected' : ''}>Done Claim</option>
-                <option value="PENDING">Batalkan Klaim</option>
-            </select>
-            <i class="fa-solid fa-chevron-down absolute right-2 text-[8px] pointer-events-none text-slate-500"></i>
-        </div>`;
+    // 3. JIKA EKSPEDISI LAIN (BUKAN JNT & JNE): BISA GANTI MANUAL KE DONE KLAIM SESUAI EKSPEDISI
+    if (st === 'DONE') {
+        return `
+            <div class="inline-flex items-center gap-1">
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    <i class="fa-solid fa-circle-check text-emerald-600"></i> Done Klaim
+                </span>
+                <select onchange="changeSingleClaimStatus('${inv}', this)" class="text-[9px] bg-slate-50 border border-slate-200 rounded px-1 py-0.5 cursor-pointer text-slate-600">
+                    <option value="DONE" selected>Done</option>
+                    <option value="PROCESS">Proses</option>
+                    <option value="PENDING">Batal</option>
+                </select>
+            </div>
+        `;
+    } else if (st === 'PROCESS') {
+        return `
+            <div class="inline-flex items-center gap-1">
+                <button type="button" onclick="manualChangeOtherClaimStatus('${inv}', 'DONE')" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold transition shadow-2xs flex items-center gap-1 cursor-pointer" title="Selesaikan ke Done Klaim">
+                    <i class="fa-solid fa-circle-check"></i> Done Klaim
+                </button>
+                <button onclick="openClaimDetailModal('${inv}')" class="p-1 text-slate-400 hover:text-slate-600" title="Buka berkas">
+                    <i class="fa-solid fa-file-lines text-xs"></i>
+                </button>
+            </div>
+        `;
+    } else {
+        return `
+            <div class="inline-flex items-center gap-1">
+                <button type="button" onclick="manualChangeOtherClaimStatus('${inv}', 'DONE')" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold transition shadow-2xs flex items-center gap-1 cursor-pointer" title="Ubah langsung status ke Done Klaim">
+                    <i class="fa-solid fa-circle-check"></i> Done Klaim
+                </button>
+                <button onclick="openClaimDetailModal('${inv}')" class="p-1 text-slate-400 hover:text-slate-600" title="Buka berkas">
+                    <i class="fa-solid fa-file-lines text-xs"></i>
+                </button>
+            </div>
+        `;
+    }
 }
 
-async function updateClaimStatusRequest(invoices, status) {
+async function updateClaimStatusRequest(invoices, status, notes = '') {
     const res = await fetch('api/claim_status.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoices, status })
+        body: JSON.stringify({ invoices, status, notes, accounting_notes: notes })
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || !json.success) throw new Error(json.error || 'Gagal memperbarui status klaim');
@@ -5307,7 +5569,13 @@ async function updateClaimStatusRequest(invoices, status) {
     // Update cache lokal agar UI langsung berubah tanpa reload penuh
     const invSet = new Set(invoices);
     cachedClaimCandidates.forEach(c => {
-        if (invSet.has(c.invoice_number)) c.claim_status = status;
+        if (invSet.has(c.invoice_number)) {
+            c.claim_status = status;
+            if (status === 'RECEIVED' || status === 'DONE' || status === 'DONE_EMAIL') {
+                c.accounting_status = status;
+            }
+            if (notes) c.accounting_notes = notes;
+        }
     });
     return json;
 }
@@ -5321,7 +5589,7 @@ window.processSelectedClaims = async function () {
         showToast('info', 'Semua paket terpilih sudah dalam status Proses / Done Claim.', 'Info');
         return;
     }
-    if (!confirm(`Ajukan klaim untuk ${pending.length} paket terpilih?\nStatus akan berubah menjadi "Proses Klaim" dan tombol Print Invoice akan muncul.`)) return;
+    if (!confirm(`Ajukan klaim untuk ${pending.length} paket terpilih?\nStatus akan berubah menjadi "Proses Klaim".`)) return;
 
     const btn = document.getElementById('btnBulkClaimProcess');
     if (btn) btn.disabled = true;
@@ -5337,21 +5605,132 @@ window.processSelectedClaims = async function () {
 };
 
 window.markSelectedClaimsDone = async function () {
-    const targets = Array.from(selectedClaimInvoices).filter(inv => {
-        const c = cachedClaimCandidates.find(x => x.invoice_number === inv);
-        return c && c.claim_status === 'PROCESS';
-    });
-    if (targets.length === 0) {
-        showToast('info', 'Tidak ada paket berstatus Proses Klaim pada pilihan Anda.', 'Info');
+    if (selectedClaimInvoices.size === 0) {
+        showToast('warning', 'Pilih minimal 1 paket terlebih dahulu.', 'Info');
         return;
     }
-    if (!confirm(`Tandai ${targets.length} paket sebagai "Done Claim"?`)) return;
+    const targets = Array.from(selectedClaimInvoices);
+    if (!confirm(`Tandai ${targets.length} paket sebagai "Done Klaim" sesuai ekspedisi masing-masing?`)) return;
     try {
         const json = await updateClaimStatusRequest(targets, 'DONE');
-        showToast('success', json.message || 'Paket ditandai Done Claim', 'Done Claim');
+        showToast('success', json.message || `${targets.length} paket berhasil diubah ke Done Klaim`, 'Done Klaim');
+        clearSelectedClaims();
         applyClaimCandidatesFilter();
     } catch (err) {
         showToast('error', err.message, 'Gagal');
+    }
+};
+
+window.manualChangeOtherClaimStatus = async function (invoice, newStatus) {
+    if (!invoice) return;
+    const label = (newStatus === 'DONE') ? 'Done Klaim' : (newStatus === 'PROCESS' ? 'Proses Klaim' : 'Belum Klaim');
+    if (!confirm(`Ubah status klaim ekspedisi [${invoice}] menjadi "${label}"?`)) return;
+
+    try {
+        const json = await updateClaimStatusRequest([invoice], newStatus);
+        showToast('success', json.message || `Status klaim [${invoice}] diubah menjadi ${label}`, 'Status Diperbarui');
+        const found = cachedClaimCandidates.find(c => c.invoice_number === invoice);
+        if (found) {
+            found.claim_status = newStatus;
+        }
+        applyClaimCandidatesFilter();
+    } catch (err) {
+        showToast('error', err.message, 'Gagal');
+    }
+};
+
+window.accountingReceiveClaim = async function (invoice) {
+    if (!invoice) return;
+    if (!confirm(`Terima berkas klaim [${invoice}] oleh Divisi Accounting?\nStatus akan berubah menjadi [Received].`)) return;
+    try {
+        const json = await updateClaimStatusRequest([invoice], 'RECEIVED');
+        showToast('success', `Paket [${invoice}] berhasil diterima oleh Accounting.`, 'Received Accounting');
+        const found = cachedClaimCandidates.find(c => c.invoice_number === invoice);
+        if (found) {
+            found.accounting_status = 'RECEIVED';
+            found.claim_status = 'RECEIVED';
+        }
+        applyClaimCandidatesFilter();
+    } catch (err) {
+        showToast('error', err.message, 'Gagal Receive');
+    }
+};
+
+window.accountingEditClaimModal = function (invoice) {
+    const c = cachedClaimCandidates.find(x => x.invoice_number === invoice);
+    if (!c) {
+        showToast('warning', 'Data paket tidak ditemukan.', 'Warning');
+        return;
+    }
+
+    const modal = document.getElementById('modalAccountingEdit');
+    const inputInv = document.getElementById('accEditInvoice');
+    const dispInv = document.getElementById('accEditInvoiceDisplay');
+    const dispExp = document.getElementById('accEditExpedition');
+    const dispPrice = document.getElementById('accEditPrice');
+    const selStatus = document.getElementById('accEditStatus');
+    const txtNotes = document.getElementById('accEditNotes');
+
+    if (!modal) return;
+
+    if (inputInv) inputInv.value = c.invoice_number;
+    if (dispInv) dispInv.value = c.invoice_number;
+    if (dispExp) dispExp.value = c.expedition || '-';
+    if (dispPrice) dispPrice.value = c.package_price_formatted || (c.package_price > 0 ? 'Rp ' + Number(c.package_price).toLocaleString('id-ID') : 'Rp 0');
+    if (selStatus) {
+        const curSt = (c.claim_status || c.accounting_status || 'RECEIVED').toUpperCase();
+        selStatus.value = (curSt === 'DONE' ? 'DONE' : 'RECEIVED');
+    }
+    if (txtNotes) txtNotes.value = c.accounting_notes || c.notes || '';
+
+    modal.classList.remove('hidden');
+};
+
+window.closeAccountingEditModal = function () {
+    const modal = document.getElementById('modalAccountingEdit');
+    if (modal) modal.classList.add('hidden');
+};
+
+window.submitAccountingEdit = async function (e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const invoice = document.getElementById('accEditInvoice')?.value?.trim();
+    const status = document.getElementById('accEditStatus')?.value?.trim() || 'RECEIVED';
+    const notes = document.getElementById('accEditNotes')?.value?.trim() || '';
+
+    if (!invoice) return;
+
+    const btn = document.getElementById('btnSubmitAccEdit');
+    if (btn) btn.disabled = true;
+
+    try {
+        const res = await fetch('api/claim_status.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                invoices: [invoice],
+                status: status,
+                notes: notes,
+                accounting_notes: notes
+            })
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) throw new Error(json.error || 'Gagal menyimpan status');
+
+        showToast('success', json.message || `Status klaim [${invoice}] berhasil diperbarui.`, 'Berhasil Disimpan');
+        
+        const found = cachedClaimCandidates.find(c => c.invoice_number === invoice);
+        if (found) {
+            found.claim_status = status;
+            found.accounting_status = status;
+            found.accounting_notes = notes;
+        }
+
+        closeAccountingEditModal();
+        applyClaimCandidatesFilter();
+    } catch (err) {
+        showToast('error', err.message, 'Gagal');
+    } finally {
+        if (btn) btn.disabled = false;
     }
 };
 
@@ -5361,7 +5740,7 @@ window.changeSingleClaimStatus = async function (invoice, selectEl) {
     const prev = c ? (c.claim_status || 'PENDING') : 'PENDING';
     if (newStatus === prev) return;
 
-    const labels = { PENDING: 'Belum Klaim (batalkan klaim)', PROCESS: 'Proses Klaim', DONE: 'Done Claim' };
+    const labels = { PENDING: 'Belum Klaim (batalkan klaim)', PROCESS: 'Proses Klaim', DONE: 'Done Klaim' };
     if (!confirm(`Ubah status klaim [${invoice}] menjadi "${labels[newStatus]}"?`)) {
         selectEl.value = prev;
         return;
@@ -5811,42 +6190,42 @@ window.updateSelectedClaimsBar = function () {
     const btnDone = document.getElementById('btnBulkClaimDone');
     const btnPrint = document.getElementById('btnPrintClaimInvoice');
 
-    if (claimExpeditionMode === 'jnt') {
-        // MODE JNT: Kirim ke Accounting & Tarik Approval
+    if (claimExpeditionMode === 'jnt_jne') {
+        // MODE JNT & JNE: Kirim Email & Assign ke Accounting
         if (btnSendAcc) {
             btnSendAcc.classList.remove('hidden');
             if (btnSendAccCount) btnSendAccCount.innerText = selectedClaimInvoices.size;
         }
-        if (btnPullAcc) btnPullAcc.classList.remove('hidden');
+        if (btnPullAcc) btnPullAcc.classList.add('hidden');
 
-        // Sembunyikan tombol klaim manual admin
+        // Sembunyikan tombol klaim manual ekspedisi lain
         if (btnClaim) btnClaim.classList.add('hidden');
         if (btnDone) btnDone.classList.add('hidden');
 
-        // Tombol Print Invoice muncul jika ada item terpilih yang sudah di-approve oleh Accounting
+        // Tombol Print Invoice muncul jika ada item terpilih yang sudah di-proses atau di-approve
         if (btnPrint) {
-            btnPrint.classList.toggle('hidden', approvedCount === 0);
+            btnPrint.classList.remove('hidden');
         }
     } else {
-        // MODE EKSPEDISI LAIN: Klaim Manual Admin
+        // MODE EKSPEDISI LAIN: Klaim Manual Ekspedisi (Bisa Done Klaim Langsung)
         if (btnSendAcc) btnSendAcc.classList.add('hidden');
         if (btnPullAcc) btnPullAcc.classList.add('hidden');
 
-        if (btnClaimCount) btnClaimCount.innerText = pendingCount;
-        if (btnClaim) btnClaim.classList.toggle('hidden', pendingCount === 0);
-        if (btnPrint) btnPrint.classList.toggle('hidden', pendingCount > 0);
-        if (btnDone) btnDone.classList.toggle('hidden', pendingCount > 0 || processCount === 0);
+        if (btnClaimCount) btnClaimCount.innerText = selectedClaimInvoices.size;
+        if (btnClaim) btnClaim.classList.remove('hidden');
+        if (btnDone) btnDone.classList.remove('hidden');
+        if (btnPrint) btnPrint.classList.remove('hidden');
     }
 };
 
 window.sendSelectedToAccounting = async function () {
     if (selectedClaimInvoices.size === 0) {
-        showToast('warning', 'Pilih minimal 1 paket klaim J&T terlebih dahulu.', 'Peringatan');
+        showToast('warning', 'Pilih minimal 1 paket klaim J&T / JNE terlebih dahulu.', 'Peringatan');
         return;
     }
 
     const invoices = Array.from(selectedClaimInvoices);
-    if (!confirm(`Kirim data tabel untuk ${invoices.length} klaim J&T ke Accounting via InfinityFree untuk di-approval?\n\nSesuai instruksi: Data yang dikirim hanya berupa DATA TABEL (Resi, Order ID OCS, Produk Rusak, Total Tagihan) TANPA FOTO.`)) {
+    if (!confirm(`Kirim email & assign ${invoices.length} paket klaim (J&T / JNE) ke Accounting?\n\nStatus paket akan langsung berubah menjadi [Done Email].`)) {
         return;
     }
 
@@ -5854,11 +6233,11 @@ window.sendSelectedToAccounting = async function () {
     const origHtml = btn ? btn.innerHTML : '';
     if (btn) {
         btn.disabled = true;
-        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Mengirim...`;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Mengirim Email...`;
     }
 
     try {
-        const res = await fetch('api/sync_jnt_claims.php?action=send_to_cloud', {
+        const res = await fetch('api/claim_email_accounting.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ invoices })
@@ -5866,16 +6245,27 @@ window.sendSelectedToAccounting = async function () {
         const data = await res.json();
 
         if (data.success) {
-            showToast('success', data.message || `${invoices.length} klaim J&T berhasil dikirim ke Accounting!`, 'Terkirim ke Accounting');
+            showToast('success', data.message || `${invoices.length} klaim berhasil di-email ke Accounting! Status: Done Email`, 'Terkirim ke Accounting');
             const invSet = new Set(invoices);
             cachedClaimCandidates.forEach(c => {
                 if (invSet.has(c.invoice_number)) {
-                    c.accounting_status = 'PENDING_APPROVAL';
+                    c.claim_status = 'DONE_EMAIL';
+                    c.accounting_status = 'DONE_EMAIL';
+                    c.email_accounting_at = new Date().toISOString().replace('T', ' ').substring(0, 19);
                 }
             });
+
+            if (data.mailto_url && !data.mail_sent) {
+                const openMail = confirm(`Catatan: Server lokal tidak memiliki direct SMTP sender.\nBuka aplikasi email (Outlook / Gmail) untuk mengirim salinan rekap klaim ke ${data.accounting_email || 'Accounting'}?`);
+                if (openMail) {
+                    window.location.href = data.mailto_url;
+                }
+            }
+
+            clearSelectedClaims();
             applyClaimCandidatesFilter();
         } else {
-            showToast('error', data.error || 'Gagal mengirim data klaim ke Accounting.', 'Gagal Kirim');
+            showToast('error', data.error || 'Gagal mengirim email klaim ke Accounting.', 'Gagal Kirim');
         }
     } catch (err) {
         showToast('error', 'Koneksi error: ' + err.message, 'Gagal');

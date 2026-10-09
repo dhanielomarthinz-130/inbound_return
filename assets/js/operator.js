@@ -2222,8 +2222,10 @@ function startVideoRecording() {
 
         let mime = '';
         const candidateTypes = [
-            'video/webm;codecs=vp8',
+            'video/webm;codecs=vp9,opus',
+            'video/webm;codecs=vp9',
             'video/webm;codecs=vp8,opus',
+            'video/webm;codecs=vp8',
             'video/webm',
             'video/mp4;codecs=avc1',
             'video/mp4'
@@ -2237,12 +2239,12 @@ function startVideoRecording() {
             }
         }
 
-        // Gunakan bitrate hemat 300 kbps agar video unboxing sangat ringan (<2MB) & upload cepat
+        // Gunakan bitrate HD 2.0 Mbps agar video unboxing jernih & barcode/produk terlihat jelas
         let rec = null;
         let options = {};
         if (mime) options.mimeType = mime;
         try {
-            options.videoBitsPerSecond = 300000;
+            options.videoBitsPerSecond = 2000000;
             rec = new MediaRecorder(mediaStream, options);
         } catch (recErr) {
             console.warn("MediaRecorder dengan options bitrate gagal, fallback:", recErr);
@@ -2706,17 +2708,17 @@ async function startCamera(deviceId = null) {
 
         let stream = null;
 
-        // Upaya 1: Coba dengan constraint ideal / deviceId
+        // Upaya 1: Coba dengan constraint ideal HD / deviceId
         try {
             const constraints = {
                 video: deviceId 
-                    ? { deviceId: { exact: deviceId } } 
-                    : { facingMode: { ideal: "environment" }, width: { ideal: 1280 } },
+                    ? { deviceId: { exact: deviceId }, width: { ideal: 1920, min: 1280 }, height: { ideal: 1080, min: 720 }, frameRate: { ideal: 30, min: 15 } } 
+                    : { facingMode: { ideal: "environment" }, width: { ideal: 1920, min: 1280 }, height: { ideal: 1080, min: 720 }, frameRate: { ideal: 30, min: 15 } },
                 audio: false
             };
             stream = await navigator.mediaDevices.getUserMedia(constraints);
         } catch (specErr) {
-            console.warn("Gagal constraint spesifik, fallback ke video standar:", specErr);
+            console.warn("Gagal constraint spesifik HD, fallback ke video standar:", specErr);
             // Upaya 2: Fallback ke parameter paling universal (didukung semua webcam USB)
             stream = await navigator.mediaDevices.getUserMedia({
                 video: deviceId ? { deviceId: deviceId } : true,

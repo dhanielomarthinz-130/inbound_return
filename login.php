@@ -6,7 +6,7 @@ $currentUser = getSessionUser();
 
 // Jika sudah login, langsung redirect sesuai role
 if ($currentUser) {
-    if ($currentUser['role'] === 'operator') {
+    if (in_array($currentUser['role'] ?? '', ['operator', 'operator_mobile'])) {
         header('Location: ' . getAppBaseUrl() . 'menu');
     } else {
         header('Location: ' . getAppBaseUrl() . 'admin');
@@ -16,7 +16,7 @@ if ($currentUser) {
 
 // Ambil daftar operator aktif untuk memudahkan operator memilih akun di station
 try {
-    $stmtOps = $pdo->query("SELECT id, username, name FROM users WHERE role = 'operator' AND status = 'ACTIVE' ORDER BY name ASC");
+    $stmtOps = $pdo->query("SELECT id, username, name FROM users WHERE role IN ('operator', 'operator_mobile') AND status = 'ACTIVE' ORDER BY name ASC");
     $operators = $stmtOps->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
     $operators = [];
@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if (!$user) {
                     $error = 'Akun Operator tidak ditemukan!';
-                } elseif ($user['role'] !== 'operator') {
+                } elseif (!in_array($user['role'], ['operator', 'operator_mobile'])) {
                     $error = 'Akun ini bukan role Operator. Silakan login melalui Tab Admin.';
                 } elseif ($user['status'] !== 'ACTIVE') {
                     $error = 'Akun Anda sedang dinonaktifkan. Hubungi Admin Gudang.';
@@ -101,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($user && (password_verify($password, $user['password']) || $password === $user['password'])) {
                     if ($user['status'] !== 'ACTIVE') {
                         $error = 'Akun Anda sedang dinonaktifkan. Hubungi Superadmin.';
-                    } elseif ($user['role'] === 'operator') {
+                    } elseif (in_array($user['role'], ['operator', 'operator_mobile'])) {
                         // Jika operator mencoba login di tab admin dengan password
                         $error = 'Akun ini adalah Operator Inbound. Silakan gunakan Tab Operator untuk masuk dengan PIN.';
                     } else {

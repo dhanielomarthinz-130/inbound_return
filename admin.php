@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/config.php';
 $currentUser = getSessionUser();
-$user = requireLogin(['admin', 'superadmin', 'management', 'accounting']);
+$user = requireLogin(['admin', 'superadmin', 'management', 'accounting', 'operator_reporting', 'customer_service']);
 
 // Normalisasi role pengguna agar toleran variasi string ('super admin', 'superadmin') dan superadmin mendapat FULL ACCESS
 $rawRole = strtolower(trim(str_replace([' ', '_', '-'], '', $user['role'] ?? '')));
@@ -9,6 +9,8 @@ $isSuperAdmin = ($rawRole === 'superadmin');
 $isAdmin = ($rawRole === 'admin' || $isSuperAdmin);
 $isManagement = ($rawRole === 'management' || $isSuperAdmin);
 $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
+$isReporting = ($rawRole === 'operatorreporting' || $rawRole === 'operator_reporting' || $isSuperAdmin || $isAdmin);
+$isCS = ($rawRole === 'customerservice' || $rawRole === 'customer_service' || $isSuperAdmin || $isAdmin);
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -26,6 +28,10 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
         window.CURRENT_USER_ROLE = <?= json_encode($rawRole) ?>;
         window.IS_SUPER_ADMIN = <?= $isSuperAdmin ? 'true' : 'false' ?>;
         window.IS_ADMIN = <?= $isAdmin ? 'true' : 'false' ?>;
+        window.IS_MANAGEMENT = <?= $isManagement ? 'true' : 'false' ?>;
+        window.IS_ACCOUNTING = <?= $isAccounting ? 'true' : 'false' ?>;
+        window.IS_REPORTING = <?= $isReporting ? 'true' : 'false' ?>;
+        window.IS_CS = <?= $isCS ? 'true' : 'false' ?>;
     </script>
     <!-- Favicon Huruf D Warna Hijau -->
     <link rel="icon" type="image/svg+xml" sizes="any" href="assets/image/favicon.svg?v=2">
@@ -259,29 +265,38 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
         <div class="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
             <div class="px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Menu Navigasi</div>
 
+            <?php if ($isAdmin || $isManagement || $isReporting): ?>
             <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition text-white bg-indigo-600 shadow-sm shadow-indigo-600/30">
                 <i class="fa-solid fa-gauge-high w-5 text-center text-indigo-100"></i>
                 <span>Dashboard Overview</span>
             </button>
+            <?php endif; ?>
 
             <!-- MENU: RECEIVING INBOUND (PENERIMAAN EKSPEDISI) -->
+            <?php if ($isAdmin): ?>
             <button onclick="switchTab('receiving')" id="nav-receiving" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-truck-ramp-box w-5 text-center text-emerald-600"></i>
                 <span>Receiving Inbound</span>
             </button>
+            <?php endif; ?>
 
+            <?php if ($isAdmin || $isCS): ?>
             <button onclick="switchTab('transactions')" id="nav-transactions" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-box-open w-5 text-center text-indigo-500"></i>
                 <span>Inbound Unboxing</span>
             </button>
+            <?php endif; ?>
 
             <!-- MENU: PUSAT KLAIM & BANDING (CLAIM DOSSIER) -->
+            <?php if ($isAdmin || $isAccounting || $isCS): ?>
             <button onclick="switchTab('claims')" id="nav-claims" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-shield-halved w-5 text-center text-amber-500"></i>
-                <span>Pusat Klaim & Banding</span>
+                <span>Pusat Klaim &amp; Banding</span>
             </button>
+            <?php endif; ?>
 
             <!-- MENU BARU: DATA ORDERS OCS (SINKRONISASI PESANAN) -->
+            <?php if ($isAdmin): ?>
             <button onclick="switchTab('orders')" id="nav-orders" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-cart-flatbed w-5 text-center text-blue-600"></i>
                 <span>Data Orders OCS</span>
@@ -306,6 +321,7 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
                 <i class="fa-solid fa-users-gear w-5 text-center text-slate-500"></i>
                 <span>Kelola Pengguna</span>
             </button>
+            <?php endif; ?>
 
             <?php if ($isSuperAdmin || $isAdmin): ?>
             <button onclick="switchTab('roles')" id="nav-roles" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
@@ -314,14 +330,11 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
             </button>
             <?php endif; ?>
 
-            <?php if ($isSuperAdmin || $isAdmin || $isManagement || $isAccounting): ?>
+            <?php if ($isSuperAdmin || $isAdmin || $isAccounting): ?>
             <button onclick="switchTab('bank-settings')" id="nav-bank-settings" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-building-columns w-5 text-center text-emerald-600"></i>
                 <span>Pengaturan Bank</span>
             </button>
-            <?php endif; ?>
-
-            <?php if ($isSuperAdmin || $isAdmin || $isManagement || $isAccounting): ?>
             <button onclick="switchTab('approval-jnt')" id="nav-approval-jnt" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-stamp w-5 text-center text-rose-600"></i>
                 <span>Approval Klaim J&amp;T</span>
@@ -413,21 +426,23 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
                         <button onclick="triggerCloudSyncNow(true)" title="Tarik data & foto transaksi terbaru dari InfinityFree secara manual (On-Demand)" class="bg-sky-600 hover:bg-sky-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-sm shadow-sky-600/30 shrink-0 cursor-pointer">
                             <i class="fa-solid fa-cloud-arrow-down text-xs"></i> Tarik Data Cloud
                         </button>
-                        <button onclick="exportDashboardExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 shrink-0">
+                        <button onclick="shareDashboardReport()" title="Bagikan ringkasan laporan produktivitas" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-sm shadow-indigo-600/20 shrink-0 cursor-pointer">
+                            <i class="fa-solid fa-share-nodes text-xs"></i> Share Report
+                        </button>
+                        <button onclick="exportDashboardExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 shrink-0 cursor-pointer">
                             <i class="fa-solid fa-file-excel text-xs"></i> Export Excel
                         </button>
                     </div>
                 </div>
 
-                <!-- KPI Cards Row -->
-                <!-- KPI Cards Row (5 Cards) -->
+                <!-- KPI Cards Row (5 Cards Sesuai Request) -->
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
-                    <!-- 1. Total Receiving Inbound -->
+                    <!-- 1. Total Paket yang Diterima -->
                     <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-xs border border-emerald-200/80 relative overflow-hidden group hover:shadow-md transition">
                         <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-emerald-50 opacity-60 group-hover:opacity-100 transition"></div>
                         <div class="relative">
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Receiving Inbound</span>
+                                <span class="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Total Paket Diterima</span>
                                 <span class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
                                     <i class="fa-solid fa-truck-ramp-box text-xs"></i>
                                 </span>
@@ -439,23 +454,53 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
                         </div>
                     </div>
 
-                    <!-- 2. Total Unboxing (Invoice) -->
+                    <!-- 2. Total Paket yang Missing (Belum di Unboxing) -->
+                    <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-xs border border-amber-200/90 relative overflow-hidden group hover:shadow-md transition">
+                        <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-amber-50 opacity-60 group-hover:opacity-100 transition"></div>
+                        <div class="relative">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Paket Missing</span>
+                                <span class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                                    <i class="fa-solid fa-clock-rotate-left text-xs"></i>
+                                </span>
+                            </div>
+                            <div class="text-2xl sm:text-3xl font-black text-amber-600 font-mono" id="kpiTotalMissingPackages">—</div>
+                            <div class="text-[10px] text-amber-600 mt-1">Belum unboxing di station</div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Total Paket yang Received (Sudah di Unboxing) -->
                     <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-xs border border-indigo-200/80 relative overflow-hidden group hover:shadow-md transition">
                         <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-indigo-50 opacity-60 group-hover:opacity-100 transition"></div>
                         <div class="relative">
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-[10px] font-bold text-indigo-800 uppercase tracking-wider">Total Unboxing</span>
+                                <span class="text-[10px] font-bold text-indigo-800 uppercase tracking-wider">Paket Received</span>
                                 <span class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
                                     <i class="fa-solid fa-box-open text-xs"></i>
                                 </span>
                             </div>
                             <div class="text-2xl sm:text-3xl font-black text-indigo-700 font-mono" id="kpiTotalInvoice">—</div>
-                            <div class="text-[10px] text-slate-400 mt-1">Sesi unboxing retur</div>
+                            <div class="text-[10px] text-slate-400 mt-1">Sudah selesai unboxing</div>
                         </div>
                     </div>
 
-                    <!-- 3. Total Unit Fisik (Qty) -->
-                    <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-xs border border-blue-200/80 relative overflow-hidden group hover:shadow-md transition">
+                    <!-- 4. Total Paket yang Reject (Kondisi Rusak / Defect) -->
+                    <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-xs border border-rose-200/80 relative overflow-hidden group hover:shadow-md transition">
+                        <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-rose-50 opacity-60 group-hover:opacity-100 transition"></div>
+                        <div class="relative">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-bold text-rose-600 uppercase tracking-wider">Paket Reject</span>
+                                <span class="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+                                    <i class="fa-solid fa-triangle-exclamation text-xs"></i>
+                                </span>
+                            </div>
+                            <div class="text-2xl sm:text-3xl font-black text-rose-600 font-mono" id="kpiTotalDamaged">—</div>
+                            <div class="text-[10px] text-rose-500 mt-1">Cacat / layak klaim</div>
+                        </div>
+                    </div>
+
+                    <!-- 5. Total Unit Fisik (Qty Barang Masuk) -->
+                    <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-xs border border-blue-200/80 relative overflow-hidden group hover:shadow-md transition col-span-2 md:col-span-1">
                         <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-blue-50 opacity-60 group-hover:opacity-100 transition"></div>
                         <div class="relative">
                             <div class="flex items-center justify-between mb-2">
@@ -465,50 +510,55 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
                                 </span>
                             </div>
                             <div class="text-2xl sm:text-3xl font-black text-blue-700 font-mono" id="kpiTotalItems">—</div>
-                            <div class="text-[10px] text-slate-400 mt-1">Total produk masuk</div>
-                        </div>
-                    </div>
-
-                    <!-- 4. Kondisi Baik -->
-                    <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-xs border border-emerald-100 relative overflow-hidden group hover:shadow-md transition">
-                        <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-emerald-50 opacity-60 group-hover:opacity-100 transition"></div>
-                        <div class="relative">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Kondisi Baik</span>
-                                <span class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                                    <i class="fa-solid fa-circle-check text-xs"></i>
-                                </span>
-                            </div>
-                            <div class="text-2xl sm:text-3xl font-black text-emerald-600 font-mono" id="kpiTotalGood">—</div>
-                            <div class="text-[10px] text-emerald-500 mt-1">Layak restock / jual</div>
-                        </div>
-                    </div>
-
-                    <!-- 5. Kondisi Rusak -->
-                    <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-xs border border-rose-200/80 relative overflow-hidden group hover:shadow-md transition col-span-2 md:col-span-1">
-                        <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-rose-50 opacity-60 group-hover:opacity-100 transition"></div>
-                        <div class="relative">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-[10px] font-bold text-rose-600 uppercase tracking-wider">Kondisi Rusak</span>
-                                <span class="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-                                    <i class="fa-solid fa-triangle-exclamation text-xs"></i>
-                                </span>
-                            </div>
-                            <div class="text-2xl sm:text-3xl font-black text-rose-600 font-mono" id="kpiTotalDamaged">—</div>
-                            <div class="text-[10px] text-rose-500 mt-1">Cacat / layak klaim</div>
+                            <div class="text-[10px] text-slate-400 mt-1">Total produk diperiksa</div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Middle Row: Charts (Ekspedisi + Rasio + Trend) -->
+                <!-- KPI Productivity Charts Section -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <!-- KPI Productivity 1: Trend Penerimaan Paket (Line Chart) -->
+                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 flex flex-col">
+                        <div class="flex items-center justify-between mb-3">
+                            <div>
+                                <h4 class="font-bold text-sm text-slate-800 flex items-center gap-2">
+                                    <i class="fa-solid fa-chart-line text-emerald-600 text-xs"></i> Trend Penerimaan Paket (Receiving)
+                                </h4>
+                                <p class="text-[11px] text-slate-400">KPI Productivity Serah Terima Paket Ekspedisi Fisik</p>
+                            </div>
+                            <span class="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">Line Chart</span>
+                        </div>
+                        <div class="flex-1 relative min-h-[230px]">
+                            <canvas id="trendReceivingChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- KPI Productivity 2: Trend Unboxing per Hari (Bar Chart) -->
+                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 flex flex-col">
+                        <div class="flex items-center justify-between mb-3">
+                            <div>
+                                <h4 class="font-bold text-sm text-slate-800 flex items-center gap-2">
+                                    <i class="fa-solid fa-chart-simple text-indigo-600 text-xs"></i> Trend Unboxing per Hari
+                                </h4>
+                                <p class="text-[11px] text-slate-400">KPI Productivity Paket Selesai Di-unboxing per Hari</p>
+                            </div>
+                            <span class="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full font-bold">Bar Chart</span>
+                        </div>
+                        <div class="flex-1 relative min-h-[230px]">
+                            <canvas id="trendUnboxingChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Middle Row: Breakdown Ekspedisi & Donut Rasio Kondisi -->
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
                     <!-- Chart 1: Total Paket per Ekspedisi -->
-                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 lg:col-span-5 flex flex-col">
+                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 lg:col-span-7 flex flex-col">
                         <div class="flex items-center justify-between mb-3">
                             <h4 class="font-bold text-sm text-slate-800 flex items-center gap-2">
                                 <i class="fa-solid fa-truck-fast text-blue-600 text-xs"></i> Total Paket per Ekspedisi
                             </h4>
-                            <span class="text-[10px] text-slate-400 font-mono">Receiving & Unboxing</span>
+                            <span class="text-[10px] text-slate-400 font-mono">Receiving &amp; Unboxing</span>
                         </div>
                         <div class="flex-1 relative min-h-[220px]">
                             <canvas id="expeditionChart"></canvas>
@@ -516,7 +566,7 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
                     </div>
 
                     <!-- Chart 2: Donut Rasio Kondisi -->
-                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 lg:col-span-3 flex flex-col">
+                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 lg:col-span-5 flex flex-col">
                         <div class="flex items-center justify-between mb-3">
                             <h4 class="font-bold text-sm text-slate-800 flex items-center gap-2">
                                 <i class="fa-solid fa-chart-pie text-emerald-500 text-xs"></i> Rasio Kondisi
@@ -525,19 +575,6 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
                         </div>
                         <div class="flex-1 relative min-h-[220px]">
                             <canvas id="ratioChart"></canvas>
-                        </div>
-                    </div>
-
-                    <!-- Chart 3: Trend 7 Hari Terakhir -->
-                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 lg:col-span-4 flex flex-col">
-                        <div class="flex items-center justify-between mb-3">
-                            <h4 class="font-bold text-sm text-slate-800 flex items-center gap-2">
-                                <i class="fa-solid fa-chart-area text-indigo-500 text-xs"></i> Trend Volume 7 Hari
-                            </h4>
-                            <span class="text-[10px] text-slate-400 font-mono">Daily Inflow</span>
-                        </div>
-                        <div class="flex-1 relative min-h-[220px]">
-                            <canvas id="trendChart"></canvas>
                         </div>
                     </div>
                 </div>
@@ -899,16 +936,16 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
                         </div>
                     </div>
 
-                    <!-- TAB PEMISAH: KLAIM J&T (APPROVAL ACCOUNTING) VS EKSPEDISI LAIN (KLAIM MANUAL) -->
+                    <!-- TAB PEMISAH: KLAIM J&T & JNE (ASSIGN KE ACCOUNTING) VS EKSPEDISI LAIN (KLAIM MANUAL) -->
                     <div class="px-4 pt-2.5 bg-slate-100 border-b border-slate-200 flex items-center gap-2 overflow-x-auto">
-                        <button type="button" onclick="setClaimExpeditionMode('jnt')" id="btnClaimModeJnt" class="px-4 py-2 rounded-t-xl font-bold text-xs transition border-t-2 border-rose-500 bg-white text-rose-700 shadow-2xs flex items-center gap-1.5 cursor-pointer">
-                            <i class="fa-solid fa-stamp text-rose-600"></i>
-                            <span>Klaim Ekspedisi J&amp;T (Approval Accounting via Web)</span>
+                        <button type="button" onclick="setClaimExpeditionMode('jnt_jne')" id="btnClaimModeJnt" class="px-4 py-2 rounded-t-xl font-bold text-xs transition border-t-2 border-rose-500 bg-white text-rose-700 shadow-2xs flex items-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-envelope text-rose-600"></i>
+                            <span>Klaim Ekspedisi J&amp;T &amp; JNE (Assign ke Accounting)</span>
                             <span id="badgeJntPendingApproval" class="ml-1 px-1.5 py-0.2 rounded-full text-[9px] bg-rose-100 text-rose-800 font-extrabold hidden">0</span>
                         </button>
                         <button type="button" onclick="setClaimExpeditionMode('other')" id="btnClaimModeOther" class="px-4 py-2 rounded-t-xl font-bold text-xs transition text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 flex items-center gap-1.5 cursor-pointer">
                             <i class="fa-solid fa-truck-fast text-slate-500"></i>
-                            <span>Klaim Ekspedisi Lain (Klaim Manual Admin)</span>
+                            <span>Klaim Ekspedisi Lain (Klaim Manual Ekspedisi)</span>
                         </button>
                     </div>
 
@@ -934,8 +971,10 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
                                 class="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-amber-500 focus:outline-none transition shadow-2xs cursor-pointer">
                                 <option value="">Semua Status</option>
                                 <option value="PENDING">Belum Klaim</option>
+                                <option value="DONE_EMAIL">Done Email (Accounting)</option>
+                                <option value="RECEIVED">Received (Accounting)</option>
                                 <option value="PROCESS">Proses Klaim</option>
-                                <option value="DONE">Done Claim</option>
+                                <option value="DONE">Done Klaim</option>
                             </select>
 
                             <!-- Filter Tanggal Unboxing (Flatpickr Rentang) -->
@@ -958,8 +997,12 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
                             </button>
                         </div>
 
-                        <!-- Rekap Total Finansial Realtime Mengikuti Filter -->
+                        <!-- Rekap Total Finansial Realtime Mengikuti Filter Termasuk Average Aging -->
                         <div class="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-between xl:justify-end text-xs">
+                            <div class="flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl shadow-2xs">
+                                <span class="text-[11px] text-amber-700 font-medium"><i class="fa-solid fa-clock-rotate-left text-amber-600 mr-1"></i>Avg Aging:</span>
+                                <b id="avgClaimAging" class="text-amber-800 font-mono font-black">0 Hari</b>
+                            </div>
                             <div class="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs">
                                 <span class="text-[11px] text-slate-500">Terfilter:</span>
                                 <b id="countClaimFiltered" class="text-indigo-600 font-bold">0</b>
@@ -987,19 +1030,21 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
                                             <span class="text-[9px] text-slate-400 font-mono">ALL</span>
                                         </div>
                                     </th>
-                                    <th class="py-3 px-3">No. Resi / Invoice & Ekspedisi</th>
-                                    <th class="py-3 px-3">Nama Produk & SKU</th>
+                                    <th class="py-3 px-3">No. Resi / Invoice &amp; Ekspedisi</th>
+                                    <th class="py-3 px-3 text-center">Age Paket (FIFO)</th>
+                                    <th class="py-3 px-3">Nama Produk &amp; SKU</th>
                                     <th class="py-3 px-3 text-center">Qty Rusak</th>
                                     <th class="py-3 px-3">Kondisi / Alasan Rusak</th>
                                     <th class="py-3 px-3 text-right">Biaya Paket</th>
                                     <th class="py-3 px-3">Waktu Unboxing</th>
+                                    <th class="py-3 px-3 text-center">Status / Accounting</th>
                                     <th class="py-3 px-3 text-center">Video Unbox</th>
                                     <th class="py-3 px-3 text-center">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody id="claimCandidatesTableBody" class="divide-y divide-slate-100">
                                 <tr>
-                                    <td colspan="9" class="text-center py-10 text-slate-400">
+                                    <td colspan="11" class="text-center py-10 text-slate-400">
                                         <i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat daftar paket rusak...
                                     </td>
                                 </tr>
@@ -1030,27 +1075,21 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
                                 Batal
                             </button>
 
-                            <!-- KHUSUS MODE JNT: KIRIM KE ACCOUNTING (DATA TABLE ONLY TANPA FOTO) -->
-                            <button type="button" id="btnSendToAccounting" onclick="sendSelectedToAccounting()" class="hidden px-4 py-2 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 active:scale-95 text-white font-bold rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-lg shadow-rose-600/30 cursor-pointer" title="Kirim data tabel klaim J&T ke Accounting di InfinityFree untuk di-approval (Tanpa Foto)">
-                                <i class="fa-solid fa-cloud-arrow-up"></i>
-                                <span>Kirim ke Accounting (<span id="btnSendAccountingCount">0</span>)</span>
-                            </button>
-
-                            <!-- KHUSUS MODE JNT: TARIK STATUS APPROVAL DARI CLOUD -->
-                            <button type="button" id="btnPullAccounting" onclick="pullAccountingApproval()" class="hidden px-3.5 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-amber-400 hover:text-amber-300 rounded-xl text-xs font-bold transition border border-amber-500/40 flex items-center gap-1.5 cursor-pointer" title="Tarik status approval dari web InfinityFree">
-                                <i class="fa-solid fa-arrows-rotate"></i>
-                                <span>Tarik Approval Cloud</span>
+                            <!-- KHUSUS MODE JNT & JNE: EMAIL & ASSIGN KE ACCOUNTING -->
+                            <button type="button" id="btnSendToAccounting" onclick="sendSelectedToAccounting()" class="hidden px-4 py-2 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 active:scale-95 text-white font-bold rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-lg shadow-rose-600/30 cursor-pointer" title="Assign dan kirim email rekap klaim terpilih langsung ke Accounting">
+                                <i class="fa-solid fa-envelope-circle-check"></i>
+                                <span>Kirim Email ke Accounting (<span id="btnSendAccountingCount">0</span>)</span>
                             </button>
 
                             <!-- KHUSUS MODE EKSPEDISI LAIN: KLAIM MANUAL -->
                             <button type="button" id="btnBulkClaimProcess" onclick="processSelectedClaims()" class="hidden px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 active:scale-95 text-slate-950 font-black rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-lg shadow-amber-500/30 cursor-pointer" title="Ubah status paket terpilih menjadi Proses Klaim">
                                 <i class="fa-solid fa-shield-halved"></i>
-                                <span>Klaim (<span id="btnBulkClaimCount">0</span>)</span>
+                                <span>Proses Klaim (<span id="btnBulkClaimCount">0</span>)</span>
                             </button>
-                            <!-- Opsional: tandai Done Claim secara manual -->
-                            <button type="button" id="btnBulkClaimDone" onclick="markSelectedClaimsDone()" class="hidden px-3 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-emerald-400 hover:text-emerald-300 rounded-xl text-xs font-bold transition border border-emerald-500/40 flex items-center gap-1.5 cursor-pointer" title="Tandai paket terpilih sebagai Done Claim">
+                            <!-- Tandai Done Klaim secara manual per ekspedisi -->
+                            <button type="button" id="btnBulkClaimDone" onclick="markSelectedClaimsDone()" class="hidden px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/30 cursor-pointer" title="Tandai paket terpilih sebagai Done Klaim sesuai ekspedisi">
                                 <i class="fa-solid fa-circle-check"></i>
-                                <span>Done Claim</span>
+                                <span>Done Klaim Ekspedisi</span>
                             </button>
                             <!-- Step 2: Print Invoice (muncul setelah di-approve atau diklaim) -->
                             <button type="button" id="btnPrintClaimInvoice" onclick="printCollectiveClaimInvoice()" class="hidden px-4 py-2 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-700 active:scale-95 text-white font-black rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-lg shadow-emerald-600/30 cursor-pointer">
@@ -3436,6 +3475,63 @@ $isAccounting = ($rawRole === 'accounting' || $isSuperAdmin);
                     <button type="submit" id="btnSaveEditReceiving" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-amber-600/30 transition flex items-center space-x-1.5 cursor-pointer">
                         <i class="fa-solid fa-floppy-disk"></i>
                         <span>Simpan Perubahan</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL EDIT DATA & STATUS KLAIM ACCOUNTING -->
+    <div id="modalAccountingEdit" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden transform transition-all">
+            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold shadow-2xs">
+                        <i class="fa-solid fa-file-signature"></i>
+                    </span>
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-sm">Proses &amp; Edit Data Klaim</h3>
+                        <p class="text-[10px] text-slate-400">Verifikasi status &amp; catatan divisi Accounting</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeAccountingEditModal()" class="text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+            <form id="formAccountingEdit" onsubmit="submitAccountingEdit(event)" class="p-5 space-y-3.5 text-xs">
+                <input type="hidden" id="accEditInvoice">
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">No. Resi / Invoice</label>
+                    <input type="text" id="accEditInvoiceDisplay" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl font-mono font-bold text-slate-700 text-xs">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Ekspedisi</label>
+                        <input type="text" id="accEditExpedition" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-700 text-xs">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Nilai Tagihan</label>
+                        <input type="text" id="accEditPrice" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl font-mono font-bold text-emerald-700 text-xs">
+                    </div>
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Status Accounting <span class="text-rose-500">*</span></label>
+                    <select id="accEditStatus" required class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-bold text-slate-800 text-xs focus:ring-2 focus:ring-indigo-500">
+                        <option value="RECEIVED">RECEIVED (Paket Diterima Accounting)</option>
+                        <option value="DONE">DONE (Done Klaim / Selesai Klaim)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Catatan / No. Bukti Pengajuan Ekspedisi</label>
+                    <textarea id="accEditNotes" rows="3" placeholder="Masukkan nomor referensi klaim, tiket ekspedisi, atau catatan approval..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-800 text-xs focus:ring-2 focus:ring-indigo-500"></textarea>
+                </div>
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" onclick="closeAccountingEditModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition">
+                        Batal
+                    </button>
+                    <button type="submit" id="btnSubmitAccEdit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-md shadow-indigo-600/30 transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>Simpan Status</span>
                     </button>
                 </div>
             </form>

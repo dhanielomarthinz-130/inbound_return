@@ -41,7 +41,16 @@ if ($query === '' || $action === 'list_claimable') {
         $sqlDamaged = "
             SELECT rs.id, rs.invoice_number, rs.expedition, rs.operator_name, rs.status, rs.claim_status,
                    rs.accounting_status, rs.accounting_approved_by, rs.accounting_approved_at, rs.accounting_esign, rs.accounting_notes,
+                   rs.email_accounting_at, rs.email_accounting_by, rs.accounting_received_at, rs.accounting_received_by,
                    rs.total_items, rs.total_good, rs.total_damaged, rs.notes, rs.video_path, rs.created_at,
+                   rp.scanned_at AS receiving_at,
+                   CASE 
+                       WHEN rp.scanned_at IS NOT NULL AND rs.created_at IS NOT NULL 
+                           THEN GREATEST(0, DATEDIFF(rs.created_at, rp.scanned_at))
+                       WHEN rp.scanned_at IS NOT NULL AND rs.created_at IS NULL 
+                           THEN GREATEST(0, DATEDIFF(NOW(), rp.scanned_at))
+                       ELSE 0 
+                   END AS aging_days,
                    COUNT(ri.id) as item_count,
                    SUM(CASE WHEN (ri.condition != 'GOOD' AND ri.condition != 'BAGUS' AND ri.condition IS NOT NULL AND ri.condition != '') 
                               OR (ri.type != 'GOOD' AND ri.type != 'BAGUS' AND ri.type IS NOT NULL AND ri.type != '') 
@@ -73,12 +82,19 @@ if ($query === '' || $action === 'list_claimable') {
                    NULL as ocs_seller_sku,
                    0 as has_packing_video
             FROM return_sessions rs
+            LEFT JOIN (
+                SELECT package_barcode, MIN(scanned_at) as scanned_at 
+                FROM reception_packages 
+                GROUP BY package_barcode
+            ) rp ON rp.package_barcode = rs.invoice_number
             LEFT JOIN return_items ri ON ri.session_id = rs.id
             GROUP BY rs.id, rs.invoice_number, rs.expedition, rs.operator_name, rs.status, rs.claim_status,
                      rs.accounting_status, rs.accounting_approved_by, rs.accounting_approved_at, rs.accounting_esign, rs.accounting_notes,
-                     rs.total_items, rs.total_good, rs.total_damaged, rs.notes, rs.video_path, rs.created_at
+                     rs.email_accounting_at, rs.email_accounting_by, rs.accounting_received_at, rs.accounting_received_by,
+                     rs.total_items, rs.total_good, rs.total_damaged, rs.notes, rs.video_path, rs.created_at,
+                     rp.scanned_at
             HAVING rs.total_damaged > 0 OR damaged_items_count > 0
-            ORDER BY rs.id DESC
+            ORDER BY COALESCE(rp.scanned_at, rs.created_at) ASC, rs.id ASC
             LIMIT 500
         ";
 
@@ -259,13 +275,17 @@ if ($query === '' || $action === 'list_claimable') {
 
             // Status klaim (default PENDING = Belum Klaim)
             $cs = strtoupper(trim($c['claim_status'] ?? ''));
-            $c['claim_status'] = in_array($cs, ['PENDING', 'PROCESS', 'DONE'], true) ? $cs : 'PENDING';
+            $c['claim_status'] = in_array($cs, ['PENDING', 'PROCESS', 'DONE_EMAIL', 'RECEIVED', 'DONE'], true) ? $cs : 'PENDING';
+            $c['aging_days'] = (int)($c['aging_days'] ?? 0);
         }
+
+        $avgAging = count($candidates) > 0 ? round(array_sum(array_column($candidates, 'aging_days')) / count($candidates), 1) : 0;
 
         echo json_encode([
             'success'    => true,
             'action'     => 'list_claimable',
             'total'      => count($candidates),
+            'avg_aging'  => $avgAging,
             'candidates' => $candidates
         ]);
         exit;

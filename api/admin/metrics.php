@@ -245,7 +245,45 @@ try {
         return $b['total_processed'] <=> $a['total_processed'];
     });
 
-    // ── 5. Trend 7 hari terakhir (Gunakan Index created_at) ────────────────
+    // Missing packages: paket di reception_packages yang belum pernah di-unboxing di return_sessions
+    $sqlMissing = "
+        SELECT COUNT(DISTINCT rp.package_barcode)
+        FROM reception_packages rp
+        LEFT JOIN return_sessions rs ON rs.invoice_number = rp.package_barcode
+        WHERE rs.id IS NULL
+    ";
+    $missingCount = 0;
+    try {
+        $missingCount = (int)$pdo->query($sqlMissing)->fetchColumn();
+    } catch (Exception $eMis) {}
+
+    // ── 5. Trend 7 hari terakhir (KPI Productivity) ────────────────
+    // a. Trend Penerimaan Paket (Line Chart)
+    $sqlTrendRec = "
+        SELECT DATE(rp.scanned_at) as tgl, COUNT(DISTINCT rp.package_barcode) as total_packages
+        FROM reception_packages rp
+        WHERE rp.scanned_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+        GROUP BY DATE(rp.scanned_at)
+        ORDER BY tgl ASC
+    ";
+    $trendRec = [];
+    try {
+        $trendRec = $pdo->query($sqlTrendRec)->fetchAll();
+    } catch (Exception $eTrRec) {}
+
+    // b. Trend Unboxing Paket per Hari (Bar Chart)
+    $sqlTrendUnbox = "
+        SELECT DATE(s.created_at) as tgl, COUNT(DISTINCT s.id) as total_packages, COALESCE(SUM(s.total_items), 0) as total_qty
+        FROM return_sessions s
+        WHERE s.created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+        GROUP BY DATE(s.created_at)
+        ORDER BY tgl ASC
+    ";
+    $trendUnbox = [];
+    try {
+        $trendUnbox = $pdo->query($sqlTrendUnbox)->fetchAll();
+    } catch (Exception $eTrUnb) {}
+
     $sqlTrend = "
         SELECT
             DATE(s.created_at) AS tgl,
@@ -260,6 +298,7 @@ try {
 
     $response = [
         'total_received_packages' => (int)($recKpi['total_received_packages'] ?? 0),
+        'total_missing_packages'  => $missingCount,
         'total_receptions'        => (int)($recKpi['total_receptions'] ?? 0),
         'total_invoices'          => (int)($metrics['total_invoices'] ?? 0),
         'total_items'             => (int)($metrics['total_items'] ?? 0),
@@ -269,6 +308,8 @@ try {
         'by_condition'            => $byCondition,
         'pic_stats'               => $picStats,
         'trend_7days'             => $trend,
+        'trend_receiving'         => $trendRec,
+        'trend_unboxing'          => $trendUnbox,
         'cached_at'               => date('Y-m-d H:i:s')
     ];
 

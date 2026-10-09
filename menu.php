@@ -2,8 +2,8 @@
 // menu.php - Launcher Portal Operator Bergaya Aplikasi Mobile Android (Material You Light Theme & Google Symbols)
 require_once __DIR__ . '/config.php';
 
-// Pastikan hanya operator, admin, atau superadmin yang sudah login dapat mengakses
-$user = requireLogin(['operator', 'admin', 'superadmin']);
+// Pastikan hanya operator, operator_mobile, admin, atau superadmin yang sudah login dapat mengakses
+$user = requireLogin(['operator', 'operator_mobile', 'admin', 'superadmin']);
 
 // Ambil Statistik Hari Ini untuk Widget
 $todayDate = date('Y-m-d');

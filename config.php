@@ -590,7 +590,8 @@ function requireLogin($allowedRoles = []) {
             if ($isApi) {
                 jsonResponse(['error' => 'Akses ditolak: role Anda (' . $user['role'] . ') tidak memiliki izin.'], 403);
             } else {
-                $redirect = ($rawRole === 'operator') ? 'menu' : 'admin';
+                $isOpMobile = in_array($rawRole, ['operator', 'operatormobile', 'operatormenumobile'], true);
+                $redirect = $isOpMobile ? 'menu' : 'admin';
                 echo "<script>alert('Akses Ditolak: Halaman ini hanya untuk role " . implode('/', $allowedRoles) . "'); window.location.href = '{$redirect}';</script>";
                 exit;
             }
@@ -635,7 +636,10 @@ function ensureClaimStatusColumn($pdo = null) {
         // 1. Kolom Klaim & Approval di return_sessions
         $cols = $pdo->query("SHOW COLUMNS FROM return_sessions")->fetchAll(PDO::FETCH_COLUMN);
         if (!in_array('claim_status', $cols)) {
-            $pdo->exec("ALTER TABLE return_sessions ADD COLUMN claim_status VARCHAR(20) NOT NULL DEFAULT 'PENDING' AFTER status");
+            $pdo->exec("ALTER TABLE return_sessions ADD COLUMN claim_status VARCHAR(30) NOT NULL DEFAULT 'PENDING' AFTER status");
+        } else {
+            // Perbesar ukuran varchar agar menampung 'DONE_EMAIL'
+            try { $pdo->exec("ALTER TABLE return_sessions MODIFY COLUMN claim_status VARCHAR(30) NOT NULL DEFAULT 'PENDING'"); } catch (Exception $eM) {}
         }
         if (!in_array('claim_updated_at', $cols)) {
             $pdo->exec("ALTER TABLE return_sessions ADD COLUMN claim_updated_at DATETIME NULL AFTER claim_status");
@@ -643,8 +647,20 @@ function ensureClaimStatusColumn($pdo = null) {
         if (!in_array('accounting_status', $cols)) {
             $pdo->exec("ALTER TABLE return_sessions ADD COLUMN accounting_status VARCHAR(30) NOT NULL DEFAULT 'NONE' AFTER claim_status");
         }
+        if (!in_array('email_accounting_at', $cols)) {
+            $pdo->exec("ALTER TABLE return_sessions ADD COLUMN email_accounting_at DATETIME NULL AFTER accounting_status");
+        }
+        if (!in_array('email_accounting_by', $cols)) {
+            $pdo->exec("ALTER TABLE return_sessions ADD COLUMN email_accounting_by VARCHAR(100) NULL AFTER email_accounting_at");
+        }
+        if (!in_array('accounting_received_at', $cols)) {
+            $pdo->exec("ALTER TABLE return_sessions ADD COLUMN accounting_received_at DATETIME NULL AFTER email_accounting_by");
+        }
+        if (!in_array('accounting_received_by', $cols)) {
+            $pdo->exec("ALTER TABLE return_sessions ADD COLUMN accounting_received_by VARCHAR(100) NULL AFTER accounting_received_at");
+        }
         if (!in_array('accounting_approved_by', $cols)) {
-            $pdo->exec("ALTER TABLE return_sessions ADD COLUMN accounting_approved_by VARCHAR(100) NULL AFTER accounting_status");
+            $pdo->exec("ALTER TABLE return_sessions ADD COLUMN accounting_approved_by VARCHAR(100) NULL AFTER accounting_received_by");
         }
         if (!in_array('accounting_approved_at', $cols)) {
             $pdo->exec("ALTER TABLE return_sessions ADD COLUMN accounting_approved_at DATETIME NULL AFTER accounting_approved_by");
@@ -659,7 +675,7 @@ function ensureClaimStatusColumn($pdo = null) {
             $pdo->exec("ALTER TABLE return_sessions ADD COLUMN accounting_synced_at DATETIME NULL AFTER accounting_esign");
         }
 
-        // 2. Pastikan tabel roles ada dan berisi role default
+        // 2. Pastikan tabel roles ada dan berisi 7 role resmi sistem
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS `roles` (
                 `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -674,19 +690,25 @@ function ensureClaimStatusColumn($pdo = null) {
         ");
 
         $defaultRoles = [
-            ['superadmin', 'Super Admin', 'Akses penuh ke seluruh menu dan pengaturan sistem', 1],
-            ['admin', 'Admin Retrun', 'Akses dashboard, receiving, scan unboxing, dan klaim manual ekspedisi', 1],
-            ['operator', 'Operator Inbound', 'Akses station scanner & input unboxing', 1],
-            ['management', 'Management', 'Akses dashboard monitoring, approval, dan pengaturan bank', 1],
-            ['accounting', 'Accounting', 'Akses approval klaim ekspedisi JNT, pengaturan bank, dan cetak invoice tagihan', 1]
+            ['superadmin',         'Super Admin',           'Akses penuh ke seluruh menu dan pengaturan sistem', 1],
+            ['admin',              'Admin',                 'Akses dashboard, serah terima receiving, unboxing, dan klaim', 1],
+            ['accounting',         'Accounting',            'View data paket yang sudah di-email, receive/edit data, dan Done Klaim', 1],
+            ['operator_reporting', 'Operator Reporting',    'Download & share report productivity dashboard', 1],
+            ['operator_mobile',    'Operator Menu Mobile',  'Akses menu mobile: Serah Terima (Receiving) & Unboxing Scanner', 1],
+            ['customer_service',   'Customer Service',      'Lacak resi, cek status unboxing, dan berkas klaim dossier', 1],
+            ['management',         'Management',            'View dashboard monitoring analitik & KPI', 1],
+            ['operator',           'Operator Inbound',      'Akses stasiun unboxing scanner & input barang retur', 1]
         ];
 
         $stmtCheckRole = $pdo->prepare("SELECT id FROM roles WHERE role_key = ?");
         $stmtInsertRole = $pdo->prepare("INSERT INTO roles (role_key, role_name, description, is_system) VALUES (?, ?, ?, ?)");
+        $stmtUpdateRole = $pdo->prepare("UPDATE roles SET role_name = ?, description = ? WHERE role_key = ? AND is_system = 1");
         foreach ($defaultRoles as $r) {
             $stmtCheckRole->execute([$r[0]]);
             if (!$stmtCheckRole->fetch()) {
                 $stmtInsertRole->execute([$r[0], $r[1], $r[2], $r[3]]);
+            } else {
+                $stmtUpdateRole->execute([$r[1], $r[2], $r[0]]);
             }
         }
 
