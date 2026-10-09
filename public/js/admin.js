@@ -8483,30 +8483,97 @@ function renderAgingReturnTable(packages, summary) {
         const recOp = pkg.receiving_operator || '-';
         const unboxOp = pkg.unboxing_operator || (isBelum ? '<span class="text-slate-400 italic">Belum ada</span>' : '-');
 
-        // Media badges
+        // Media badges (Kurir, Paket, Video)
         let mediaHtml = '<div class="flex items-center justify-center gap-1.5">';
         if (pkg.has_video) {
-            mediaHtml += `<span class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs" title="Video Unboxing Tersedia"><i class="fa-solid fa-video"></i></span>`;
+            mediaHtml += `<span class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs shadow-2xs" title="Video Unboxing Tersedia"><i class="fa-solid fa-video"></i></span>`;
         } else {
             mediaHtml += `<span class="w-6 h-6 rounded-lg bg-slate-100 text-slate-300 flex items-center justify-center text-xs" title="Tidak ada video"><i class="fa-solid fa-video-slash"></i></span>`;
         }
-        if (pkg.has_photo) {
-            mediaHtml += `<span class="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs" title="Foto Tersedia"><i class="fa-solid fa-image"></i></span>`;
-        } else {
-            mediaHtml += `<span class="w-6 h-6 rounded-lg bg-slate-100 text-slate-300 flex items-center justify-center text-xs" title="Tidak ada foto"><i class="fa-regular fa-image"></i></span>`;
+        if (pkg.has_courier_photo) {
+            mediaHtml += `<span class="w-6 h-6 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center text-xs shadow-2xs" title="Foto Kurir Ekspedisi Tersedia"><i class="fa-solid fa-id-badge"></i></span>`;
+        }
+        if (pkg.has_package_photo) {
+            const pCount = (pkg.package_photos && pkg.package_photos.length) ? pkg.package_photos.length : 1;
+            mediaHtml += `<span class="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs shadow-2xs" title="Foto Fisik Paket Tersedia (${pCount} foto)"><i class="fa-solid fa-box"></i></span>`;
+        } else if (!pkg.has_courier_photo) {
+            mediaHtml += `<span class="w-6 h-6 rounded-lg bg-slate-100 text-slate-300 flex items-center justify-center text-xs" title="Tidak ada foto tersimpan"><i class="fa-regular fa-image"></i></span>`;
         }
         mediaHtml += '</div>';
 
         const safeBarcode = escapeHtml(pkg.barcode || '');
+        const safeOrderId = escapeHtml(pkg.order_id || '');
+        const safePlatform = escapeHtml(pkg.commerce_platform || '');
+
+        // Format Tampilan No. Resi & No. Order Dalam 1 Kolom
+        let resiAndOrderHtml = '';
+        if (safeOrderId && safeOrderId !== safeBarcode) {
+            // Terdapat No Resi DAN No Order
+            resiAndOrderHtml = `
+                <div class="space-y-1">
+                    <div>
+                        <button type="button" onclick="openAgingDetail('${safeBarcode}')" class="font-mono font-bold text-teal-700 hover:text-teal-900 hover:underline text-left block text-xs cursor-pointer" title="Klik untuk membuka detail paket & foto">
+                            ${safeBarcode}
+                        </button>
+                    </div>
+                    <div class="flex items-center flex-wrap gap-1 text-[11px] font-mono pt-0.5 border-t border-slate-100">
+                        <span class="text-slate-400 font-medium flex items-center gap-1">
+                            <i class="fa-solid fa-receipt text-indigo-500 text-[10px]"></i> Order:
+                        </span>
+                        <button type="button" onclick="openAgingDetail('${safeBarcode}')" class="font-bold text-indigo-600 hover:text-indigo-800 hover:underline select-all cursor-pointer" title="Nomor Pesanan OCS">
+                            ${safeOrderId}
+                        </button>
+                        ${safePlatform ? `
+                            <span class="px-1.5 py-0.2 rounded text-[9px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200">
+                                ${safePlatform}
+                            </span>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        } else if (safeOrderId && safeOrderId === safeBarcode && pkg.tracking_number) {
+            // Barcode yang discan adalah No Order, dan No Resi tersimpan terpisah
+            resiAndOrderHtml = `
+                <div class="space-y-1">
+                    <div>
+                        <button type="button" onclick="openAgingDetail('${safeBarcode}')" class="font-mono font-bold text-teal-700 hover:text-teal-900 hover:underline text-left block text-xs cursor-pointer" title="Klik untuk membuka detail paket & foto">
+                            ${escapeHtml(pkg.tracking_number)}
+                        </button>
+                    </div>
+                    <div class="flex items-center flex-wrap gap-1 text-[11px] font-mono pt-0.5 border-t border-slate-100">
+                        <span class="text-slate-400 font-medium flex items-center gap-1">
+                            <i class="fa-solid fa-receipt text-indigo-500 text-[10px]"></i> Order:
+                        </span>
+                        <span class="font-bold text-indigo-600 select-all">${safeOrderId}</span>
+                        ${safePlatform ? `
+                            <span class="px-1.5 py-0.2 rounded text-[9px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200">
+                                ${safePlatform}
+                            </span>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        } else {
+            // Hanya ada No Resi, belum sinkron No Order
+            resiAndOrderHtml = `
+                <div class="space-y-1">
+                    <button type="button" onclick="openAgingDetail('${safeBarcode}')" class="font-mono font-bold text-teal-700 hover:text-teal-900 hover:underline text-left block text-xs cursor-pointer" title="Klik untuk membuka detail paket & foto">
+                        ${safeBarcode}
+                    </button>
+                    ${pkg.invoice_number && pkg.invoice_number !== pkg.barcode ? `
+                        <span class="text-[10px] text-slate-400 font-mono block">Inv: ${escapeHtml(pkg.invoice_number)}</span>
+                    ` : `
+                        <span class="text-[10px] text-slate-400 font-mono block italic">Order: Belum sinkron</span>
+                    `}
+                </div>
+            `;
+        }
 
         html += `
             <tr class="hover:bg-teal-50/40 transition">
                 <td class="py-3 px-3.5 text-center text-slate-400 font-mono text-[11px]">${index + 1}</td>
-                <td class="py-3 px-4">
-                    <button type="button" onclick="openAgingDetail('${safeBarcode}')" class="font-mono font-bold text-teal-700 hover:text-teal-900 hover:underline text-left block text-xs cursor-pointer" title="Klik untuk melihat detail paket & riwayat lead time">
-                        ${safeBarcode}
-                    </button>
-                    ${pkg.invoice_number && pkg.invoice_number !== pkg.barcode ? `<span class="text-[10px] text-slate-400 font-mono block">Inv: ${escapeHtml(pkg.invoice_number)}</span>` : ''}
+                <td class="py-3 px-4 min-w-[210px]">
+                    ${resiAndOrderHtml}
                 </td>
                 <td class="py-3 px-4">
                     <span class="font-bold text-slate-800 block">${escapeHtml(pkg.expedition || 'Lainnya')}</span>
@@ -8558,7 +8625,7 @@ async function openAgingDetail(barcode) {
     modal.classList.remove('hidden');
 
     // Cari paket di currentAgingPackages
-    const pkg = currentAgingPackages.find(p => p.barcode === barcode || p.invoice_number === barcode) || {
+    const pkg = currentAgingPackages.find(p => p.barcode === barcode || p.invoice_number === barcode || p.order_id === barcode) || {
         barcode: barcode,
         expedition: '-',
         status_paket: 'BELUM_UNBOXING',
@@ -8575,7 +8642,13 @@ async function openAgingDetail(barcode) {
     const statusBadge = document.getElementById('mAgingStatusBadge');
     const subtitleEl = document.getElementById('mAgingSubtitle');
 
-    if (titleEl) titleEl.innerText = `Paket Inbound #${barcode}`;
+    if (titleEl) {
+        if (pkg.order_id) {
+            titleEl.innerHTML = `Paket #${escapeHtml(barcode)} <span class="text-slate-400 font-normal">| Order: <strong class="text-indigo-400 font-mono">${escapeHtml(pkg.order_id)}</strong></span>`;
+        } else {
+            titleEl.innerText = `Paket Inbound #${barcode}`;
+        }
+    }
     if (subtitleEl) subtitleEl.innerText = `Ekspedisi: ${pkg.expedition || '-'} • Kurir: ${pkg.courier_name || '-'}`;
 
     if (statusBadge) {
@@ -8660,8 +8733,11 @@ async function openAgingDetail(barcode) {
     if (photoView) {
         if (pkg.receiving_photo) {
             photoView.innerHTML = `
-                <a href="${escapeHtml(pkg.receiving_photo)}" target="_blank" title="Klik untuk perbesar foto serah terima" class="block w-full h-full">
-                    <img src="${escapeHtml(pkg.receiving_photo)}" alt="Foto Receiving" class="w-full h-44 object-cover hover:opacity-90 transition">
+                <a href="${escapeHtml(pkg.receiving_photo)}" target="_blank" title="Klik untuk perbesar foto serah terima" class="block w-full h-full relative group">
+                    <img src="${escapeHtml(pkg.receiving_photo)}" alt="Foto Receiving" class="w-full h-44 object-cover group-hover:opacity-90 transition">
+                    <div class="absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-bold gap-1">
+                        <i class="fa-solid fa-up-right-and-down-left-from-center"></i> Perbesar
+                    </div>
                 </a>
             `;
         } else {
@@ -8770,37 +8846,180 @@ async function openAgingDetail(barcode) {
         }
     }
 
-    // Async: Ambil data pelengkap OCS Marketplace jika tersedia
+    // SECTION KHUSUS: DOKUMENTASI VISUAL (FOTO KURIR & FOTO PAKET)
+    // 1. Render Foto Kurir Pengantar
+    const courView = document.getElementById('mAgingCourierPhotoView');
+    const courBadge = document.getElementById('mAgingCourierPhotoBadge');
+    const courNameCap = document.getElementById('mAgingCourierCaptionName');
+    const courRcptCap = document.getElementById('mAgingCourierCaptionReceipt');
+
+    if (courNameCap) courNameCap.innerText = pkg.courier_name || '-';
+    if (courRcptCap) courRcptCap.innerText = pkg.receipt_number ? `SJ #${pkg.receipt_number}` : '-';
+
+    if (courView) {
+        if (pkg.courier_photo) {
+            courView.innerHTML = `
+                <a href="${escapeHtml(pkg.courier_photo)}" target="_blank" title="Klik untuk memperbesar foto kurir" class="block w-full h-full relative group cursor-pointer">
+                    <img src="${escapeHtml(pkg.courier_photo)}" alt="Foto Kurir" class="w-full h-48 object-cover group-hover:scale-102 transition duration-300">
+                    <div class="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-bold gap-1.5">
+                        <i class="fa-solid fa-expand"></i>
+                        <span>Lihat Ukuran Penuh</span>
+                    </div>
+                </a>
+            `;
+            if (courBadge) {
+                courBadge.className = 'text-[9px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200';
+                courBadge.innerText = 'Foto Kurir Tersedia';
+            }
+        } else {
+            courView.innerHTML = `
+                <div class="text-center py-8 text-slate-400 space-y-1">
+                    <i class="fa-solid fa-user-slash text-2xl block mb-1 text-slate-500"></i>
+                    <span class="text-xs">Tidak ada foto kurir tersimpan</span>
+                </div>
+            `;
+            if (courBadge) {
+                courBadge.className = 'text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500';
+                courBadge.innerText = 'Tidak Ada Foto';
+            }
+        }
+    }
+
+    // 2. Render Foto Fisik Paket & Unboxing
+    const pkgView = document.getElementById('mAgingPackagePhotoView');
+    const pkgBadge = document.getElementById('mAgingPackagePhotoBadge');
+    const thumbsContainer = document.getElementById('mAgingPackagePhotoThumbnails');
+
+    const packagePhotos = pkg.package_photos || [];
+    if (pkgView) {
+        if (packagePhotos.length > 0) {
+            const firstPhoto = packagePhotos[0];
+            pkgView.innerHTML = `
+                <a id="mAgingMainPackagePhotoLink" href="${escapeHtml(firstPhoto.url)}" target="_blank" title="${escapeHtml(firstPhoto.title || 'Foto Paket')}" class="block w-full h-full relative group cursor-pointer">
+                    <img id="mAgingMainPackagePhotoImg" src="${escapeHtml(firstPhoto.url)}" alt="${escapeHtml(firstPhoto.title || 'Foto Paket')}" class="w-full h-48 object-cover group-hover:scale-102 transition duration-300">
+                    <div class="absolute bottom-2 left-2 bg-slate-950/80 backdrop-blur-xs text-white px-2.5 py-1 rounded-lg text-[10px] font-semibold flex items-center gap-1.5 border border-white/10 shadow-xs">
+                        <i class="fa-solid fa-camera text-emerald-400"></i>
+                        <span id="mAgingMainPackagePhotoTag">${escapeHtml(firstPhoto.tag || firstPhoto.title || 'Foto Paket')}</span>
+                    </div>
+                    <div class="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-bold gap-1.5">
+                        <i class="fa-solid fa-expand"></i>
+                        <span>Lihat Ukuran Penuh</span>
+                    </div>
+                </a>
+            `;
+            if (pkgBadge) {
+                pkgBadge.className = 'text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200';
+                pkgBadge.innerText = `${packagePhotos.length} Foto Tersedia`;
+            }
+
+            // Thumbnail navigation jika foto paket > 1
+            if (thumbsContainer) {
+                if (packagePhotos.length > 1) {
+                    thumbsContainer.innerHTML = packagePhotos.map((photo, pIdx) => `
+                        <button type="button" onclick="selectAgingMainPackagePhoto('${escapeHtml(photo.url)}', '${escapeHtml(photo.tag || photo.title)}', this)" class="aging-pkg-thumb shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 ${pIdx === 0 ? 'border-emerald-500 ring-2 ring-emerald-500/30' : 'border-slate-200 opacity-70 hover:opacity-100'} transition cursor-pointer" title="${escapeHtml(photo.title)}">
+                            <img src="${escapeHtml(photo.url)}" alt="${escapeHtml(photo.title)}" class="w-full h-full object-cover">
+                        </button>
+                    `).join('');
+                    thumbsContainer.classList.remove('hidden');
+                } else {
+                    thumbsContainer.innerHTML = '';
+                    thumbsContainer.classList.add('hidden');
+                }
+            }
+        } else {
+            pkgView.innerHTML = `
+                <div class="text-center py-8 text-slate-400 space-y-1">
+                    <i class="fa-solid fa-box-open text-2xl block mb-1 text-slate-500"></i>
+                    <span class="text-xs">Tidak ada foto paket tersimpan</span>
+                </div>
+            `;
+            if (pkgBadge) {
+                pkgBadge.className = 'text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500';
+                pkgBadge.innerText = 'Tidak Ada Foto';
+            }
+            if (thumbsContainer) {
+                thumbsContainer.innerHTML = '';
+                thumbsContainer.classList.add('hidden');
+            }
+        }
+    }
+
+    // Badges ringkasan media
+    const summaryBadgeEl = document.getElementById('mAgingMediaBadgesSummary');
+    if (summaryBadgeEl) {
+        let bHtml = '';
+        if (pkg.has_courier_photo) {
+            bHtml += `<span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-100 text-purple-700 border border-purple-200"><i class="fa-solid fa-id-badge mr-1"></i>Foto Kurir</span>`;
+        }
+        if (packagePhotos.length > 0) {
+            bHtml += `<span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200"><i class="fa-solid fa-box mr-1"></i>${packagePhotos.length} Foto Paket</span>`;
+        }
+        if (pkg.has_video) {
+            bHtml += `<span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-100 text-indigo-700 border border-indigo-200"><i class="fa-solid fa-video mr-1"></i>Video Unboxing</span>`;
+        }
+        summaryBadgeEl.innerHTML = bHtml;
+    }
+
+    // Pre-populate Data Order OCS jika sudah ada dari API list
     const ocsSec = document.getElementById('mAgingOcsSection');
+    const elOcsId = document.getElementById('mAgingOcsOrderId');
+    const elOcsShop = document.getElementById('mAgingOcsShop');
+    const elOcsPlat = document.getElementById('mAgingOcsPlatform');
+    const elOcsPrice = document.getElementById('mAgingOcsPrice');
+    const elOcsCust = document.getElementById('mAgingOcsCustomer');
+
+    if (pkg.order_id) {
+        if (elOcsId) elOcsId.innerText = pkg.order_id;
+        if (elOcsShop) elOcsShop.innerText = pkg.shop_name || '-';
+        if (elOcsPlat) elOcsPlat.innerText = pkg.commerce_platform || 'Marketplace';
+        if (elOcsPrice) elOcsPrice.innerText = pkg.package_price > 0 ? 'Rp ' + Number(pkg.package_price).toLocaleString('id-ID') : 'Rp -';
+        if (elOcsCust) elOcsCust.innerText = pkg.customer_name || '-';
+        if (ocsSec) ocsSec.classList.remove('hidden');
+    }
+
+    // Async: Ambil data pelengkap OCS Marketplace jika tersedia (packing video, order detail lengkap)
     try {
         const ocsRes = await fetch(`api/ocs_lookup.php?q=${encodeURIComponent(barcode)}`);
         const ocsData = await ocsRes.json();
         if (ocsData && ocsData.success && ocsData.order) {
             const ord = ocsData.order;
-            const elOcsId = document.getElementById('mAgingOcsOrderId');
-            const elOcsShop = document.getElementById('mAgingOcsShop');
-            const elOcsPlat = document.getElementById('mAgingOcsPlatform');
-            const elOcsPrice = document.getElementById('mAgingOcsPrice');
-            const elOcsCust = document.getElementById('mAgingOcsCustomer');
-
-            if (elOcsId) elOcsId.innerText = ord.Id || barcode;
-            if (elOcsShop) elOcsShop.innerText = ord.ShopName || '-';
-            if (elOcsPlat) elOcsPlat.innerText = ord.CommercePlatform || 'Marketplace';
+            if (elOcsId) elOcsId.innerText = ord.Id || pkg.order_id || barcode;
+            if (elOcsShop) elOcsShop.innerText = ord.ShopName || pkg.shop_name || '-';
+            if (elOcsPlat) elOcsPlat.innerText = ord.CommercePlatform || pkg.commerce_platform || 'Marketplace';
             if (elOcsPrice) elOcsPrice.innerText = ord.PackagePriceFormatted || (ord.PackagePrice > 0 ? 'Rp ' + Number(ord.PackagePrice).toLocaleString('id-ID') : 'Rp -');
-            if (elOcsCust) elOcsCust.innerText = (ord.Customer && ord.Customer.Name) ? ord.Customer.Name : '-';
+            if (elOcsCust) elOcsCust.innerText = (ord.Customer && ord.Customer.Name) ? ord.Customer.Name : (pkg.customer_name || '-');
 
             if (ocsSec) ocsSec.classList.remove('hidden');
 
             if (btnClaim && ocsData.is_claimable) {
                 btnClaim.classList.remove('hidden');
             }
-        } else {
+        } else if (!pkg.order_id) {
             if (ocsSec) ocsSec.classList.add('hidden');
         }
     } catch (e) {
-        if (ocsSec) ocsSec.classList.add('hidden');
+        if (!pkg.order_id && ocsSec) ocsSec.classList.add('hidden');
     }
 }
+
+// Handler pemilihan thumbnail foto paket utama di modal detail
+window.selectAgingMainPackagePhoto = function(url, tag, btnEl) {
+    const img = document.getElementById('mAgingMainPackagePhotoImg');
+    const link = document.getElementById('mAgingMainPackagePhotoLink');
+    const tagEl = document.getElementById('mAgingMainPackagePhotoTag');
+    if (img) img.src = url;
+    if (link) link.href = url;
+    if (tagEl) tagEl.innerText = tag || 'Foto Paket';
+
+    document.querySelectorAll('.aging-pkg-thumb').forEach(btn => {
+        btn.classList.remove('border-emerald-500', 'ring-2', 'ring-emerald-500/30');
+        btn.classList.add('border-slate-200', 'opacity-70');
+    });
+    if (btnEl) {
+        btnEl.classList.remove('border-slate-200', 'opacity-70');
+        btnEl.classList.add('border-emerald-500', 'ring-2', 'ring-emerald-500/30');
+    }
+};
 
 function closeAgingDetailModal() {
     const modal = document.getElementById('modalAgingDetail');
@@ -8846,22 +9065,25 @@ function exportAgingReturnExcel() {
         return {
             'No': idx + 1,
             'No. Resi / AWB': pkg.barcode || '',
+            'No. Order (OCS)': pkg.order_id || '-',
+            'Platform Marketplace': pkg.commerce_platform || '-',
+            'Toko / Shop': pkg.shop_name || '-',
             'No. Invoice': pkg.invoice_number || '',
             'Ekspedisi': pkg.expedition || '',
-            'Nama Kurir': pkg.courier_name || '',
-            'No. Surat Jalan': pkg.receipt_number || '',
-            'No. Karung / Sack': pkg.receiving_sack || '',
-            'Waktu Receiving Inbound': pkg.receiving_at || '',
-            'Petugas Receiving': pkg.receiving_operator || '',
-            'Waktu Inbound Unboxing': pkg.unboxing_at || (isBelum ? 'BELUM UNBOXING' : ''),
-            'Operator Unboxing': pkg.unboxing_operator || '',
+            'Nama Kurir': pkg.courier_name || '-',
+            'Ada Foto Kurir': pkg.has_courier_photo ? 'YA' : 'TIDAK',
+            'Ada Foto Paket': pkg.has_package_photo ? 'YA' : 'TIDAK',
+            'No. Surat Jalan': pkg.receipt_number || '-',
+            'Tgl Receiving': pkg.receiving_at || '-',
+            'Petugas Receiving': pkg.receiving_operator || '-',
+            'Tgl Unboxing': pkg.unboxing_at || '-',
+            'Petugas Unboxing': pkg.unboxing_operator || '-',
             'Status Paket': isBelum ? 'Belum di Unboxing' : 'Sudah di Unboxing',
-            'Aging Lead Time (Hari)': pkg.aging_days,
-            'Kategori Aging': isCrit ? 'Kritis (> 14 Hari)' : 'Aman (≤ 14 Hari)',
-            'Status Kondisi': pkg.unboxing_status || '',
-            'Total Items': pkg.total_items || 0,
-            'Total Rusak': pkg.total_damaged || 0,
-            'Catatan Unboxing': pkg.unboxing_notes || '',
+            'Lead Time (Aging Hari)': pkg.aging_days,
+            'Kategori Aging': isCrit ? 'Kritis (>14 Hari)' : 'Aman (<=14 Hari)',
+            'Total Item': pkg.total_items,
+            'Total Rusak': pkg.total_damaged,
+            'Video Unboxing': pkg.has_video ? 'Ada' : 'Tidak Ada',
             'Link Video Unboxing': pkg.unboxing_video ? window.location.origin + '/' + pkg.unboxing_video : ''
         };
     });

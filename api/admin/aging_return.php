@@ -37,10 +37,11 @@ try {
             COALESCE(NULLIF(rs.expedition, ''), NULLIF(er.expedition, ''), 'Lainnya') AS expedition,
             er.receipt_number,
             er.courier_name,
+            er.courier_photo,
             er.operator_name AS receiving_operator,
             rp.scanned_at AS receiving_at,
             rp.sack_number AS receiving_sack,
-            rp.photo_path AS receiving_photo,
+            COALESCE(NULLIF(rp.photo_path, ''), er.photo_path) AS receiving_photo,
             rs.id AS session_id,
             rs.invoice_number,
             rs.operator_name AS unboxing_operator,
@@ -49,6 +50,9 @@ try {
             COALESCE(rs.total_items, 0) AS total_items,
             COALESCE(rs.total_damaged, 0) AS total_damaged,
             rs.video_path AS unboxing_video,
+            rs.package_photo AS unboxing_package_photo,
+            rs.product_photo AS unboxing_product_photo,
+            rs.photos AS unboxing_photos,
             rs.notes AS unboxing_notes,
             CASE 
                 WHEN rs.id IS NOT NULL THEN 'SUDAH_UNBOXING'
@@ -84,6 +88,7 @@ try {
             COALESCE(NULLIF(rs.expedition, ''), 'Lainnya') AS expedition,
             NULL AS receipt_number,
             NULL AS courier_name,
+            NULL AS courier_photo,
             NULL AS receiving_operator,
             NULL AS receiving_at,
             NULL AS receiving_sack,
@@ -96,6 +101,9 @@ try {
             COALESCE(rs.total_items, 0) AS total_items,
             COALESCE(rs.total_damaged, 0) AS total_damaged,
             rs.video_path AS unboxing_video,
+            rs.package_photo AS unboxing_package_photo,
+            rs.product_photo AS unboxing_product_photo,
+            rs.photos AS unboxing_photos,
             rs.notes AS unboxing_notes,
             'SUDAH_UNBOXING' AS status_paket,
             0 AS aging_days
@@ -109,15 +117,52 @@ try {
     $params = [];
 
     if (!empty($search)) {
-        $whereConditions[] = "(
-            barcode LIKE :search1 
-            OR invoice_number LIKE :search2 
-            OR receipt_number LIKE :search3 
-            OR courier_name LIKE :search4 
-            OR receiving_operator LIKE :search5 
-            OR unboxing_operator LIKE :search6 
-            OR expedition LIKE :search7
-        )";
+        // Cek apakah kata kunci cocok dengan nomor order di ocs_orders
+        $matchingResis = [];
+        try {
+            $stmtSrchOcs = $pdo->prepare("
+                SELECT tracking_number, order_id 
+                FROM ocs_orders 
+                WHERE order_id LIKE :s OR tracking_number LIKE :s 
+                LIMIT 50
+            ");
+            $stmtSrchOcs->execute([':s' => '%' . $search . '%']);
+            while ($rOcs = $stmtSrchOcs->fetch(PDO::FETCH_ASSOC)) {
+                if (!empty($rOcs['tracking_number'])) $matchingResis[] = $rOcs['tracking_number'];
+                if (!empty($rOcs['order_id'])) $matchingResis[] = $rOcs['order_id'];
+            }
+        } catch (Exception $e) {}
+
+        if (!empty($matchingResis)) {
+            $matchingResis = array_unique($matchingResis);
+            $inPlaceholders = [];
+            foreach ($matchingResis as $idx => $mResi) {
+                $pName = ":mResi{$idx}";
+                $inPlaceholders[] = $pName;
+                $params[$pName] = $mResi;
+            }
+            $whereConditions[] = "(
+                barcode LIKE :search1 
+                OR invoice_number LIKE :search2 
+                OR receipt_number LIKE :search3 
+                OR courier_name LIKE :search4 
+                OR receiving_operator LIKE :search5 
+                OR unboxing_operator LIKE :search6 
+                OR expedition LIKE :search7
+                OR barcode IN (" . implode(',', $inPlaceholders) . ")
+                OR invoice_number IN (" . implode(',', $inPlaceholders) . ")
+            )";
+        } else {
+            $whereConditions[] = "(
+                barcode LIKE :search1 
+                OR invoice_number LIKE :search2 
+                OR receipt_number LIKE :search3 
+                OR courier_name LIKE :search4 
+                OR receiving_operator LIKE :search5 
+                OR unboxing_operator LIKE :search6 
+                OR expedition LIKE :search7
+            )";
+        }
         $sTerm = '%' . $search . '%';
         for ($i = 1; $i <= 7; $i++) {
             $params[":search{$i}"] = $sTerm;
@@ -203,14 +248,105 @@ try {
     $stmtData->execute($params);
     $packages = $stmtData->fetchAll(PDO::FETCH_ASSOC);
 
-    // Format fields
+    // 4. Batch lookup ocs_orders untuk Order ID & Data Penjualan (Sangat Cepat & Efisien)
+    $barcodes = [];
+    foreach ($packages as $p) {
+        if (!empty($p['barcode'])) $barcodes[$p['barcode']] = true;
+        if (!empty($p['invoice_number'])) $barcodes[$p['invoice_number']] = true;
+    }
+    $barcodeList = array_keys($barcodes);
+    $ocsMap = [];
+    if (!empty($barcodeList)) {
+        try {
+            $placeholders = implode(',', array_fill(0, count($barcodeList), '?'));
+            $stmtOcs = $pdo->prepare("
+                SELECT order_id, tracking_number, commerce_platform, shop_name, customer_name, total_amount, package_price
+                FROM ocs_orders
+                WHERE tracking_number IN ($placeholders) OR order_id IN ($placeholders)
+            ");
+            $stmtOcs->execute(array_merge($barcodeList, $barcodeList));
+            while ($row = $stmtOcs->fetch(PDO::FETCH_ASSOC)) {
+                if (!empty($row['tracking_number'])) $ocsMap[$row['tracking_number']] = $row;
+                if (!empty($row['order_id'])) $ocsMap[$row['order_id']] = $row;
+            }
+        } catch (Exception $e) {}
+    }
+
+    // Format fields & Media Foto Kurir / Foto Paket
     foreach ($packages as &$pkg) {
         $pkg['aging_days'] = (int)($pkg['aging_days'] ?? 0);
         $pkg['is_critical_aging'] = ($pkg['aging_days'] > 14);
         $pkg['total_items'] = (int)($pkg['total_items'] ?? 0);
         $pkg['total_damaged'] = (int)($pkg['total_damaged'] ?? 0);
+
+        // Pasangkan data Order dari OCS
+        $matchedOcs = $ocsMap[$pkg['barcode']] ?? ($ocsMap[$pkg['invoice_number']] ?? null);
+        if ($matchedOcs) {
+            $pkg['order_id'] = $matchedOcs['order_id'] ?? null;
+            $pkg['commerce_platform'] = $matchedOcs['commerce_platform'] ?? null;
+            $pkg['shop_name'] = $matchedOcs['shop_name'] ?? null;
+            $pkg['customer_name'] = $matchedOcs['customer_name'] ?? null;
+            $pkg['package_price'] = (float)($matchedOcs['package_price'] ?? ($matchedOcs['total_amount'] ?? 0));
+        } else {
+            $pkg['order_id'] = null;
+            $pkg['commerce_platform'] = null;
+            $pkg['shop_name'] = null;
+            $pkg['customer_name'] = null;
+            $pkg['package_price'] = 0;
+        }
+
+        // Kumpulkan Daftar Foto Paket
+        $pkgPhotos = [];
+        if (!empty($pkg['receiving_photo'])) {
+            $pkgPhotos[] = [
+                'type'   => 'receiving',
+                'title'  => 'Foto Paket Saat Receiving',
+                'url'    => $pkg['receiving_photo'],
+                'tag'    => 'Receiving Inbound'
+            ];
+        }
+        if (!empty($pkg['unboxing_package_photo'])) {
+            $pkgPhotos[] = [
+                'type'   => 'unboxing_pkg',
+                'title'  => 'Foto Paket Sebelum Unboxing',
+                'url'    => $pkg['unboxing_package_photo'],
+                'tag'    => 'Meja Unboxing'
+            ];
+        }
+        if (!empty($pkg['unboxing_product_photo'])) {
+            $pkgPhotos[] = [
+                'type'   => 'product',
+                'title'  => 'Foto Produk / Kerusakan',
+                'url'    => $pkg['unboxing_product_photo'],
+                'tag'    => 'Fisik Produk'
+            ];
+        }
+        if (!empty($pkg['unboxing_photos'])) {
+            $dec = json_decode($pkg['unboxing_photos'], true);
+            if (is_array($dec)) {
+                foreach ($dec as $pItem) {
+                    if (is_array($pItem) && !empty($pItem['path'])) {
+                        $already = false;
+                        foreach ($pkgPhotos as $ex) {
+                            if ($ex['url'] === $pItem['path']) { $already = true; break; }
+                        }
+                        if (!$already) {
+                            $pkgPhotos[] = [
+                                'type'  => $pItem['type'] ?? 'unboxing',
+                                'title' => $pItem['title'] ?? 'Foto Unboxing Tambahan',
+                                'url'   => $pItem['path'],
+                                'tag'   => 'Unboxing'
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+        $pkg['package_photos'] = $pkgPhotos;
+        $pkg['has_courier_photo'] = !empty($pkg['courier_photo']);
+        $pkg['has_package_photo'] = !empty($pkgPhotos);
         $pkg['has_video'] = !empty($pkg['unboxing_video']);
-        $pkg['has_photo'] = !empty($pkg['receiving_photo']) || !empty($pkg['unboxing_photo']);
+        $pkg['has_photo'] = $pkg['has_package_photo'] || $pkg['has_courier_photo'];
     }
     unset($pkg);
 

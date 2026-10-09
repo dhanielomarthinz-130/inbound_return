@@ -1100,7 +1100,7 @@ $currentUserAllowedMenus = $isSuperAdmin ? array_keys(getSystemMenus()) : ($user
                             <thead>
                                 <tr class="bg-slate-100/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
                                     <th class="py-3 px-3.5 text-center w-12">No</th>
-                                    <th class="py-3 px-4">No. Resi / AWB</th>
+                                    <th class="py-3 px-4">No. Resi / No. Order</th>
                                     <th class="py-3 px-4">Ekspedisi & Kurir</th>
                                     <th class="py-3 px-4">Tgl Receiving</th>
                                     <th class="py-3 px-4">Tgl Unboxing</th>
@@ -3990,6 +3990,68 @@ $currentUserAllowedMenus = $isSuperAdmin ? array_keys(getSystemMenus()) : ($user
                         <!-- Konten Dinamis: Jika Belum vs Jika Sudah Unboxing -->
                         <div id="mAgingUnboxContent" class="space-y-3">
                             <!-- Diisi via JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section Khusus: Dokumentasi Visual (Foto Kurir & Foto Paket) -->
+                <div class="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                        <div class="flex items-center gap-2">
+                            <span class="w-7 h-7 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center text-xs border border-teal-200">
+                                <i class="fa-solid fa-camera"></i>
+                            </span>
+                            <div>
+                                <h4 class="font-bold text-slate-800 text-xs">Dokumentasi Visual &amp; Bukti Media</h4>
+                                <p class="text-[10px] text-slate-400">Foto serah terima kurir dan foto fisik paket return</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5" id="mAgingMediaBadgesSummary">
+                            <!-- Injected badges -->
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Card 1: Foto Kurir Ekspedisi -->
+                        <div class="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200 space-y-2.5">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-slate-700 flex items-center gap-1.5 text-xs">
+                                    <i class="fa-solid fa-id-badge text-purple-600"></i> Foto Kurir Pengantar
+                                </span>
+                                <span id="mAgingCourierPhotoBadge" class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
+                                    Tidak Ada Foto
+                                </span>
+                            </div>
+
+                            <div id="mAgingCourierPhotoView" class="rounded-xl overflow-hidden border border-slate-200 bg-slate-900 min-h-[140px] max-h-52 flex items-center justify-center">
+                                <span class="text-slate-400 text-xs py-8">Tidak ada foto kurir tersimpan</span>
+                            </div>
+
+                            <div class="text-[11px] text-slate-600 flex items-center justify-between pt-1 border-t border-slate-200">
+                                <span>Kurir: <strong id="mAgingCourierCaptionName" class="text-slate-800">-</strong></span>
+                                <span id="mAgingCourierCaptionReceipt" class="font-mono text-[10px] text-slate-500">-</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 2: Foto Fisik Paket & Unboxing -->
+                        <div class="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200 space-y-2.5">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-slate-700 flex items-center gap-1.5 text-xs">
+                                    <i class="fa-solid fa-box-open text-emerald-600"></i> Foto Fisik Paket
+                                </span>
+                                <span id="mAgingPackagePhotoBadge" class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
+                                    0 Foto Tersedia
+                                </span>
+                            </div>
+
+                            <div id="mAgingPackagePhotoView" class="rounded-xl overflow-hidden border border-slate-200 bg-slate-900 min-h-[140px] max-h-52 flex items-center justify-center">
+                                <span class="text-slate-400 text-xs py-8">Tidak ada foto paket tersimpan</span>
+                            </div>
+
+                            <!-- Thumbnails / Multi-photos if more than 1 -->
+                            <div id="mAgingPackagePhotoThumbnails" class="flex items-center gap-1.5 overflow-x-auto py-1">
+                                <!-- Thumbnails injected via JS -->
+                            </div>
                         </div>
                     </div>
                 </div>
