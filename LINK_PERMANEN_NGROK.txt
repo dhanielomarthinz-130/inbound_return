@@ -3,16 +3,16 @@
 ================================================================================
 
 Link Login Utama (Buka di browser Laptop / HP kantor / luar):
-https://music-saloon-viscosity.ngrok-free.dev/inbound_return/login
+https://unmoving-faculty-bok.ngrok-free.dev/inbound_return/login
 
 Link Dashboard Admin:
-https://music-saloon-viscosity.ngrok-free.dev/inbound_return/admin
+https://unmoving-faculty-bok.ngrok-free.dev/inbound_return/admin
 
 Link Operator Unboxing:
-https://music-saloon-viscosity.ngrok-free.dev/inbound_return/operator
+https://unmoving-faculty-bok.ngrok-free.dev/inbound_return/operator
 
 Link Penerimaan Ekspedisi (Receiving):
-https://music-saloon-viscosity.ngrok-free.dev/inbound_return/reception
+https://unmoving-faculty-bok.ngrok-free.dev/inbound_return/reception
 
 --------------------------------------------------------------------------------
 PETUNJUK PENGGUNAAN:

@@ -1,6 +1,22 @@
 Options -MultiViews
 RewriteEngine On
 
+# 0. Redirect domain hosting InfinityFree ke Ngrok tunnel server lokal
+RewriteCond %{HTTP_HOST} ^(www\.)?returninboundieg\.great-site\.net [NC,OR]
+RewriteCond %{HTTP_HOST} great-site\.net$ [NC]
+RewriteCond %{REQUEST_URI} !^/api/ [NC]
+RewriteRule ^$ https://unmoving-faculty-bok.ngrok-free.dev/inbound_return/login [R=302,L,NE]
+
+RewriteCond %{HTTP_HOST} ^(www\.)?returninboundieg\.great-site\.net [NC,OR]
+RewriteCond %{HTTP_HOST} great-site\.net$ [NC]
+RewriteCond %{REQUEST_URI} !^/api/ [NC]
+RewriteRule ^login/?$ https://unmoving-faculty-bok.ngrok-free.dev/inbound_return/login [R=302,L,NE]
+
+RewriteCond %{HTTP_HOST} ^(www\.)?returninboundieg\.great-site\.net [NC,OR]
+RewriteCond %{HTTP_HOST} great-site\.net$ [NC]
+RewriteCond %{REQUEST_URI} !^/api/ [NC]
+RewriteRule ^(.*)$ https://unmoving-faculty-bok.ngrok-free.dev/inbound_return/$1 [R=302,L,NE]
+
 # 1. Redirect eksternal dari *.php ke Clean URL (hanya untuk request GET non-API)
 RewriteCond %{REQUEST_METHOD} !POST
 RewriteCond %{THE_REQUEST} ^[A-Z]{3,}\s+([^?\s]+)\.php(\?[^\s]*)?\s [NC]
