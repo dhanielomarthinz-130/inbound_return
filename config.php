@@ -726,12 +726,22 @@ function getSystemMenus() {
         'menu-permissions' => [
             'key' => 'menu-permissions',
             'name' => 'Control Panel Akses Menu',
+            'label' => 'Control Panel Akses Menu',
             'icon' => 'fa-solid fa-sliders',
             'category' => 'Pengaturan & Akses',
             'description' => 'Konfigurasi hak akses menu untuk masing-masing role (Khusus Super Admin)',
             'superadmin_only' => true
         ]
     ];
+
+    foreach ($menus as $k => &$m) {
+        if (!isset($m['label'])) {
+            $m['label'] = $m['name'] ?? $k;
+        }
+    }
+    unset($m);
+
+    return $menus;
 }
 
 /**
@@ -818,9 +828,9 @@ function userHasMenuAccess($menuKey, $userRole, $pdo = null) {
     if ($roleClean === 'superadmin') {
         return true;
     }
-    // Control panel akses menu hanya boleh dibuka oleh superadmin
+    // Control panel akses menu hanya boleh dibuka oleh superadmin & admin (mode lihat/kelola)
     if ($menuKey === 'menu-permissions') {
-        return false;
+        return ($roleClean === 'superadmin' || $roleClean === 'admin');
     }
 
     global $pdo;

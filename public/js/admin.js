@@ -314,8 +314,8 @@ window.switchTab = function (tabName, updateUrl = true) {
     if (tabName === 'approval-jnt') loadJntClaimsData();
     if (tabName === 'maintenance') loadMaintenanceStatus();
     if (tabName === 'menu-permissions') {
-        if (!window.IS_SUPER_ADMIN) {
-            showToast('error', 'Akses Ditolak: Hanya Super Admin yang berhak mengakses Control Panel ini.', 'Akses Ditolak');
+        if (!window.IS_SUPER_ADMIN && !window.IS_ADMIN) {
+            showToast('error', 'Akses Ditolak: Hanya Super Admin dan Admin yang berhak mengakses Control Panel ini.', 'Akses Ditolak');
             switchTab('dashboard');
             return;
         }
@@ -3202,12 +3202,25 @@ function renderMenuPermsMatrix(data) {
 
     const menus = data.menus || [];
     const roles = data.roles || [];
+    const isSuperAdmin = (typeof data.is_superadmin !== 'undefined') ? !!data.is_superadmin : (!!window.IS_SUPER_ADMIN);
 
     // Update stats label
     const menuCountLabel = document.getElementById('menuCountLabel');
     const roleCountLabel = document.getElementById('roleCountLabel');
     if (menuCountLabel) menuCountLabel.innerText = `${menus.length} Menu`;
     if (roleCountLabel) roleCountLabel.innerText = `${roles.length} Role`;
+
+    if (!menus.length || !roles.length) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="12" class="text-center py-12 text-slate-400 text-xs">
+                    <i class="fa-solid fa-folder-open text-2xl mb-2 block text-slate-300"></i>
+                    Belum ada data menu atau role sistem yang terdaftar.
+                </td>
+            </tr>
+        `;
+        return;
+    }
 
     // 1. Build THEAD
     let headerHtml = `
@@ -3239,6 +3252,7 @@ function renderMenuPermsMatrix(data) {
                 <div class="flex flex-col items-center gap-1 text-center">
                     <span class="font-bold text-xs text-slate-800">${escapeHtml(role.role_name || role.role_key)}</span>
                     <span class="text-[10px] text-slate-400 font-mono">${escapeHtml(role.role_key)}</span>
+                    ${isSuperAdmin ? `
                     <div class="flex items-center gap-1 mt-1">
                         <button type="button" onclick="toggleRoleAllMenus('${escapeHtml(role.role_key)}', true)" class="px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold text-[9px] transition cursor-pointer" title="Centang semua menu untuk role ini">
                             Semua
@@ -3246,7 +3260,9 @@ function renderMenuPermsMatrix(data) {
                         <button type="button" onclick="toggleRoleAllMenus('${escapeHtml(role.role_key)}', false)" class="px-1.5 py-0.5 rounded bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold text-[9px] transition cursor-pointer" title="Batal centang semua untuk role ini">
                             Kosong
                         </button>
-                    </div>
+                    </div>` : `
+                    <span class="text-[9px] text-slate-400 mt-1 block font-normal">(Lihat)</span>
+                    `}
                 </div>
             </th>
         `;
@@ -3259,23 +3275,26 @@ function renderMenuPermsMatrix(data) {
     let bodyHtml = '';
     menus.forEach(menu => {
         const mKey = menu.key;
+        const mName = menu.name || menu.label || menu.key;
+        const mDesc = menu.description || '';
+        const mIcon = menu.icon || 'fa-solid fa-circle';
         const isPermControlMenu = (mKey === 'menu-permissions');
 
         bodyHtml += `
-            <tr class="hover:bg-slate-50/70 transition border-b border-slate-100 menu-row" data-menu-search="${escapeHtml((menu.label + ' ' + (menu.description || '') + ' ' + menu.key).toLowerCase())}">
+            <tr class="hover:bg-slate-50/70 transition border-b border-slate-100 menu-row" data-menu-search="${escapeHtml((mName + ' ' + mDesc + ' ' + mKey).toLowerCase())}">
                 <!-- Menu Info Cell -->
                 <td class="py-3.5 px-4 border-r border-slate-100">
                     <div class="flex items-start space-x-3">
                         <div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center text-sm shrink-0 border border-slate-200 mt-0.5">
-                            <i class="${escapeHtml(menu.icon || 'fa-solid fa-circle')}"></i>
+                            <i class="${escapeHtml(mIcon)}"></i>
                         </div>
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-2">
-                                <span class="font-bold text-slate-800 text-xs">${escapeHtml(menu.label)}</span>
+                                <span class="font-bold text-slate-800 text-xs">${escapeHtml(mName)}</span>
                                 ${isPermControlMenu ? '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-100 text-purple-700">Khusus Superadmin</span>' : ''}
                             </div>
-                            <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">${escapeHtml(menu.description || '')}</p>
-                            <span class="inline-block mt-1 text-[9px] font-mono text-slate-400 bg-slate-100 px-1 rounded">${escapeHtml(menu.key)}</span>
+                            ${mDesc ? `<p class="text-[11px] text-slate-500 mt-0.5 leading-snug">${escapeHtml(mDesc)}</p>` : ''}
+                            <span class="inline-block mt-1 text-[9px] font-mono text-slate-400 bg-slate-100 px-1 rounded">${escapeHtml(mKey)}</span>
                         </div>
                     </div>
                 </td>
@@ -3308,12 +3327,13 @@ function renderMenuPermsMatrix(data) {
             } else {
                 bodyHtml += `
                     <td class="py-3.5 px-3 text-center border-r border-slate-100">
-                        <label class="inline-flex items-center justify-center cursor-pointer select-none">
+                        <label class="inline-flex items-center justify-center ${isSuperAdmin ? 'cursor-pointer' : 'cursor-not-allowed'} select-none">
                             <input type="checkbox" 
-                                class="menu-perm-chk role-${escapeHtml(role.role_key)} w-4 h-4 text-purple-600 bg-slate-100 border-slate-300 rounded focus:ring-purple-500 focus:ring-2 cursor-pointer transition" 
+                                class="menu-perm-chk role-${escapeHtml(role.role_key)} w-4 h-4 text-purple-600 bg-slate-100 border-slate-300 rounded focus:ring-purple-500 focus:ring-2 ${isSuperAdmin ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'} transition" 
                                 data-role="${escapeHtml(role.role_key)}" 
                                 data-menu="${escapeHtml(mKey)}"
                                 ${isChecked ? 'checked' : ''}
+                                ${!isSuperAdmin ? 'disabled title="Mode Lihat: Hanya Super Admin yang dapat mengubah"' : ''}
                                 onchange="setMenuPermsDirty(true)">
                         </label>
                     </td>
@@ -3337,6 +3357,7 @@ window.setMenuPermsDirty = function (dirty) {
 };
 
 window.toggleRoleAllMenus = function (roleKey, checkAll) {
+    if (!window.IS_SUPER_ADMIN) return;
     const checkboxes = document.querySelectorAll(`.menu-perm-chk.role-${CSS.escape ? CSS.escape(roleKey) : roleKey}`);
     checkboxes.forEach(chk => {
         if (!chk.disabled) {
@@ -3361,6 +3382,11 @@ window.filterMenuPermissionsTable = function () {
 };
 
 window.saveMenuPermissions = async function () {
+    if (!window.IS_SUPER_ADMIN) {
+        showToast('error', 'Akses Ditolak: Hanya Super Admin yang berhak menyimpan perubahan hak akses menu.', 'Akses Ditolak');
+        return;
+    }
+
     if (!cachedMenuPermsData || !cachedMenuPermsData.roles) {
         showToast('warning', 'Data role belum dimuat, silakan muat ulang halaman.', 'Perhatian');
         return;
@@ -3418,6 +3444,11 @@ window.saveMenuPermissions = async function () {
 };
 
 window.resetMenuPermissionsToDefaults = async function () {
+    if (!window.IS_SUPER_ADMIN) {
+        showToast('error', 'Akses Ditolak: Hanya Super Admin yang berhak mereset hak akses menu.', 'Akses Ditolak');
+        return;
+    }
+
     if (!confirm("Kembalikan hak akses menu untuk SELURUH role ke rekomendasi default sistem?\n\nPerubahan ini akan langsung disimpan ke database.")) {
         return;
     }

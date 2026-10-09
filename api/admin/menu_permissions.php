@@ -48,9 +48,16 @@ if ($method === 'GET') {
             $formattedRoles[] = $r;
         }
 
+        foreach ($allMenus as $mk => &$mv) {
+            if (!isset($mv['label'])) $mv['label'] = $mv['name'] ?? $mk;
+            if (!isset($mv['name'])) $mv['name'] = $mv['label'] ?? $mk;
+        }
+        unset($mv);
+
         jsonResponse([
             'success'       => true,
             'is_superadmin' => $isSuperAdmin,
+            'is_admin'      => ($isSuperAdmin || $rawRole === 'admin'),
             'menus'         => array_values($allMenus),
             'roles'         => $formattedRoles,
             'permissions'   => $activePerms,

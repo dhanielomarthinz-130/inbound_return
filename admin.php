@@ -16,6 +16,9 @@ $isCS = ($rawRole === 'customerservice' || $rawRole === 'customer_service' || $i
 $userRoleMenuPermissions = getRoleMenuPermissions($pdo);
 $roleKeyClean = str_replace([' ', '-'], '_', $rawRole);
 $currentUserAllowedMenus = $isSuperAdmin ? array_keys(getSystemMenus()) : ($userRoleMenuPermissions[$roleKeyClean] ?? ($userRoleMenuPermissions[$rawRole] ?? []));
+if ($isAdmin && !in_array('menu-permissions', $currentUserAllowedMenus, true)) {
+    $currentUserAllowedMenus[] = 'menu-permissions';
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -376,13 +379,13 @@ $currentUserAllowedMenus = $isSuperAdmin ? array_keys(getSystemMenus()) : ($user
             </button>
             <?php endif; ?>
 
-            <!-- MENU BARU: CONTROL PANEL AKSES MENU & ROLE (KHUSUS SUPER ADMIN) -->
-            <?php if ($isSuperAdmin): ?>
+            <!-- MENU BARU: CONTROL PANEL AKSES MENU & ROLE (SUPER ADMIN & ADMIN) -->
+            <?php if ($isSuperAdmin || $isAdmin): ?>
             <button onclick="switchTab('menu-permissions')" id="nav-menu-permissions" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-purple-700 hover:text-purple-900 hover:bg-purple-100/70 border border-purple-300/80 bg-purple-50/60" title="Kelola Hak Akses Menu untuk Setiap Role">
                 <i class="fa-solid fa-sliders w-5 text-center text-purple-600"></i>
                 <div class="flex items-center justify-between flex-1">
                     <span>Control Panel Akses</span>
-                    <span class="px-1.5 py-0.5 text-[9px] font-black rounded-full bg-purple-200 text-purple-800 uppercase tracking-wider">Superadmin</span>
+                    <span class="px-1.5 py-0.5 text-[9px] font-black rounded-full bg-purple-200 text-purple-800 uppercase tracking-wider"><?= $isSuperAdmin ? 'Superadmin' : 'Control Panel' ?></span>
                 </div>
             </button>
             <?php endif; ?>
@@ -1933,56 +1936,81 @@ $currentUserAllowedMenus = $isSuperAdmin ? array_keys(getSystemMenus()) : ($user
             </div>
             <?php endif; ?>
 
-            <!-- TAB: CONTROL PANEL AKSES MENU ROLE (KHUSUS SUPER ADMIN) -->
-            <?php if ($isSuperAdmin): ?>
+            <!-- TAB: CONTROL PANEL AKSES MENU ROLE (SUPER ADMIN & ADMIN) -->
+            <?php if ($isSuperAdmin || $isAdmin): ?>
             <div id="tab-menu-permissions" class="tab-content hidden space-y-6">
                 <div class="bg-white rounded-2xl shadow-xs border border-slate-200 p-6 space-y-5">
                     <!-- Header Card & Actions -->
                     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-5">
                         <div class="flex items-center space-x-3.5">
-                            <div class="w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center text-xl shrink-0 border border-purple-200 shadow-xs">
+                            <div class="w-12 h-12 rounded-2xl <?= $isSuperAdmin ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-indigo-100 text-indigo-700 border-indigo-200' ?> flex items-center justify-center text-xl shrink-0 border shadow-xs">
                                 <i class="fa-solid fa-sliders"></i>
                             </div>
                             <div>
                                 <div class="flex items-center gap-2">
                                     <h3 class="font-bold text-base text-slate-800">Control Panel Hak Akses Menu</h3>
+                                    <?php if ($isSuperAdmin): ?>
                                     <span class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-800 border border-purple-200">
-                                        Super Admin Only
+                                        Super Admin Mode
                                     </span>
+                                    <?php else: ?>
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200">
+                                        Mode Lihat (Read-Only)
+                                    </span>
+                                    <?php endif; ?>
                                 </div>
                                 <p class="text-xs text-slate-500 mt-0.5">
-                                    Atur menu apa saja yang dapat diakses oleh setiap role akun pengguna di sistem Inbound Return.
+                                    <?= $isSuperAdmin ? 'Atur menu apa saja yang dapat diakses oleh setiap role akun pengguna di sistem Inbound Return.' : 'Tampilan matriks hak akses menu untuk setiap role pengguna sistem Inbound Return.' ?>
                                 </p>
                             </div>
                         </div>
                         <div class="flex flex-wrap items-center gap-2.5">
-                            <button type="button" onclick="resetMenuPermissionsToDefaults()" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition border border-slate-200 flex items-center gap-1.5 cursor-pointer">
-                                <i class="fa-solid fa-rotate-left text-slate-500"></i>
-                                <span>Reset Default</span>
-                            </button>
                             <button type="button" onclick="loadMenuPermissionsData(true)" class="px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs rounded-xl transition border border-indigo-200 flex items-center gap-1.5 cursor-pointer">
                                 <i class="fa-solid fa-arrows-rotate text-indigo-600"></i>
                                 <span>Muat Ulang</span>
+                            </button>
+                            <?php if ($isSuperAdmin): ?>
+                            <button type="button" onclick="resetMenuPermissionsToDefaults()" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition border border-slate-200 flex items-center gap-1.5 cursor-pointer">
+                                <i class="fa-solid fa-rotate-left text-slate-500"></i>
+                                <span>Reset Default</span>
                             </button>
                             <button type="button" id="btnSaveMenuPerms" onclick="saveMenuPermissions()" class="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:scale-95 text-white font-bold text-xs rounded-xl transition shadow-md shadow-purple-600/30 flex items-center gap-2 cursor-pointer">
                                 <i class="fa-solid fa-floppy-disk"></i>
                                 <span>Simpan Hak Akses</span>
                             </button>
+                            <?php else: ?>
+                            <span class="px-3.5 py-2 bg-amber-50 text-amber-800 text-xs font-semibold rounded-xl border border-amber-200 flex items-center gap-1.5" title="Login sebagai Super Admin untuk mengubah atau menyimpan hak akses">
+                                <i class="fa-solid fa-lock text-amber-600"></i>
+                                <span>Pengeditan Khusus Super Admin</span>
+                            </span>
+                            <?php endif; ?>
                         </div>
                     </div>
 
-                    <!-- Security Alert Banner -->
+                    <!-- Alert Banner (Super Admin vs Admin View) -->
+                    <?php if ($isSuperAdmin): ?>
                     <div class="p-4 rounded-xl bg-purple-50/80 border border-purple-200/80 flex items-start space-x-3 text-xs text-purple-900">
                         <i class="fa-solid fa-shield-halved text-purple-600 mt-0.5 text-base shrink-0"></i>
                         <div class="space-y-1">
                             <span class="font-bold text-purple-900">Prinsip Keamanan Sistem:</span>
                             <ul class="list-disc list-inside space-y-0.5 text-slate-600 text-[11px]">
                                 <li>Role <strong>Super Admin</strong> selalu memiliki akses penuh (unrestricted) ke seluruh menu dan tidak dapat dikunci.</li>
-                                <li>Menu <strong>Control Panel Akses</strong> diproteksi khusus dan hanya dapat dibuka oleh Super Admin.</li>
+                                <li>Menu <strong>Control Panel Akses</strong> diproteksi khusus dan hanya dapat dibuka oleh Administrator.</li>
                                 <li>Pengguna role lain hanya akan melihat menu sidebar dan membuka halaman yang dicentang di bawah ini.</li>
                             </ul>
                         </div>
                     </div>
+                    <?php else: ?>
+                    <div class="p-4 rounded-xl bg-amber-50/80 border border-amber-200/80 flex items-start space-x-3 text-xs text-amber-900">
+                        <i class="fa-solid fa-circle-info text-amber-600 mt-0.5 text-base shrink-0"></i>
+                        <div class="space-y-1">
+                            <span class="font-bold text-amber-900">Mode Lihat (Read-Only):</span>
+                            <p class="text-slate-600 text-[11px]">
+                                Anda sedang membuka Control Panel dengan akun <strong>Admin</strong>. Anda dapat melihat seluruh konfigurasi hak akses menu, namun perubahan centang dan tombol simpan hanya dapat dilakukan oleh akun <strong>Super Admin</strong>.
+                            </p>
+                        </div>
+                    </div>
+                    <?php endif; ?>
 
                     <!-- Search & Quick Filters -->
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-200">
@@ -2013,7 +2041,7 @@ $currentUserAllowedMenus = $isSuperAdmin ? array_keys(getSystemMenus()) : ($user
                             </thead>
                             <tbody id="menuPermsTableBody" class="divide-y divide-slate-100 bg-white">
                                 <tr>
-                                    <td colspan="10" class="text-center py-12 text-slate-400">
+                                    <td colspan="12" class="text-center py-12 text-slate-400">
                                         <i class="fa-solid fa-spinner fa-spin mr-2 text-purple-600"></i> Memuat matriks hak akses...
                                     </td>
                                 </tr>
@@ -2028,10 +2056,16 @@ $currentUserAllowedMenus = $isSuperAdmin ? array_keys(getSystemMenus()) : ($user
                             <span>Centang kotak untuk memberikan hak akses menu ke role yang bersangkutan.</span>
                         </div>
                         <div class="flex items-center gap-2">
+                            <?php if ($isSuperAdmin): ?>
                             <button type="button" onclick="saveMenuPermissions()" class="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold rounded-xl transition shadow-md shadow-purple-600/30 flex items-center gap-2 cursor-pointer">
                                 <i class="fa-solid fa-check"></i>
                                 <span>Simpan Konfigurasi</span>
                             </button>
+                            <?php else: ?>
+                            <span class="text-xs text-slate-400 italic">
+                                Mode Baca: Pengaturan hanya dapat disimpan oleh Super Admin.
+                            </span>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
