@@ -130,7 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Masuk - IEG OCS (Omni Channel System)</title>
+    <title>Masuk - IEG Return</title>
     <base href="<?= htmlspecialchars(getAppBaseUrl()) ?>">
     <!-- Favicon Huruf D Warna Hijau -->
     <link rel="icon" type="image/svg+xml" sizes="any" href="assets/image/favicon.svg?v=2">
@@ -191,7 +191,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7 lg:py-10 min-h-screen flex flex-col justify-between">
         
-        <!-- Header Branding: Top Left & Right Status -->
+        <!-- Header Branding: Top Left -->
         <header class="flex items-center justify-between mb-4 sm:mb-6">
             <div class="flex items-center gap-3">
                 <div class="w-11 h-11 rounded-2xl bg-white/20 border border-white/30 backdrop-blur-md flex items-center justify-center text-white shadow-md shadow-blue-950/20">
@@ -202,10 +202,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="text-[11px] text-blue-100 font-medium tracking-wide mt-0.5 opacity-90">Omni Channel System</div>
                 </div>
             </div>
-            <div class="hidden sm:flex items-center gap-2 text-xs font-semibold text-white/85 bg-white/10 px-3.5 py-1.5 rounded-full border border-white/15 backdrop-blur-sm">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>Sistem Inbound Return Aktif</span>
-            </div>
         </header>
 
         <!-- Main Content Area: Left Hero + Right Form Card -->
@@ -215,41 +211,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <section class="lg:col-span-5 text-white space-y-6 sm:space-y-8 pr-0 lg:pr-4">
                 <div class="space-y-4">
                     <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.12] drop-shadow-md">
-                        Selamat Datang<br>di IEG OCS
+                        Selamat Datang<br>di IEG Return
                     </h1>
                     <p class="text-sm sm:text-base lg:text-lg text-blue-100/90 font-normal leading-relaxed max-w-xl">
                         Kelola pergudangan, pesanan, dan integrasi multi-platform dengan cepat dan akurat.
                     </p>
                 </div>
 
-                <!-- 4 FEATURE PILLS (Order Fulfillment, Stock Monitoring, Multi Shipping, Marketplace Sync) -->
+                <!-- 4 FEATURE PILLS (Reciving Expedisi, Unboxing Paket, Klaim Expedisi, Video & Foto) -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5 max-w-lg pt-1">
                     <div class="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 backdrop-blur-md text-white text-xs sm:text-[13px] font-semibold shadow-xs transition duration-200">
                         <div class="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
-                            <i class="fa-solid fa-globe text-xs text-blue-200"></i>
+                            <i class="fa-solid fa-truck-ramp-box text-xs text-blue-200"></i>
                         </div>
-                        <span class="truncate">Order Fulfillment</span>
+                        <span class="truncate">Reciving Expedisi</span>
                     </div>
 
                     <div class="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 backdrop-blur-md text-white text-xs sm:text-[13px] font-semibold shadow-xs transition duration-200">
                         <div class="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
-                            <i class="fa-solid fa-boxes-stacked text-xs text-blue-200"></i>
+                            <i class="fa-solid fa-box-open text-xs text-blue-200"></i>
                         </div>
-                        <span class="truncate">Stock Monitoring</span>
+                        <span class="truncate">Unboxing Paket</span>
                     </div>
 
                     <div class="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 backdrop-blur-md text-white text-xs sm:text-[13px] font-semibold shadow-xs transition duration-200">
                         <div class="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
-                            <i class="fa-solid fa-truck-fast text-xs text-blue-200"></i>
+                            <i class="fa-solid fa-file-shield text-xs text-blue-200"></i>
                         </div>
-                        <span class="truncate">Multi Shipping</span>
+                        <span class="truncate">Klaim Expedisi</span>
                     </div>
 
                     <div class="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 backdrop-blur-md text-white text-xs sm:text-[13px] font-semibold shadow-xs transition duration-200">
                         <div class="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
-                            <i class="fa-solid fa-store text-xs text-blue-200"></i>
+                            <i class="fa-solid fa-video text-xs text-blue-200"></i>
                         </div>
-                        <span class="truncate">Marketplace Sync</span>
+                        <span class="truncate">Video & Foto</span>
                     </div>
                 </div>
             </section>
@@ -476,23 +472,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </form>
                     </div>
 
-                    <!-- Footer Link Bantuan -->
-                    <div class="text-center mt-5 pt-3 border-t border-slate-100">
-                        <span class="text-xs text-slate-400 font-medium">
-                            Butuh bantuan? Hubungi tim IT
-                        </span>
-                    </div>
-
                 </div>
             </section>
         </main>
 
-        <!-- Footer Bawah Hak Cipta -->
-        <footer class="pt-4 text-center sm:text-left text-xs text-white/60 flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-white/10">
+        <!-- Footer Bawah -->
+        <footer class="pt-4 text-center sm:text-left text-xs text-white/70 flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-white/10 font-medium">
             <div>
-                &copy; <?= date('Y') ?> PT Inovasi Eka Gemilang &bull; Sistem Inbound Return &amp; OCS IEG
+                Powered By Dhanielo-Marthinz
             </div>
-            <div class="flex items-center gap-4 text-white/70">
+            <div class="flex items-center gap-4 text-white/60">
                 <span>Versi 2.4</span>
                 <span>&bull;</span>
                 <span>All Rights Reserved</span>
