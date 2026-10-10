@@ -65,7 +65,11 @@ function syncSingleOrderFromPicklistFindOrder($pdo, $keyword) {
     curl_setopt_array($chLogin, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => json_encode(['username' => 'ADMIN', 'password' => 'ADMIN', 'companydb' => 'EJI_WMS']),
+        CURLOPT_POSTFIELDS     => json_encode([
+            'username'  => defined('OCS_USERNAME') ? OCS_USERNAME : 'ADMIN',
+            'password'  => defined('OCS_PASSWORD') ? OCS_PASSWORD : 'luwakwhitecoffee',
+            'companydb' => defined('OCS_COMPANYDB') ? OCS_COMPANYDB : 'EJI_WMS'
+        ]),
         CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
         CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_SSL_VERIFYHOST => false,
@@ -275,7 +279,11 @@ function enrichOrdersFromOcs($pdo, array $orderIds) {
     curl_setopt_array($chLogin, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => json_encode(['username' => 'ADMIN', 'password' => 'ADMIN', 'companydb' => 'EJI_WMS']),
+        CURLOPT_POSTFIELDS     => json_encode([
+            'username'  => defined('OCS_USERNAME') ? OCS_USERNAME : 'ADMIN',
+            'password'  => defined('OCS_PASSWORD') ? OCS_PASSWORD : 'luwakwhitecoffee',
+            'companydb' => defined('OCS_COMPANYDB') ? OCS_COMPANYDB : 'EJI_WMS'
+        ]),
         CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
         CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_SSL_VERIFYHOST => false,

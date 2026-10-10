@@ -48,6 +48,12 @@ if ($is_remote) {
     $db_name = 'inbound_return';
 }
 
+// Konfigurasi Kredensial OCS IEG System (https://ocs.iegsystem.id/)
+defined('OCS_BASE_URL')  or define('OCS_BASE_URL', 'https://ocs.iegsystem.id');
+defined('OCS_USERNAME')  or define('OCS_USERNAME', 'ADMIN');
+defined('OCS_PASSWORD')  or define('OCS_PASSWORD', 'luwakwhitecoffee');
+defined('OCS_COMPANYDB') or define('OCS_COMPANYDB', 'EJI_WMS');
+
 try {
     // 1. Koneksi langsung ke database
     try {

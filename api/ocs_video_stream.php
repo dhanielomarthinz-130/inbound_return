@@ -12,10 +12,14 @@ if ($orderId === '') {
     die("Parameter orderId wajib diisi.");
 }
 
-$ocsBaseUrl = 'https://ocs.iegsystem.id';
-$ocsUser    = 'ADMIN';
-$ocsPass    = 'ADMIN';
-$ocsCompany = 'EJI_WMS';
+if (file_exists(__DIR__ . '/../config.php')) {
+    require_once __DIR__ . '/../config.php';
+}
+
+$ocsBaseUrl = defined('OCS_BASE_URL') ? OCS_BASE_URL : 'https://ocs.iegsystem.id';
+$ocsUser    = defined('OCS_USERNAME') ? OCS_USERNAME : 'ADMIN';
+$ocsPass    = defined('OCS_PASSWORD') ? OCS_PASSWORD : 'luwakwhitecoffee';
+$ocsCompany = defined('OCS_COMPANYDB') ? OCS_COMPANYDB : 'EJI_WMS';
 
 // Token caching sederhana (50 menit)
 $tokenCacheFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'ocs_token_cache.json';

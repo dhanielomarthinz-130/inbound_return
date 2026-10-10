@@ -207,10 +207,10 @@ writeOcsSyncLog("=== MEMULAI SYNC ORDERS DARI OCS ===");
 writeOcsSyncLog("Rentang WIB: {$startWib} s/d {$endWib} [Target: {$targetDateLabel}]");
 writeOcsSyncLog("Rentang UTC: {$startUtc} s/d {$endUtc}");
 
-$ocsBaseUrl = 'https://ocs.iegsystem.id';
-$ocsUser    = 'ADMIN';
-$ocsPass    = 'ADMIN';
-$ocsCompany = 'EJI_WMS';
+$ocsBaseUrl = defined('OCS_BASE_URL') ? OCS_BASE_URL : 'https://ocs.iegsystem.id';
+$ocsUser    = defined('OCS_USERNAME') ? OCS_USERNAME : 'ADMIN';
+$ocsPass    = defined('OCS_PASSWORD') ? OCS_PASSWORD : 'luwakwhitecoffee';
+$ocsCompany = defined('OCS_COMPANYDB') ? OCS_COMPANYDB : 'EJI_WMS';
 
 try {
     // -------------------------------------------------------------

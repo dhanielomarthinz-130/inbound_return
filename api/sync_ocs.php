@@ -7,10 +7,10 @@ header('Content-Type: application/json; charset=utf-8');
 // Meningkatkan timeout untuk sinkronisasi 700+ item
 set_time_limit(180);
 
-$ocsBaseUrl = 'https://ocs.iegsystem.id';
-$ocsUser    = 'ADMIN';
-$ocsPass    = 'ADMIN';
-$ocsCompany = 'EJI_WMS';
+$ocsBaseUrl = defined('OCS_BASE_URL') ? OCS_BASE_URL : 'https://ocs.iegsystem.id';
+$ocsUser    = defined('OCS_USERNAME') ? OCS_USERNAME : 'ADMIN';
+$ocsPass    = defined('OCS_PASSWORD') ? OCS_PASSWORD : 'luwakwhitecoffee';
+$ocsCompany = defined('OCS_COMPANYDB') ? OCS_COMPANYDB : 'EJI_WMS';
 
 try {
     // 1. LOGIN KE OCS IEG SYSTEM
