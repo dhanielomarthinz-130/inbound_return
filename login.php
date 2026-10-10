@@ -14,112 +14,51 @@ if ($currentUser) {
     exit;
 }
 
-// Ambil daftar operator aktif untuk memudahkan operator memilih akun di station
-try {
-    $stmtOps = $pdo->query("SELECT id, username, name FROM users WHERE role IN ('operator', 'operator_mobile') AND status = 'ACTIVE' ORDER BY name ASC");
-    $operators = $stmtOps->fetchAll(PDO::FETCH_ASSOC);
-} catch (Exception $e) {
-    $operators = [];
-}
-
-// Menentukan tab aktif default (admin atau operator)
-$activeTab = $_POST['tab'] ?? ($_GET['tab'] ?? 'admin');
-if (!in_array($activeTab, ['admin', 'operator'])) {
-    $activeTab = 'admin';
-}
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $submittedTab = trim($_POST['tab'] ?? 'admin');
-    $activeTab = $submittedTab;
+    $username = trim($_POST['username'] ?? '');
+    $password = trim($_POST['password'] ?? '');
 
-    if ($submittedTab === 'operator') {
-        // ==========================================
-        // PROSES LOGIN OPERATOR (MENGGUNAKAN PIN)
-        // ==========================================
-        $username = trim($_POST['operator_username'] ?? '');
-        $pin      = trim($_POST['pin'] ?? '');
-
-        if (empty($username)) {
-            $error = 'Silakan pilih atau masukkan Username Operator!';
-        } elseif (empty($pin)) {
-            $error = 'Silakan masukkan PIN Operator (6 Digit)!';
-        } else {
-            try {
-                $cleanUser = str_replace([' ', '_', '-'], '', strtolower($username));
-                $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ? OR REPLACE(REPLACE(LOWER(username), ' ', ''), '_', '') = ? OR LOWER(name) = ? LIMIT 1");
-                $stmt->execute([$username, $cleanUser, strtolower($username)]);
-                $user = $stmt->fetch();
-
-                if (!$user) {
-                    $error = 'Akun Operator tidak ditemukan!';
-                } elseif (!in_array($user['role'], ['operator', 'operator_mobile'])) {
-                    $error = 'Akun ini bukan role Operator. Silakan login melalui Tab Admin.';
-                } elseif ($user['status'] !== 'ACTIVE') {
-                    $error = 'Akun Anda sedang dinonaktifkan. Hubungi Admin Gudang.';
-                } else {
-                    // Verifikasi PIN
-                    $isPinValid = false;
-                    if (!empty($user['pin']) && $user['pin'] === $pin) {
-                        $isPinValid = true;
-                    } elseif ($pin === $user['password'] || password_verify($pin, $user['password'])) {
-                        $isPinValid = true;
-                    }
-
-                    if ($isPinValid) {
-                        $_SESSION['user'] = [
-                            'id' => $user['id'],
-                            'username' => $user['username'],
-                            'name' => $user['name'],
-                            'role' => $user['role']
-                        ];
-                        
-                        header('Location: ' . getAppBaseUrl() . 'menu');
-                        exit;
-                    } else {
-                        $error = 'PIN yang Anda masukkan salah!';
-                    }
-                }
-            } catch (Exception $e) {
-                $error = 'Terjadi kesalahan sistem: ' . $e->getMessage();
-            }
-        }
+    if (empty($username) || empty($password)) {
+        $error = 'Username dan Password wajib diisi!';
     } else {
-        // ==========================================
-        // PROSES LOGIN ADMIN (MENGGUNAKAN PASSWORD)
-        // ==========================================
-        $username = trim($_POST['username'] ?? '');
-        $password = trim($_POST['password'] ?? '');
+        try {
+            $cleanUser = str_replace([' ', '_', '-'], '', strtolower($username));
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ? OR LOWER(username) = ? OR REPLACE(REPLACE(LOWER(username), ' ', ''), '_', '') = ? OR LOWER(name) = ? LIMIT 1");
+            $stmt->execute([$username, strtolower($username), $cleanUser, strtolower($username)]);
+            $user = $stmt->fetch();
 
-        if (empty($username) || empty($password)) {
-            $error = 'Username dan Password Admin wajib diisi!';
-        } else {
-            try {
-                $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ? LIMIT 1");
-                $stmt->execute([$username]);
-                $user = $stmt->fetch();
-
-                if ($user && (password_verify($password, $user['password']) || $password === $user['password'])) {
-                    if ($user['status'] !== 'ACTIVE') {
-                        $error = 'Akun Anda sedang dinonaktifkan. Hubungi Superadmin.';
-                    } elseif (in_array($user['role'], ['operator', 'operator_mobile'])) {
-                        // Jika operator mencoba login di tab admin dengan password
-                        $error = 'Akun ini adalah Operator Inbound. Silakan gunakan Tab Operator untuk masuk dengan PIN.';
-                    } else {
-                        $_SESSION['user'] = [
-                            'id' => $user['id'],
-                            'username' => $user['username'],
-                            'name' => $user['name'],
-                            'role' => $user['role']
-                        ];
-                        header('Location: ' . getAppBaseUrl() . 'admin');
-                        exit;
-                    }
-                } else {
-                    $error = 'Username atau Password Admin salah!';
+            $isAuthValid = false;
+            if ($user) {
+                if (password_verify($password, $user['password']) || $password === $user['password']) {
+                    $isAuthValid = true;
+                } elseif (!empty($user['pin']) && $password === $user['pin']) {
+                    $isAuthValid = true;
                 }
-            } catch (Exception $e) {
-                $error = 'Terjadi kesalahan sistem: ' . $e->getMessage();
             }
+
+            if ($user && $isAuthValid) {
+                if ($user['status'] !== 'ACTIVE') {
+                    $error = 'Akun Anda sedang dinonaktifkan. Hubungi Administrator.';
+                } else {
+                    $_SESSION['user'] = [
+                        'id'       => $user['id'],
+                        'username' => $user['username'],
+                        'name'     => $user['name'],
+                        'role'     => $user['role']
+                    ];
+
+                    if (in_array($user['role'], ['operator', 'operator_mobile'])) {
+                        header('Location: ' . getAppBaseUrl() . 'menu');
+                    } else {
+                        header('Location: ' . getAppBaseUrl() . 'admin');
+                    }
+                    exit;
+                }
+            } else {
+                $error = 'Username atau Password salah! Periksa kembali data Anda.';
+            }
+        } catch (Exception $e) {
+            $error = 'Terjadi kesalahan sistem: ' . $e->getMessage();
         }
     }
 }
@@ -129,377 +68,299 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Masuk Sistem - Inbound Return IEG</title>
+    <title>Masuk - IEG OCS (Omni Channel System)</title>
     <base href="<?= htmlspecialchars(getAppBaseUrl()) ?>">
     <!-- Favicon Huruf D Warna Hijau -->
     <link rel="icon" type="image/svg+xml" sizes="any" href="assets/image/favicon.svg?v=2">
     <link rel="icon" type="image/png" sizes="64x64" href="assets/image/favicon.png?v=2">
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico?v=2">
     <link rel="apple-touch-icon" href="assets/image/favicon.png?v=2">
+    
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="assets/css/custom.css?v=<?= file_exists(__DIR__ . '/assets/css/custom.css') ? filemtime(__DIR__ . '/assets/css/custom.css') : time() ?>">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
     <style>
+        body {
+            font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            background-color: #1547dd;
+            background-image: 
+                radial-gradient(circle at 88% 50%, rgba(139, 92, 246, 0.55) 0%, transparent 55%),
+                radial-gradient(circle at 18% 30%, rgba(29, 78, 216, 0.65) 0%, transparent 60%),
+                radial-gradient(circle at 45% 85%, rgba(37, 99, 235, 0.45) 0%, transparent 65%),
+                linear-gradient(135deg, #0b3bb8 0%, #1754ee 32%, #2563eb 55%, #6366f1 78%, #7c3aed 100%);
+            background-attachment: fixed;
+        }
+
         .numpad-btn {
             transition: all 0.15s ease;
             user-select: none;
             -webkit-user-select: none;
         }
         .numpad-btn:active {
-            transform: scale(0.92);
-            background-color: #cbd5e1;
+            transform: scale(0.94);
+            background-color: #e2e8f0;
         }
-        /* Responsif Height & Multi-Screen Aware untuk Layar Laptop / Kiosk Touchscreen */
-        @media (max-height: 760px) {
-            body { padding: 0.5rem !important; }
-            .login-card { padding: 1.25rem 1.5rem !important; space-y: 0.75rem !important; }
-            .login-header-logo { width: 3rem !important; height: 3rem !important; margin-bottom: 0 !important; }
-            .login-header-title { font-size: 1.25rem !important; }
-            .login-header-desc { display: none !important; }
-            .numpad-btn { padding-top: 0.4rem !important; padding-bottom: 0.4rem !important; font-size: 0.875rem !important; }
+
+        .floating-input-group:focus-within {
+            border-color: #6348eb;
+            box-shadow: 0 0 0 3px rgba(99, 72, 235, 0.15);
         }
-        @media (max-height: 640px) {
-            .login-header-logo { display: none !important; }
-            .login-card { padding: 0.75rem 1rem !important; }
+        .floating-input-group:focus-within label {
+            color: #6348eb;
         }
     </style>
 </head>
-<body class="bg-gradient-to-br from-slate-100 via-indigo-50/50 to-slate-200 min-h-screen flex items-center justify-center p-3 sm:p-4 md:p-6 font-sans text-slate-800">
+<body class="min-h-screen text-slate-800 flex flex-col justify-between selection:bg-purple-500 selection:text-white">
 
-    <div id="loginCard" class="login-card w-full <?= $activeTab === 'operator' ? 'max-w-2xl' : 'max-w-md' ?> bg-white rounded-3xl shadow-2xl shadow-indigo-900/10 border border-slate-200/90 p-5 sm:p-6 md:p-8 space-y-4 md:space-y-5 transition-all duration-300 my-auto">
+    <div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-8 lg:py-12 min-h-screen flex flex-col justify-between">
         
-        <!-- Header & Logo -->
-        <div class="text-center space-y-1.5">
-            <div class="login-header-logo inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 p-2 rounded-2xl bg-white border border-slate-200 shadow-md mb-0.5">
-                <img src="assets/image/logo-IEG.png" alt="Logo IEG" class="w-full h-full object-contain">
+        <!-- Header Branding: Top Left -->
+        <header class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-2xl bg-white/20 border border-white/30 backdrop-blur-md flex items-center justify-center text-white shadow-md shadow-blue-950/20">
+                    <i class="fa-solid fa-cart-shopping text-lg"></i>
+                </div>
+                <div>
+                    <div class="text-base sm:text-lg font-black text-white tracking-tight leading-none drop-shadow-sm">IEG OCS</div>
+                    <div class="text-[11px] text-blue-100 font-medium tracking-wide mt-0.5 opacity-90">Omni Channel System</div>
+                </div>
             </div>
-            <h2 class="login-header-title text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Inbound Return IEG</h2>
-            <p class="login-header-desc text-xs text-slate-400 font-medium">Sistem Verifikasi & Unboxing Pengembalian Barang</p>
-        </div>
+            <div class="hidden sm:flex items-center gap-2 text-xs font-semibold text-white/80 bg-white/10 px-3.5 py-1.5 rounded-full border border-white/15 backdrop-blur-sm">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Sistem Inbound Return Aktif</span>
+            </div>
+        </header>
 
-        <!-- 2 TAB SWITCHER: ADMIN (PASSWORD) & OPERATOR (PIN) -->
-        <div class="p-1.5 bg-slate-100 rounded-2xl flex items-center gap-1.5 border border-slate-200">
-            <button type="button" id="tabBtnAdmin" onclick="switchLoginTab('admin')"
-                class="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition duration-200 <?= $activeTab === 'admin' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800' ?>">
-                <i class="fa-solid fa-user-shield text-sm"></i>
-                <span>Admin</span>
-                <span class="text-[10px] px-1.5 py-0.5 rounded-md font-mono <?= $activeTab === 'admin' ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-200 text-slate-500' ?>">Password</span>
-            </button>
-            <button type="button" id="tabBtnOperator" onclick="switchLoginTab('operator')"
-                class="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition duration-200 <?= $activeTab === 'operator' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-800' ?>">
-                <i class="fa-solid fa-id-badge text-sm"></i>
-                <span>Operator</span>
-                <span class="text-[10px] px-1.5 py-0.5 rounded-md font-mono <?= $activeTab === 'operator' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-200 text-slate-500' ?>">PIN</span>
-            </button>
-        </div>
-
-        <?php if (!empty($error)): ?>
-        <div class="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-semibold flex items-center gap-2.5 animate-shake">
-            <i class="fa-solid fa-circle-exclamation text-rose-500 text-base shrink-0"></i>
-            <span><?= htmlspecialchars($error) ?></span>
-        </div>
-        <?php endif; ?>
-
-        <!-- ======================================================== -->
-        <!-- FORM 1: LOGIN ADMIN (USERNAME & PASSWORD) -->
-        <!-- ======================================================== -->
-        <div id="sectionAdmin" class="<?= $activeTab === 'admin' ? '' : 'hidden' ?>">
-            <form method="POST" action="login" class="space-y-4">
-                <input type="hidden" name="tab" value="admin">
-                
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1.5">Username Admin</label>
-                    <div class="relative">
-                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
-                            <i class="fa-solid fa-user"></i>
-                        </span>
-                        <input type="text" name="username" id="adminUsername" required placeholder="Contoh: superadmin / admin"
-                            value="<?= $activeTab === 'admin' ? htmlspecialchars($_POST['username'] ?? '') : '' ?>"
-                            class="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-2xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
-                    </div>
+        <!-- Main Content Area: Left Hero + Right Card -->
+        <main class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center py-6 sm:py-10 my-auto">
+            
+            <!-- KOLOM KIRI: TEKS SELAMAT DATANG & 4 FITUR UTAMA -->
+            <section class="lg:col-span-7 text-white space-y-6 sm:space-y-8 pr-0 lg:pr-6">
+                <div class="space-y-4">
+                    <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.12] drop-shadow-md">
+                        Selamat Datang<br>di IEG OCS
+                    </h1>
+                    <p class="text-sm sm:text-base lg:text-lg text-blue-100/90 font-normal leading-relaxed max-w-xl">
+                        Kelola pergudangan, pesanan, dan integrasi multi-platform dengan cepat dan akurat.
+                    </p>
                 </div>
 
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1.5">Password</label>
-                    <div class="relative">
-                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
-                            <i class="fa-solid fa-lock"></i>
-                        </span>
-                        <input type="password" name="password" id="adminPassword" required placeholder="Masukkan password Anda"
-                            class="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-300 rounded-2xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
-                        <button type="button" onclick="toggleAdminPassword()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 text-sm">
-                            <i class="fa-solid fa-eye" id="adminEyeIcon"></i>
-                        </button>
+                <!-- 4 FEATURE PILLS (Order Fulfillment, Stock Monitoring, Multi Shipping, Marketplace Sync) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5 max-w-lg pt-1">
+                    <div class="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 backdrop-blur-md text-white text-xs sm:text-[13px] font-semibold shadow-xs transition duration-200">
+                        <div class="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-globe text-xs text-blue-200"></i>
+                        </div>
+                        <span class="truncate">Order Fulfillment</span>
+                    </div>
+
+                    <div class="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 backdrop-blur-md text-white text-xs sm:text-[13px] font-semibold shadow-xs transition duration-200">
+                        <div class="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-boxes-stacked text-xs text-blue-200"></i>
+                        </div>
+                        <span class="truncate">Stock Monitoring</span>
+                    </div>
+
+                    <div class="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 backdrop-blur-md text-white text-xs sm:text-[13px] font-semibold shadow-xs transition duration-200">
+                        <div class="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-truck-fast text-xs text-blue-200"></i>
+                        </div>
+                        <span class="truncate">Multi Shipping</span>
+                    </div>
+
+                    <div class="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 backdrop-blur-md text-white text-xs sm:text-[13px] font-semibold shadow-xs transition duration-200">
+                        <div class="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-store text-xs text-blue-200"></i>
+                        </div>
+                        <span class="truncate">Marketplace Sync</span>
                     </div>
                 </div>
+            </section>
 
-                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-2xl text-xs transition duration-200 flex items-center justify-center gap-2 shadow-md shadow-indigo-600/30">
-                    <span>Masuk sebagai Admin</span>
-                    <i class="fa-solid fa-arrow-right-to-bracket"></i>
-                </button>
-            </form>
-        </div>
+            <!-- KOLOM KANAN: KARTU LOGIN PUTIH (TANPA PILIH DATABASE) -->
+            <section class="lg:col-span-5 flex justify-center lg:justify-end">
+                <div class="w-full max-w-[420px] bg-white rounded-3xl sm:rounded-[2rem] shadow-2xl shadow-indigo-950/30 p-6 sm:p-8 md:p-9 border border-white/40">
+                    
+                    <!-- Logo Perusahaan: logo_text-BademdvM.jpg -->
+                    <div class="flex justify-center mb-5">
+                        <img src="assets/image/logo_text-BademdvM.jpg" alt="Inovasi Eka Gemilang" class="h-14 sm:h-16 w-auto max-w-[260px] object-contain">
+                    </div>
 
-        <!-- ======================================================== -->
-        <!-- FORM 2: LOGIN OPERATOR (OPERATOR & PIN) -->
-        <!-- ======================================================== -->
-        <div id="sectionOperator" class="<?= $activeTab === 'operator' ? '' : 'hidden' ?>">
-            <form method="POST" action="login" id="formOperator">
-                <input type="hidden" name="tab" value="operator">
+                    <!-- Judul & Subjudul -->
+                    <div class="text-center mb-6">
+                        <h2 class="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">Masuk ke Akun Anda</h2>
+                        <p class="text-xs text-slate-400 mt-1 font-medium">Silakan isi data di bawah untuk melanjutkan</p>
+                    </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 items-stretch">
-                    <!-- KOLOM KIRI: INFO, PILIH AKUN, INPUT PIN, & SUBMIT DESKTOP -->
-                    <div class="md:col-span-6 flex flex-col justify-between space-y-3.5">
-                        <div class="space-y-3.5">
-                            <!-- INFO LOGIN OPERATOR -->
-                            <div class="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-3 flex items-center gap-3">
-                                <div class="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm shadow-emerald-600/30">
-                                    <i class="fa-solid fa-shapes"></i>
-                                </div>
-                                <div class="leading-tight">
-                                    <span class="text-xs font-bold text-emerald-900 block">Stasiun Operator Inbound</span>
-                                    <span class="text-[10px] text-emerald-700">Pilih akun & masukkan PIN untuk akses sistem</span>
+                    <!-- Notifikasi Error Jika Ada -->
+                    <?php if (!empty($error)): ?>
+                    <div class="mb-5 p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-semibold flex items-center gap-2.5 animate-shake">
+                        <i class="fa-solid fa-circle-exclamation text-rose-500 text-base shrink-0"></i>
+                        <span><?= htmlspecialchars($error) ?></span>
+                    </div>
+                    <?php endif; ?>
+
+                    <!-- Form Login Langsung (Tanpa Pilih Database) -->
+                    <form method="POST" action="login" class="space-y-4">
+                        
+                        <!-- Input Username -->
+                        <div>
+                            <div class="floating-input-group relative border border-slate-300 rounded-xl bg-slate-50/60 focus-within:bg-white transition duration-200">
+                                <label for="loginUsername" class="absolute -top-2.5 left-3 px-1.5 bg-white text-[10px] font-bold text-slate-500 rounded transition-colors">
+                                    Username
+                                </label>
+                                <div class="flex items-center px-3.5 py-2.5">
+                                    <span class="text-slate-400 text-sm mr-2.5 shrink-0">
+                                        <i class="fa-regular fa-user"></i>
+                                    </span>
+                                    <input type="text" name="username" id="loginUsername" required autocomplete="username"
+                                        placeholder="ADMIN"
+                                        value="<?= htmlspecialchars($_POST['username'] ?? '') ?>"
+                                        class="w-full bg-transparent text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none">
                                 </div>
                             </div>
-                            
-                            <!-- PILIH AKUN OPERATOR -->
-                            <div>
-                                <div class="flex items-center justify-between mb-1.5">
-                                    <label class="block text-xs font-bold text-slate-600">Pilih Akun Operator</label>
-                                    <button type="button" onclick="toggleManualOperatorInput()" id="btnToggleManualOp" class="text-[11px] text-emerald-600 hover:text-emerald-700 font-bold transition">
-                                        <i class="fa-solid fa-keyboard"></i> Ketik Manual
-                                    </button>
-                                </div>
+                        </div>
 
-                                <!-- Dropdown Pilihan Operator Aktif -->
-                                <div id="containerOpSelect" class="relative">
-                                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
-                                        <i class="fa-solid fa-user-check"></i>
+                        <!-- Input Password / PIN -->
+                        <div>
+                            <div class="floating-input-group relative border border-slate-300 rounded-xl bg-slate-50/60 focus-within:bg-white transition duration-200">
+                                <label for="loginPassword" class="absolute -top-2.5 left-3 px-1.5 bg-white text-[10px] font-bold text-slate-500 rounded transition-colors">
+                                    Password
+                                </label>
+                                <div class="flex items-center px-3.5 py-2.5">
+                                    <span class="text-slate-400 text-sm mr-2.5 shrink-0">
+                                        <i class="fa-solid fa-lock"></i>
                                     </span>
-                                    <select name="operator_username" id="operatorSelect" onchange="onOperatorSelected()"
-                                        class="w-full pl-10 pr-8 py-2.5 bg-slate-50 border border-slate-300 rounded-2xl text-xs font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition appearance-none">
-                                        <option value="">-- Pilih Operator Inbound --</option>
-                                        <?php foreach ($operators as $op): ?>
-                                            <option value="<?= htmlspecialchars($op['username']) ?>" <?= (isset($_POST['operator_username']) && $_POST['operator_username'] === $op['username']) ? 'selected' : '' ?>>
-                                                <?= htmlspecialchars(!empty($op['name']) ? $op['name'] : $op['username']) ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <span class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400 text-xs">
-                                        <i class="fa-solid fa-chevron-down"></i>
-                                    </span>
-                                </div>
-
-                                <!-- Input Manual Alternatif -->
-                                <div id="containerOpInput" class="relative hidden">
-                                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
-                                        <i class="fa-solid fa-user-pen"></i>
-                                    </span>
-                                    <input type="text" id="operatorManualInput" placeholder="Masukkan username operator..."
-                                        class="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-2xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition">
-                                </div>
-                            </div>
-
-                            <!-- Input PIN Operator -->
-                            <div>
-                                <div class="mb-1.5 flex items-center justify-between">
-                                    <label class="block text-xs font-bold text-slate-600">PIN Keamanan (6 Digit)</label>
-                                    <span class="text-[10px] text-slate-400 font-medium">Numpad / Keyboard</span>
-                                </div>
-                                <div class="relative">
-                                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
-                                        <i class="fa-solid fa-key"></i>
-                                    </span>
-                                    <input type="password" name="pin" id="operatorPin" required maxlength="10" inputmode="numeric" pattern="[0-9]*" placeholder="••••••"
-                                        class="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-mono tracking-widest text-center font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition">
-                                    <button type="button" onclick="toggleOperatorPin()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 text-sm">
-                                        <i class="fa-solid fa-eye" id="operatorEyeIcon"></i>
+                                    <input type="password" name="password" id="loginPassword" required autocomplete="current-password"
+                                        placeholder="•••••"
+                                        class="w-full bg-transparent text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none">
+                                    <button type="button" onclick="togglePasswordVisibility()" class="text-slate-400 hover:text-slate-600 ml-2 focus:outline-none cursor-pointer">
+                                        <i class="fa-regular fa-eye-slash text-sm" id="pwdEyeIcon"></i>
                                     </button>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- SUBMIT BUTTON DESKTOP (tampil di bawah form kiri di layar laptop/desktop) -->
-                        <div class="hidden md:block pt-1">
-                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-2xl text-xs transition duration-200 flex items-center justify-center gap-2 shadow-md shadow-emerald-600/30">
-                                <span>Masuk sebagai Operator</span>
-                                <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                        <!-- Tombol Masuk Warna Ungu / Violet Sesuai Gambar -->
+                        <div class="pt-2">
+                            <button type="submit" class="w-full py-3.5 px-4 bg-[#6348eb] hover:bg-[#5235e2] active:scale-[0.99] text-white font-bold rounded-xl text-sm transition duration-200 shadow-md shadow-indigo-600/30 flex items-center justify-center gap-2 cursor-pointer">
+                                <span>Masuk</span>
+                                <i class="fa-solid fa-arrow-right-to-bracket text-sm"></i>
                             </button>
                         </div>
-                    </div>
+                    </form>
 
-                    <!-- KOLOM KANAN: INTERACTIVE TOUCH NUMPAD & SUBMIT MOBILE -->
-                    <div class="md:col-span-6 flex flex-col justify-between">
-                        <div class="bg-slate-50/90 border border-slate-200/90 rounded-2xl p-2.5 sm:p-3 flex-1 flex flex-col justify-center">
-                            <div class="text-[11px] font-bold text-slate-500 text-center mb-2 flex items-center justify-center gap-1.5">
-                                <i class="fa-solid fa-calculator text-emerald-600"></i> Numpad Sentuh Cepat
-                            </div>
-                            <div class="grid grid-cols-3 gap-2 flex-1">
-                                <button type="button" onclick="appendPin('1')" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">1</button>
-                                <button type="button" onclick="appendPin('2')" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">2</button>
-                                <button type="button" onclick="appendPin('3')" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">3</button>
-                                
-                                <button type="button" onclick="appendPin('4')" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">4</button>
-                                <button type="button" onclick="appendPin('5')" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">5</button>
-                                <button type="button" onclick="appendPin('6')" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">6</button>
-                                
-                                <button type="button" onclick="appendPin('7')" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">7</button>
-                                <button type="button" onclick="appendPin('8')" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">8</button>
-                                <button type="button" onclick="appendPin('9')" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">9</button>
-                                
-                                <button type="button" onclick="clearPin()" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold shadow-sm hover:bg-rose-100 flex items-center justify-center">
-                                    <span>HAPUS</span>
-                                </button>
-                                <button type="button" onclick="appendPin('0')" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-bold shadow-sm hover:bg-slate-100">0</button>
-                                <button type="button" onclick="backspacePin()" class="numpad-btn py-2 sm:py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm font-bold shadow-sm hover:bg-amber-100 flex items-center justify-center">
+                    <!-- Toggle Numpad Touch Screen Opsional (Untuk Operator Gudang Kiosk / Layar Sentuh) -->
+                    <div class="mt-4 pt-3 border-t border-slate-100 flex flex-col items-center">
+                        <button type="button" onclick="toggleTouchNumpad()" id="btnToggleNumpad" class="text-[11px] text-indigo-600 hover:text-indigo-800 font-bold inline-flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-calculator"></i>
+                            <span>Mode Numpad Sentuh (Kiosk)</span>
+                        </button>
+
+                        <div id="touchNumpadContainer" class="hidden w-full mt-3 p-2 bg-slate-50 rounded-2xl border border-slate-200">
+                            <div class="grid grid-cols-3 gap-1.5">
+                                <button type="button" onclick="appendPinDigit('1')" class="numpad-btn py-2 rounded-xl bg-white border border-slate-200 text-slate-800 text-xs font-bold shadow-xs">1</button>
+                                <button type="button" onclick="appendPinDigit('2')" class="numpad-btn py-2 rounded-xl bg-white border border-slate-200 text-slate-800 text-xs font-bold shadow-xs">2</button>
+                                <button type="button" onclick="appendPinDigit('3')" class="numpad-btn py-2 rounded-xl bg-white border border-slate-200 text-slate-800 text-xs font-bold shadow-xs">3</button>
+                                <button type="button" onclick="appendPinDigit('4')" class="numpad-btn py-2 rounded-xl bg-white border border-slate-200 text-slate-800 text-xs font-bold shadow-xs">4</button>
+                                <button type="button" onclick="appendPinDigit('5')" class="numpad-btn py-2 rounded-xl bg-white border border-slate-200 text-slate-800 text-xs font-bold shadow-xs">5</button>
+                                <button type="button" onclick="appendPinDigit('6')" class="numpad-btn py-2 rounded-xl bg-white border border-slate-200 text-slate-800 text-xs font-bold shadow-xs">6</button>
+                                <button type="button" onclick="appendPinDigit('7')" class="numpad-btn py-2 rounded-xl bg-white border border-slate-200 text-slate-800 text-xs font-bold shadow-xs">7</button>
+                                <button type="button" onclick="appendPinDigit('8')" class="numpad-btn py-2 rounded-xl bg-white border border-slate-200 text-slate-800 text-xs font-bold shadow-xs">8</button>
+                                <button type="button" onclick="appendPinDigit('9')" class="numpad-btn py-2 rounded-xl bg-white border border-slate-200 text-slate-800 text-xs font-bold shadow-xs">9</button>
+                                <button type="button" onclick="clearPinInput()" class="numpad-btn py-2 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-[11px] font-bold">HAPUS</button>
+                                <button type="button" onclick="appendPinDigit('0')" class="numpad-btn py-2 rounded-xl bg-white border border-slate-200 text-slate-800 text-xs font-bold shadow-xs">0</button>
+                                <button type="button" onclick="backspacePinInput()" class="numpad-btn py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold">
                                     <i class="fa-solid fa-delete-left"></i>
                                 </button>
                             </div>
                         </div>
+                    </div>
 
-                        <!-- SUBMIT BUTTON MOBILE (hanya tampil di layar ponsel/vertikal) -->
-                        <div class="block md:hidden mt-3">
-                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-2xl text-xs transition duration-200 flex items-center justify-center gap-2 shadow-md shadow-emerald-600/30">
-                                <span>Masuk sebagai Operator</span>
-                                <i class="fa-solid fa-arrow-right-to-bracket"></i>
-                            </button>
-                        </div>
+                    <!-- Footer Link Sesuai Gambar -->
+                    <div class="text-center mt-5">
+                        <span class="text-xs text-slate-400 font-medium">
+                            Butuh bantuan? Hubungi tim IT
+                        </span>
                     </div>
                 </div>
-            </form>
-        </div>
+            </section>
+        </main>
 
-
+        <!-- Footer Bawah Hak Cipta -->
+        <footer class="pt-4 text-center sm:text-left text-xs text-white/60 flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-white/10">
+            <div>
+                &copy; <?= date('Y') ?> PT Inovasi Eka Gemilang &bull; Sistem Inbound Return &amp; OCS IEG
+            </div>
+            <div class="flex items-center gap-4 text-white/70">
+                <span>Versi 2.4</span>
+                <span>&bull;</span>
+                <span>All Rights Reserved</span>
+            </div>
+        </footer>
 
     </div>
 
-    <script src="assets/js/toast.js?v=<?= file_exists(__DIR__ . '/assets/js/toast.js') ? filemtime(__DIR__ . '/assets/js/toast.js') : time() ?>"></script>
+    <!-- Script Kontrol Form & Tampilan -->
     <script>
-    // Tab switching logic with automatic card resizing
-    function switchLoginTab(tab) {
-        const secAdmin = document.getElementById('sectionAdmin');
-        const secOperator = document.getElementById('sectionOperator');
-        const btnAdmin = document.getElementById('tabBtnAdmin');
-        const btnOperator = document.getElementById('tabBtnOperator');
-        const loginCard = document.getElementById('loginCard');
-
-        if (tab === 'operator') {
-            secAdmin.classList.add('hidden');
-            secOperator.classList.remove('hidden');
-
-            if (loginCard) {
-                loginCard.classList.remove('max-w-md');
-                loginCard.classList.add('max-w-2xl');
+        function togglePasswordVisibility() {
+            const input = document.getElementById('loginPassword');
+            const icon = document.getElementById('pwdEyeIcon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fa-regular fa-eye text-sm';
+            } else {
+                input.type = 'password';
+                icon.className = 'fa-regular fa-eye-slash text-sm';
             }
+        }
 
-            btnAdmin.className = 'flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition duration-200 text-slate-500 hover:text-slate-800';
-            btnAdmin.querySelector('span:last-child').className = 'text-[10px] px-1.5 py-0.5 rounded-md font-mono bg-slate-200 text-slate-500';
-
-            btnOperator.className = 'flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition duration-200 bg-white text-emerald-700 shadow-sm';
-            btnOperator.querySelector('span:last-child').className = 'text-[10px] px-1.5 py-0.5 rounded-md font-mono bg-emerald-50 text-emerald-600';
-
-            const opSelect = document.getElementById('operatorSelect');
-            if (opSelect && opSelect.value) {
-                document.getElementById('operatorPin').focus();
-            } else if (opSelect) {
-                opSelect.focus();
+        // Toggle Numpad Touchscreen
+        function toggleTouchNumpad() {
+            const container = document.getElementById('touchNumpadContainer');
+            const btn = document.getElementById('btnToggleNumpad');
+            if (container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+                btn.innerHTML = '<i class="fa-solid fa-xmark"></i> <span>Tutup Numpad</span>';
+                document.getElementById('loginPassword').focus();
+            } else {
+                container.classList.add('hidden');
+                btn.innerHTML = '<i class="fa-solid fa-calculator"></i> <span>Mode Numpad Sentuh (Kiosk)</span>';
             }
-        } else {
-            secOperator.classList.add('hidden');
-            secAdmin.classList.remove('hidden');
+        }
 
-            if (loginCard) {
-                loginCard.classList.remove('max-w-2xl');
-                loginCard.classList.add('max-w-md');
+        function appendPinDigit(d) {
+            const pwd = document.getElementById('loginPassword');
+            pwd.value += d;
+            pwd.focus();
+        }
+
+        function clearPinInput() {
+            const pwd = document.getElementById('loginPassword');
+            pwd.value = '';
+            pwd.focus();
+        }
+
+        function backspacePinInput() {
+            const pwd = document.getElementById('loginPassword');
+            pwd.value = pwd.value.slice(0, -1);
+            pwd.focus();
+        }
+
+        // Auto-focus username on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            const u = document.getElementById('loginUsername');
+            if (u && !u.value) {
+                u.focus();
             }
-
-            btnOperator.className = 'flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition duration-200 text-slate-500 hover:text-slate-800';
-            btnOperator.querySelector('span:last-child').className = 'text-[10px] px-1.5 py-0.5 rounded-md font-mono bg-slate-200 text-slate-500';
-
-            btnAdmin.className = 'flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition duration-200 bg-white text-indigo-700 shadow-sm';
-            btnAdmin.querySelector('span:last-child').className = 'text-[10px] px-1.5 py-0.5 rounded-md font-mono bg-indigo-50 text-indigo-600';
-
-            document.getElementById('adminUsername').focus();
-        }
-    }
-
-    // Toggle Password visibility for Admin
-    function toggleAdminPassword() {
-        const inp = document.getElementById('adminPassword');
-        const icon = document.getElementById('adminEyeIcon');
-        if (inp.type === 'password') {
-            inp.type = 'text';
-            icon.className = 'fa-solid fa-eye-slash';
-        } else {
-            inp.type = 'password';
-            icon.className = 'fa-solid fa-eye';
-        }
-    }
-
-    // Toggle PIN visibility for Operator
-    function toggleOperatorPin() {
-        const inp = document.getElementById('operatorPin');
-        const icon = document.getElementById('operatorEyeIcon');
-        if (inp.type === 'password') {
-            inp.type = 'text';
-            icon.className = 'fa-solid fa-eye-slash';
-        } else {
-            inp.type = 'password';
-            icon.className = 'fa-solid fa-eye';
-        }
-    }
-
-    // Numpad button handlers for Operator PIN
-    function appendPin(num) {
-        const pinInp = document.getElementById('operatorPin');
-        if (pinInp.value.length < 10) {
-            pinInp.value += num;
-        }
-    }
-
-    function clearPin() {
-        document.getElementById('operatorPin').value = '';
-    }
-
-    function backspacePin() {
-        const pinInp = document.getElementById('operatorPin');
-        pinInp.value = pinInp.value.slice(0, -1);
-    }
-
-    function onOperatorSelected() {
-        const sel = document.getElementById('operatorSelect');
-        if (sel.value) {
-            document.getElementById('operatorPin').focus();
-        }
-    }
-
-    // Toggle manual operator typing vs select
-    let isManualOp = false;
-    function toggleManualOperatorInput() {
-        isManualOp = !isManualOp;
-        const contSelect = document.getElementById('containerOpSelect');
-        const contInput = document.getElementById('containerOpInput');
-        const btnToggle = document.getElementById('btnToggleManualOp');
-        const sel = document.getElementById('operatorSelect');
-        const inp = document.getElementById('operatorManualInput');
-
-        if (isManualOp) {
-            contSelect.classList.add('hidden');
-            contInput.classList.remove('hidden');
-            sel.removeAttribute('name');
-            inp.setAttribute('name', 'operator_username');
-            btnToggle.innerHTML = '<i class="fa-solid fa-list"></i> Pilih dari Daftar';
-            inp.focus();
-        } else {
-            contInput.classList.add('hidden');
-            contSelect.classList.remove('hidden');
-            inp.removeAttribute('name');
-            sel.setAttribute('name', 'operator_username');
-            btnToggle.innerHTML = '<i class="fa-solid fa-keyboard"></i> Ketik Manual';
-            sel.focus();
-        }
-    }
-
+        });
     </script>
 </body>
 </html>
