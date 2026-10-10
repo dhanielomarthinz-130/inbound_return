@@ -191,21 +191,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7 lg:py-10 min-h-screen flex flex-col justify-between">
         
-        <!-- Header Branding: Top Left -->
-        <header class="flex items-center justify-between mb-4 sm:mb-6">
-            <div class="flex items-center gap-3">
-                <div class="w-11 h-11 rounded-2xl bg-white/20 border border-white/30 backdrop-blur-md flex items-center justify-center text-white shadow-md shadow-blue-950/20">
-                    <i class="fa-solid fa-cart-shopping text-lg"></i>
-                </div>
-                <div>
-                    <div class="text-base sm:text-lg font-black text-white tracking-tight leading-none drop-shadow-sm">IEG OCS</div>
-                    <div class="text-[11px] text-blue-100 font-medium tracking-wide mt-0.5 opacity-90">Omni Channel System</div>
-                </div>
-            </div>
-        </header>
-
         <!-- Main Content Area: Left Hero + Right Form Card -->
-        <main class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center py-4 sm:py-6 my-auto">
+        <main class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center py-6 sm:py-10 my-auto">
             
             <!-- KOLOM KIRI: TEKS SELAMAT DATANG & 4 FITUR UTAMA -->
             <section class="lg:col-span-5 text-white space-y-6 sm:space-y-8 pr-0 lg:pr-4">
@@ -254,9 +241,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <section class="lg:col-span-7 flex justify-center lg:justify-end">
                 <div id="loginCard" class="w-full transition-all duration-300 <?= $activeTab === 'operator' ? 'max-w-2xl' : 'max-w-md' ?> bg-white rounded-3xl sm:rounded-[2rem] shadow-2xl shadow-indigo-950/30 p-5 sm:p-7 md:p-8 border border-white/40">
                     
-                    <!-- Logo Perusahaan: logo_text-BademdvM.jpg -->
-                    <div class="flex justify-center mb-4">
-                        <img src="assets/image/logo_text-BademdvM.jpg" alt="Inovasi Eka Gemilang" class="h-12 sm:h-14 w-auto max-w-[250px] object-contain">
+                    <!-- Logo Perusahaan: logo_text-BademdvM.jpg (Diperbesar & Tajam) -->
+                    <div class="flex justify-center mb-5">
+                        <img src="assets/image/logo_text-BademdvM.jpg?v=<?= file_exists(__DIR__ . '/assets/image/logo_text-BademdvM.jpg') ? filemtime(__DIR__ . '/assets/image/logo_text-BademdvM.jpg') : time() ?>" alt="Inovasi Eka Gemilang" class="h-16 sm:h-20 w-auto max-w-[280px] sm:max-w-[330px] object-contain">
                     </div>
 
                     <!-- Judul & Subjudul -->
