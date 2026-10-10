@@ -51,6 +51,16 @@ Cukup klik ganda (double-click) file **`jalankan-server.bat`**, atau buka langsu
   3. `return_sessions`: Data transaksi sesi return (invoice, kurir/ekspedisi, operator, total barang).
   4. `return_items`: Rincian per invoice (barcode, nama produk, batch, exp date, qty, tipe kondisi).
 
+### 📥 Import Manual Database (`database.sql`):
+File **[`database.sql`](database.sql)** telah disediakan di root repository untuk kemudahan deployment manual di phpMyAdmin, HeidiSQL, DBeaver, ataupun via MySQL CLI:
+```bash
+mysql -u root -p < database.sql
+```
+File ini sudah berisi:
+- Skema lengkap 12 tabel sistem (`inbound_return`).
+- Data master awal (`roles`, `users` resmi, `master_conditions`, `master_expeditions`, `master_products` 686 item, dan `system_settings`).
+- Struktur tabel transaksi bersih (*clean schema*) siap pakai.
+
 ---
 
 ## 🚚 Deteksi Ekspedisi Otomatis (Auto-Detect):
