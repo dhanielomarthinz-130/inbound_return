@@ -201,7 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         Selamat Datang<br>di IEG Return
                     </h1>
                     <p class="text-sm sm:text-base lg:text-lg text-blue-100/90 font-normal leading-relaxed max-w-xl">
-                        Kelola pergudangan, pesanan, dan integrasi multi-platform dengan cepat dan akurat.
+                        Kelola penerimaan paket retur, proses unboxing, dokumentasi video &amp; foto, serta klaim ekspedisi secara cepat dan akurat.
                     </p>
                 </div>
 
