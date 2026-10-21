@@ -13,22 +13,33 @@ Thumbs.db
 *.sublime-workspace
 
 # User Uploads
-uploads/videos/*.webm
-uploads/videos/*.mp4
-uploads/photos/*.jpg
-uploads/photos/*.jpeg
-uploads/photos/*.png
-uploads/reception/*.jpg
-uploads/reception/*.jpeg
-uploads/reception/*.png
+uploads/videos/*
+uploads/photos/*
+uploads/reception/*
+uploads/*.webm
+uploads/*.mp4
+uploads/*.jpg
+uploads/*.jpeg
+uploads/*.png
 uploads/cache/
 uploads/logs/
 uploads/.db_ready
+*.sql
+*.sql.zip
+!database.sql
 cloudflared.exe
 ngrok.exe
 ngrok_domain.txt
+# Local Configuration & Credentials
+config.local.php
+nas_config.local.php
+sync_config.local.php
+*.local.php
+.env
+.env.*
+
+# Backup & Scripts
 scratch/
 _backup_*/
-sync_config.local.php
-.is_pc_server
 TRANSFER_KE_SERVER_*/
+.is_pc_server

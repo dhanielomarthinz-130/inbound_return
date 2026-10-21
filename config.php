@@ -23,6 +23,11 @@ if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS
     exit;
 }
 
+// Muat konfigurasi kredensial lokal jika ada (di-ignore oleh git)
+if (file_exists(__DIR__ . '/config.local.php')) {
+    require_once __DIR__ . '/config.local.php';
+}
+
 $http_host = $_SERVER['HTTP_HOST'] ?? '';
 $is_remote = (
     strpos($http_host, 'great-site.net') !== false ||
@@ -36,23 +41,23 @@ $is_remote = (
 
 if ($is_remote) {
     // Production InfinityFree (returninboundieg.great-site.net)
-    $db_host = 'sql202.infinityfree.com';
-    $db_user = 'if0_38464190';
-    $db_pass = 'Dhaniel0';
-    $db_name = 'if0_38464190_inboundreturnIEG';
+    $db_host = defined('DB_PROD_HOST') ? DB_PROD_HOST : (getenv('DB_HOST') ?: 'sql202.infinityfree.com');
+    $db_user = defined('DB_PROD_USER') ? DB_PROD_USER : (getenv('DB_USER') ?: 'if0_38464190');
+    $db_pass = defined('DB_PROD_PASS') ? DB_PROD_PASS : (getenv('DB_PASS') ?: '');
+    $db_name = defined('DB_PROD_NAME') ? DB_PROD_NAME : (getenv('DB_NAME') ?: 'if0_38464190_inboundreturnIEG');
 } else {
     // Localhost (Laragon / XAMPP)
-    $db_host = '127.0.0.1';
-    $db_user = 'root';
-    $db_pass = '';
-    $db_name = 'inbound_return';
+    $db_host = defined('DB_LOCAL_HOST') ? DB_LOCAL_HOST : (getenv('DB_HOST') ?: '127.0.0.1');
+    $db_user = defined('DB_LOCAL_USER') ? DB_LOCAL_USER : (getenv('DB_USER') ?: 'root');
+    $db_pass = defined('DB_LOCAL_PASS') ? DB_LOCAL_PASS : (getenv('DB_PASS') ?: '');
+    $db_name = defined('DB_LOCAL_NAME') ? DB_LOCAL_NAME : (getenv('DB_NAME') ?: 'inbound_return');
 }
 
 // Konfigurasi Kredensial OCS IEG System (https://ocs.iegsystem.id/)
-defined('OCS_BASE_URL')  or define('OCS_BASE_URL', 'https://ocs.iegsystem.id');
-defined('OCS_USERNAME')  or define('OCS_USERNAME', 'ADMIN');
-defined('OCS_PASSWORD')  or define('OCS_PASSWORD', 'luwakwhitecoffee');
-defined('OCS_COMPANYDB') or define('OCS_COMPANYDB', 'EJI_WMS');
+defined('OCS_BASE_URL')  or define('OCS_BASE_URL', getenv('OCS_BASE_URL') ?: 'https://ocs.iegsystem.id');
+defined('OCS_USERNAME')  or define('OCS_USERNAME', getenv('OCS_USERNAME') ?: 'ADMIN');
+defined('OCS_PASSWORD')  or define('OCS_PASSWORD', getenv('OCS_PASSWORD') ?: '');
+defined('OCS_COMPANYDB') or define('OCS_COMPANYDB', getenv('OCS_COMPANYDB') ?: 'EJI_WMS');
 
 try {
     // 1. Koneksi langsung ke database
@@ -430,27 +435,15 @@ try {
             }
         } catch (Exception $e) {}
 
-        // Seed / Update Pengguna Resmi (Hanya jika belum ada atau password kosong)
+        // Inisialisasi Pengguna Awal (Hanya jika tabel users masih kosong)
         try {
-            $requiredUsers = [
-                ['username' => 'Daniel',     'password' => 'Dh@niel0',   'name' => 'Daniel',     'role' => 'superadmin', 'pin' => '123456'],
-                ['username' => 'Admin',      'password' => 'Password01', 'name' => 'Admin',      'role' => 'admin',      'pin' => '123456'],
-                ['username' => 'Operator 1', 'password' => 'Password01', 'name' => 'Operator 1', 'role' => 'operator',   'pin' => '123456'],
-                ['username' => 'Operator 2', 'password' => 'Password01', 'name' => 'Operator 2', 'role' => 'operator',   'pin' => '123456']
-            ];
-
-            foreach ($requiredUsers as $reqUser) {
-                $chkU = $pdo->prepare("SELECT id, password FROM users WHERE username = ?");
-                $chkU->execute([$reqUser['username']]);
-                $existing = $chkU->fetch();
-
-                if (!$existing) {
-                    $hashedPass = password_hash($reqUser['password'], PASSWORD_DEFAULT);
-                    $pdo->prepare("INSERT INTO users (username, password, name, role, pin, status) VALUES (?, ?, ?, ?, ?, 'ACTIVE')")
-                        ->execute([$reqUser['username'], $hashedPass, $reqUser['name'], $reqUser['role'], $reqUser['pin']]);
-                }
+            $userCount = (int)$pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
+            if ($userCount === 0) {
+                // Buat akun default superadmin jika instalasi database masih benar-benar kosong
+                $initialPassword = password_hash('Admin123!', PASSWORD_DEFAULT);
+                $pdo->prepare("INSERT INTO users (username, password, name, role, pin, status) VALUES (?, ?, ?, ?, ?, 'ACTIVE')")
+                    ->execute(['admin', $initialPassword, 'Administrator', 'superadmin', '123456']);
             }
-
             $pdo->exec("DELETE FROM users WHERE username IN ('superadmin', 'operator')");
 
             $chkMaint = $pdo->prepare("SELECT key_value FROM system_settings WHERE key_name = 'maintenance_mode'");
@@ -830,18 +823,19 @@ function getRoleMenuPermissions($pdo = null) {
  * Cek Apakah Role Pengguna Berhak Mengakses Suatu Menu
  */
 function userHasMenuAccess($menuKey, $userRole, $pdo = null) {
-    $roleClean = strtolower(trim(str_replace([' ', '-'], '_', $userRole ?? '')));
-    if ($roleClean === 'superadmin') {
+    $roleRaw = strtolower(trim(str_replace([' ', '-', '_'], '', $userRole ?? '')));
+    if ($roleRaw === 'superadmin') {
         return true;
     }
     // Control panel akses menu hanya boleh dibuka oleh superadmin & admin (mode lihat/kelola)
     if ($menuKey === 'menu-permissions') {
-        return ($roleClean === 'superadmin' || $roleClean === 'admin');
+        return ($roleRaw === 'superadmin' || $roleRaw === 'admin');
     }
 
+    $roleClean = strtolower(trim(str_replace([' ', '-'], '_', $userRole ?? '')));
     global $pdo;
     $perms = getRoleMenuPermissions($pdo);
-    $allowed = $perms[$roleClean] ?? ($perms[str_replace('_', '', $roleClean)] ?? []);
+    $allowed = $perms[$roleClean] ?? ($perms[$roleRaw] ?? []);
 
     return in_array($menuKey, $allowed, true);
 }

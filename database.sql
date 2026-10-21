@@ -77,19 +77,8 @@ CREATE TABLE `users` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 -- Dumping data for table `users`
-INSERT INTO `users` (`id`, `username`, `password`, `name`, `role`, `pin`, `status`, `created_at`) VALUES
-('1', 'Daniel', '$2y$12$d2t2QGgscPwOQfeKiWEUme0S75d0tjDOXngj6GuHDVCWArcAkdmku', 'Daniel', 'superadmin', '123456', 'ACTIVE', '2026-09-30 06:34:16'),
-('2', 'Admin', '$2y$12$DfmFTBHwa8HarZE9hmETxOVKX.kz0yDJxgO8CyEBVTUwK/GcJ5gMu', 'Admin', 'admin', '123456', 'ACTIVE', '2026-09-30 06:34:17'),
-('3', 'Operator 1', '$2y$12$mfZr9nRK0q1qG4OkkEgaTuzP/AKp5pMKcbTddP0Kwdn.dgyN3Vbmu', 'Operator 1', 'operator', '123456', 'ACTIVE', '2026-09-30 06:34:17'),
-('4', 'Operator 2', '$2y$12$xT0Pu1eDyfTpeQ0J.VF3BO1o/s6pAi9XTO1UAdgjRctokeW0Fv3SK', 'Operator 2', 'operator', '123456', 'ACTIVE', '2026-09-30 06:34:17'),
-('5', 'Return', '$2y$10$sLSfzwQRnTHbrcjkDcJ/D.uGIuIgajXpdYKtvhLdIUVZVF4VFqUHe', 'return', 'operator', '123456', 'ACTIVE', '2026-10-02 06:21:51'),
-('8', 'fikri', '$2y$12$.nW22acL6kVzyuKhDBkMz.cajcGBQz2Ur6bg96G45dMaUW.yKkc9u', 'fikri pratama', 'operator', '123456', 'ACTIVE', '2026-09-28 16:29:36'),
-('9', 'dapit', '$2y$12$9xcaV3vlFBUkyLQTTPu/lOajs0SJBw.6prihok5flvTp.8OAG/KQW', 'dapit pratama', 'operator', '123456', 'ACTIVE', '2026-09-28 16:29:36'),
-('10', 'raihan', '$2y$12$iMxJ/w1WZUJVw5AZzTtmLezgott37.XyMjJI4j/63byCMGRuIEYJC', 'raihan permana', 'operator', '123456', 'ACTIVE', '2026-10-02 01:32:29'),
-('11', 'dimas', '$2y$12$.npatdNjhL22M/Uya0GgxuLY8wC0fwJuiuY4bFs/m3EKs3cjXE3hm', 'dimas angga', 'operator', '123456', 'ACTIVE', '2026-10-02 01:32:51'),
-('3956', 'anwar', '$2y$12$FH4sl81ZrP2LJAmrqw4Ki.Y06N3yWjLbF8CbzsWmZxZqCoDwUFEJi', 'syaiful anwar', 'operator', '123456', 'ACTIVE', '2026-10-07 08:17:12');
+-- (Data akun pengguna sengaja tidak di-dump untuk alasan keamanan privasi & proteksi kredensial)
 
 -- ------------------------------------------------------------------------------
 -- Table structure for `master_conditions`

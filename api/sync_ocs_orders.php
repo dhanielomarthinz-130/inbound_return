@@ -188,15 +188,23 @@ if (!empty($startParam) && !empty($endParam)) {
     $endWib   = "{$todayStr} 23:59:59";
     $targetDateLabel = $todayStr;
 } else {
-    if ($dateParam === 'yesterday') {
+    $dateParamLower = strtolower($dateParam);
+    if ($dateParamLower === 'yesterday' || $dateParamLower === 'h-1' || $dateParamLower === 'h_1' || $dateParamLower === '1_day_ago') {
         $targetDayStr = date('Y-m-d', strtotime('-1 day'));
+        $targetDateLabel = "{$targetDayStr} (H-1 / Kemarin)";
+    } elseif ($dateParamLower === 'h-2' || $dateParamLower === 'h_2' || $dateParamLower === '2_days_ago' || $dateParamLower === '-2 days') {
+        $targetDayStr = date('Y-m-d', strtotime('-2 days'));
+        $targetDateLabel = "{$targetDayStr} (H-2)";
+    } elseif ($dateParamLower === 'h-3' || $dateParamLower === 'h_3' || $dateParamLower === '3_days_ago' || $dateParamLower === '-3 days') {
+        $targetDayStr = date('Y-m-d', strtotime('-3 days'));
+        $targetDateLabel = "{$targetDayStr} (H-3)";
     } else {
         $targetDayStr = date('Y-m-d', strtotime($dateParam));
+        $targetDateLabel = $targetDayStr;
     }
     // Dari jam 00:00:00 sampai 23:59:59 WIB
     $startWib = "{$targetDayStr} 00:00:00";
     $endWib   = "{$targetDayStr} 23:59:59";
-    $targetDateLabel = $targetDayStr;
 }
 
 // Konversi WIB ke UTC untuk query OData CreatedAt OCS

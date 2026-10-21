@@ -5,17 +5,20 @@
  * Menampilkan Aging Paket dari Receiving sampai Unboxing (berapa hari).
  * Jika belum di-unboxing, menampilkan status BELUM_UNBOXING dan aging dihitung dari receiving sampai hari ini (Today).
  */
+ob_start();
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../../config.php';
 
 $user = getSessionUser();
 if (!$user) {
+    if (ob_get_length()) ob_clean();
     jsonResponse(['success' => false, 'error' => 'Unauthorized. Silakan login terlebih dahulu.'], 401);
 }
 
 $rawRole = strtolower(trim(str_replace([' ', '_', '-'], '', $user['role'] ?? '')));
 $allowedRoles = ['superadmin', 'admin', 'management', 'operatorreporting', 'operator_reporting', 'customerservice', 'customer_service', 'accounting'];
 if (!in_array($rawRole, $allowedRoles, true)) {
+    if (ob_get_length()) ob_clean();
     jsonResponse(['success' => false, 'error' => 'Akses ditolak.'], 403);
 }
 
@@ -26,7 +29,21 @@ try {
     $agingFlt   = strtoupper(trim($_GET['aging_filter'] ?? 'ALL'));
     $dateFilter = trim($_GET['date'] ?? '');
     $sort       = strtolower(trim($_GET['sort'] ?? 'fifo'));
-    $limit      = min(500, max(20, (int)($_GET['limit'] ?? 200)));
+    $page       = max(1, (int)($_GET['page'] ?? 1));
+    $rawLimit   = $_GET['limit'] ?? 50;
+    $isExport   = isset($_GET['export']) && ($_GET['export'] === '1' || $_GET['export'] === 'true');
+
+    if ($isExport) {
+        $limit  = 10000;
+        $offset = 0;
+    } elseif (strtolower((string)$rawLimit) === 'all') {
+        $limit  = 500;
+        $offset = ($page - 1) * $limit;
+    } else {
+        $limitVal = (int)$rawLimit;
+        $limit  = ($limitVal > 0) ? min(500, max(10, $limitVal)) : 50;
+        $offset = ($page - 1) * $limit;
+    }
 
     // CTE / Subquery data paket terpadu (Receiving -> Unboxing)
     // 1. Data paket yang tercatat di serah terima receiving (reception_packages)
@@ -124,7 +141,7 @@ try {
                 SELECT tracking_number, order_id 
                 FROM ocs_orders 
                 WHERE order_id LIKE :s OR tracking_number LIKE :s 
-                LIMIT 50
+                LIMIT 500
             ");
             $stmtSrchOcs->execute([':s' => '%' . $search . '%']);
             while ($rOcs = $stmtSrchOcs->fetch(PDO::FETCH_ASSOC)) {
@@ -228,7 +245,6 @@ try {
     $stmtSummary->execute($params);
     $summary = $stmtSummary->fetch(PDO::FETCH_ASSOC);
 
-    // 2. Ambil list ekspedisi unik untuk filter dropdown
     $stmtExp = $pdo->query("
         SELECT DISTINCT COALESCE(NULLIF(expedition,''), 'Lainnya') as exp_name 
         FROM expedition_receptions 
@@ -237,18 +253,35 @@ try {
     ");
     $availableExpeditions = $stmtExp->fetchAll(PDO::FETCH_COLUMN);
 
-    // 3. Ambil data list paket
+    // Ambil rentang tanggal kedatangan paket yang belum di-unboxing
+    $stmtUnboxRng = $pdo->query("
+        SELECT 
+            MIN(DATE(COALESCE(receiving_at, unboxing_at))) as min_unboxed_date,
+            MAX(DATE(COALESCE(receiving_at, unboxing_at))) as max_unboxed_date
+        FROM ({$baseSql}) AS b
+        WHERE b.status_paket = 'BELUM_UNBOXING'
+    ");
+    $unboxedRngRow = $stmtUnboxRng->fetch(PDO::FETCH_ASSOC);
+    $unboxedRangeInfo = [
+        'start_date' => $unboxedRngRow['min_unboxed_date'] ?? date('Y-m-d'),
+        'end_date'   => $unboxedRngRow['max_unboxed_date'] ?? date('Y-m-d')
+    ];
+
+    $totalRecords = (int)($summary['total_packages'] ?? 0);
+    $totalPages   = $totalRecords > 0 ? (int)ceil($totalRecords / $limit) : 1;
+
+    // 3. Ambil data list paket dengan pagination aman
     $dataSql = "
         SELECT * FROM ({$baseSql}) AS t 
         {$whereClause} 
         {$orderBy} 
-        LIMIT {$limit}
+        LIMIT {$limit} OFFSET {$offset}
     ";
     $stmtData = $pdo->prepare($dataSql);
     $stmtData->execute($params);
     $packages = $stmtData->fetchAll(PDO::FETCH_ASSOC);
 
-    // 4. Batch lookup ocs_orders untuk Order ID & Data Penjualan (Sangat Cepat & Efisien)
+    // 4. Batch lookup ocs_orders untuk Order ID & Data Penjualan (Sangat Cepat & Efisien dengan chunking)
     $barcodes = [];
     foreach ($packages as $p) {
         if (!empty($p['barcode'])) $barcodes[$p['barcode']] = true;
@@ -258,16 +291,19 @@ try {
     $ocsMap = [];
     if (!empty($barcodeList)) {
         try {
-            $placeholders = implode(',', array_fill(0, count($barcodeList), '?'));
-            $stmtOcs = $pdo->prepare("
-                SELECT order_id, tracking_number, commerce_platform, shop_name, customer_name, total_amount, package_price
-                FROM ocs_orders
-                WHERE tracking_number IN ($placeholders) OR order_id IN ($placeholders)
-            ");
-            $stmtOcs->execute(array_merge($barcodeList, $barcodeList));
-            while ($row = $stmtOcs->fetch(PDO::FETCH_ASSOC)) {
-                if (!empty($row['tracking_number'])) $ocsMap[$row['tracking_number']] = $row;
-                if (!empty($row['order_id'])) $ocsMap[$row['order_id']] = $row;
+            $chunks = array_chunk($barcodeList, 500);
+            foreach ($chunks as $chunk) {
+                $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+                $stmtOcs = $pdo->prepare("
+                    SELECT order_id, tracking_number, commerce_platform, shop_name, customer_name, total_amount, package_price
+                    FROM ocs_orders
+                    WHERE tracking_number IN ($placeholders) OR order_id IN ($placeholders)
+                ");
+                $stmtOcs->execute(array_merge($chunk, $chunk));
+                while ($row = $stmtOcs->fetch(PDO::FETCH_ASSOC)) {
+                    if (!empty($row['tracking_number'])) $ocsMap[$row['tracking_number']] = $row;
+                    if (!empty($row['order_id'])) $ocsMap[$row['order_id']] = $row;
+                }
             }
         } catch (Exception $e) {}
     }
@@ -350,6 +386,7 @@ try {
     }
     unset($pkg);
 
+    if (ob_get_length()) ob_clean();
     jsonResponse([
         'success'              => true,
         'summary'              => [
@@ -361,13 +398,24 @@ try {
             'avg_aging_days'       => round((float)($summary['avg_aging_days'] ?? 0), 1),
             'max_aging_days'       => (int)($summary['max_aging_days'] ?? 0),
         ],
+        'pagination'           => [
+            'page'          => $page,
+            'limit'         => $limit,
+            'total_records' => $totalRecords,
+            'total_pages'   => $totalPages,
+            'start_index'   => $totalRecords > 0 ? ($offset + 1) : 0,
+            'end_index'     => min($offset + count($packages), $totalRecords)
+        ],
         'expeditions'          => $availableExpeditions,
+        'unboxed_range'        => $unboxedRangeInfo,
         'packages'             => $packages,
         'count'                => count($packages),
-        'limit'                => $limit
+        'limit'                => $limit,
+        'page'                 => $page
     ]);
 
 } catch (Exception $e) {
+    if (ob_get_length()) ob_clean();
     jsonResponse([
         'success' => false,
         'error'   => 'Gagal memuat data Aging Return: ' . $e->getMessage()

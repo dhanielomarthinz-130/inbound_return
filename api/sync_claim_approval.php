@@ -160,12 +160,13 @@ if ($action === 'list_for_accounting') {
         $stats = $statStmt->fetch(PDO::FETCH_ASSOC);
 
         $listStmt = $pdo->prepare("
-            SELECT j.*, COALESCE(j.video_path, rs.video_path) AS video_path
+            SELECT j.*, 
+                   COALESCE(j.video_path, rs.video_path) AS video_path,
+                   COALESCE(j.unboxing_date, rs.created_at) AS unboxing_date
             FROM jnt_claim_approvals j
             LEFT JOIN return_sessions rs ON rs.invoice_number = j.invoice_number
             {$whereSql}
             ORDER BY j.id DESC
-            LIMIT 500
         ");
         $listStmt->execute($params);
         $rows = $listStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -258,7 +259,6 @@ if ($action === 'get_approved_for_local') {
             FROM jnt_claim_approvals
             WHERE status IN ('APPROVED', 'REJECTED')
             ORDER BY updated_at ASC
-            LIMIT 500
         ");
         $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 

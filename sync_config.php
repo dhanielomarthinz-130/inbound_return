@@ -6,16 +6,16 @@
  * dan yang ada di PC Localhost untuk keamanan transmisi data.
  */
 
-// Kunci Keamanan Token Rahasia (Pastikan sama di online dan local)
-defined('SYNC_SECRET_KEY') or define('SYNC_SECRET_KEY', 'IEG_RETURN_SYNC_TOKEN_2026_X99A');
-
-// URL Web InfinityFree Anda
-defined('CLOUD_BASE_URL') or define('CLOUD_BASE_URL', 'https://returninboundieg.great-site.net');
-
 // Muat konfigurasi khusus mesin ini jika ada (misal di PC Server Kantor)
 if (file_exists(__DIR__ . '/sync_config.local.php')) {
     require_once __DIR__ . '/sync_config.local.php';
 }
+
+// Kunci Keamanan Token Rahasia (Pastikan sama di online dan local, override di sync_config.local.php)
+defined('SYNC_SECRET_KEY') or define('SYNC_SECRET_KEY', getenv('SYNC_SECRET_KEY') ?: 'IEG_RETURN_DEFAULT_SYNC_KEY');
+
+// URL Web InfinityFree Anda
+defined('CLOUD_BASE_URL') or define('CLOUD_BASE_URL', getenv('CLOUD_BASE_URL') ?: 'https://returninboundieg.great-site.net');
 
 /**
  * PENGATURAN SYNC MULTI-PERANGKAT:
@@ -30,7 +30,7 @@ defined('SYNC_ENABLED') or define('SYNC_ENABLED', ($hasServerMarker && !$isLapto
 defined('SYNC_BATCH_LIMIT') or define('SYNC_BATCH_LIMIT', 30);
 
 // Konfigurasi Direct FTP (Bypass Anti-Bot / Anti-Scraping InfinityFree untuk Foto & Video)
-defined('FTP_SYNC_HOST') or define('FTP_SYNC_HOST', 'ftpupload.net');
-defined('FTP_SYNC_USER') or define('FTP_SYNC_USER', 'if0_38464190');
-defined('FTP_SYNC_PASS') or define('FTP_SYNC_PASS', 'Dhaniel0');
-defined('FTP_SYNC_BASE') or define('FTP_SYNC_BASE', 'returninboundieg.great-site.net/htdocs');
+defined('FTP_SYNC_HOST') or define('FTP_SYNC_HOST', getenv('FTP_SYNC_HOST') ?: 'ftpupload.net');
+defined('FTP_SYNC_USER') or define('FTP_SYNC_USER', getenv('FTP_SYNC_USER') ?: 'if0_38464190');
+defined('FTP_SYNC_PASS') or define('FTP_SYNC_PASS', getenv('FTP_SYNC_PASS') ?: '');
+defined('FTP_SYNC_BASE') or define('FTP_SYNC_BASE', getenv('FTP_SYNC_BASE') ?: 'returninboundieg.great-site.net/htdocs');

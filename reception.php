@@ -991,6 +991,26 @@ try {
 
     <!-- AUDIO BEEP & SHUTTER SYNTHESIZER -->
     <script>
+        // Helper Format Tanggal Indonesia
+        const INDO_MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+        function formatDateIndonesia(dateVal, options = {}) {
+            if (!dateVal) return '-';
+            const str = String(dateVal).trim();
+            if (!str || str === '-' || str === '0000-00-00' || str === '0000-00-00 00:00:00') return '-';
+            const m = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[T\s](\d{1,2}):(\d{1,2}))?/);
+            if (m) {
+                const day = String(parseInt(m[3], 10)).padStart(2, '0');
+                const month = INDO_MONTHS_SHORT[parseInt(m[2], 10) - 1] || '';
+                const year = m[1];
+                let res = `${day} ${month} ${year}`;
+                if (options.withTime !== false && m[4] !== undefined) {
+                    res += `, ${String(parseInt(m[4], 10)).padStart(2, '0')}:${String(parseInt(m[5], 10)).padStart(2, '0')} WIB`;
+                }
+                return res;
+            }
+            return str;
+        }
+
         // Helper Safe Dom Text Setter
         function setText(idOrEl, text) {
             const el = (typeof idOrEl === 'string') ? document.getElementById(idOrEl) : idOrEl;
@@ -3039,9 +3059,8 @@ try {
                                         <span class="underline decoration-emerald-300 underline-offset-2">${escapeHtml(item.receipt_number)}</span>
                                     </button>
                                 </td>
-                                <td class="py-2.5 px-3 font-mono text-[11px] text-slate-600">
-                                    <span class="font-bold">${timeOnly}</span>
-                                    <span class="text-[10px] text-slate-400 block">${scanTime.includes(' ') ? scanTime.split(' ')[0] : ''}</span>
+                                <td class="py-2.5 px-3 font-mono text-[11px] text-slate-700 whitespace-nowrap">
+                                    <div class="font-bold text-slate-800">${formatDateIndonesia(item.scanned_at || item.reception_created_at, { withTime: true })}</div>
                                 </td>
                                 <td class="py-2.5 px-3 text-slate-600 font-medium">${escapeHtml(item.operator_name || '-')}</td>
                                 <td class="py-2.5 px-3 text-center">${actionBtns}</td>

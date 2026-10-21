@@ -244,6 +244,23 @@ if ($isAdmin && !in_array('menu-permissions', $currentUserAllowedMenus, true)) {
             }
             .no-print { display: none !important; }
         }
+        .custom-sidebar-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 transparent;
+        }
+        .custom-sidebar-scroll::-webkit-scrollbar {
+            width: 5px;
+        }
+        .custom-sidebar-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-sidebar-scroll::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 4px;
+        }
+        .custom-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+            background-color: #94a3b8;
+        }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800 flex overflow-x-hidden">
@@ -252,7 +269,7 @@ if ($isAdmin && !in_array('menu-permissions', $currentUserAllowedMenus, true)) {
     <div id="sidebarBackdrop" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 lg:hidden hidden"></div>
 
     <!-- SIDEBAR -->
-    <aside id="sidebar" class="w-64 bg-white text-slate-700 flex flex-col shrink-0 fixed inset-y-0 left-0 z-50 lg:static transition-transform duration-300 transform -translate-x-full lg:translate-x-0 shadow-xl lg:shadow-none border-r border-slate-200">
+    <aside id="sidebar" class="w-64 bg-white text-slate-700 flex flex-col shrink-0 fixed inset-y-0 left-0 z-50 lg:sticky lg:top-0 lg:h-screen lg:max-h-screen transition-transform duration-300 transform -translate-x-full lg:translate-x-0 shadow-xl lg:shadow-none border-r border-slate-200">
         
         <!-- Sidebar Brand -->
         <div class="p-5 border-b border-slate-100 flex items-center justify-between">
@@ -271,10 +288,10 @@ if ($isAdmin && !in_array('menu-permissions', $currentUserAllowedMenus, true)) {
         </div>
 
         <!-- Sidebar Navigation -->
-        <div class="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-            <div class="px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Menu Navigasi</div>
+        <div class="flex-1 py-4 px-3 space-y-1 overflow-y-auto custom-sidebar-scroll">
+            <div class="px-3 pb-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Menu Operasional</div>
 
-            <?php if (userHasMenuAccess('dashboard', $rawRole, $pdo)): ?>
+            <?php if ($isSuperAdmin || userHasMenuAccess('dashboard', $rawRole, $pdo)): ?>
             <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition text-white bg-indigo-600 shadow-sm shadow-indigo-600/30">
                 <i class="fa-solid fa-gauge-high w-5 text-center text-indigo-100"></i>
                 <span>Dashboard Overview</span>
@@ -282,14 +299,14 @@ if ($isAdmin && !in_array('menu-permissions', $currentUserAllowedMenus, true)) {
             <?php endif; ?>
 
             <!-- MENU: RECEIVING INBOUND (PENERIMAAN EKSPEDISI) -->
-            <?php if (userHasMenuAccess('receiving', $rawRole, $pdo)): ?>
+            <?php if ($isSuperAdmin || userHasMenuAccess('receiving', $rawRole, $pdo)): ?>
             <button onclick="switchTab('receiving')" id="nav-receiving" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-truck-ramp-box w-5 text-center text-emerald-600"></i>
                 <span>Receiving Inbound</span>
             </button>
             <?php endif; ?>
 
-            <?php if (userHasMenuAccess('transactions', $rawRole, $pdo)): ?>
+            <?php if ($isSuperAdmin || userHasMenuAccess('transactions', $rawRole, $pdo)): ?>
             <button onclick="switchTab('transactions')" id="nav-transactions" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-box-open w-5 text-center text-indigo-500"></i>
                 <span>Inbound Unboxing</span>
@@ -297,7 +314,7 @@ if ($isAdmin && !in_array('menu-permissions', $currentUserAllowedMenus, true)) {
             <?php endif; ?>
 
             <!-- MENU BARU: AGING RETURN (MONITORING DURASI RECEIVING KE UNBOXING) -->
-            <?php if (userHasMenuAccess('aging-return', $rawRole, $pdo)): ?>
+            <?php if ($isSuperAdmin || userHasMenuAccess('aging-return', $rawRole, $pdo)): ?>
             <button onclick="switchTab('aging-return')" id="nav-aging-return" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-clock-rotate-left w-5 text-center text-teal-600"></i>
                 <div class="flex items-center justify-between flex-1">
@@ -308,7 +325,7 @@ if ($isAdmin && !in_array('menu-permissions', $currentUserAllowedMenus, true)) {
             <?php endif; ?>
 
             <!-- MENU: PUSAT KLAIM & BANDING (CLAIM DOSSIER) -->
-            <?php if (userHasMenuAccess('claims', $rawRole, $pdo)): ?>
+            <?php if ($isSuperAdmin || userHasMenuAccess('claims', $rawRole, $pdo)): ?>
             <button onclick="switchTab('claims')" id="nav-claims" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-shield-halved w-5 text-center text-amber-500"></i>
                 <span>Pusat Klaim &amp; Banding</span>
@@ -316,71 +333,75 @@ if ($isAdmin && !in_array('menu-permissions', $currentUserAllowedMenus, true)) {
             <?php endif; ?>
 
             <!-- MENU BARU: DATA ORDERS OCS (SINKRONISASI PESANAN) -->
-            <?php if (userHasMenuAccess('orders', $rawRole, $pdo)): ?>
+            <?php if ($isSuperAdmin || userHasMenuAccess('orders', $rawRole, $pdo)): ?>
             <button onclick="switchTab('orders')" id="nav-orders" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-cart-flatbed w-5 text-center text-blue-600"></i>
                 <span>Data Orders OCS</span>
             </button>
             <?php endif; ?>
 
-            <?php if (userHasMenuAccess('products', $rawRole, $pdo)): ?>
+            <div class="pt-3 px-3 pb-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Master Data</div>
+
+            <?php if ($isSuperAdmin || userHasMenuAccess('products', $rawRole, $pdo)): ?>
             <button onclick="switchTab('products')" id="nav-products" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-tags w-5 text-center text-blue-500"></i>
                 <span>Master Produk</span>
             </button>
             <?php endif; ?>
 
-            <?php if (userHasMenuAccess('expeditions', $rawRole, $pdo)): ?>
+            <?php if ($isSuperAdmin || userHasMenuAccess('expeditions', $rawRole, $pdo)): ?>
             <button onclick="switchTab('expeditions')" id="nav-expeditions" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-truck-fast w-5 text-center text-teal-500"></i>
                 <span>Master Ekspedisi</span>
             </button>
             <?php endif; ?>
 
-            <?php if (userHasMenuAccess('conditions', $rawRole, $pdo)): ?>
+            <?php if ($isSuperAdmin || userHasMenuAccess('conditions', $rawRole, $pdo)): ?>
             <button onclick="switchTab('conditions')" id="nav-conditions" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-clipboard-check w-5 text-center text-purple-500"></i>
                 <span>Master Kondisi</span>
             </button>
             <?php endif; ?>
 
-            <?php if (userHasMenuAccess('users', $rawRole, $pdo)): ?>
+            <?php if ($isSuperAdmin || userHasMenuAccess('users', $rawRole, $pdo)): ?>
             <button onclick="switchTab('users')" id="nav-users" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-users-gear w-5 text-center text-slate-500"></i>
                 <span>Kelola Pengguna</span>
             </button>
             <?php endif; ?>
 
-            <?php if (userHasMenuAccess('roles', $rawRole, $pdo)): ?>
+            <div class="pt-3 px-3 pb-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pengaturan &amp; Hak Akses</div>
+
+            <?php if ($isSuperAdmin || userHasMenuAccess('roles', $rawRole, $pdo)): ?>
             <button onclick="switchTab('roles')" id="nav-roles" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-user-shield w-5 text-center text-purple-600"></i>
                 <span>Kelola Role</span>
             </button>
             <?php endif; ?>
 
-            <?php if (userHasMenuAccess('bank-settings', $rawRole, $pdo)): ?>
+            <?php if ($isSuperAdmin || userHasMenuAccess('bank-settings', $rawRole, $pdo)): ?>
             <button onclick="switchTab('bank-settings')" id="nav-bank-settings" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-building-columns w-5 text-center text-emerald-600"></i>
                 <span>Pengaturan Bank</span>
             </button>
             <?php endif; ?>
 
-            <?php if (userHasMenuAccess('approval-jnt', $rawRole, $pdo)): ?>
+            <?php if ($isSuperAdmin || userHasMenuAccess('approval-jnt', $rawRole, $pdo)): ?>
             <button onclick="switchTab('approval-jnt')" id="nav-approval-jnt" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                 <i class="fa-solid fa-stamp w-5 text-center text-rose-600"></i>
                 <span>Approval Klaim J&amp;T</span>
             </button>
             <?php endif; ?>
 
-            <?php if (userHasMenuAccess('maintenance', $rawRole, $pdo)): ?>
+            <?php if ($isSuperAdmin || userHasMenuAccess('maintenance', $rawRole, $pdo)): ?>
             <button onclick="switchTab('maintenance')" id="nav-maintenance" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-amber-700 hover:text-amber-800 hover:bg-amber-100/70 border border-amber-300/80 bg-amber-50/60">
                 <i class="fa-solid fa-screwdriver-wrench w-5 text-center text-amber-600"></i>
                 <span>Pemeliharaan</span>
             </button>
             <?php endif; ?>
 
-            <!-- MENU BARU: CONTROL PANEL AKSES MENU & ROLE (SUPER ADMIN & ADMIN) -->
-            <?php if ($isSuperAdmin || $isAdmin): ?>
+            <!-- MENU: CONTROL PANEL AKSES MENU & ROLE (SUPER ADMIN & ADMIN) -->
+            <?php if ($isSuperAdmin || $isAdmin || userHasMenuAccess('menu-permissions', $rawRole, $pdo)): ?>
             <button onclick="switchTab('menu-permissions')" id="nav-menu-permissions" class="nav-item w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-purple-700 hover:text-purple-900 hover:bg-purple-100/70 border border-purple-300/80 bg-purple-50/60" title="Kelola Hak Akses Menu untuk Setiap Role">
                 <i class="fa-solid fa-sliders w-5 text-center text-purple-600"></i>
                 <div class="flex items-center justify-between flex-1">
@@ -390,7 +411,7 @@ if ($isAdmin && !in_array('menu-permissions', $currentUserAllowedMenus, true)) {
             </button>
             <?php endif; ?>
 
-            <div class="pt-4 px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Akses Langsung</div>
+            <div class="pt-3 px-3 pb-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Akses Langsung</div>
 
             <a href="scanner" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100/70 border border-emerald-300/80 bg-emerald-50/60 transition">
                 <i class="fa-solid fa-barcode w-5 text-center text-emerald-600"></i>
@@ -445,10 +466,22 @@ if ($isAdmin && !in_array('menu-permissions', $currentUserAllowedMenus, true)) {
                         </div>
                         <div>
                             <h3 class="font-bold text-sm text-slate-800">Dashboard Monitoring Retur</h3>
-                            <span id="dashboardDateBadge" class="bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-200">Hari Ini</span>
+                            <span id="dashboardDateBadge" class="bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-200">Memuat...</span>
                         </div>
                     </div>
                     <div class="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+                        <!-- Quick Shortcuts: Rentang Belum Unbox & Hari Ini -->
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" onclick="setDashboardUnboxedRange()" title="Otomatis terapkan rentang tanggal paket yang belum di-unboxing" class="bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs px-2.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 border border-amber-300 shadow-2xs shrink-0 cursor-pointer">
+                                <i class="fa-solid fa-hourglass-half text-amber-600 text-[11px]"></i>
+                                <span>Rentang Belum Unbox</span>
+                            </button>
+                            <button type="button" onclick="setDashboardToday()" title="Terapkan filter khusus data hari ini" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 border border-slate-300 shadow-2xs shrink-0 cursor-pointer">
+                                <i class="fa-regular fa-calendar text-slate-500 text-[11px]"></i>
+                                <span>Hari Ini</span>
+                            </button>
+                        </div>
+
                         <div class="relative flex items-center">
                             <span class="absolute left-3 text-indigo-600 pointer-events-none text-xs z-10">
                                 <i class="fa-regular fa-calendar-days"></i>
@@ -459,10 +492,10 @@ if ($isAdmin && !in_array('menu-permissions', $currentUserAllowedMenus, true)) {
                                 <i class="fa-solid fa-circle-xmark"></i>
                             </button>
                         </div>
-                        <button onclick="applyDashboardDateFilter()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-sm shadow-indigo-600/30 shrink-0">
+                        <button onclick="applyDashboardDateFilter()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-sm shadow-indigo-600/30 shrink-0 cursor-pointer">
                             <i class="fa-solid fa-filter text-[11px]"></i> Terapkan
                         </button>
-                        <button onclick="refreshDashboardMetrics()" title="Refresh data metrik dashboard dari backend" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 border border-slate-300 shadow-2xs shrink-0">
+                        <button onclick="refreshDashboardMetrics()" title="Refresh data metrik dashboard dari backend" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 border border-slate-300 shadow-2xs shrink-0 cursor-pointer">
                             <i class="fa-solid fa-rotate text-indigo-600"></i> Refresh
                         </button>
                         <button onclick="triggerCloudSyncNow(true)" title="Tarik data & foto transaksi terbaru dari InfinityFree secara manual (On-Demand)" class="bg-sky-600 hover:bg-sky-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 shadow-sm shadow-sky-600/30 shrink-0 cursor-pointer">
@@ -477,82 +510,54 @@ if ($isAdmin && !in_array('menu-permissions', $currentUserAllowedMenus, true)) {
                     </div>
                 </div>
 
-                <!-- KPI Cards Row (5 Cards Sesuai Request) -->
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
-                    <!-- 1. Total Paket yang Diterima -->
-                    <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-xs border border-emerald-200/80 relative overflow-hidden group hover:shadow-md transition">
+                <!-- KPI Cards Row (3 Cards: Receiving, Unboxing, Sisa Belum Unboxing) -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- 1. Total Paket Receiving -->
+                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-emerald-200/80 relative overflow-hidden group hover:shadow-md transition">
                         <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-emerald-50 opacity-60 group-hover:opacity-100 transition"></div>
                         <div class="relative">
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Total Paket Diterima</span>
-                                <span class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
-                                    <i class="fa-solid fa-truck-ramp-box text-xs"></i>
+                                <span class="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Total Paket Receiving</span>
+                                <span class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-sm shadow-2xs border border-emerald-100">
+                                    <i class="fa-solid fa-truck-ramp-box"></i>
                                 </span>
                             </div>
-                            <div class="text-2xl sm:text-3xl font-black text-emerald-700 font-mono" id="kpiTotalReceivedPackages">—</div>
-                            <div class="text-[10px] text-emerald-600 mt-1 flex items-center gap-1">
+                            <div class="text-3xl font-black text-emerald-700 font-mono tracking-tight" id="kpiTotalReceivedPackages">—</div>
+                            <div class="text-xs text-emerald-600 mt-1.5 flex items-center gap-1 font-semibold">
                                 <b id="kpiTotalReceptions">0</b> Surat Jalan Fisik
                             </div>
                         </div>
                     </div>
 
-                    <!-- 2. Total Paket yang Missing (Belum di Unboxing) -->
-                    <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-xs border border-amber-200/90 relative overflow-hidden group hover:shadow-md transition">
-                        <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-amber-50 opacity-60 group-hover:opacity-100 transition"></div>
-                        <div class="relative">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Paket Missing</span>
-                                <span class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-                                    <i class="fa-solid fa-clock-rotate-left text-xs"></i>
-                                </span>
-                            </div>
-                            <div class="text-2xl sm:text-3xl font-black text-amber-600 font-mono" id="kpiTotalMissingPackages">—</div>
-                            <div class="text-[10px] text-amber-600 mt-1">Belum unboxing di station</div>
-                        </div>
-                    </div>
-
-                    <!-- 3. Total Paket yang Received (Sudah di Unboxing) -->
-                    <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-xs border border-indigo-200/80 relative overflow-hidden group hover:shadow-md transition">
+                    <!-- 2. Total Paket Selesai di Unboxing -->
+                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-indigo-200/80 relative overflow-hidden group hover:shadow-md transition">
                         <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-indigo-50 opacity-60 group-hover:opacity-100 transition"></div>
                         <div class="relative">
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-[10px] font-bold text-indigo-800 uppercase tracking-wider">Paket Received</span>
-                                <span class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                                    <i class="fa-solid fa-box-open text-xs"></i>
+                                <span class="text-[11px] font-bold text-indigo-800 uppercase tracking-wider">Paket Di-unboxing</span>
+                                <span class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm shadow-2xs border border-indigo-100">
+                                    <i class="fa-solid fa-box-open"></i>
                                 </span>
                             </div>
-                            <div class="text-2xl sm:text-3xl font-black text-indigo-700 font-mono" id="kpiTotalInvoice">—</div>
-                            <div class="text-[10px] text-slate-400 mt-1">Sudah selesai unboxing</div>
+                            <div class="text-3xl font-black text-indigo-700 font-mono tracking-tight" id="kpiTotalInvoice">—</div>
+                            <div class="text-xs text-indigo-600 mt-1.5 flex items-center gap-1 font-semibold" id="kpiUnboxSub">
+                                <b id="kpiUnboxTotalQty">0</b> Pcs Unit Fisik
+                            </div>
                         </div>
                     </div>
 
-                    <!-- 4. Total Paket yang Reject (Kondisi Rusak / Defect) -->
-                    <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-xs border border-rose-200/80 relative overflow-hidden group hover:shadow-md transition">
-                        <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-rose-50 opacity-60 group-hover:opacity-100 transition"></div>
+                    <!-- 3. Sisa Paket Belum di Unboxing (Real-time Backlog Gudang) -->
+                    <div class="bg-white p-5 rounded-2xl shadow-xs border border-amber-200/90 relative overflow-hidden group hover:shadow-md transition">
+                        <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-amber-50 opacity-60 group-hover:opacity-100 transition"></div>
                         <div class="relative">
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-[10px] font-bold text-rose-600 uppercase tracking-wider">Paket Reject</span>
-                                <span class="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-                                    <i class="fa-solid fa-triangle-exclamation text-xs"></i>
+                                <span class="text-[11px] font-bold text-amber-800 uppercase tracking-wider">Sisa Belum Unboxing</span>
+                                <span class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-sm shadow-2xs border border-amber-100">
+                                    <i class="fa-solid fa-clock-rotate-left"></i>
                                 </span>
                             </div>
-                            <div class="text-2xl sm:text-3xl font-black text-rose-600 font-mono" id="kpiTotalDamaged">—</div>
-                            <div class="text-[10px] text-rose-500 mt-1">Cacat / layak klaim</div>
-                        </div>
-                    </div>
-
-                    <!-- 5. Total Unit Fisik (Qty Barang Masuk) -->
-                    <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-xs border border-blue-200/80 relative overflow-hidden group hover:shadow-md transition col-span-2 md:col-span-1">
-                        <div class="absolute -right-3 -top-3 w-16 h-16 rounded-full bg-blue-50 opacity-60 group-hover:opacity-100 transition"></div>
-                        <div class="relative">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-[10px] font-bold text-blue-800 uppercase tracking-wider">Total Unit Fisik</span>
-                                <span class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                                    <i class="fa-solid fa-boxes-stacked text-xs"></i>
-                                </span>
-                            </div>
-                            <div class="text-2xl sm:text-3xl font-black text-blue-700 font-mono" id="kpiTotalItems">—</div>
-                            <div class="text-[10px] text-slate-400 mt-1">Total produk diperiksa</div>
+                            <div class="text-3xl font-black text-amber-600 font-mono tracking-tight" id="kpiTotalMissingPackages">—</div>
+                            <div class="text-xs text-amber-600 mt-1.5 font-semibold truncate" id="kpiMissingSub">Antrean Real-time Gudang</div>
                         </div>
                     </div>
                 </div>
@@ -566,7 +571,7 @@ if ($isAdmin && !in_array('menu-permissions', $currentUserAllowedMenus, true)) {
                                 <h4 class="font-bold text-sm text-slate-800 flex items-center gap-2">
                                     <i class="fa-solid fa-chart-line text-emerald-600 text-xs"></i> Trend Penerimaan Paket (Receiving)
                                 </h4>
-                                <p class="text-[11px] text-slate-400">KPI Productivity Serah Terima Paket Ekspedisi Fisik</p>
+                                <p class="text-[11px] text-slate-400">KPI Productivity Serah Terima Paket Ekspedisi Fisik per Hari</p>
                             </div>
                             <span class="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">Line Chart</span>
                         </div>
@@ -582,7 +587,7 @@ if ($isAdmin && !in_array('menu-permissions', $currentUserAllowedMenus, true)) {
                                 <h4 class="font-bold text-sm text-slate-800 flex items-center gap-2">
                                     <i class="fa-solid fa-chart-simple text-indigo-600 text-xs"></i> Trend Unboxing per Hari
                                 </h4>
-                                <p class="text-[11px] text-slate-400">KPI Productivity Paket Selesai Di-unboxing per Hari</p>
+                                <p class="text-[11px] text-slate-400">KPI Productivity Paket Selesai Di-unboxing &amp; Qty Pcs per Hari</p>
                             </div>
                             <span class="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full font-bold">Bar Chart</span>
                         </div>
@@ -985,15 +990,18 @@ if ($isAdmin && !in_array('menu-permissions', $currentUserAllowedMenus, true)) {
                         </div>
 
                         <!-- 2. Belum di Unboxing -->
-                        <div class="bg-white p-3.5 rounded-2xl border border-amber-200 shadow-2xs bg-gradient-to-br from-white to-amber-50/30">
+                        <div onclick="setAgingUnboxedRange()" title="Klik untuk otomatis filter paket & rentang tanggal yang belum di-unboxing" class="bg-white p-3.5 rounded-2xl border border-amber-200 shadow-2xs bg-gradient-to-br from-white to-amber-50/30 hover:border-amber-400 hover:shadow-md transition cursor-pointer group">
                             <div class="flex items-center justify-between">
-                                <span class="text-[10px] font-bold uppercase tracking-wider text-amber-700">Belum di Unboxing</span>
-                                <span class="w-6 h-6 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center text-xs">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-amber-700 group-hover:text-amber-900">Belum di Unboxing</span>
+                                <span class="w-6 h-6 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center text-xs group-hover:bg-amber-200 transition">
                                     <i class="fa-solid fa-hourglass-half"></i>
                                 </span>
                             </div>
                             <div class="text-xl sm:text-2xl font-black text-amber-600 mt-1" id="agingKpiBelum">0</div>
-                            <span class="text-[10px] text-amber-600 font-medium">Menunggu di gudang</span>
+                            <span class="text-[10px] text-amber-600 font-medium flex items-center gap-1">
+                                <span>Menunggu di gudang</span>
+                                <i class="fa-solid fa-arrow-right text-[9px] opacity-0 group-hover:opacity-100 transition"></i>
+                            </span>
                         </div>
 
                         <!-- 3. Sudah di Unboxing -->
@@ -1125,16 +1133,59 @@ if ($isAdmin && !in_array('menu-permissions', $currentUserAllowedMenus, true)) {
                         </table>
                     </div>
 
-                    <!-- Footer Table / Info -->
-                    <div class="p-3.5 sm:p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-2 text-xs text-slate-500">
-                        <div id="agingTableCountInfo">Menampilkan 0 data paket</div>
-                        <div class="flex items-center gap-2">
-                            <span class="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Aman (≤ 14 Hari)
-                            </span>
-                            <span class="inline-flex items-center gap-1 text-[11px] text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
-                                <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Kritis (&gt; 14 Hari)
-                            </span>
+                    <!-- Footer Table / Pagination & Info -->
+                    <div class="p-3.5 sm:p-4 bg-slate-50 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center gap-3 text-xs text-slate-500">
+                        <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                            <!-- Info Count Data -->
+                            <div id="agingTableCountInfo" class="font-medium text-slate-600">
+                                Menampilkan 0 data paket
+                            </div>
+
+                            <!-- Selector Jumlah Baris Per Halaman -->
+                            <div class="flex items-center gap-1.5 text-xs text-slate-500">
+                                <span>Tampilkan:</span>
+                                <select id="agingLimitSelect" onchange="changeAgingLimit(this.value)" class="bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500 cursor-pointer shadow-2xs">
+                                    <option value="25">25</option>
+                                    <option value="50" selected>50</option>
+                                    <option value="100">100</option>
+                                    <option value="200">200</option>
+                                </select>
+                                <span>per hal</span>
+                            </div>
+                        </div>
+
+                        <!-- Pagination Controls & Legend -->
+                        <div class="flex flex-wrap items-center justify-between md:justify-end gap-3 w-full md:w-auto">
+                            <!-- Pagination Buttons -->
+                            <div class="flex items-center gap-1" id="agingPaginationControls">
+                                <button type="button" id="btnAgingFirst" onclick="goToAgingPage(1)" disabled title="Halaman Pertama" class="w-8 h-8 rounded-lg bg-white border border-slate-300 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 flex items-center justify-center text-xs transition shadow-2xs cursor-pointer">
+                                    <i class="fa-solid fa-angles-left"></i>
+                                </button>
+                                <button type="button" id="btnAgingPrev" onclick="goToAgingPrevPage()" disabled title="Halaman Sebelumnya" class="w-8 h-8 rounded-lg bg-white border border-slate-300 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 flex items-center justify-center text-xs transition shadow-2xs cursor-pointer">
+                                    <i class="fa-solid fa-chevron-left"></i>
+                                </button>
+                                
+                                <div id="agingPaginationNumbers" class="flex items-center gap-1">
+                                    <!-- Dynamic Page Numbers -->
+                                </div>
+
+                                <button type="button" id="btnAgingNext" onclick="goToAgingNextPage()" disabled title="Halaman Selanjutnya" class="w-8 h-8 rounded-lg bg-white border border-slate-300 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 flex items-center justify-center text-xs transition shadow-2xs cursor-pointer">
+                                    <i class="fa-solid fa-chevron-right"></i>
+                                </button>
+                                <button type="button" id="btnAgingLast" onclick="goToAgingLastPage()" disabled title="Halaman Terakhir" class="w-8 h-8 rounded-lg bg-white border border-slate-300 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 flex items-center justify-center text-xs transition shadow-2xs cursor-pointer">
+                                    <i class="fa-solid fa-angles-right"></i>
+                                </button>
+                            </div>
+
+                            <!-- Legend Badges -->
+                            <div class="hidden sm:flex items-center gap-1.5 pl-2 border-l border-slate-200">
+                                <span class="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> ≤ 14 Hari
+                                </span>
+                                <span class="inline-flex items-center gap-1 text-[11px] text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> > 14 Hari
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1688,6 +1739,141 @@ if ($isAdmin && !in_array('menu-permissions', $currentUserAllowedMenus, true)) {
                             <span id="maintStatusBadge" class="bg-white text-slate-800 text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-sm flex items-center gap-2">
                                 <i class="fa-solid fa-circle-check text-emerald-500" id="maintStatusIcon"></i> <span id="maintStatusText">Memeriksa Status...</span>
                             </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KARTU UTAMA: MIGRASI PC SERVER & DOWNLOAD BACKUP -->
+                <div class="bg-gradient-to-br from-indigo-900 via-slate-900 to-slate-800 rounded-3xl p-6 md:p-8 text-white shadow-xl border border-indigo-500/30 space-y-6">
+                    <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-indigo-500/30 pb-5">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-500 to-blue-500 flex items-center justify-center text-2xl shadow-lg shadow-indigo-500/30 shrink-0">
+                                <i class="fa-solid fa-server"></i>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-lg md:text-xl font-black text-white tracking-tight">Migrasi Sistem ke PC Server Baru</h3>
+                                    <span class="bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase">1-Click Migration</span>
+                                </div>
+                                <p class="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
+                                    Unduh seluruh database dan file folder server dari PC lama ini untuk dipindahkan ke PC Server baru tanpa kehilangan data transaksi, bukti foto/video, maupun pengaturan sistem.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 self-start md:self-auto bg-slate-800/80 px-4 py-2 rounded-xl border border-slate-700 text-xs">
+                            <i class="fa-solid fa-hard-drive text-indigo-400"></i>
+                            <span class="text-slate-400">Total Baris Data:</span>
+                            <span class="font-bold font-mono text-emerald-400" id="migrationTotalRowsBadge">Memuat...</span>
+                        </div>
+                    </div>
+
+                    <!-- 3 Pilihan Download Migrasi -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- OPSI 1: DOWNLOAD DATABASE (.SQL) -->
+                        <div class="bg-slate-800/90 hover:bg-slate-800 border border-slate-700 hover:border-indigo-500/60 transition-all rounded-2xl p-5 flex flex-col justify-between shadow-lg space-y-4">
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-lg border border-amber-500/30">
+                                        <i class="fa-solid fa-database"></i>
+                                    </div>
+                                    <span class="text-[10px] font-bold bg-amber-500/20 text-amber-300 px-2.5 py-0.5 rounded-full border border-amber-500/30">Database SQL</span>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-sm text-white">1. Download Database Saja</h4>
+                                    <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                                        Ekspor seluruh tabel, skema, dan baris data transaksi (Unboxing, Receiving, Master Produk, Akun User, dan Setting).
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="space-y-2 pt-2 border-t border-slate-700/60">
+                                <a href="api/maintenance.php?action=download_database&format=sql" onclick="notifyDownloadStart('db_sql')" download class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-download"></i>
+                                    <span>Unduh File (.sql)</span>
+                                </a>
+                                <a href="api/maintenance.php?action=download_database&format=zip" onclick="notifyDownloadStart('db_zip')" download class="w-full bg-slate-700/80 hover:bg-slate-700 text-slate-200 font-semibold text-[11px] py-1.5 px-3 rounded-lg transition flex items-center justify-center gap-1.5 border border-slate-600">
+                                    <i class="fa-solid fa-file-zipper text-amber-400"></i>
+                                    <span>Unduh Terkompresi (.zip)</span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- OPSI 2: PAKET APLIKASI RINGAN (.ZIP) -->
+                        <div class="bg-slate-800/90 hover:bg-slate-800 border border-slate-700 hover:border-indigo-500/60 transition-all rounded-2xl p-5 flex flex-col justify-between shadow-lg space-y-4">
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <div class="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center text-lg border border-blue-500/30">
+                                        <i class="fa-solid fa-bolt"></i>
+                                    </div>
+                                    <span class="text-[10px] font-bold bg-blue-500/20 text-blue-300 px-2.5 py-0.5 rounded-full border border-blue-500/30">±15 MB (Sangat Cepat)</span>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-sm text-white">2. Download Paket Sistem &amp; DB</h4>
+                                    <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                                        Seluruh file program PHP, CSS, JS, server-tools, plus <b>database terbaru sudah ada di dalam ZIP</b> (tanpa media uploads raksasa).
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="pt-2 border-t border-slate-700/60">
+                                <a href="api/maintenance.php?action=download_server_files&mode=app" onclick="notifyDownloadStart('app_zip')" download class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-file-zipper"></i>
+                                    <span>Unduh Paket Ringan (.zip)</span>
+                                </a>
+                                <span class="text-[10px] text-slate-400 text-center block mt-1.5">Sangat disarankan untuk koneksi normal</span>
+                            </div>
+                        </div>
+
+                        <!-- OPSI 3: DOWNLOAD SEMUA FILE SERVER LENGKAP (.ZIP) -->
+                        <div class="bg-slate-800/90 hover:bg-slate-800 border border-slate-700 hover:border-emerald-500/60 transition-all rounded-2xl p-5 flex flex-col justify-between shadow-lg space-y-4">
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-lg border border-emerald-500/30">
+                                        <i class="fa-solid fa-boxes-packing"></i>
+                                    </div>
+                                    <span class="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-500/30">Full Server Backup</span>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-sm text-white">3. Download Semua File Server</h4>
+                                    <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                                        Seluruh folder server termasuk seluruh foto &amp; video bukti unboxing di folder <code>uploads/</code> + database terbaru.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="pt-2 border-t border-slate-700/60">
+                                <a href="api/maintenance.php?action=download_server_files&mode=full" onclick="notifyDownloadStart('full_zip')" download class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-cloud-arrow-down"></i>
+                                    <span>Unduh Full Server (.zip)</span>
+                                </a>
+                                <span class="text-[10px] text-slate-400 text-center block mt-1.5">Mencakup ribuan bukti foto retur</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panduan Langkah Restore di PC Server Baru -->
+                    <div class="bg-slate-900/80 rounded-2xl p-4 md:p-5 border border-slate-700/80 space-y-3">
+                        <h5 class="text-xs font-bold text-slate-200 flex items-center gap-2">
+                            <i class="fa-solid fa-circle-question text-indigo-400"></i> Cara Memasang di PC Server Baru (Hanya 4 Langkah):
+                        </h5>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs text-slate-300">
+                            <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
+                                <span class="w-6 h-6 rounded-lg bg-indigo-600 text-white font-bold inline-flex items-center justify-center text-[11px] mb-1.5">1</span>
+                                <p class="font-bold text-white text-[11px]">Install Web Server</p>
+                                <p class="text-[10px] text-slate-400 mt-0.5">Pasang <b>Laragon</b> atau <b>XAMPP</b> di PC Server baru dan nyalakan Apache &amp; MySQL.</p>
+                            </div>
+                            <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
+                                <span class="w-6 h-6 rounded-lg bg-indigo-600 text-white font-bold inline-flex items-center justify-center text-[11px] mb-1.5">2</span>
+                                <p class="font-bold text-white text-[11px]">Ekstrak File ZIP</p>
+                                <p class="text-[10px] text-slate-400 mt-0.5">Ekstrak ke <code>C:\laragon\www\inbound_return</code> (atau <code>htdocs</code>).</p>
+                            </div>
+                            <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
+                                <span class="w-6 h-6 rounded-lg bg-indigo-600 text-white font-bold inline-flex items-center justify-center text-[11px] mb-1.5">3</span>
+                                <p class="font-bold text-white text-[11px]">1-Click Restore DB</p>
+                                <p class="text-[10px] text-slate-400 mt-0.5">Klik dua kali file <b><code>MIGRASI_RESTORE_PC_BARU.bat</code></b> untuk otomatis import database.</p>
+                            </div>
+                            <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
+                                <span class="w-6 h-6 rounded-lg bg-indigo-600 text-white font-bold inline-flex items-center justify-center text-[11px] mb-1.5">4</span>
+                                <p class="font-bold text-white text-[11px]">Jalankan Server</p>
+                                <p class="text-[10px] text-slate-400 mt-0.5">Jalankan <b><code>server-tools\3_JALANKAN_SERVER.bat</code></b> dan buka di HP operator!</p>
+                            </div>
                         </div>
                     </div>
                 </div>

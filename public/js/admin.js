@@ -332,11 +332,18 @@ window.switchTab = function (tabName, updateUrl = true) {
 async function loadMetrics(forceRefresh = false) {
     const elRecPkg = document.getElementById('kpiTotalReceivedPackages');
     const elMissing = document.getElementById('kpiTotalMissingPackages');
+    const elMissingSub = document.getElementById('kpiMissingSub');
     const elRecSess = document.getElementById('kpiTotalReceptions');
     const elInv = document.getElementById('kpiTotalInvoice');
+    const elUnboxQty = document.getElementById('kpiUnboxTotalQty');
     const elItems = document.getElementById('kpiTotalItems');
     const elGood = document.getElementById('kpiTotalGood');
+    const elGoodPcs = document.getElementById('kpiTotalGoodPcs');
     const elDamaged = document.getElementById('kpiTotalDamaged');
+    const elDamagedPcs = document.getElementById('kpiTotalDamagedPcs');
+    const elDamagedPcsSub = document.getElementById('kpiTotalDamagedPcsSub');
+    const dailyTbody = document.getElementById('dashDailyTableBody');
+    const dailyTfoot = document.getElementById('dashDailyTableFoot');
     const picTbody = document.getElementById('dashPicTableBody');
     const expTbody = document.getElementById('dashExpeditionTableBody');
 
@@ -348,6 +355,10 @@ async function loadMetrics(forceRefresh = false) {
     if (elGood) elGood.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-base text-emerald-400"></i>';
     if (elDamaged) elDamaged.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-base text-rose-400"></i>';
 
+    if (dailyTbody) {
+        dailyTbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-2 text-indigo-600 text-base"></i>Memuat rekapitulasi data harian...</td></tr>`;
+    }
+    if (dailyTfoot) dailyTfoot.innerHTML = '';
     if (picTbody) {
         picTbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-2 text-indigo-600 text-base"></i>Memuat produktivitas petugas inbound...</td></tr>`;
     }
@@ -369,24 +380,63 @@ async function loadMetrics(forceRefresh = false) {
         }
         const res = await fetch(url);
         const data = await res.json();
+        window.dashboardMetricsData = data;
 
+        // Otomatis isi tanggal dari paket belum di-unboxing jika belum diatur manual
+        if (data.filter_info) {
+            if (!activeDashboardDateFilter || data.filter_info.is_auto_filled) {
+                activeDashboardDateFilter = data.filter_info.date_str || '';
+                if (flatpickrDashboardInstance && data.filter_info.start_date && data.filter_info.end_date) {
+                    flatpickrDashboardInstance.setDate([data.filter_info.start_date, data.filter_info.end_date], false);
+                }
+            }
+        }
+        updateDashboardDateUI();
+
+        // 1. Total Paket Receiving
         if (elRecPkg) elRecPkg.innerText = (data.total_received_packages ?? 0).toLocaleString('id-ID');
-        if (elMissing) elMissing.innerText = (data.total_missing_packages ?? 0).toLocaleString('id-ID');
         if (elRecSess) elRecSess.innerText = (data.total_receptions ?? 0).toLocaleString('id-ID');
+
+        // 2. Paket Di-unboxing (Hitung Paket & Qty Pcs)
         if (elInv) elInv.innerText = (data.total_invoices ?? 0).toLocaleString('id-ID');
+        if (elUnboxQty) elUnboxQty.innerText = (data.total_items ?? 0).toLocaleString('id-ID');
+        const elUnboxSub = document.getElementById('kpiUnboxSub');
+        if (elUnboxSub) {
+            elUnboxSub.innerHTML = `<b id="kpiUnboxTotalQty">${(data.total_items ?? 0).toLocaleString('id-ID')}</b> Pcs Unit Fisik`;
+        }
+
+        // 3. Sisa Paket Belum di Unboxing (Total Antrean Real-Time Gudang)
+        if (elMissing) elMissing.innerText = (data.total_missing_packages ?? 0).toLocaleString('id-ID');
+        if (elMissingSub) {
+            if (data.unboxed_range && data.unboxed_range.start_date) {
+                elMissingSub.innerHTML = `Masuk sejak: <b class="text-amber-700 font-bold underline decoration-amber-400">${data.unboxed_range.start_date}</b>`;
+                elMissingSub.title = `Total ${(data.total_missing_packages ?? 0).toLocaleString('id-ID')} paket antrean riil di gudang yang belum di-unboxing (kedatangan ${data.unboxed_range.start_date} s/d ${data.unboxed_range.end_date}).`;
+            } else {
+                elMissingSub.innerHTML = 'Antrean Real-time Gudang';
+            }
+        }
+
+        // 4. Paket Reject (Hitung Paket yang Ada Rusak & Qty Pcs Rusak)
+        if (elDamaged) elDamaged.innerText = (data.total_damaged_packages ?? 0).toLocaleString('id-ID');
+        if (elDamagedPcs) elDamagedPcs.innerText = (data.total_damaged ?? 0).toLocaleString('id-ID');
+        if (elDamagedPcsSub) elDamagedPcsSub.innerText = (data.total_damaged ?? 0).toLocaleString('id-ID');
+
+        // 5. Total Unit Fisik (Hitung Pcs Qty)
         if (elItems) elItems.innerText = (data.total_items ?? 0).toLocaleString('id-ID');
         if (elGood) elGood.innerText = (data.total_good ?? 0).toLocaleString('id-ID');
-        if (elDamaged) elDamaged.innerText = (data.total_damaged ?? 0).toLocaleString('id-ID');
+        if (elGoodPcs) elGoodPcs.innerText = (data.total_good ?? 0).toLocaleString('id-ID');
 
         renderRatioChart(data.total_good || 0, data.total_damaged || 0);
-        renderReceivingTrendChart(data.trend_receiving || data.trend_7days || []);
-        renderUnboxingTrendChart(data.trend_unboxing || data.trend_7days || []);
+        renderReceivingTrendChart(data.trend_receiving || []);
+        renderUnboxingTrendChart(data.trend_unboxing || []);
+        renderDailyBreakdownTable(data.daily_breakdown || []);
         renderExpeditionChart(data.by_expedition || []);
         renderDashExpeditionTable(data.by_expedition || []);
         renderDashPicTable(data.pic_stats || []);
         renderDashConditionBreakdown(data.by_condition || {});
     } catch (err) {
         console.error("Gagal memuat metrics:", err);
+        if (dailyTbody) dailyTbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-rose-500 text-xs font-semibold">Gagal memuat rekap harian: ${err.message}</td></tr>`;
         if (picTbody) picTbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-rose-500 text-xs font-semibold">Gagal memuat data petugas: ${err.message}</td></tr>`;
         if (expTbody) expTbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-rose-500 text-xs font-semibold">Gagal memuat data ekspedisi: ${err.message}</td></tr>`;
     }
@@ -461,7 +511,7 @@ function renderReceivingTrendChart(trend) {
     });
 }
 
-// KPI Productivity 2: Trend Unboxing per Hari (Bar Chart)
+// KPI Productivity 2: Trend Unboxing per Hari (Bar Chart: Paket vs Qty Pcs)
 function renderUnboxingTrendChart(trend) {
     const canvas = document.getElementById('trendUnboxingChart') || document.getElementById('trendChart');
     if (!canvas) return;
@@ -474,27 +524,46 @@ function renderUnboxingTrendChart(trend) {
         const d = new Date(t.tgl); 
         return isNaN(d.getTime()) ? t.tgl : d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }); 
     });
-    const values = (trend || []).map(t => parseInt(t.total_packages ?? t.total_qty) || 0);
+    const packageVals = (trend || []).map(t => parseInt(t.total_packages) || 0);
+    const qtyVals     = (trend || []).map(t => parseInt(t.total_qty) || 0);
 
     trendUnboxingChartInstance = new Chart(ctx, {
         type: 'bar',
         data: {
             labels,
-            datasets: [{
-                label: 'Paket Selesai Unboxing',
-                data: values,
-                backgroundColor: 'rgba(99, 102, 241, 0.85)',
-                borderColor: '#6366f1',
-                borderWidth: 1,
-                borderRadius: 6
-            }]
+            datasets: [
+                {
+                    label: 'Paket Di-unboxing',
+                    data: packageVals,
+                    backgroundColor: 'rgba(99, 102, 241, 0.85)',
+                    borderColor: '#6366f1',
+                    borderWidth: 1,
+                    borderRadius: 6
+                },
+                {
+                    label: 'Total Pcs Unit Fisik',
+                    data: qtyVals,
+                    backgroundColor: 'rgba(14, 165, 233, 0.85)',
+                    borderColor: '#0ea5e9',
+                    borderWidth: 1,
+                    borderRadius: 6
+                }
+            ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { display: false },
-                tooltip: { callbacks: { label: (ctx) => ` ${ctx.raw.toLocaleString('id-ID')} paket selesai unboxing` } }
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: { boxWidth: 12, padding: 10, font: { size: 11, weight: '600' } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw.toLocaleString('id-ID')} ${ctx.datasetIndex === 0 ? 'paket' : 'pcs'}`
+                    }
+                }
             },
             scales: {
                 x: { grid: { display: false }, ticks: { font: { size: 10 } } },
@@ -504,45 +573,276 @@ function renderUnboxingTrendChart(trend) {
     });
 }
 
+// Render Tabel Rekapitulasi Data Harian
+function renderDailyBreakdownTable(list) {
+    const tbody = document.getElementById('dashDailyTableBody');
+    const tfoot = document.getElementById('dashDailyTableFoot');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    if (tfoot) tfoot.innerHTML = '';
+
+    if (!list || list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400 text-xs">
+            <i class="fa-regular fa-calendar-xmark text-2xl text-slate-300 mb-2 block"></i>
+            Tidak ada riwayat transaksi inbound pada rentang tanggal ini.
+        </td></tr>`;
+        return;
+    }
+
+    let totRec = 0, totRem = 0, totUnb = 0, totGoodPkg = 0, totRejPkg = 0, totPcs = 0, totGoodPcs = 0, totDmgPcs = 0;
+
+    list.forEach(r => {
+        totRec += (r.received_packages || 0);
+        totRem += (r.remaining_unboxed || 0);
+        totUnb += (r.unboxed_packages || 0);
+        totGoodPkg += (r.good_packages || 0);
+        totRejPkg += (r.reject_packages || 0);
+        totPcs += (r.total_pcs || 0);
+        totGoodPcs += (r.good_pcs || 0);
+        totDmgPcs += (r.damaged_pcs || 0);
+
+        const dayStr = formatDateIndonesia(r.date, { withDay: true, withTime: false });
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 border-b border-slate-100 transition';
+        tr.innerHTML = `
+            <td class="py-3 px-4 font-bold text-slate-800 text-xs">${escapeHtml(dayStr)}</td>
+            <td class="py-3 px-4 text-center">
+                <span class="inline-flex items-center gap-1 font-extrabold text-xs text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 rounded-lg">
+                    ${(r.received_packages || 0).toLocaleString('id-ID')} <span class="text-[10px] font-normal text-slate-500">paket</span>
+                </span>
+            </td>
+            <td class="py-3 px-4 text-center">
+                ${(r.remaining_unboxed || 0) > 0 
+                    ? `<span class="inline-flex items-center gap-1 font-bold text-xs text-amber-700 bg-amber-50 border border-amber-200/80 px-2.5 py-0.5 rounded-lg" title="${(r.remaining_unboxed).toLocaleString('id-ID')} paket belum di-unboxing dari penerimaan tanggal ini">
+                        ${(r.remaining_unboxed).toLocaleString('id-ID')} <span class="text-[10px] font-normal text-amber-600">sisa</span>
+                       </span>`
+                    : `<span class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 bg-emerald-50/50 px-2 py-0.5 rounded-md">
+                        <i class="fa-solid fa-check text-[10px]"></i> Selesai
+                       </span>`
+                }
+            </td>
+            <td class="py-3 px-4 text-center">
+                <span class="inline-flex items-center gap-1 font-extrabold text-xs text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2.5 py-0.5 rounded-lg">
+                    ${(r.unboxed_packages || 0).toLocaleString('id-ID')} <span class="text-[10px] font-normal text-slate-500">paket</span>
+                </span>
+            </td>
+            <td class="py-3 px-4 text-center">
+                <div class="inline-flex items-center gap-1.5 text-xs font-semibold">
+                    <span class="text-emerald-700 bg-emerald-50/80 px-1.5 py-0.5 rounded border border-emerald-200/60">${(r.good_packages || 0).toLocaleString('id-ID')} Baik</span>
+                    <span class="text-rose-700 bg-rose-50/80 px-1.5 py-0.5 rounded border border-rose-200/60">${(r.reject_packages || 0).toLocaleString('id-ID')} Reject</span>
+                </div>
+            </td>
+            <td class="py-3 px-4 text-right">
+                <span class="font-black text-sm text-slate-900">${(r.total_pcs || 0).toLocaleString('id-ID')}</span>
+                <span class="text-[10px] text-slate-400 font-normal ml-0.5">pcs</span>
+            </td>
+            <td class="py-3 px-4 text-center">
+                <div class="inline-flex items-center gap-1.5 text-xs font-semibold">
+                    <span class="text-emerald-700">${(r.good_pcs || 0).toLocaleString('id-ID')} Baik</span>
+                    <span class="text-slate-300">&bull;</span>
+                    <span class="text-rose-700">${(r.damaged_pcs || 0).toLocaleString('id-ID')} Rusak</span>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    if (tfoot) {
+        tfoot.innerHTML = `
+            <tr>
+                <td class="py-3 px-4 text-slate-800 font-extrabold text-xs">Total Akumulasi Periode</td>
+                <td class="py-3 px-4 text-center font-black text-emerald-800 text-xs">${totRec.toLocaleString('id-ID')} paket</td>
+                <td class="py-3 px-4 text-center font-black text-amber-800 text-xs">${totRem.toLocaleString('id-ID')} paket</td>
+                <td class="py-3 px-4 text-center font-black text-indigo-800 text-xs">${totUnb.toLocaleString('id-ID')} paket</td>
+                <td class="py-3 px-4 text-center font-bold text-xs">
+                    <span class="text-emerald-700">${totGoodPkg.toLocaleString('id-ID')} Baik</span> &bull; 
+                    <span class="text-rose-700">${totRejPkg.toLocaleString('id-ID')} Reject</span>
+                </td>
+                <td class="py-3 px-4 text-right font-black text-slate-900 text-sm">${totPcs.toLocaleString('id-ID')} pcs</td>
+                <td class="py-3 px-4 text-center font-bold text-xs">
+                    <span class="text-emerald-700">${totGoodPcs.toLocaleString('id-ID')} Baik</span> &bull; 
+                    <span class="text-rose-700">${totDmgPcs.toLocaleString('id-ID')} Rusak</span>
+                </td>
+            </tr>
+        `;
+    }
+}
+
 // Backward Compatibility Trend Chart
 function renderTrendChart(trend) {
     renderUnboxingTrendChart(trend);
 }
 
 // Share Dashboard Productivity Report
+// Share Dashboard Productivity Report (Card Metrics + Proses & Produktivitas PIC)
 window.shareDashboardReport = function() {
-    const rec = document.getElementById('kpiTotalReceivedPackages')?.innerText || '0';
-    const miss = document.getElementById('kpiTotalMissingPackages')?.innerText || '0';
-    const unb = document.getElementById('kpiTotalInvoice')?.innerText || '0';
-    const dmg = document.getElementById('kpiTotalDamaged')?.innerText || '0';
-    const itm = document.getElementById('kpiTotalItems')?.innerText || '0';
+    const data = window.dashboardMetricsData || {};
+
+    const recPkg = document.getElementById('kpiTotalReceivedPackages')?.innerText || '0';
+    const recSess = document.getElementById('kpiTotalReceptions')?.innerText || '0';
+    const unbPkg = document.getElementById('kpiTotalInvoice')?.innerText || '0';
+    const unbQty = document.getElementById('kpiUnboxTotalQty')?.innerText || '0';
+    const missPkg = document.getElementById('kpiTotalMissingPackages')?.innerText || '0';
+    const dmgPkg = document.getElementById('kpiTotalDamaged')?.innerText || '0';
+    const dmgPcs = document.getElementById('kpiTotalDamagedPcs')?.innerText || '0';
+    const itmQty = document.getElementById('kpiTotalItems')?.innerText || '0';
+    const goodPcs = document.getElementById('kpiTotalGoodPcs')?.innerText || '0';
+
     const period = activeDashboardDateFilter || 'Hari Ini';
+    const now = new Date();
+    const todayStr = now.toLocaleDateString('id-ID', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+    const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
-    const text = `📊 *LAPORAN PRODUKTIVITAS INBOUND RETURN IEG*\n` +
-        `📅 Periode: ${period}\n\n` +
-        `📦 Total Paket Diterima: ${rec} paket\n` +
-        `⏳ Total Paket Missing (Belum Unbox): ${miss} paket\n` +
-        `✅ Total Paket Received (Selesai Unbox): ${unb} paket\n` +
-        `⚠️ Total Paket Reject (Cacat/Rusak): ${dmg} paket\n` +
-        `🏷️ Total Unit Fisik Produk: ${itm} unit\n\n` +
-        `Sistem Inbound Return IEG - ${new Date().toLocaleDateString('id-ID')}`;
+    let text = `📊 *LAPORAN MONITORING INBOUND RETURN IEG*\n`;
+    text += `📅 *Periode:* ${period}\n`;
+    text += `🕒 *Waktu Update:* ${todayStr} ${timeStr} WIB\n`;
+    text += `📦 *1. RINGKASAN MONITORING PAKET*\n`;
+    text += `• *Total Paket Receiving:* ${recPkg} paket (${recSess} Surat Jalan Fisik)\n`;
+    text += `• *Paket Selesai Unboxing:* ${unbPkg} paket (${unbQty} Pcs Unit Fisik)\n`;
+    text += `• *Sisa Belum Unboxing:* ${missPkg} paket _(Antrean Real-time Gudang)_\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    text += `👥 *2. PROSES & PRODUKTIVITAS PIC INBOUND*\n`;
 
-    if (navigator.share) {
-        navigator.share({
-            title: 'Laporan Produktivitas Inbound Return',
-            text: text
-        }).catch(() => {});
+    const picList = data.pic_stats || [];
+    if (picList.length > 0) {
+        const sorted = [...picList].sort((a, b) => (b.total_processed || 0) - (a.total_processed || 0));
+        const totalProcessedAll = sorted.reduce((sum, item) => sum + (item.total_processed || 0), 0) || 1;
+
+        sorted.forEach((pic, i) => {
+            const numEmoji = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'][i] || `*#${i + 1}*`;
+            const name = pic.pic_name || 'Petugas Inbound';
+            const recCount = (pic.receiving_packages || 0).toLocaleString('id-ID');
+            const recSessCount = (pic.receiving_sessions || 0).toLocaleString('id-ID');
+            const unboxCount = (pic.unboxing_packages || 0).toLocaleString('id-ID');
+            const unboxItems = (pic.unboxing_items || 0).toLocaleString('id-ID');
+            const totProcessed = (pic.total_processed || 0).toLocaleString('id-ID');
+            const pct = Math.round(((pic.total_processed || 0) / totalProcessedAll) * 100);
+
+            text += `\n${numEmoji} *${name}* (${pct}% Kontribusi)\n`;
+            if ((pic.receiving_packages || 0) > 0) {
+                text += `   📥 Receiving : ${recCount} paket (${recSessCount} Surat Jalan)\n`;
+            }
+            if ((pic.unboxing_packages || 0) > 0) {
+                text += `   ✂️ Unboxing  : ${unboxCount} paket (${unboxItems} pcs fisik)\n`;
+            }
+            text += `   📊 Total Diproses: ${totProcessed} paket\n`;
+        });
     } else {
+        text += `_(Belum ada catatan aktivitas petugas pada periode tanggal ini)_\n`;
+    }
+
+    text += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    text += `🏢 *Sistem Monitoring Inbound Return IEG*`;
+
+    // Otomatis salin ke clipboard
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).catch(() => {});
+    }
+
+    // Tampilkan modal preview share yang cantik
+    showShareReportModal(text, period);
+};
+
+// Modal Preview & Aksi Share Report
+function showShareReportModal(text, period) {
+    let modal = document.getElementById('modalShareReportPreview');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modalShareReportPreview';
+        modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-200';
+        document.body.appendChild(modal);
+    }
+
+    modal.innerHTML = `
+        <div class="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150">
+            <!-- Modal Header -->
+            <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm shadow-2xs border border-indigo-100">
+                        <i class="fa-solid fa-share-nodes"></i>
+                    </span>
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800">Bagikan Laporan Produktivitas Inbound</h3>
+                        <p class="text-[11px] text-slate-500">Periode: <b class="text-indigo-600">${escapeHtml(period)}</b> • Lengkap dengan Proses PIC</p>
+                    </div>
+                </div>
+                <button onclick="closeShareReportModal()" class="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200 flex items-center justify-center transition cursor-pointer">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body (Preview Box) -->
+            <div class="p-5 overflow-y-auto space-y-3 flex-1 bg-slate-50/30">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                        <i class="fa-solid fa-file-lines text-indigo-500"></i> Preview Pesan Laporan (WhatsApp / Telegram)
+                    </span>
+                    <span class="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1">
+                        <i class="fa-solid fa-check"></i> Siap Dibagikan
+                    </span>
+                </div>
+                <div class="relative group">
+                    <textarea id="shareReportTextarea" readonly class="w-full h-72 p-3.5 bg-slate-900 text-emerald-400 font-mono text-xs rounded-xl border border-slate-800 shadow-inner focus:outline-none select-all resize-none leading-relaxed">${escapeHtml(text)}</textarea>
+                </div>
+                <p class="text-[11px] text-slate-500">
+                    <i class="fa-solid fa-circle-info text-indigo-500 mr-1"></i> Teks di atas otomatis disalin ke clipboard Anda dan siap di-paste (Ctrl + V) ke WhatsApp / Telegram grup manajemen.
+                </p>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-5 py-3.5 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+                <button type="button" onclick="closeShareReportModal()" class="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer">
+                    Tutup
+                </button>
+                <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <button type="button" onclick="copyShareReportText()" class="w-full sm:w-auto px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition flex items-center justify-center gap-1.5 cursor-pointer">
+                        <i class="fa-regular fa-copy text-xs"></i>
+                        <span>Salin Teks</span>
+                    </button>
+                    <button type="button" onclick="shareToWhatsAppDirect()" class="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/30 transition flex items-center justify-center gap-1.5 cursor-pointer">
+                        <i class="fa-brands fa-whatsapp text-sm"></i>
+                        <span>Kirim WhatsApp</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    modal.classList.remove('hidden');
+    showToast('success', 'Teks laporan telah disalin ke clipboard!', 'Laporan Siap');
+}
+
+window.closeShareReportModal = function() {
+    const modal = document.getElementById('modalShareReportPreview');
+    if (modal) modal.classList.add('hidden');
+};
+
+window.copyShareReportText = function() {
+    const ta = document.getElementById('shareReportTextarea');
+    if (ta) {
+        ta.select();
         if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(() => {
-                showToast('success', 'Ringkasan laporan produktivitas berhasil disalin ke clipboard!', 'Laporan Disalin');
-            }).catch(() => {
-                prompt('Salin teks laporan berikut:', text);
+            navigator.clipboard.writeText(ta.value).then(() => {
+                showToast('success', 'Teks laporan berhasil disalin ke clipboard!', 'Tersalin');
             });
         } else {
-            prompt('Salin teks laporan berikut:', text);
+            document.execCommand('copy');
+            showToast('success', 'Teks laporan berhasil disalin!', 'Tersalin');
         }
     }
+};
+
+window.shareToWhatsAppDirect = function() {
+    const ta = document.getElementById('shareReportTextarea');
+    const text = ta ? ta.value : '';
+    const encoded = encodeURIComponent(text);
+    window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
 };
 
 // Visualisasi Chart per Ekspedisi Total Paket (Receiving Fisik vs Unboxing Terproses)
@@ -719,12 +1019,22 @@ function renderDashExpeditionTable(list) {
 
 const COND_COLOR = {
     GOOD: { dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    DAMAGED: { dot: 'bg-red-500', badge: 'bg-red-50 text-red-700 border-red-200' },
+    BAGUS: { dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    BAIK: { dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    DAMAGED: { dot: 'bg-rose-500', badge: 'bg-rose-50 text-rose-700 border-rose-200' },
+    RUSAK: { dot: 'bg-rose-500', badge: 'bg-rose-50 text-rose-700 border-rose-200' },
+    'RUSAK TOTAL': { dot: 'bg-rose-600', badge: 'bg-rose-50 text-rose-700 border-rose-200' },
+    'RUSAK KEMASAN': { dot: 'bg-amber-500', badge: 'bg-amber-50 text-amber-700 border-amber-200' },
     MISSING: { dot: 'bg-amber-500', badge: 'bg-amber-50 text-amber-700 border-amber-200' },
     EXPIRED: { dot: 'bg-orange-500', badge: 'bg-orange-50 text-orange-700 border-orange-200' },
     WRONG: { dot: 'bg-purple-500', badge: 'bg-purple-50 text-purple-700 border-purple-200' },
+    'ISI SALAH': { dot: 'bg-purple-500', badge: 'bg-purple-50 text-purple-700 border-purple-200' },
+    'SALAH_KIRIM': { dot: 'bg-purple-500', badge: 'bg-purple-50 text-purple-700 border-purple-200' },
 };
-function getCondColor(code) { return COND_COLOR[code?.toUpperCase()] || { dot: 'bg-slate-400', badge: 'bg-slate-100 text-slate-600 border-slate-200' }; }
+function getCondColor(code) { 
+    const key = (code || '').toUpperCase().trim();
+    return COND_COLOR[key] || { dot: 'bg-slate-400', badge: 'bg-slate-100 text-slate-600 border-slate-200' }; 
+}
 
 function renderDashConditionBreakdown(byCondition) {
     const container = document.getElementById('dashConditionContainer');
@@ -744,26 +1054,114 @@ function renderChart(good, damaged) { renderRatioChart(good, damaged); }
 let cachedTransactions = [];
 let flatpickrInstance = null;
 
-// Helper Format Tanggal & Jam Bahasa Indonesia yang Premium
+// Nama Hari & Bulan Bahasa Indonesia Standar
+const INDO_MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+const INDO_MONTHS_FULL  = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+const INDO_DAYS_SHORT   = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+const INDO_DAYS_FULL    = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+
+/**
+ * Parsing datetime string secara aman (MySQL YYYY-MM-DD HH:mm:ss, ISO, Date object, dsb)
+ */
+function parseDateParts(dateVal) {
+    if (!dateVal) return null;
+    if (dateVal instanceof Date) {
+        if (isNaN(dateVal.getTime())) return null;
+        return {
+            year: dateVal.getFullYear(),
+            month: dateVal.getMonth(),
+            day: dateVal.getDate(),
+            hour: dateVal.getHours(),
+            minute: dateVal.getMinutes(),
+            second: dateVal.getSeconds(),
+            dayOfWeek: dateVal.getDay(),
+            hasTime: true
+        };
+    }
+    const str = String(dateVal).trim();
+    if (!str || str === '-' || str === '0000-00-00' || str === '0000-00-00 00:00:00') return null;
+
+    // Pattern YYYY-MM-DD HH:mm:ss atau YYYY-MM-DD
+    const m = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[T\s](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+    if (m) {
+        const year = parseInt(m[1], 10);
+        const month = parseInt(m[2], 10) - 1;
+        const day = parseInt(m[3], 10);
+        const hour = m[4] !== undefined ? parseInt(m[4], 10) : 0;
+        const minute = m[5] !== undefined ? parseInt(m[5], 10) : 0;
+        const second = m[6] !== undefined ? parseInt(m[6], 10) : 0;
+        const d = new Date(year, month, day, hour, minute, second);
+        return {
+            year,
+            month,
+            day,
+            hour,
+            minute,
+            second,
+            dayOfWeek: d.getDay(),
+            hasTime: m[4] !== undefined
+        };
+    }
+
+    const d = new Date(str);
+    if (isNaN(d.getTime())) return null;
+    return {
+        year: d.getFullYear(),
+        month: d.getMonth(),
+        day: d.getDate(),
+        hour: d.getHours(),
+        minute: d.getMinutes(),
+        second: d.getSeconds(),
+        dayOfWeek: d.getDay(),
+        hasTime: true
+    };
+}
+
+/**
+ * Format tanggal ke format Bahasa Indonesia
+ * Contoh hasil: "11 Okt 2026, 09:54 WIB" atau "11 Okt 2026"
+ */
+function formatDateIndonesia(dateVal, options = {}) {
+    if (!dateVal) return '-';
+    const parts = parseDateParts(dateVal);
+    if (!parts) return String(dateVal || '-');
+
+    const monthFormat = options.monthFormat || 'short';
+    const monthName = (monthFormat === 'full') ? INDO_MONTHS_FULL[parts.month] : INDO_MONTHS_SHORT[parts.month];
+    const dayStr = String(parts.day).padStart(2, '0');
+    let res = `${dayStr} ${monthName} ${parts.year}`;
+
+    if (options.withDay) {
+        const dayName = (options.dayFormat === 'full') ? INDO_DAYS_FULL[parts.dayOfWeek] : INDO_DAYS_SHORT[parts.dayOfWeek];
+        res = `${dayName}, ${res}`;
+    }
+
+    const includeTime = (options.withTime !== undefined) ? options.withTime : (parts.hasTime ?? true);
+    if (includeTime) {
+        const h = String(parts.hour).padStart(2, '0');
+        const min = String(parts.minute).padStart(2, '0');
+        const wibSuffix = (options.suffixWib !== false) ? ' WIB' : '';
+        res += `, ${h}:${min}${wibSuffix}`;
+    }
+
+    return res;
+}
+window.formatDateIndonesia = formatDateIndonesia;
+
+// Helper Format Tanggal & Jam Bahasa Indonesia yang Premium untuk Kolom Tabel
 function formatDateTime(dateStr) {
     if (!dateStr) return { date: '-', time: '-' };
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return { date: dateStr, time: '' };
+    const parts = parseDateParts(dateStr);
+    if (!parts) return { date: String(dateStr || '-'), time: '-' };
 
-    const dateFormatted = d.toLocaleDateString('id-ID', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric'
-    });
-
-    const timeFormatted = d.toLocaleTimeString('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-    });
+    const dayStr = String(parts.day).padStart(2, '0');
+    const monthName = INDO_MONTHS_SHORT[parts.month];
+    const dateFormatted = `${dayStr} ${monthName} ${parts.year}`;
+    const timeFormatted = `${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`;
 
     return { date: dateFormatted, time: timeFormatted };
 }
+window.formatDateTime = formatDateTime;
 
 // Update UI Filter Tanggal Inbound Unboxing (Mandiri - Tidak Mirroring Dashboard)
 function updateInboundDateUI() {
@@ -781,15 +1179,25 @@ function updateDashboardDateUI() {
     const dbDateEl = document.getElementById('dashboardFilterDate');
     const dbClearBtn = document.getElementById('btnClearDashboardDate');
     const dbBadge = document.getElementById('dashboardDateBadge');
-    if (dbDateEl) dbDateEl.value = activeDashboardDateFilter;
+    if (dbDateEl && !flatpickrDashboardInstance) dbDateEl.value = activeDashboardDateFilter;
     if (dbClearBtn) {
         if (activeDashboardDateFilter) dbClearBtn.classList.remove('hidden');
         else dbClearBtn.classList.add('hidden');
     }
     if (dbBadge) {
+        const data = window.dashboardMetricsData;
+        const isAuto = data?.filter_info?.is_auto_filled;
         if (activeDashboardDateFilter) {
-            dbBadge.innerText = activeDashboardDateFilter;
-            dbBadge.className = 'bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200';
+            if (activeDashboardDateFilter === getTodayYMD()) {
+                dbBadge.innerText = 'Hari Ini (' + activeDashboardDateFilter + ')';
+                dbBadge.className = 'bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-indigo-200';
+            } else if (isAuto) {
+                dbBadge.innerText = 'Rentang Belum Unbox: ' + activeDashboardDateFilter;
+                dbBadge.className = 'bg-amber-50 text-amber-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-amber-300 shadow-2xs';
+            } else {
+                dbBadge.innerText = activeDashboardDateFilter;
+                dbBadge.className = 'bg-teal-50 text-teal-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-teal-200';
+            }
         } else {
             dbBadge.innerText = 'Hari Ini';
             dbBadge.className = 'bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-200';
@@ -846,7 +1254,7 @@ function initFlatpickr() {
         flatpickrDashboardInstance = flatpickr(dbEl, {
             mode: 'range',
             dateFormat: 'Y-m-d',
-            defaultDate: activeDashboardDateFilter || getTodayYMD(),
+            defaultDate: activeDashboardDateFilter || null,
             altInput: true,
             altFormat: 'j M Y',
             altInputClass: 'bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs transition w-full sm:w-64 cursor-pointer',
@@ -890,6 +1298,41 @@ window.clearDashboardDateFilter = function () {
     updateDashboardDateUI();
     updateBrowserUrl(false);
     loadMetrics();
+};
+
+// Terapkan rentang paket belum di-unboxing otomatis
+window.setDashboardUnboxedRange = function () {
+    const data = window.dashboardMetricsData;
+    if (data && data.unboxed_range && data.unboxed_range.start_date && data.unboxed_range.end_date) {
+        activeDashboardDateFilter = data.unboxed_range.date_str || `${data.unboxed_range.start_date} to ${data.unboxed_range.end_date}`;
+        if (flatpickrDashboardInstance) {
+            flatpickrDashboardInstance.setDate([data.unboxed_range.start_date, data.unboxed_range.end_date], false);
+        }
+        updateDashboardDateUI();
+        updateBrowserUrl(false);
+        loadMetrics();
+        if (typeof showToast === 'function') {
+            showToast('info', `Rentang tanggal paket belum di-unboxing diterapkan: ${activeDashboardDateFilter}`, 'Rentang Otomatis');
+        }
+    } else {
+        activeDashboardDateFilter = '';
+        loadMetrics();
+    }
+};
+
+// Terapkan filter khusus data hari ini
+window.setDashboardToday = function () {
+    const today = getTodayYMD();
+    activeDashboardDateFilter = today;
+    if (flatpickrDashboardInstance) {
+        flatpickrDashboardInstance.setDate([today, today], false);
+    }
+    updateDashboardDateUI();
+    updateBrowserUrl(false);
+    loadMetrics();
+    if (typeof showToast === 'function') {
+        showToast('info', `Filter tanggal hari ini diterapkan: ${today}`, 'Hari Ini');
+    }
 };
 
 // Refresh Metrik Dashboard di Backend
@@ -936,11 +1379,20 @@ async function loadTransactions() {
     if (expedition) url += `expedition=${encodeURIComponent(expedition)}&`;
     if (condition) url += `condition=${encodeURIComponent(condition)}&`;
     if (operator) url += `operator=${encodeURIComponent(operator)}&`;
-    if (!date && !search && !expedition && !condition && !operator) {
-        url += `limit=200&`;
-    }
 
     try {
+        if (!allConditions || allConditions.length === 0) {
+            try {
+                const cRes = await fetch('api/conditions.php');
+                if (cRes.ok) {
+                    allConditions = await cRes.json();
+                    if (typeof populateFilterConditionSelect === 'function') {
+                        populateFilterConditionSelect(allConditions);
+                    }
+                }
+            } catch (_) {}
+        }
+
         const res = await fetch(url);
         const rows = await res.json();
         cachedTransactions = Array.isArray(rows) ? rows : [];
@@ -1000,17 +1452,18 @@ function populateTransactionFilterDropdowns(rows) {
 function formatExpDate(val) {
     if (!val || val === '-' || val.trim() === '') return '-';
     const clean = val.trim();
-    if (/^\d{2}-\d{2}-\d{4}$/.test(clean)) return clean;
-    const parts = clean.split(/[-/]/);
-    if (parts.length === 3) {
-        if (parts[0].length === 4) {
-            return `${parts[2].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[0]}`;
-        } else if (parts[2].length === 4) {
-            return `${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[2]}`;
-        }
-    }
-    return clean;
+    return formatDateIndonesia(clean, { withTime: false });
 }
+
+// Helper pembersih barcode scanner raw (seperti QR SPX M={'k1':'','k2':...,'k5':'510044...'})
+function cleanBarcodeString(val) {
+    if (!val) return '';
+    const s = String(val).trim();
+    const m = s.match(/['"]?k5['"]?\s*:\s*['"]([^'"]+)['"]/i);
+    if (m) return m[1].trim();
+    return s;
+}
+window.cleanBarcodeString = cleanBarcodeString;
 
 function createTransactionRow(r, isPreview = false) {
     const tr = document.createElement('tr');
@@ -1018,36 +1471,62 @@ function createTransactionRow(r, isPreview = false) {
 
     const { date, time } = formatDateTime(r.created_at);
 
+    // Sanitasi raw string scanner
+    const displayInvoice = cleanBarcodeString(r.invoice_number);
+    r.invoice_number = displayInvoice;
+
     const expBadge = r.expedition ?
         `<span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-md font-semibold text-[11px] inline-flex items-center gap-1 whitespace-nowrap">
-            <i class="fa-solid fa-truck-fast text-[10px]"></i> ${r.expedition}
+            <i class="fa-solid fa-truck-fast text-[10px]"></i> ${escapeHtml(r.expedition)}
          </span>` :
         `<span class="text-slate-400 italic text-[11px]">-</span>`;
 
     // Seller SKU Badge
     const skuBadge = r.seller_sku ?
-        `<span class="font-mono font-bold text-indigo-700 bg-indigo-50/80 border border-indigo-200/80 px-2.5 py-1 rounded-lg text-xs inline-block tracking-tight">${r.seller_sku}</span>` :
+        `<span class="font-mono font-bold text-indigo-700 bg-indigo-50/80 border border-indigo-200/80 px-2.5 py-1 rounded-lg text-xs inline-block tracking-tight">${escapeHtml(r.seller_sku)}</span>` :
         `<span class="text-slate-400 font-mono text-xs italic">-</span>`;
 
-    // Type / Kondisi Dinamis dari Master Kondisi
-    const condCode = (r.raw_type || r.condition_type || 'GOOD').toUpperCase();
+    // Type / Kondisi Dinamis dari Master Kondisi & Fallback Kategori
+    const condCode = (r.raw_type || r.condition_type || 'GOOD').toUpperCase().trim();
+    const isGoodCond = ['GOOD', 'BAGUS', 'BAIK', 'NORMAL', 'SESUAI', 'OK', 'LAYAK'].includes(condCode);
+    const isKemasan = ['RUSAK KEMASAN', 'KEMASAN RUSAK', 'PENYOK', 'KEMASAN PENYOK'].includes(condCode);
+    const isSalahKirim = ['ISI SALAH', 'BARANG SALAH', 'SALAH KIRIM', 'SALAH_KIRIM', 'TIDAK SESUAI'].includes(condCode);
+    const isExpired = ['EXPIRED', 'KADALUARSA'].includes(condCode);
+
     const matchedCond = (typeof allConditions !== 'undefined' && Array.isArray(allConditions))
         ? allConditions.find(x => (x.code || '').toUpperCase() === condCode)
         : null;
 
     let typeBadge = '';
-    if (matchedCond) {
-        const clr = CONDITION_COLOR_MAP[matchedCond.color] || CONDITION_COLOR_MAP.slate;
-        typeBadge = `<span class="${clr.bg} ${clr.text} border ${clr.border} px-2.5 py-1 rounded-xl font-bold text-[10px] inline-flex items-center gap-1 shadow-2xs font-mono">
-            <i class="fa-solid fa-tag text-[9px]"></i> ${matchedCond.name}
+    if (isGoodCond) {
+        // Kondisi GOOD / BAGUS / BAIK selalu tampil HIJAU EMERALD dengan ikon centang
+        const condTitle = (matchedCond && matchedCond.name) ? matchedCond.name : (condCode === 'GOOD' ? 'BAGUS' : condCode);
+        typeBadge = `<span class="bg-emerald-50 text-emerald-700 border border-emerald-300 px-2.5 py-1 rounded-xl font-bold text-[10px] inline-flex items-center gap-1 shadow-2xs font-mono">
+            <i class="fa-solid fa-circle-check text-emerald-600 text-[10px]"></i> ${escapeHtml(condTitle)}
         </span>`;
-    } else if (condCode === 'GOOD') {
-        typeBadge = `<span class="bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-xl font-bold text-[10px] inline-flex items-center gap-1 shadow-2xs">
-            <i class="fa-solid fa-circle-check text-emerald-600"></i> GOOD
+    } else if (matchedCond) {
+        const clr = (typeof CONDITION_COLOR_MAP !== 'undefined' && CONDITION_COLOR_MAP[matchedCond.color])
+            ? CONDITION_COLOR_MAP[matchedCond.color]
+            : { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' };
+        const iconCls = isKemasan ? 'fa-box-open text-amber-600' : (isSalahKirim ? 'fa-shuffle text-purple-600' : (isExpired ? 'fa-calendar-xmark text-orange-600' : 'fa-triangle-exclamation text-rose-600'));
+        typeBadge = `<span class="${clr.bg} ${clr.text} border ${clr.border} px-2.5 py-1 rounded-xl font-bold text-[10px] inline-flex items-center gap-1 shadow-2xs font-mono">
+            <i class="fa-solid ${iconCls} text-[9px]"></i> ${escapeHtml(matchedCond.name)}
+        </span>`;
+    } else if (isKemasan) {
+        typeBadge = `<span class="bg-amber-50 text-amber-700 border border-amber-300 px-2.5 py-1 rounded-xl font-bold text-[10px] inline-flex items-center gap-1 shadow-2xs">
+            <i class="fa-solid fa-box-open text-amber-600 text-[9px]"></i> RUSAK KEMASAN
+        </span>`;
+    } else if (isSalahKirim) {
+        typeBadge = `<span class="bg-purple-50 text-purple-700 border border-purple-300 px-2.5 py-1 rounded-xl font-bold text-[10px] inline-flex items-center gap-1 shadow-2xs">
+            <i class="fa-solid fa-shuffle text-purple-600 text-[9px]"></i> ${escapeHtml(condCode)}
+        </span>`;
+    } else if (isExpired) {
+        typeBadge = `<span class="bg-orange-50 text-orange-700 border border-orange-300 px-2.5 py-1 rounded-xl font-bold text-[10px] inline-flex items-center gap-1 shadow-2xs">
+            <i class="fa-solid fa-calendar-xmark text-orange-600 text-[9px]"></i> EXPIRED
         </span>`;
     } else {
-        typeBadge = `<span class="bg-rose-100 text-rose-800 border border-rose-200 px-2.5 py-1 rounded-xl font-bold text-[10px] inline-flex items-center gap-1 shadow-2xs">
-            <i class="fa-solid fa-triangle-exclamation text-rose-600"></i> ${escapeHtml(condCode)}
+        typeBadge = `<span class="bg-rose-50 text-rose-700 border border-rose-300 px-2.5 py-1 rounded-xl font-bold text-[10px] inline-flex items-center gap-1 shadow-2xs">
+            <i class="fa-solid fa-triangle-exclamation text-rose-600 text-[9px]"></i> ${escapeHtml(condCode)}
         </span>`;
     }
 
@@ -1467,18 +1946,19 @@ window.viewDetails = async function (id, focusCondition) {
 
     const targetSessionId = r.session_id || r.id;
     currentModalSessionId = targetSessionId;
-    currentModalInvoice = r.invoice_number || '';
-    const condCode = (focusCondition || r.raw_type || r.condition_type || 'GOOD').toUpperCase();
+    currentModalInvoice = cleanBarcodeString(r.invoice_number || '');
+    const condCode = (focusCondition || r.raw_type || r.condition_type || 'GOOD').toUpperCase().trim();
+    const isGood = ['GOOD', 'BAGUS', 'BAIK', 'NORMAL', 'SESUAI', 'OK', 'LAYAK'].includes(condCode);
 
-    const initCond = (focusCondition || r.raw_type || r.condition_type || '').toUpperCase().trim();
-    const isInitGood = (initCond === 'GOOD' || initCond === 'BAGUS' || initCond === 'LAYAK' || initCond === '');
+    const initCond = condCode;
+    const isInitGood = isGood || initCond === '';
     const initQty = parseInt(r.total_qty || r.qty || 1, 10);
     const initGood = parseInt(r.total_good !== undefined ? r.total_good : (isInitGood ? initQty : 0), 10);
     const initDamaged = parseInt(r.total_damaged !== undefined ? r.total_damaged : (!isInitGood ? initQty : 0), 10);
 
-    document.getElementById('modalDetailInvoice').innerText = r.invoice_number;
+    document.getElementById('modalDetailInvoice').innerText = currentModalInvoice;
     document.getElementById('modalDetailExpedition').innerText = r.expedition || 'Reguler';
-    document.getElementById('modalDetailMeta').innerText = `Operator: ${r.operator_name} • ${new Date(r.created_at).toLocaleString('id-ID')}`;
+    document.getElementById('modalDetailMeta').innerText = `Operator: ${r.operator_name} • ${formatDateIndonesia(r.created_at, { withTime: true })}`;
     document.getElementById('modalTotalUnit').innerText = initQty;
     document.getElementById('modalTotalGood').innerText = initGood;
     document.getElementById('modalTotalDamaged').innerText = initDamaged;
@@ -1488,7 +1968,6 @@ window.viewDetails = async function (id, focusCondition) {
     const condBadge = document.getElementById('modalDetailConditionBadge');
     if (condBadge) {
         if (condCode) {
-            const isGood = condCode === 'GOOD';
             condBadge.className = isGood
                 ? "text-[10px] font-bold px-2.5 py-0.5 rounded-lg border font-mono shadow-2xs bg-emerald-50 text-emerald-700 border-emerald-300"
                 : "text-[10px] font-bold px-2.5 py-0.5 rounded-lg border font-mono shadow-2xs bg-rose-50 text-rose-700 border-rose-300";
@@ -1503,7 +1982,7 @@ window.viewDetails = async function (id, focusCondition) {
     const dmgAlert = document.getElementById('modalDetailDamageAlert');
     const dmgTxt = document.getElementById('modalDetailDamageText');
     if (dmgAlert && dmgTxt) {
-        const reason = r.damage_reason || (condCode !== 'GOOD' ? r.notes : '');
+        const reason = r.damage_reason || (!isGood ? r.notes : '');
         if (reason && reason.trim()) {
             dmgTxt.innerText = reason;
             dmgAlert.classList.remove('hidden');
@@ -1518,7 +1997,7 @@ window.viewDetails = async function (id, focusCondition) {
     const wmExp = document.getElementById('watermarkExpedition');
     if (wmExp) wmExp.innerText = `KURIR: ${r.expedition || 'Reguler'}`;
     const wmTime = document.getElementById('watermarkTime');
-    if (wmTime) wmTime.innerHTML = `<i class="fa-regular fa-clock text-indigo-400 mr-1"></i> ${new Date(r.created_at).toLocaleString('id-ID')} WIB`;
+    if (wmTime) wmTime.innerHTML = `<i class="fa-regular fa-clock text-indigo-400 mr-1"></i> ${formatDateIndonesia(r.created_at, { withTime: true })}`;
 
     // Setup Video Player
     const videoPlayer = document.getElementById('modalVideoPlayer');
@@ -2124,12 +2603,31 @@ window.exportDashboardExcel = async function () {
         const transList = await resTrans.json();
 
         const kpiData = [
-            { "Keterangan Indikator": "Total Invoice Terproses Hari Ini", "Nilai / Jumlah": kpi.total_invoices || 0 },
-            { "Keterangan Indikator": "Total Fisik Unit Masuk", "Nilai / Jumlah": kpi.total_items || 0 },
-            { "Keterangan Indikator": "Total Unit Layak (Good)", "Nilai / Jumlah": kpi.total_good || 0 },
-            { "Keterangan Indikator": "Total Unit Rusak / Defect", "Nilai / Jumlah": kpi.total_damaged || 0 },
-            { "Keterangan Indikator": "Waktu Download Laporan", "Nilai / Jumlah": new Date().toLocaleString('id-ID') }
+            { "Keterangan Indikator": "Periode Laporan", "Nilai / Jumlah": activeDashboardDateFilter || 'Hari Ini' },
+            { "Keterangan Indikator": "Total Paket Diterima (Receiving)", "Nilai / Jumlah": (kpi.total_received_packages || 0) + ' paket' },
+            { "Keterangan Indikator": "Total Surat Jalan Fisik", "Nilai / Jumlah": (kpi.total_receptions || 0) + ' surat jalan' },
+            { "Keterangan Indikator": "Sisa Paket Belum di-Unboxing", "Nilai / Jumlah": (kpi.total_missing_packages || 0) + ' paket' },
+            { "Keterangan Indikator": "Total Paket Selesai Unboxing", "Nilai / Jumlah": (kpi.total_invoices || 0) + ' paket' },
+            { "Keterangan Indikator": "Paket Baik / Restock", "Nilai / Jumlah": (kpi.total_good_packages || 0) + ' paket' },
+            { "Keterangan Indikator": "Paket Reject / Cacat", "Nilai / Jumlah": (kpi.total_damaged_packages || 0) + ' paket' },
+            { "Keterangan Indikator": "Total Unit Fisik Produk (Pcs)", "Nilai / Jumlah": (kpi.total_items || 0) + ' pcs' },
+            { "Keterangan Indikator": "Total Unit Fisik Baik (Good Pcs)", "Nilai / Jumlah": (kpi.total_good || 0) + ' pcs' },
+            { "Keterangan Indikator": "Total Unit Fisik Rusak (Reject Pcs)", "Nilai / Jumlah": (kpi.total_damaged || 0) + ' pcs' },
+            { "Keterangan Indikator": "Waktu Download Laporan", "Nilai / Jumlah": formatDateIndonesia(new Date(), { withTime: true }) }
         ];
+
+        const dailyData = (Array.isArray(kpi.daily_breakdown) ? kpi.daily_breakdown : []).map(d => ({
+            "Tanggal": formatDateIndonesia(d.date, { withDay: true, withTime: false }),
+            "Paket Diterima (Rcv)": d.received_packages || 0,
+            "Surat Jalan": d.total_receptions || 0,
+            "Sisa Belum Unbox": d.remaining_unboxed || 0,
+            "Paket Di-unboxing": d.unboxed_packages || 0,
+            "Paket Baik": d.good_packages || 0,
+            "Paket Reject": d.reject_packages || 0,
+            "Total Unit Fisik (Pcs)": d.total_pcs || 0,
+            "Pcs Baik": d.good_pcs || 0,
+            "Pcs Rusak": d.damaged_pcs || 0
+        }));
 
         const transData = (Array.isArray(transList) ? transList : []).map((r, i) => {
             const { date, time } = formatDateTime(r.created_at);
@@ -2151,10 +2649,14 @@ window.exportDashboardExcel = async function () {
         });
 
         hideGlobalLoading();
-        generateExcelFile([
-            { name: "Ringkasan KPI", data: kpiData },
-            { name: "Transaksi Terkini", data: transData }
-        ], "Laporan_Dashboard_Inbound");
+        const sheets = [
+            { name: "Ringkasan KPI", data: kpiData }
+        ];
+        if (dailyData.length > 0) {
+            sheets.push({ name: "Rekap Harian", data: dailyData });
+        }
+        sheets.push({ name: "Transaksi Terkini", data: transData });
+        generateExcelFile(sheets, "Laporan_Dashboard_Inbound");
 
     } catch (err) {
         hideGlobalLoading();
@@ -2546,7 +3048,7 @@ function renderUsersTable(list) {
             <td class="p-3 text-center">${roleBadge}</td>
             <td class="p-3 text-center font-mono font-bold text-slate-700 bg-slate-50/70">${u.pin || '-'}</td>
             <td class="p-3 text-center">${statusBadge}</td>
-            <td class="p-3 font-mono text-[11px] text-slate-500">${new Date(u.created_at).toLocaleDateString('id-ID')}</td>
+            <td class="p-3 font-mono text-[11px] text-slate-500">${formatDateIndonesia(u.created_at, { withTime: true })}</td>
             <td class="p-3 text-center">
                 <div class="flex items-center justify-center space-x-1.5">
                     <button onclick="editUser(${u.id})" title="Edit Pengguna" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2 py-1 rounded-lg text-xs font-semibold transition">
@@ -2993,6 +3495,16 @@ async function loadMaintenanceStatus() {
             if (elSess) elSess.innerText = data.tables.return_sessions || 0;
             if (elItem) elItem.innerText = data.tables.return_items || 0;
             if (elUser) elUser.innerText = data.tables.users || 0;
+
+            // Total baris migrasi
+            const badgeRows = document.getElementById('migrationTotalRowsBadge');
+            if (badgeRows) {
+                let total = 0;
+                for (const k in data.tables) {
+                    total += (Number(data.tables[k]) || 0);
+                }
+                badgeRows.innerText = total.toLocaleString('id-ID') + ' Baris Data';
+            }
         }
 
         // Pengaturan Rekening Bank untuk Invoice Klaim
@@ -3012,6 +3524,18 @@ async function loadMaintenanceStatus() {
         console.error("Gagal load status maintenance:", err);
     }
 }
+
+window.notifyDownloadStart = function (type) {
+    if (type === 'db_sql') {
+        showToast('info', 'Database sedang diekspor dan akan segera diunduh browser...', 'Mempersiapkan Database (.sql)');
+    } else if (type === 'db_zip') {
+        showToast('info', 'Database terkompresi ZIP sedang dibuat...', 'Mempersiapkan Database (.zip)');
+    } else if (type === 'app_zip') {
+        showToast('info', 'Paket sistem aplikasi & database terbaru sedang dikemas ke file ZIP...', 'Mengemas Paket Sistem');
+    } else if (type === 'full_zip') {
+        showToast('info', 'Mempersiapkan Full Backup Server (termasuk folder uploads)... Mohon tunggu hingga proses selesai.', 'Mengemas Full Server Backup');
+    }
+};
 
 window.saveBankSettings = async function (e) {
     if (e) e.preventDefault();
@@ -4007,7 +4531,7 @@ function renderReceivingTable(data) {
     const canDelete = (typeof window.IS_ADMIN !== 'undefined' || typeof window.IS_SUPER_ADMIN !== 'undefined') ? isAdmin : true;
 
     data.forEach((item, idx) => {
-        const timeStr = item.created_at || '-';
+        const timeStr = item.created_at ? formatDateIndonesia(item.created_at, { withTime: true }) : '-';
         rowsHtml += `
             <tr class="hover:bg-slate-50 transition border-b border-slate-100">
                 <td class="py-3 px-4 font-bold text-slate-400 text-center">${idx + 1}</td>
@@ -4278,7 +4802,7 @@ window.viewReceivingReceipt = async function (id) {
             const r = data.reception;
             document.getElementById('adminSlipReceiptNo').innerText = r.receipt_number || '-';
             document.getElementById('adminSlipExpedition').innerText = r.expedition || '-';
-            document.getElementById('adminSlipDateTime').innerText = r.created_at || '-';
+            document.getElementById('adminSlipDateTime').innerText = r.created_at ? formatDateIndonesia(r.created_at, { withTime: true }) : '-';
             document.getElementById('adminSlipCourier').innerText = r.courier_name || '-';
             const elSack = document.getElementById('adminSlipSackNumber');
             if (elSack) elSack.innerText = r.sack_number || '-';
@@ -4395,7 +4919,7 @@ window.viewReceivingPackagesList = async function (id) {
             if (titleEl) titleEl.innerText = `Detail History Receiving ${r.receipt_number}`;
 
             const subTitleEl = document.getElementById('pkgModalSubtitle');
-            if (subTitleEl) subTitleEl.innerText = `Petugas: ${r.operator_name || '-'} • Diterima: ${r.created_at || '-'}`;
+            if (subTitleEl) subTitleEl.innerText = `Petugas: ${r.operator_name || '-'} • Diterima: ${r.created_at ? formatDateIndonesia(r.created_at, { withTime: true }) : '-'}`;
 
             const rcptNoEl = document.getElementById('pkgModalReceiptNo');
             if (rcptNoEl) rcptNoEl.innerText = r.receipt_number || '-';
@@ -4404,7 +4928,7 @@ window.viewReceivingPackagesList = async function (id) {
             if (expCourEl) expCourEl.innerText = r.expedition || '-';
 
             const timeEl = document.getElementById('pkgModalTime');
-            if (timeEl) timeEl.innerText = r.created_at || '-';
+            if (timeEl) timeEl.innerText = r.created_at ? formatDateIndonesia(r.created_at, { withTime: true }) : '-';
 
             const totalEl = document.getElementById('pkgModalTotal');
             if (totalEl) totalEl.innerText = `${data.packages ? data.packages.length : (r.total_packages || 0)} Paket`;
@@ -5138,7 +5662,7 @@ window.copyClaimPacketSummary = function () {
         `• Status Unboxing        : ${unb.status || '-'} (${unb.total_damaged || 0} Rusak, ${unb.total_good || 0} Bagus)\n` +
         `• Video Unboxing Retur   : ${unb.video_path ? 'TEREKAM LENGKAP' : 'BELUM ADA'}\n` +
         `• Foto Bukti Fisik       : ${photos.length} foto tersedia\n` +
-        `Waktu Generate           : ${new Date().toLocaleString('id-ID')}\n` +
+        `Waktu Generate           : ${formatDateIndonesia(new Date(), { withTime: true })}\n` +
         `========================================`;
 
     navigator.clipboard.writeText(summary).then(() => {
@@ -5205,7 +5729,7 @@ window.printClaimDossier = function () {
                 </div>
             </div>
             <div style="text-align: right; font-size: 8.5pt; color: #64748b;">
-                Tanggal: <b>${new Date().toLocaleDateString('id-ID')}</b><br>
+                Tanggal: <b>${formatDateIndonesia(new Date(), { withTime: false, monthFormat: 'full' })}</b><br>
                 Status: <span class="badge-ok">VERIFIKASI SISTEM</span>
             </div>
         </div>
@@ -5671,9 +6195,9 @@ window.applyClaimCandidatesFilter = function () {
             `;
         }
 
-        const recvDate = c.receiving_at ? String(c.receiving_at).substring(0, 10) : '';
-        const unboxDate = c.created_at ? String(c.created_at).substring(0, 10) : '';
-        const dateSubtext = recvDate ? `<span class="block text-[9px] text-slate-400 font-mono mt-0.5">Recv: ${recvDate}</span>` : `<span class="block text-[9px] text-slate-400 font-mono mt-0.5">Unbox: ${unboxDate}</span>`;
+        const recvDate = c.receiving_at ? formatDateIndonesia(c.receiving_at, { withTime: false }) : '';
+        const unboxDate = c.created_at ? formatDateIndonesia(c.created_at, { withTime: false }) : '';
+        const dateSubtext = recvDate ? `<span class="block text-[9px] text-slate-400 font-mono mt-0.5">Recv: ${recvDate}</span>` : (unboxDate ? `<span class="block text-[9px] text-slate-400 font-mono mt-0.5">Unbox: ${unboxDate}</span>` : '');
 
         // Status Badge
         const stMain = (c.claim_status || 'PENDING').toUpperCase();
@@ -5745,7 +6269,7 @@ window.applyClaimCandidatesFilter = function () {
                 <td class="py-3 px-3 text-right whitespace-nowrap">
                     ${priceHtml}
                 </td>
-                <td class="py-3 px-3 text-slate-500 text-[11px] whitespace-nowrap">${escapeHtml(c.created_at || '-')}</td>
+                <td class="py-3 px-3 text-slate-600 text-[11px] whitespace-nowrap font-medium">${c.created_at ? formatDateIndonesia(c.created_at, { withTime: true }) : '<span class="text-slate-400 italic">-</span>'}</td>
                 <td class="py-3 px-3 text-center whitespace-nowrap">
                     ${statusColBadge}
                 </td>
@@ -6291,7 +6815,7 @@ function renderClaimDetailModalContent(data) {
     if (courierEl) courierEl.innerText = reception.courier_name ? `${reception.courier_name} (${reception.expedition || '-'})` : (unboxing.expedition || '-');
     if (receiptEl) receiptEl.innerText = reception.receipt_number ? `Surat Jalan: ${reception.receipt_number}` : 'Tanda Terima: -';
     if (opEl) opEl.innerText = `Petugas: ${unboxing.operator_name || 'Operator Gudang'}`;
-    if (unboxTimeEl) unboxTimeEl.innerText = unboxing.created_at || '-';
+    if (unboxTimeEl) unboxTimeEl.innerText = unboxing.created_at ? formatDateIndonesia(unboxing.created_at, { withTime: true }) : '-';
 
     // 4. Video Unboxing Player
     const videoEl = document.getElementById('mClaimVideoPlayer');
@@ -7615,8 +8139,8 @@ window.renderOrdersTable = function (orders, pagination) {
                 <td class="p-3 text-right">
                     <span class="font-mono font-black text-emerald-600 text-xs">${claimFmt}</span>
                 </td>
-                <td class="p-3 whitespace-nowrap text-slate-500 text-[11px]">
-                    ${orderDate}
+                <td class="p-3 whitespace-nowrap text-slate-600 font-mono text-[11px]">
+                    ${orderDate && orderDate !== '-' ? formatDateIndonesia(orderDate, { withTime: true }) : '<span class="text-slate-400 italic">-</span>'}
                 </td>
                 <td class="p-3 text-center whitespace-nowrap">
                     <div class="flex items-center justify-center gap-1.5">
@@ -7716,7 +8240,7 @@ window.openOrderDetailModal = async function (orderId) {
         const o = data.order;
         document.getElementById('dtlOrderId').innerText = o.order_id || '-';
         document.getElementById('dtlTrackingNo').innerText = o.tracking_number || '- Belum Ada -';
-        document.getElementById('dtlOrderDate').innerText = o.order_date || '-';
+        document.getElementById('dtlOrderDate').innerText = o.order_date ? formatDateIndonesia(o.order_date, { withTime: true }) : '-';
         document.getElementById('dtlPlatform').innerText = o.platform || '-';
         document.getElementById('dtlShop').innerText = o.shop_name || '-';
         document.getElementById('dtlShipping').innerText = o.shipping_provider || '-';
@@ -8051,7 +8575,7 @@ function renderJntClaimsTable() {
                     </div>
                 </td>
                 <td class="py-3 px-3.5 whitespace-nowrap">
-                    <div class="font-semibold text-slate-800 text-[11px]">${item.unboxing_date ? escapeHtml(item.unboxing_date.substring(0, 16)) : '-'}</div>
+                    <div class="font-semibold text-slate-800 text-[11px]">${item.unboxing_date ? formatDateIndonesia(item.unboxing_date, { withTime: true }) : '<span class="text-slate-400 italic">-</span>'}</div>
                     <div class="text-[10px] text-slate-400">Petugas: ${escapeHtml(item.operator_name || '-')}</div>
                 </td>
                 <td class="py-3 px-3.5">
@@ -8265,6 +8789,10 @@ window.rejectSingleJnt = rejectSingleJnt;
 // ==========================================
 let currentAgingPackages = [];
 let currentAgingSummary = {};
+let currentAgingPage = 1;
+let currentAgingLimit = 50;
+let totalAgingPages = 1;
+let totalAgingRecords = 0;
 let flatpickrAgingInstance = null;
 let agingSearchTimer = null;
 let activeAgingBarcode = null;
@@ -8321,7 +8849,8 @@ function resetAgingFilters() {
     const btnClear = document.getElementById('btnClearAgingDate');
     if (btnClear) btnClear.classList.add('hidden');
 
-    loadAgingReturnData();
+    currentAgingPage = 1;
+    loadAgingReturnData(true);
 }
 
 function debounceAgingSearch() {
@@ -8339,9 +8868,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Load Data Aging Return dari backend
-async function loadAgingReturnData(forceRefresh = false) {
+// Load Data Aging Return dari backend dengan Pagination Cepat & Ringan
+async function loadAgingReturnData(resetPage = false) {
     initAgingDatePicker();
+
+    if (resetPage) {
+        currentAgingPage = 1;
+    }
 
     const tbody = document.getElementById('agingReturnTableBody');
     const refreshIcon = document.getElementById('agingRefreshIcon');
@@ -8383,7 +8916,8 @@ async function loadAgingReturnData(forceRefresh = false) {
             aging_filter: agingFilter,
             date: dateVal,
             sort: sort,
-            limit: '500'
+            page: currentAgingPage,
+            limit: currentAgingLimit
         });
 
         const res = await fetch(`api/admin/aging_return.php?${queryParams.toString()}`);
@@ -8395,6 +8929,18 @@ async function loadAgingReturnData(forceRefresh = false) {
 
         currentAgingPackages = data.packages || [];
         currentAgingSummary = data.summary || {};
+        if (data.unboxed_range) {
+            window.agingUnboxedRange = data.unboxed_range;
+        }
+        const pagination = data.pagination || {
+            page: currentAgingPage,
+            limit: currentAgingLimit,
+            total_records: currentAgingSummary.total_packages || 0,
+            total_pages: 1
+        };
+
+        totalAgingPages = pagination.total_pages || 1;
+        totalAgingRecords = pagination.total_records || 0;
 
         // Update KPI Summary Cards
         const elTotal = document.getElementById('agingKpiTotal');
@@ -8433,7 +8979,8 @@ async function loadAgingReturnData(forceRefresh = false) {
             if (expedition) expSelect.value = expedition;
         }
 
-        renderAgingReturnTable(currentAgingPackages, currentAgingSummary);
+        renderAgingReturnTable(currentAgingPackages, currentAgingSummary, pagination);
+        renderAgingPaginationControls(pagination);
 
     } catch (err) {
         console.error('Error loadAgingReturnData:', err);
@@ -8453,10 +9000,148 @@ async function loadAgingReturnData(forceRefresh = false) {
     }
 }
 
-// Render data ke tabel Aging Return
-function renderAgingReturnTable(packages, summary) {
-    const tbody = document.getElementById('agingReturnTableBody');
+// Terapkan filter rentang tanggal paket yang belum di-unboxing pada modul Aging Return
+window.setAgingUnboxedRange = function() {
+    initAgingDatePicker();
+    const stEl = document.getElementById('agingStatusFilter');
+    if (stEl) stEl.value = 'BELUM_UNBOXING';
+    if (window.agingUnboxedRange && window.agingUnboxedRange.start_date && window.agingUnboxedRange.end_date) {
+        if (flatpickrAgingInstance) {
+            flatpickrAgingInstance.setDate([window.agingUnboxedRange.start_date, window.agingUnboxedRange.end_date], false);
+        }
+        const btnClear = document.getElementById('btnClearAgingDate');
+        if (btnClear) btnClear.classList.remove('hidden');
+    }
+    currentAgingPage = 1;
+    loadAgingReturnData(true);
+    if (typeof showToast === 'function') {
+        showToast('info', 'Filter otomatis diterapkan untuk paket yang belum di-unboxing.', 'Belum di Unboxing');
+    }
+};
+
+// Navigasi Pagination Aging Return
+window.goToAgingPage = function(page) {
+    if (page < 1 || page > totalAgingPages || page === currentAgingPage) return;
+    currentAgingPage = page;
+    loadAgingReturnData(false);
+};
+
+window.goToAgingPrevPage = function() {
+    if (currentAgingPage > 1) {
+        currentAgingPage--;
+        loadAgingReturnData(false);
+    }
+};
+
+window.goToAgingNextPage = function() {
+    if (currentAgingPage < totalAgingPages) {
+        currentAgingPage++;
+        loadAgingReturnData(false);
+    }
+};
+
+window.goToAgingLastPage = function() {
+    if (currentAgingPage !== totalAgingPages) {
+        currentAgingPage = totalAgingPages;
+        loadAgingReturnData(false);
+    }
+};
+
+window.changeAgingLimit = function(limit) {
+    currentAgingLimit = parseInt(limit) || 50;
+    currentAgingPage = 1;
+    loadAgingReturnData(false);
+};
+
+function renderAgingPaginationControls(pagination) {
     const infoEl = document.getElementById('agingTableCountInfo');
+    const numbersEl = document.getElementById('agingPaginationNumbers');
+    const btnFirst = document.getElementById('btnAgingFirst');
+    const btnPrev = document.getElementById('btnAgingPrev');
+    const btnNext = document.getElementById('btnAgingNext');
+    const btnLast = document.getElementById('btnAgingLast');
+    const limitSelect = document.getElementById('agingLimitSelect');
+
+    const totalRec = pagination.total_records || 0;
+    const page = pagination.page || currentAgingPage || 1;
+    const totalPages = pagination.total_pages || 1;
+    const startIdx = pagination.start_index || 0;
+    const endIdx = pagination.end_index || 0;
+
+    if (limitSelect && limitSelect.value != currentAgingLimit) {
+        limitSelect.value = currentAgingLimit;
+    }
+
+    if (infoEl) {
+        if (totalRec === 0) {
+            infoEl.innerHTML = `Menampilkan <b class="text-slate-800">0</b> data paket`;
+        } else {
+            infoEl.innerHTML = `Menampilkan <b class="text-slate-800">${startIdx.toLocaleString('id-ID')} - ${endIdx.toLocaleString('id-ID')}</b> dari <b class="text-teal-700 font-black">${totalRec.toLocaleString('id-ID')}</b> data paket (Hal. ${page} / ${totalPages})`;
+        }
+    }
+
+    if (btnFirst) btnFirst.disabled = (page <= 1);
+    if (btnPrev) btnPrev.disabled = (page <= 1);
+    if (btnNext) btnNext.disabled = (page >= totalPages);
+    if (btnLast) btnLast.disabled = (page >= totalPages);
+
+    if (numbersEl) {
+        numbersEl.innerHTML = '';
+        if (totalPages <= 1) return;
+
+        let startPage = Math.max(1, page - 2);
+        let endPage = Math.min(totalPages, page + 2);
+
+        if (page <= 3) {
+            endPage = Math.min(totalPages, 5);
+        } else if (page >= totalPages - 2) {
+            startPage = Math.max(1, totalPages - 4);
+        }
+
+        if (startPage > 1) {
+            const btn = document.createElement('button');
+            btn.className = 'w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 cursor-pointer shadow-2xs';
+            btn.innerText = '1';
+            btn.onclick = () => goToAgingPage(1);
+            numbersEl.appendChild(btn);
+
+            if (startPage > 2) {
+                const dots = document.createElement('span');
+                dots.className = 'px-1 text-slate-400 text-xs font-bold';
+                dots.innerText = '...';
+                numbersEl.appendChild(dots);
+            }
+        }
+
+        for (let p = startPage; p <= endPage; p++) {
+            const btn = document.createElement('button');
+            btn.className = (p === page)
+                ? 'w-8 h-8 rounded-lg text-xs font-black transition flex items-center justify-center bg-teal-600 text-white shadow-sm shadow-teal-600/30'
+                : 'w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 cursor-pointer shadow-2xs';
+            btn.innerText = p;
+            btn.onclick = () => goToAgingPage(p);
+            numbersEl.appendChild(btn);
+        }
+
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                const dots = document.createElement('span');
+                dots.className = 'px-1 text-slate-400 text-xs font-bold';
+                dots.innerText = '...';
+                numbersEl.appendChild(dots);
+            }
+            const btn = document.createElement('button');
+            btn.className = 'w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 cursor-pointer shadow-2xs';
+            btn.innerText = totalPages;
+            btn.onclick = () => goToAgingPage(totalPages);
+            numbersEl.appendChild(btn);
+        }
+    }
+}
+
+// Render data ke tabel Aging Return
+function renderAgingReturnTable(packages, summary, pagination = {}) {
+    const tbody = document.getElementById('agingReturnTableBody');
     if (!tbody) return;
 
     if (!packages || packages.length === 0) {
@@ -8469,13 +9154,11 @@ function renderAgingReturnTable(packages, summary) {
                 </td>
             </tr>
         `;
-        if (infoEl) infoEl.innerText = `Menampilkan 0 dari 0 data paket`;
         return;
     }
 
-    if (infoEl) {
-        infoEl.innerText = `Menampilkan ${packages.length.toLocaleString('id-ID')} data paket (Total Terpantau: ${(summary.total_packages || packages.length).toLocaleString('id-ID')})`;
-    }
+    const page = pagination.page || currentAgingPage || 1;
+    const limit = pagination.limit || currentAgingLimit || 50;
 
     let html = '';
     packages.forEach((pkg, index) => {
@@ -8507,8 +9190,15 @@ function renderAgingReturnTable(packages, summary) {
                </div>`;
 
         // Format dates
-        const recDateStr = pkg.receiving_at ? pkg.receiving_at.substring(0, 16) : '-';
-        const unboxDateStr = pkg.unboxing_at ? pkg.unboxing_at.substring(0, 16) : '<span class="text-amber-600 font-bold italic">- Menunggu -</span>';
+        const recDateStr = pkg.receiving_at ? formatDateIndonesia(pkg.receiving_at, { withTime: true }) : '<span class="text-slate-400 italic">-</span>';
+        let unboxDateStr = '';
+        if (pkg.unboxing_at) {
+            unboxDateStr = `<div class="font-semibold text-slate-800">${formatDateIndonesia(pkg.unboxing_at, { withTime: true })}</div>`;
+        } else {
+            unboxDateStr = `<span class="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-md text-[11px] font-semibold inline-flex items-center gap-1" title="Paket dalam antrean atau belum di-unboxing">
+                <i class="fa-solid fa-hourglass-start text-[10px] text-amber-600"></i> Belum Di-unboxing
+            </span>`;
+        }
 
         // Petugas
         const recOp = pkg.receiving_operator || '-';
@@ -8600,9 +9290,10 @@ function renderAgingReturnTable(packages, summary) {
             `;
         }
 
+        const rowNum = ((page - 1) * limit) + index + 1;
         html += `
             <tr class="hover:bg-teal-50/40 transition">
-                <td class="py-3 px-3.5 text-center text-slate-400 font-mono text-[11px]">${index + 1}</td>
+                <td class="py-3 px-3.5 text-center text-slate-400 font-mono text-[11px]">${rowNum}</td>
                 <td class="py-3 px-4 min-w-[210px]">
                     ${resiAndOrderHtml}
                 </td>
@@ -8716,7 +9407,7 @@ async function openAgingDetail(barcode) {
                         : 'Paket fisik telah diterima di area receiving gudang sejak ' + (pkg.receiving_at || 'tanggal scan') + ' dan saat ini sedang menunggu giliran proses unboxing.'}
                 </p>
                 <div class="flex items-center gap-2 pt-1 text-[11px] font-mono text-slate-600">
-                    <span class="bg-white/80 px-2 py-1 rounded border border-slate-200">1. Receiving (${pkg.receiving_at || '-'})</span>
+                    <span class="bg-white/80 px-2 py-1 rounded border border-slate-200">1. Receiving (${pkg.receiving_at ? formatDateIndonesia(pkg.receiving_at, { withTime: true }) : '-'})</span>
                     <i class="fa-solid fa-arrow-right text-slate-400"></i>
                     <span class="bg-amber-100 px-2 py-1 rounded border border-amber-300 font-bold text-amber-800">2. Menunggu Unboxing (${pkg.aging_days} Hari)</span>
                 </div>
@@ -8737,9 +9428,9 @@ async function openAgingDetail(barcode) {
                     Paket berhasil diselesaikan dari proses serah terima receiving sampai unboxing dalam waktu <strong>${pkg.aging_days} hari</strong>.
                 </p>
                 <div class="flex items-center gap-2 pt-1 text-[11px] font-mono text-slate-600">
-                    <span class="bg-white/80 px-2 py-1 rounded border border-slate-200">1. Receiving (${pkg.receiving_at || '-'})</span>
+                    <span class="bg-white/80 px-2 py-1 rounded border border-slate-200">1. Receiving (${pkg.receiving_at ? formatDateIndonesia(pkg.receiving_at, { withTime: true }) : '-'})</span>
                     <i class="fa-solid fa-arrow-right text-emerald-500"></i>
-                    <span class="bg-emerald-100 px-2 py-1 rounded border border-emerald-300 font-bold text-emerald-800">2. Unboxed (${pkg.unboxing_at || '-'})</span>
+                    <span class="bg-emerald-100 px-2 py-1 rounded border border-emerald-300 font-bold text-emerald-800">2. Unboxed (${pkg.unboxing_at ? formatDateIndonesia(pkg.unboxing_at, { withTime: true }) : '-'})</span>
                 </div>
             `;
         }
@@ -8759,7 +9450,7 @@ async function openAgingDetail(barcode) {
     if (elRecCour) elRecCour.innerText = pkg.courier_name || '-';
     if (elRecRcpt) elRecRcpt.innerText = pkg.receipt_number ? `SJ #${pkg.receipt_number}${pkg.receiving_sack ? ' (Karung: ' + pkg.receiving_sack + ')' : ''}` : '-';
     if (elRecOp) elRecOp.innerText = pkg.receiving_operator || '-';
-    if (elRecTime) elRecTime.innerText = pkg.receiving_at || '-';
+    if (elRecTime) elRecTime.innerText = pkg.receiving_at ? formatDateIndonesia(pkg.receiving_at, { withTime: true }) : '-';
 
     if (photoView) {
         if (pkg.receiving_photo) {
@@ -8837,7 +9528,7 @@ async function openAgingDetail(barcode) {
                         </div>
                         <div>
                             <span class="text-[10px] uppercase font-bold text-slate-400 block">Waktu Selesai</span>
-                            <div class="font-semibold text-slate-800">${pkg.unboxing_at || '-'}</div>
+                            <div class="font-semibold text-slate-800">${pkg.unboxing_at ? formatDateIndonesia(pkg.unboxing_at, { withTime: true }) : '-'}</div>
                         </div>
                     </div>
 
@@ -9077,59 +9768,96 @@ function openClaimDossierFromAging() {
     }
 }
 
-// Export Data Aging Return ke Excel (.xlsx) Native Bebas Corrupt
-function exportAgingReturnExcel() {
+// Export Data Aging Return ke Excel (.xlsx) dengan mengambil seluruh dataset secara aman
+async function exportAgingReturnExcel() {
     if (typeof XLSX === 'undefined') {
         showToast('error', 'Pustaka Excel belum siap. Silakan muat ulang halaman.', 'Gagal');
         return;
     }
 
-    if (!currentAgingPackages || currentAgingPackages.length === 0) {
-        showToast('warning', 'Tidak ada data Aging Return yang dapat diekspor.', 'Data Kosong');
-        return;
+    const search = (document.getElementById('agingSearchInput')?.value || '').trim();
+    const status = document.getElementById('agingStatusFilter')?.value || 'ALL';
+    const expedition = document.getElementById('agingExpeditionFilter')?.value || '';
+    const agingFilter = document.getElementById('agingCategoryFilter')?.value || 'ALL';
+    const sort = document.getElementById('agingSortOrder')?.value || 'fifo';
+
+    let dateVal = '';
+    if (flatpickrAgingInstance && flatpickrAgingInstance.selectedDates && flatpickrAgingInstance.selectedDates.length > 0) {
+        if (flatpickrAgingInstance.selectedDates.length === 2) {
+            const d1 = flatpickr.formatDate(flatpickrAgingInstance.selectedDates[0], 'Y-m-d');
+            const d2 = flatpickr.formatDate(flatpickrAgingInstance.selectedDates[1], 'Y-m-d');
+            dateVal = `${d1} to ${d2}`;
+        } else {
+            dateVal = flatpickr.formatDate(flatpickrAgingInstance.selectedDates[0], 'Y-m-d');
+        }
     }
 
-    const rows = currentAgingPackages.map((pkg, idx) => {
-        const isBelum = (pkg.status_paket === 'BELUM_UNBOXING');
-        const isCrit = (pkg.aging_days > 14);
+    showToast('info', 'Sedang memuat data Aging Return untuk diekspor ke Excel...', 'Mengunduh');
 
-        return {
-            'No': idx + 1,
-            'No. Resi / AWB': pkg.barcode || '',
-            'No. Order (OCS)': pkg.order_id || '-',
-            'Platform Marketplace': pkg.commerce_platform || '-',
-            'Toko / Shop': pkg.shop_name || '-',
-            'No. Invoice': pkg.invoice_number || '',
-            'Ekspedisi': pkg.expedition || '',
-            'Nama Kurir': pkg.courier_name || '-',
-            'Ada Foto Kurir': pkg.has_courier_photo ? 'YA' : 'TIDAK',
-            'Ada Foto Paket': pkg.has_package_photo ? 'YA' : 'TIDAK',
-            'No. Surat Jalan': pkg.receipt_number || '-',
-            'Tgl Receiving': pkg.receiving_at || '-',
-            'Petugas Receiving': pkg.receiving_operator || '-',
-            'Tgl Unboxing': pkg.unboxing_at || '-',
-            'Petugas Unboxing': pkg.unboxing_operator || '-',
-            'Status Paket': isBelum ? 'Belum di Unboxing' : 'Sudah di Unboxing',
-            'Lead Time (Aging Hari)': pkg.aging_days,
-            'Kategori Aging': isCrit ? 'Kritis (>14 Hari)' : 'Aman (<=14 Hari)',
-            'Total Item': pkg.total_items,
-            'Total Rusak': pkg.total_damaged,
-            'Video Unboxing': pkg.has_video ? 'Ada' : 'Tidak Ada',
-            'Link Video Unboxing': pkg.unboxing_video ? window.location.origin + '/' + pkg.unboxing_video : ''
-        };
-    });
+    try {
+        const queryParams = new URLSearchParams({
+            search: search,
+            status: status,
+            expedition: expedition,
+            aging_filter: agingFilter,
+            date: dateVal,
+            sort: sort,
+            export: '1'
+        });
 
-    const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-    const timeStr = now.toTimeString().slice(0, 5).replace(/:/g, '');
-    const fileName = `Aging_Return_Report_${dateStr}_${timeStr}.xlsx`;
+        const res = await fetch(`api/admin/aging_return.php?${queryParams.toString()}`);
+        const data = await res.json();
+        const exportPackages = data.packages || currentAgingPackages || [];
 
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Aging_Return");
-    XLSX.writeFile(wb, fileName);
+        if (exportPackages.length === 0) {
+            showToast('warning', 'Tidak ada data Aging Return yang dapat diekspor.', 'Data Kosong');
+            return;
+        }
 
-    showToast('success', `Berhasil mengekspor ${rows.length} data Aging Return ke ${fileName}!`, 'Export Berhasil');
+        const rows = exportPackages.map((pkg, idx) => {
+            const isBelum = (pkg.status_paket === 'BELUM_UNBOXING');
+            const isCrit = (pkg.aging_days > 14);
+
+            return {
+                'No': idx + 1,
+                'No. Resi / AWB': pkg.barcode || '',
+                'No. Order (OCS)': pkg.order_id || '-',
+                'Platform Marketplace': pkg.commerce_platform || '-',
+                'Toko / Shop': pkg.shop_name || '-',
+                'No. Invoice': pkg.invoice_number || '',
+                'Ekspedisi': pkg.expedition || '',
+                'Nama Kurir': pkg.courier_name || '-',
+                'Ada Foto Kurir': pkg.has_courier_photo ? 'YA' : 'TIDAK',
+                'Ada Foto Paket': pkg.has_package_photo ? 'YA' : 'TIDAK',
+                'No. Surat Jalan': pkg.receipt_number || '-',
+                'Tgl Receiving': pkg.receiving_at ? formatDateIndonesia(pkg.receiving_at, { withTime: true }) : '-',
+                'Petugas Receiving': pkg.receiving_operator || '-',
+                'Tgl Unboxing': pkg.unboxing_at ? formatDateIndonesia(pkg.unboxing_at, { withTime: true }) : (isBelum ? 'Belum Di-unboxing' : '-'),
+                'Petugas Unboxing': pkg.unboxing_operator || '-',
+                'Status Paket': isBelum ? 'Belum di Unboxing' : 'Sudah di Unboxing',
+                'Lead Time (Aging Hari)': pkg.aging_days,
+                'Kategori Aging': isCrit ? 'Kritis (>14 Hari)' : 'Aman (<=14 Hari)',
+                'Total Item': pkg.total_items,
+                'Total Rusak': pkg.total_damaged,
+                'Video Unboxing': pkg.has_video ? 'Ada' : 'Tidak Ada',
+                'Link Video Unboxing': pkg.unboxing_video ? window.location.origin + '/' + pkg.unboxing_video : ''
+            };
+        });
+
+        const now = new Date();
+        const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+        const timeStr = now.toTimeString().slice(0, 5).replace(/:/g, '');
+        const fileName = `Aging_Return_Report_${dateStr}_${timeStr}.xlsx`;
+
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Aging_Return");
+        XLSX.writeFile(wb, fileName);
+
+        showToast('success', `Berhasil mengekspor ${rows.length.toLocaleString('id-ID')} data Aging Return ke ${fileName}!`, 'Export Berhasil');
+    } catch (err) {
+        showToast('error', 'Gagal mengekspor data: ' + err.message, 'Gagal');
+    }
 }
 
 // Window global exports

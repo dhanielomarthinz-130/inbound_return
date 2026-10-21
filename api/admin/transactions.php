@@ -8,6 +8,16 @@ $expedition = trim($_GET['expedition'] ?? '');
 $condition  = trim($_GET['condition'] ?? '');
 $operator   = trim($_GET['operator'] ?? '');
 
+// Helper pembersih barcode scanner raw (seperti QR SPX M={'k1':'','k2':...,'k5':'510044...'})
+function cleanBarcodeString($val) {
+    if (empty($val)) return '';
+    $val = trim($val);
+    if (preg_match("/['\"]?k5['\"]?\s*:\s*['\"]([^'\"]+)['\"]/i", $val, $m)) {
+        return trim($m[1]);
+    }
+    return $val;
+}
+
 try {
     $sql = "
         SELECT 
@@ -32,7 +42,7 @@ try {
             i.qty,
             COALESCE(i.type, i.condition, 'GOOD') AS raw_type,
             CASE 
-                WHEN UPPER(COALESCE(i.type, i.condition, 'GOOD')) = 'GOOD' THEN 'GOOD'
+                WHEN UPPER(COALESCE(i.type, i.condition, 'GOOD')) IN ('GOOD', 'BAGUS', 'BAIK', 'NORMAL', 'SESUAI', 'OK', 'LAYAK') THEN 'GOOD'
                 ELSE 'RUSAK'
             END AS condition_type,
             i.damage_reason,
@@ -84,8 +94,14 @@ try {
     }
 
     if (!empty($condition)) {
-        $sql .= " AND UPPER(COALESCE(i.type, i.condition, 'GOOD')) = ?";
-        $params[] = strtoupper($condition);
+        $condUpper = strtoupper(trim($condition));
+        if (in_array($condUpper, ['GOOD', 'BAGUS', 'BAIK', 'LAYAK'])) {
+            $sql .= " AND (UPPER(COALESCE(i.type, i.condition, 'GOOD')) IN ('GOOD', 'BAGUS', 'BAIK', 'LAYAK') OR UPPER(i.condition) = 'GOOD')";
+        } else {
+            $sql .= " AND (UPPER(COALESCE(i.type, i.condition, 'GOOD')) = ? OR UPPER(i.type) = ?)";
+            $params[] = $condUpper;
+            $params[] = $condUpper;
+        }
     }
 
     if (!empty($operator)) {
@@ -105,6 +121,9 @@ try {
     $rows = $stmt->fetchAll();
 
     foreach ($rows as &$r) {
+        if (!empty($r['invoice_number'])) {
+            $r['invoice_number'] = cleanBarcodeString($r['invoice_number']);
+        }
         if (!empty($r['exp_date']) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', trim($r['exp_date']), $m)) {
             $r['exp_date'] = "{$m[3]}-{$m[2]}-{$m[1]}";
         }

@@ -93,12 +93,15 @@ Sistem ini didesain agar dapat diakses oleh banyak operator sekaligus melalui ja
 
 ## 🔐 Informasi Akun Resmi Sistem
 
-| No | Role / Hak Akses | Username | Password | PIN Operator | Keterangan |
-|:---:|:---|:---|:---|:---:|:---|
-| 1 | **Superadmin** | `Daniel` | `Dh@niel0` | - | Hak akses penuh: Master Ekspedisi, User, Mode Maintenance, Master Kondisi, Dashboard |
-| 2 | **Admin** | `Admin` | `Password01` | - | Hak akses monitoring: Dashboard, Master Produk, Ekspor Excel |
-| 3 | **Operator 1** | `Operator 1` | `Password01` | `123456` | Layar scanner barcode barang masuk & rekam video unboxing |
-| 4 | **Operator 2** | `Operator 2` | `Password01` | `123456` | Layar scanner barcode barang masuk & rekam video unboxing |
+| No | Role / Hak Akses | Username Default | Hak Akses & Keterangan |
+|:---:|:---|:---|:---|
+| 1 | **Superadmin** | `Daniel` | Hak akses penuh: Master Ekspedisi, User Management, Mode Maintenance, Master Kondisi, Dashboard |
+| 2 | **Admin** | `Admin` | Hak akses monitoring: Dashboard, Master Produk, Ekspor Excel |
+| 3 | **Operator 1** | `Operator 1` | Layar scanner barcode barang masuk & rekam video unboxing |
+| 4 | **Operator 2** | `Operator 2` | Layar scanner barcode barang masuk & rekam video unboxing |
+
+> [!NOTE]
+> Demi keamanan, password dan PIN akun diatur oleh Administrator pada menu **Master User** di dalam aplikasi atau melalui database lokal. Jangan membagikan atau mempublikasikan kredensial ke repositori publik.
 
 > [!TIP]
 > Pada halaman login operator, operator cukup memilih namanya dari menu dropdown **Pilih Operator Inbound** lalu memasukkan 6 angka PIN menggunakan tombol Numpad interaktif di layar.

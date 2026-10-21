@@ -52,12 +52,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if (!$user) {
                     $error = 'Akun Operator tidak ditemukan!';
-                } elseif (!in_array($user['role'], ['operator', 'operator_mobile'])) {
-                    $error = 'Akun ini bukan role Operator. Silakan login melalui Tab Admin.';
                 } elseif ($user['status'] !== 'ACTIVE') {
                     $error = 'Akun Anda sedang dinonaktifkan. Hubungi Admin Gudang.';
                 } else {
-                    // Verifikasi PIN
+                    // Verifikasi PIN atau Password
                     $isPinValid = false;
                     if (!empty($user['pin']) && $user['pin'] === $pin) {
                         $isPinValid = true;
@@ -73,7 +71,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'role' => $user['role']
                         ];
                         
-                        header('Location: ' . getAppBaseUrl() . 'menu');
+                        $isOp = in_array($user['role'], ['operator', 'operator_mobile']);
+                        $targetUrl = $isOp ? (getAppBaseUrl() . 'menu') : (getAppBaseUrl() . 'admin');
+                        header('Location: ' . $targetUrl);
                         exit;
                     } else {
                         $error = 'PIN yang Anda masukkan salah!';
@@ -85,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } else {
         // ==========================================
-        // PROSES LOGIN ADMIN (MENGGUNAKAN PASSWORD)
+        // PROSES LOGIN ADMIN (MENGGUNAKAN PASSWORD / PIN)
         // ==========================================
         $username = trim($_POST['username'] ?? '');
         $password = trim($_POST['password'] ?? '');
@@ -99,12 +99,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$username, strtolower($username), $cleanUser, strtolower($username)]);
                 $user = $stmt->fetch();
 
-                if ($user && (password_verify($password, $user['password']) || $password === $user['password'])) {
+                $isPassValid = false;
+                if ($user) {
+                    if (password_verify($password, $user['password']) || $password === $user['password']) {
+                        $isPassValid = true;
+                    } elseif (!empty($user['pin']) && $password === $user['pin']) {
+                        $isPassValid = true;
+                    }
+                }
+
+                if ($user && $isPassValid) {
                     if ($user['status'] !== 'ACTIVE') {
                         $error = 'Akun Anda sedang dinonaktifkan. Hubungi Superadmin.';
-                    } elseif (in_array($user['role'], ['operator', 'operator_mobile'])) {
-                        // Jika operator mencoba login di tab admin dengan password
-                        $error = 'Akun ini adalah Operator Inbound. Silakan gunakan Tab Operator untuk masuk dengan PIN.';
                     } else {
                         $_SESSION['user'] = [
                             'id' => $user['id'],
@@ -112,11 +118,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'name' => $user['name'],
                             'role' => $user['role']
                         ];
-                        header('Location: ' . getAppBaseUrl() . 'admin');
+                        $isOp = in_array($user['role'], ['operator', 'operator_mobile']);
+                        $targetUrl = $isOp ? (getAppBaseUrl() . 'menu') : (getAppBaseUrl() . 'admin');
+                        header('Location: ' . $targetUrl);
                         exit;
                     }
                 } else {
-                    $error = 'Username atau Password Admin salah!';
+                    $error = 'Username atau Password / PIN salah!';
                 }
             } catch (Exception $e) {
                 $error = 'Terjadi kesalahan sistem: ' . $e->getMessage();

@@ -95,7 +95,6 @@ if ($query === '' || $action === 'list_claimable') {
                      rp.scanned_at
             HAVING rs.total_damaged > 0 OR damaged_items_count > 0
             ORDER BY COALESCE(rp.scanned_at, rs.created_at) ASC, rs.id ASC
-            LIMIT 500
         ";
 
         $stmtDamaged = $pdo->query($sqlDamaged);

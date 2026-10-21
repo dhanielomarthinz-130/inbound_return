@@ -287,6 +287,10 @@ if (!$body || !is_array($body)) {
 
 $sessionUser   = getSessionUser();
 $invoiceNumber = trim($body['invoice_number'] ?? '');
+// Bersihkan jika scanner 2D membaca QR Shopee Express (SPX): M={'k1':'','k2':...,'k5':'510044...'}
+if (preg_match("/['\"]?k5['\"]?\s*:\s*['\"]([^'\"]+)['\"]/i", $invoiceNumber, $mSPX)) {
+    $invoiceNumber = trim($mSPX[1]);
+}
 $operatorName  = trim($body['operator_name'] ?? ($sessionUser['name'] ?? 'Gudang 01'));
 if (empty($operatorName)) $operatorName = $sessionUser['name'] ?? 'Gudang 01';
 $customerName  = trim($body['customer_name'] ?? 'Pelanggan Return');

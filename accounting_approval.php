@@ -273,6 +273,25 @@ exit;
     </div>
 
     <script>
+        const INDO_MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+        function formatDateIndonesia(dateVal, options = {}) {
+            if (!dateVal) return '-';
+            const str = String(dateVal).trim();
+            if (!str || str === '-' || str === '0000-00-00' || str === '0000-00-00 00:00:00') return '-';
+            const m = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[T\s](\d{1,2}):(\d{1,2}))?/);
+            if (m) {
+                const day = String(parseInt(m[3], 10)).padStart(2, '0');
+                const month = INDO_MONTHS_SHORT[parseInt(m[2], 10) - 1] || '';
+                const year = m[1];
+                let res = `${day} ${month} ${year}`;
+                if (options.withTime !== false && m[4] !== undefined) {
+                    res += `, ${String(parseInt(m[4], 10)).padStart(2, '0')}:${String(parseInt(m[5], 10)).padStart(2, '0')} WIB`;
+                }
+                return res;
+            }
+            return str;
+        }
+
         let allClaims = [];
         let currentStatusFilter = 'ALL';
         let currentSearchQuery = '';
@@ -438,7 +457,7 @@ exit;
                             </div>
                         </td>
                         <td class="py-3 px-3.5 whitespace-nowrap">
-                            <div class="font-semibold text-slate-800 text-[11px]">${item.unboxing_date ? item.unboxing_date.substring(0, 16) : '-'}</div>
+                            <div class="font-semibold text-slate-800 text-[11px]">${item.unboxing_date ? formatDateIndonesia(item.unboxing_date, { withTime: true }) : '<span class="text-slate-400 italic">-</span>'}</div>
                             <div class="text-[10px] text-slate-400">Petugas: ${item.operator_name || '-'}</div>
                         </td>
                         <td class="py-3 px-3.5">
