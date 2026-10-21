@@ -2,6 +2,7 @@
 chcp 65001 >nul
 title 3. Peluncur Server Inbound Return IEG
 color 0B
+setlocal enabledelayedexpansion
 
 :: Masuk ke folder root proyek (satu tingkat di atas server-tools)
 cd /d "%~dp0.."
@@ -26,6 +27,36 @@ if %errorlevel% neq 0 (
     )
 )
 
+:: 2. Periksa & Nyalakan Web Server Apache (Port 80 & 443)
+netstat -ano | findstr /r /c:":80 .*LISTENING" /c:":443 .*LISTENING" >nul 2>nul
+if %errorlevel% neq 0 (
+    echo [*] Apache belum berjalan. Mencoba menyalakan Apache...
+    sc query Apache24 >nul 2>&1
+    if %errorlevel% equ 0 (
+        net start Apache24 >nul 2>&1
+    )
+    :: Cek lagi apakah sudah aktif
+    netstat -ano | findstr /r /c:":80 .*LISTENING" /c:":443 .*LISTENING" >nul 2>nul
+    if %errorlevel% neq 0 (
+        :: Jalankan direct dari Laragon jika ada
+        if exist "C:\laragon\bin\apache" (
+            for /f "delims=" %%i in ('dir /b /s "C:\laragon\bin\apache\httpd.exe" 2^>nul') do (
+                start "Apache Web Server" /min "%%i"
+                timeout /t 2 >nul
+                goto :apache_checked
+            )
+        )
+    )
+)
+:apache_checked
+
+netstat -ano | findstr /r /c:":80 .*LISTENING" /c:":443 .*LISTENING" >nul 2>nul
+if %errorlevel% equ 0 (
+    echo [OK] Web Server Apache (HTTPS 443) AKTIF!
+) else (
+    echo [!] PERINGATAN: Apache belum aktif. Buka Laragon dan klik 'Start All' atau jalankan 'server-tools\DAFTARKAN_SERVICE_APACHE.bat'!
+)
+
 echo [*] Memeriksa database MySQL dan user resmi...
 %PHP_BIN% "api/migrate.php" >nul 2>nul
 if %errorlevel% equ 0 (
@@ -35,11 +66,15 @@ if %errorlevel% equ 0 (
 )
 echo.
 
-:: 2. Ambil IP Address PC Server di Jaringan Lokal (WiFi/LAN)
+:: 3. Ambil IP Address PC Server di Jaringan Lokal (WiFi/LAN)
 set LOCAL_IP=127.0.0.1
 for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4 Address" /c:"Alamat IPv4"') do (
-    set LOCAL_IP=%%a
-    goto :ip_found
+    set TMP_IP=%%a
+    set TMP_IP=!TMP_IP: =!
+    if not "!TMP_IP:~0,3!"=="127" if not "!TMP_IP:~0,7!"=="169.254" if not "!TMP_IP:~0,4!"=="100." (
+        set LOCAL_IP=%%a
+        goto :ip_found
+    )
 )
 :ip_found
 set LOCAL_IP=%LOCAL_IP: =%
@@ -48,16 +83,19 @@ set LOCAL_IP=%LOCAL_IP: =%
 for %%I in ("%CD%") do set FOLDER_NAME=%%~nxI
 
 echo ====================================================================
-echo                     PANDUAN ALAMAT AKSES URL
+echo                     PANDUAN ALAMAT AKSES URL (HTTPS)
 echo ====================================================================
 echo.
 echo  [A] Akses di PC Server ini:
-echo      - Scanner Operator : http://localhost/%FOLDER_NAME%/
-echo      - Admin Portal     : http://localhost/%FOLDER_NAME%/admin.php
+echo      - Login Utama      : https://localhost/%FOLDER_NAME%/login
+echo      - Scanner Operator : https://localhost/%FOLDER_NAME%/
+echo      - Admin Portal     : https://localhost/%FOLDER_NAME%/admin.php
 echo.
 echo  [B] Akses dari PC / HP / Barcode Scanner Lain (Satu Wi-Fi / LAN):
-echo      - Scanner Operator : http://%LOCAL_IP%/%FOLDER_NAME%/
-echo      - Admin Portal     : http://%LOCAL_IP%/%FOLDER_NAME%/admin.php
+echo      - Login Utama      : https://%LOCAL_IP%/%FOLDER_NAME%/login
+echo      - Scanner Operator : https://%LOCAL_IP%/%FOLDER_NAME%/
+echo      - Serah Terima     : https://%LOCAL_IP%/%FOLDER_NAME%/reception.php
+echo      - Admin Portal     : https://%LOCAL_IP%/%FOLDER_NAME%/admin.php
 echo.
 echo  [C] Akun Pengguna Resmi:
 echo      - Superadmin : Daniel      ^| Password : Dh@niel0
@@ -70,4 +108,5 @@ echo.
 echo Tekan tombol apa saja untuk membuka sistem di browser...
 pause >nul
 
-start http://localhost/%FOLDER_NAME%/
+start https://localhost/%FOLDER_NAME%/login
+

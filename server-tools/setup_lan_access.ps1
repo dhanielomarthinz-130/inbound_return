@@ -19,13 +19,17 @@ Get-NetConnectionProfile | Where-Object { $_.NetworkCategory -eq 'Public' } | Fo
     Write-Host "[OK] Profil jaringan '$($_.Name)' diubah: Public -> Private" -ForegroundColor Green
 }
 
-# 2. Buka port 80 (HTTP Apache/XAMPP) di Windows Firewall
-$ruleName = "Inbound Return - Apache HTTP 80"
-if (-not (Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue)) {
-    New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Protocol TCP -LocalPort 80 -Action Allow -Profile Domain,Private,Public | Out-Null
-    Write-Host "[OK] Firewall: port 80 dibuka" -ForegroundColor Green
+# 2. Buka port 80 dan 443 (HTTP & HTTPS Apache) di Windows Firewall
+$ruleName80 = "Inbound Return - Apache HTTP 80"
+if (-not (Get-NetFirewallRule -DisplayName $ruleName80 -ErrorAction SilentlyContinue)) {
+    New-NetFirewallRule -DisplayName $ruleName80 -Direction Inbound -Protocol TCP -LocalPort 80 -Action Allow -Profile Domain,Private,Public | Out-Null
+}
+$ruleName443 = "Inbound Return - Apache HTTPS 443"
+if (-not (Get-NetFirewallRule -DisplayName $ruleName443 -ErrorAction SilentlyContinue)) {
+    New-NetFirewallRule -DisplayName $ruleName443 -Direction Inbound -Protocol TCP -LocalPort 443 -Action Allow -Profile Domain,Private,Public | Out-Null
+    Write-Host "[OK] Firewall: port 80 & 443 (HTTPS) dibuka" -ForegroundColor Green
 } else {
-    Write-Host "[OK] Firewall: port 80 sudah terbuka" -ForegroundColor Green
+    Write-Host "[OK] Firewall: port 80 & 443 (HTTPS) sudah terbuka" -ForegroundColor Green
 }
 
 # Izinkan juga httpd.exe XAMPP / Laragon jika ada
@@ -44,19 +48,51 @@ Get-ChildItem "C:\laragon\bin\apache" -Recurse -Filter httpd.exe -ErrorAction Si
     }
 }
 
-# 3. Tampilkan link berbasis IP (lebih andal daripada nama komputer)
+# 3. Pasang & Jalankan Apache sebagai Windows Service (Anti-Putus, Auto-Restart jika crash)
+$apacheExes = Get-ChildItem "C:\laragon\bin\apache" -Recurse -Filter httpd.exe -ErrorAction SilentlyContinue
+if ($apacheExes) {
+    $httpdPath = $apacheExes[0].FullName
+    $srv = Get-Service -Name "Apache24" -ErrorAction SilentlyContinue
+    if (-not $srv) {
+        Write-Host "[*] Memasang Apache sebagai Windows Service (Apache24)..." -ForegroundColor Yellow
+        & $httpdPath -k install -n "Apache24"
+        sc.exe config Apache24 start= auto | Out-Null
+        sc.exe failure Apache24 reset= 0 actions= restart/3000/restart/3000/restart/3000 | Out-Null
+        Write-Host "[OK] Service Apache24 berhasil dipasang & auto-restart diaktifkan!" -ForegroundColor Green
+    } else {
+        sc.exe config Apache24 start= auto | Out-Null
+        sc.exe failure Apache24 reset= 0 actions= restart/3000/restart/3000/restart/3000 | Out-Null
+        Write-Host "[OK] Service Apache24 terdaftar (Startup: Otomatis, Auto-Restart: Aktif)" -ForegroundColor Green
+    }
+    
+    # Jalankan service Apache24 jika belum aktif
+    $srv = Get-Service -Name "Apache24" -ErrorAction SilentlyContinue
+    if ($srv -and $srv.Status -ne 'Running') {
+        Write-Host "[*] Menjalankan Service Apache24..." -ForegroundColor Yellow
+        Start-Service -Name "Apache24" -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 2
+    }
+}
+
+# 4. Tampilkan link berbasis IP (HTTPS wajib untuk kamera barcode HP)
 $ips = Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
     $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254*' -and $_.InterfaceAlias -notmatch 'vEthernet|VirtualBox|VMware|Loopback'
 }
 
 Write-Host ""
-Write-Host "Buka salah satu link ini dari laptop / HP lain (harus di jaringan WiFi/LAN kantor yang sama):" -ForegroundColor White
+Write-Host "================================================================================" -ForegroundColor Cyan
+Write-Host " LINK AKSES HTTPS RESMI (Bisa dibuka dari HP / Laptop di Wi-Fi kantor yang sama):" -ForegroundColor Green
+Write-Host "================================================================================" -ForegroundColor Cyan
 foreach ($ip in $ips) {
-    Write-Host ("   http://{0}/inbound_return/scanner   ({1})" -f $ip.IPAddress, $ip.InterfaceAlias) -ForegroundColor Yellow
+    Write-Host ("  [+] Login Utama  : https://{0}/inbound_return/login   ({1})" -f $ip.IPAddress, $ip.InterfaceAlias) -ForegroundColor Yellow
+    Write-Host ("      Scanner      : https://{0}/inbound_return/scanner" -f $ip.IPAddress) -ForegroundColor Gray
+    Write-Host ("      Receiving    : https://{0}/inbound_return/reception" -f $ip.IPAddress) -ForegroundColor Gray
+    Write-Host ("      Admin Portal : https://{0}/inbound_return/admin" -f $ip.IPAddress) -ForegroundColor Gray
+    Write-Host ""
 }
-Write-Host ""
 Write-Host "CATATAN:" -ForegroundColor White
-Write-Host " - Agar IP tidak berubah-ubah, minta IT set 'DHCP Reservation' / IP statis untuk PC server ini." -ForegroundColor Gray
-Write-Host " - Jika masih gagal: pastikan laptop TIDAK memakai WiFi Guest (Guest biasanya memblokir antar device)." -ForegroundColor Gray
+Write-Host " - Kamera barcode scanner HP membutuhkan HTTPS. Jika muncul peringatan SSL di HP, klik 'Lanjutkan (Advanced -> Proceed)'." -ForegroundColor Gray
+Write-Host " - Agar IP tidak berubah-ubah, minta tim IT mengunci IP PC ini (DHCP Reservation / Static IP)." -ForegroundColor Gray
+Write-Host "================================================================================" -ForegroundColor Cyan
 Write-Host ""
 Read-Host "Tekan Enter untuk keluar"
